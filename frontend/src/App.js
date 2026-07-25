@@ -1,54 +1,52 @@
-import { useEffect } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
+import { AuthProvider } from "@/context/AuthContext";
+import { Toaster } from "@/components/ui/sonner";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import AdminLayout from "@/components/layout/AdminLayout";
+import Login from "@/pages/Login";
+import Dashboard from "@/pages/Dashboard";
+import Leads from "@/pages/Leads";
+import LandingCMS from "@/pages/LandingCMS";
+import RolesPermissions from "@/pages/RolesPermissions";
+import Settings from "@/pages/Settings";
+import Placeholder from "@/pages/Placeholder";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+const PLACEHOLDER_PATHS = [
+  "analytics", "reports", "properties", "property-verification", "agents", "users",
+  "property-owners", "developers", "construction", "home-marketplace",
+  "transactions", "payments", "subscriptions", "messages", "notifications", "ai",
+];
 
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Navigate to="/admin" replace />} />
+              <Route path="/admin/login" element={<Login />} />
+              <Route
+                path="/admin"
+                element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="leads" element={<Leads />} />
+                <Route path="cms" element={<LandingCMS />} />
+                <Route path="roles" element={<RolesPermissions />} />
+                <Route path="settings" element={<Settings />} />
+                {PLACEHOLDER_PATHS.map((p) => (
+                  <Route key={p} path={p} element={<Placeholder />} />
+                ))}
+              </Route>
+              <Route path="*" element={<Navigate to="/admin" replace />} />
+            </Routes>
+          </BrowserRouter>
+          <Toaster position="top-right" richColors />
+        </AuthProvider>
+      </ThemeProvider>
     </div>
   );
 }
