@@ -4,6 +4,7 @@ import { Moon, Sun, Menu, X } from "lucide-react";
 import { useTheme } from "@/context/ThemeProvider";
 import { useLeadForm } from "@/context/LeadFormProvider";
 import { scrollToSection } from "@/context/SmoothScroll";
+import Logo from "@/components/Logo";
 
 const NAV = [
   { label: "Explore", target: "#showcase" },
@@ -40,11 +41,8 @@ export default function Navbar() {
           scrolled ? "glass-light border border-hairline shadow-soft" : "border border-transparent"
         }`}
       >
-        <button onClick={() => go("#top")} className="flex items-center gap-2" data-testid="logo">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-emerald text-white shadow-glow">
-            <span className="font-display text-lg font-black">A</span>
-          </span>
-          <span className="font-display text-xl font-bold tracking-tight text-ink">AMASS</span>
+        <button onClick={() => go("#top")} className="flex items-center" data-testid="logo">
+          <Logo pinSize={30} textClass="text-ink" />
         </button>
 
         <div className="hidden items-center gap-1 lg:flex">

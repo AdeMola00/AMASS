@@ -5,6 +5,7 @@ import { FOOTER_LINKS } from "@/data/content";
 import { subscribeNewsletter } from "@/lib/api";
 import { useLeadForm } from "@/context/LeadFormProvider";
 import { scrollToSection } from "@/context/SmoothScroll";
+import Logo from "@/components/Logo";
 
 const SOCIAL = [Twitter, Instagram, Linkedin, Facebook];
 
@@ -33,11 +34,8 @@ export default function Footer() {
       <div className="mx-auto max-w-[1400px] px-6 md:px-12">
         <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr]">
           <div>
-            <button onClick={() => scrollToSection("#top")} className="flex items-center gap-2">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-emerald text-white">
-                <span className="font-display text-lg font-black">A</span>
-              </span>
-              <span className="font-display text-2xl font-bold">AMASS</span>
+            <button onClick={() => scrollToSection("#top")} className="flex items-center">
+              <Logo pinSize={34} textClass="text-white" />
             </button>
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/60">
               Africa's intelligent property discovery, real estate, construction and home
