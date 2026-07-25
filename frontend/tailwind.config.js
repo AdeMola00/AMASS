@@ -60,7 +60,7 @@ module.exports = {
       boxShadow: {
         soft: '0 8px 32px rgba(17,17,17,0.06)',
         floating: '0 20px 60px -12px rgba(17,17,17,0.18)',
-        glow: '0 0 40px rgba(15,139,76,0.28)',
+        glow: '0 0 40px rgba(225,29,42,0.30)',
         gold: '0 0 32px rgba(212,175,55,0.30)',
       },
       keyframes: {

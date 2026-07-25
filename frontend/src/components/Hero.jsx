@@ -4,7 +4,6 @@ import { ArrowRight, ShieldCheck, Sparkles, Lock, MapPinned } from "lucide-react
 import { IMAGES, TRUST, MARKER_LEGEND } from "@/data/content";
 import { MarkerField } from "@/components/MapMarker";
 import { useLeadForm } from "@/context/LeadFormProvider";
-import { scrollToSection } from "@/context/SmoothScroll";
 import Magnetic from "@/components/anim/Magnetic";
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -103,8 +102,8 @@ export default function Hero() {
           transition={{ delay: 0.9, duration: 0.8 }}
           className="mt-6 max-w-xl text-base text-white/85 md:text-lg"
         >
-          Search, verify, buy, rent, finance and explore properties using intelligent maps,
-          verified listings and AI-powered property intelligence.
+          The AMASS app lets you search, verify, buy, rent, finance and explore properties with
+          intelligent maps, verified listings and AI-powered property intelligence.
         </motion.p>
 
         <motion.div
@@ -115,11 +114,11 @@ export default function Hero() {
         >
           <Magnetic>
             <button
-              onClick={() => scrollToSection("#showcase")}
-              data-testid="hero-explore-btn"
+              onClick={() => openForm("waiting_list")}
+              data-testid="hero-getapp-btn"
               className="group flex items-center gap-2 rounded-full bg-brand-emerald px-8 py-4 text-sm font-semibold text-white shadow-glow transition-transform hover:scale-[1.03]"
             >
-              Explore Properties
+              Get Early Access
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </button>
           </Magnetic>

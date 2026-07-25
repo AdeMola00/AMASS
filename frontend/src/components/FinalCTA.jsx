@@ -4,7 +4,6 @@ import { ArrowRight, Download } from "lucide-react";
 import { IMAGES } from "@/data/content";
 import { Reveal } from "@/components/anim/Reveal";
 import { useLeadForm } from "@/context/LeadFormProvider";
-import { scrollToSection } from "@/context/SmoothScroll";
 import Magnetic from "@/components/anim/Magnetic";
 
 export default function FinalCTA() {
@@ -33,11 +32,11 @@ export default function FinalCTA() {
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Magnetic>
                 <button
-                  onClick={() => scrollToSection("#showcase")}
+                  onClick={() => openForm("waiting_list")}
                   data-testid="final-explore-btn"
                   className="group flex items-center gap-2 rounded-full bg-brand-emerald px-9 py-4 text-sm font-semibold text-white shadow-glow transition-transform hover:scale-[1.03]"
                 >
-                  Explore Properties
+                  Get Early Access
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </button>
               </Magnetic>

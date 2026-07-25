@@ -11,43 +11,80 @@ const COLOR = {
   sold: "var(--m-sold)",
 };
 
-export default function MapMarker({ marker, index }) {
+// Glossy teardrop pin (matches the AMASS brand mark), tinted per status.
+function StatusPin({ color }) {
+  const gid = React.useId();
+  return (
+    <svg width="34" height="44" viewBox="0 0 48 60" fill="none" className="origin-bottom drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]">
+      <defs>
+        <radialGradient id={`${gid}-g`} cx="0.34" cy="0.26" r="0.6">
+          <stop stopColor="#FFFFFF" stopOpacity="0.85" />
+          <stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <path
+        d="M24 2C13.5 2 5 10.3 5 20.6c0 8.6 8.2 20.5 15.9 33.2a3.6 3.6 0 0 0 6.2 0C34.8 41.1 43 29.2 43 20.6 43 10.3 34.5 2 24 2Z"
+        fill={color}
+        stroke="rgba(255,255,255,0.85)"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M24 2C13.5 2 5 10.3 5 20.6c0 8.6 8.2 20.5 15.9 33.2a3.6 3.6 0 0 0 6.2 0C34.8 41.1 43 29.2 43 20.6 43 10.3 34.5 2 24 2Z"
+        fill={`url(#${gid}-g)`}
+      />
+      <circle cx="24" cy="20.5" r="7.6" fill="#FFFFFF" />
+    </svg>
+  );
+}
+
+export default function MapMarker({ marker }) {
   const [hover, setHover] = useState(false);
   const color = COLOR[marker.status];
-  // Cards near right edge open to the left
-  const rightSide = parseInt(marker.left) > 62;
+  const leftPct = parseInt(marker.left);
+
+  // Card horizontal alignment relative to the pin tip (the coordinate point).
+  let cardStyle = { left: "50%", transform: "translateX(-50%)" };
+  if (leftPct < 24) cardStyle = { left: 0 };
+  else if (leftPct > 60) cardStyle = { right: 0 };
 
   return (
     <motion.div
       className="absolute z-20"
       style={{ top: marker.top, left: marker.left }}
-      initial={{ opacity: 0, scale: 0, y: -20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ delay: marker.delay, duration: 0.6, ease: [0.16, 1, 0.3, 1], type: "spring", stiffness: 220, damping: 18 }}
+      initial={{ opacity: 0, y: -26, scale: 0.4 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay: marker.delay, duration: 0.7, ease: [0.16, 1, 0.3, 1], type: "spring", stiffness: 200, damping: 16 }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       data-testid={`map-marker-${marker.id}`}
     >
-      {/* Pin */}
-      <button className="relative -translate-x-1/2 -translate-y-1/2" aria-label={marker.title}>
-        <span
-          className="absolute inset-0 -z-10 rounded-full animate-ping-ring"
-          style={{ backgroundColor: color }}
-        />
-        <span
-          className="block h-4 w-4 animate-marker-pulse rounded-full ring-4 ring-white/70 dark:ring-white/20"
-          style={{ backgroundColor: color, boxShadow: `0 0 18px ${color}` }}
-        />
+      {/* Pulsing halo pinned to the ground point (tip) */}
+      <span
+        className="absolute left-0 top-0 h-4 w-4 -translate-x-1/2 -translate-y-1/2 animate-ping-ring rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      <span
+        className="absolute left-0 top-0 h-1.5 w-3 -translate-x-1/2 translate-y-0.5 rounded-[50%] bg-black/40 blur-[2px]"
+      />
+
+      {/* Pin — its pointed tip sits exactly on the coordinate */}
+      <button
+        className="absolute left-0 top-0 -translate-x-1/2 -translate-y-full animate-marker-pulse"
+        style={{ transformOrigin: "bottom center" }}
+        aria-label={marker.title}
+      >
+        <StatusPin color={color} />
       </button>
 
-      {/* Preview card */}
+      {/* Preview card floats above the pin */}
       <motion.div
         initial={false}
-        animate={hover ? { opacity: 1, y: 0, scale: 1, pointerEvents: "auto" } : { opacity: 0, y: 10, scale: 0.96, pointerEvents: "none" }}
+        animate={hover
+          ? { opacity: 1, y: 0, scale: 1, pointerEvents: "auto" }
+          : { opacity: 0, y: 8, scale: 0.96, pointerEvents: "none" }}
         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-        className={`absolute bottom-6 w-64 overflow-hidden rounded-3xl glass-light border border-white/20 shadow-floating ${
-          rightSide ? "right-0" : "left-0"
-        }`}
+        className="absolute w-64 overflow-hidden rounded-3xl glass-light border border-white/20 shadow-floating"
+        style={{ bottom: 56, ...cardStyle }}
         data-testid={`marker-card-${marker.id}`}
       >
         <div className="relative h-32 overflow-hidden">
@@ -85,8 +122,8 @@ export default function MapMarker({ marker, index }) {
 export function MarkerField() {
   return (
     <>
-      {MARKERS.map((m, i) => (
-        <MapMarker key={m.id} marker={m} index={i} />
+      {MARKERS.map((m) => (
+        <MapMarker key={m.id} marker={m} />
       ))}
     </>
   );

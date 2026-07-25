@@ -84,7 +84,7 @@ export default function PropertyShowcase() {
 
         <Reveal delay={0.1} className="mt-10">
           <button onClick={() => openForm("waiting_list")} data-testid="showcase-cta" className="rounded-full bg-brand-charcoal px-8 py-4 text-sm font-semibold text-white transition-transform hover:scale-[1.03] dark:bg-white dark:text-black">
-            See all 48,000+ listings
+            Browse 48,000+ listings in the app
           </button>
         </Reveal>
       </div>

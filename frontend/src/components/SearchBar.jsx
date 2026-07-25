@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { scrollToSection } from "@/context/SmoothScroll";
+import { useLeadForm } from "@/context/LeadFormProvider";
 
 const FIELDS = [
   { key: "location", label: "Location", icon: MapPin, placeholder: "Lagos, Abuja, Lekki…", type: "input" },
@@ -16,12 +16,13 @@ const FIELDS = [
 
 export default function SearchBar() {
   const [values, setValues] = useState({});
+  const { openForm } = useLeadForm();
 
   const search = () => {
-    toast.success("Searching verified listings…", {
-      description: `${values.location || "Lagos"} · ${values.type || "All types"} · ${values.budget || "Any budget"}`,
+    toast("The full search lives in the AMASS app", {
+      description: "Get early access and we'll notify you the moment it launches.",
     });
-    scrollToSection("#showcase");
+    openForm("waiting_list");
   };
 
   return (
@@ -78,6 +79,9 @@ export default function SearchBar() {
           <Search className="h-4 w-4" /> Search
         </button>
       </motion.div>
+      <p className="mt-4 text-center text-xs font-medium tracking-wide text-subtle" data-testid="search-caption">
+        A preview of the AMASS app experience — the full intelligent search lives in the app.
+      </p>
     </div>
   );
 }

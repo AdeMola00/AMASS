@@ -17,16 +17,16 @@ export function AmassPin({ size = 36, className = "" }) {
     >
       <defs>
         <linearGradient id={`${id}-body`} x1="10" y1="4" x2="38" y2="52" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#1FD07E" />
-          <stop offset="0.45" stopColor="#12B76A" />
-          <stop offset="1" stopColor="#0C703D" />
+          <stop stopColor="#FF6B6B" />
+          <stop offset="0.45" stopColor="#ED2029" />
+          <stop offset="1" stopColor="#B3141F" />
         </linearGradient>
         <radialGradient id={`${id}-gloss`} cx="0.35" cy="0.28" r="0.6">
           <stop stopColor="#FFFFFF" stopOpacity="0.85" />
           <stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0" />
         </radialGradient>
         <filter id={`${id}-shadow`} x="-40%" y="-20%" width="180%" height="150%">
-          <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#0C703D" floodOpacity="0.35" />
+          <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#B3141F" floodOpacity="0.35" />
         </filter>
       </defs>
 

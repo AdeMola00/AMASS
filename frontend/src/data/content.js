@@ -11,37 +11,37 @@ export const IMAGES = {
 // Hero map markers positioned over the aerial image (percentages).
 export const MARKERS = [
   {
-    id: "m1", status: "available", top: "28%", left: "22%", delay: 0.2,
+    id: "m1", status: "available", top: "44%", left: "57%", delay: 0.2,
     price: "₦185M", title: "4-Bed Waterfront Duplex", address: "Banana Island, Ikoyi",
     beds: 4, baths: 5, sqm: 420, type: "Duplex", verified: true,
     image: "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=800&auto=format&fit=crop",
   },
   {
-    id: "m2", status: "premium", top: "42%", left: "58%", delay: 0.8,
+    id: "m2", status: "premium", top: "52%", left: "69%", delay: 0.8,
     price: "₦420M", title: "Penthouse with Ocean View", address: "Eko Atlantic, VI",
     beds: 5, baths: 6, sqm: 610, type: "Penthouse", verified: true,
     image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=800&auto=format&fit=crop",
   },
   {
-    id: "m3", status: "verified", top: "60%", left: "34%", delay: 1.4,
+    id: "m3", status: "verified", top: "63%", left: "61%", delay: 1.4,
     price: "₦95M", title: "Smart 3-Bed Apartment", address: "Lekki Phase 1",
     beds: 3, baths: 3, sqm: 210, type: "Apartment", verified: true,
     image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=800&auto=format&fit=crop",
   },
   {
-    id: "m4", status: "coming_soon", top: "34%", left: "77%", delay: 2.0,
+    id: "m4", status: "coming_soon", top: "45%", left: "82%", delay: 2.0,
     price: "₦260M", title: "New Development · Terraces", address: "Ikate, Lekki",
     beds: 4, baths: 4, sqm: 340, type: "Terrace", verified: false,
     image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800&auto=format&fit=crop",
   },
   {
-    id: "m5", status: "sold", top: "66%", left: "68%", delay: 2.6,
+    id: "m5", status: "sold", top: "65%", left: "76%", delay: 2.6,
     price: "₦140M", title: "Detached Family Home", address: "Osborne, Ikoyi",
     beds: 4, baths: 4, sqm: 380, type: "Detached", verified: true,
     image: "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?q=80&w=800&auto=format&fit=crop",
   },
   {
-    id: "m6", status: "available", top: "50%", left: "14%", delay: 3.2,
+    id: "m6", status: "available", top: "56%", left: "52%", delay: 3.2,
     price: "₦72M", title: "Serviced Studio · Short Let", address: "Victoria Island",
     beds: 1, baths: 1, sqm: 65, type: "Studio", verified: true,
     image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=800&auto=format&fit=crop",
@@ -169,11 +169,11 @@ export const HOME_PRODUCTS = [
 ];
 
 export const TESTIMONIALS = [
-  { name: "Adebayo Ogunlesi", role: "Property Investor", quote: "AMASS turned a 3-month search into a weekend. The verification alone saved me from two fraudulent listings.", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop" },
-  { name: "Fatima Bello", role: "First-time Buyer", quote: "I bought my first apartment in Lekki entirely through AMASS. Escrow made the payment feel completely safe.", avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop" },
-  { name: "Chinedu Okafor", role: "Verified Agent", quote: "My leads tripled in the first month. The CRM and analytics are genuinely better than tools I paid for.", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&auto=format&fit=crop" },
-  { name: "Zainab Yusuf", role: "Developer", quote: "We sold out a 40-unit development off-plan using AMASS new-development tools. Remarkable reach.", avatar: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=400&auto=format&fit=crop" },
-  { name: "Emeka Nwankwo", role: "Construction Co.", quote: "Sourcing materials and vetted professionals in one marketplace cut our procurement time in half.", avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=400&auto=format&fit=crop" },
+  { name: "Adebayo Ogunlesi", role: "Property Investor", quote: "AMASS turned a 3-month search into a weekend. The verification alone saved me from two fraudulent listings.", avatar: "https://images.pexels.com/photos/36053652/pexels-photo-36053652.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
+  { name: "Fatima Bello", role: "First-time Buyer", quote: "I bought my first apartment in Lekki entirely through AMASS. Escrow made the payment feel completely safe.", avatar: "https://images.pexels.com/photos/5999896/pexels-photo-5999896.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
+  { name: "Chinedu Okafor", role: "Verified Agent", quote: "My leads tripled in the first month. The CRM and analytics are genuinely better than tools I paid for.", avatar: "https://images.pexels.com/photos/13801446/pexels-photo-13801446.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
+  { name: "Zainab Yusuf", role: "Developer", quote: "We sold out a 40-unit development off-plan using AMASS new-development tools. Remarkable reach.", avatar: "https://images.pexels.com/photos/5905901/pexels-photo-5905901.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
+  { name: "Emeka Nwankwo", role: "Construction Co.", quote: "Sourcing materials and vetted professionals in one marketplace cut our procurement time in half.", avatar: "https://images.pexels.com/photos/13801474/pexels-photo-13801474.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
 ];
 
 export const FAQS = [

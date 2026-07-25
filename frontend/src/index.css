@@ -7,8 +7,8 @@
 
 :root {
     /* AMASS brand tokens — light */
-    --amass-primary: #0F8B4C;
-    --amass-primary-hover: #0C703D;
+    --amass-primary: #E11D2A;
+    --amass-primary-hover: #B3141F;
     --amass-accent: #D4AF37;
     --amass-surface: #F7F8FA;
     --amass-text: #111111;
@@ -28,7 +28,7 @@
     --card-foreground: 0 0% 6%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 6%;
-    --primary: 152 82% 30%;
+    --primary: 356 76% 49%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 20% 97%;
     --secondary-foreground: 0 0% 9%;
@@ -40,13 +40,13 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 90%;
     --input: 0 0% 90%;
-    --ring: 152 82% 30%;
+    --ring: 356 76% 49%;
     --radius: 1rem;
 }
 
 .dark {
-    --amass-primary: #12B76A;
-    --amass-primary-hover: #0F8B4C;
+    --amass-primary: #FF4D4D;
+    --amass-primary-hover: #E11D2A;
     --amass-accent: #F5D061;
     --amass-surface: #111214;
     --amass-text: #FFFFFF;
@@ -65,8 +65,8 @@
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 6%;
     --popover-foreground: 0 0% 98%;
-    --primary: 152 82% 40%;
-    --primary-foreground: 0 0% 4%;
+    --primary: 356 90% 62%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 10%;
@@ -77,7 +77,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 15%;
     --input: 0 0% 16%;
-    --ring: 152 82% 40%;
+    --ring: 356 90% 62%;
 }
 
 @layer base {
