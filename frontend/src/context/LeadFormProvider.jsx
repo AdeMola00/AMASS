@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -128,6 +128,8 @@ export function LeadFormProvider({ children }) {
         >
           {config && (
             <div className="relative">
+              <DialogTitle className="sr-only">{config.title}</DialogTitle>
+              <DialogDescription className="sr-only">{config.subtitle}</DialogDescription>
               <button
                 onClick={close}
                 data-testid="lead-form-close"
