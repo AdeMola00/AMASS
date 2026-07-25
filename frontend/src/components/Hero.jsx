@@ -50,7 +50,7 @@ export default function Hero() {
           src={IMAGES.heroAerial}
           alt="Aerial view of Lagos, Nigeria"
           className="h-full w-full object-cover"
-          fetchpriority="high"
+          fetchPriority="high"
         />
       </motion.div>
       <motion.div
