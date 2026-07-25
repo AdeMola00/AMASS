@@ -13,7 +13,7 @@ const LINES = ["Discover Africa's", "Properties Like", "Never Before"];
 
 function MaskedHeading() {
   return (
-    <h1 className="font-display text-[3rem] font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-[5.5rem]">
+    <h1 className="font-display text-[2.6rem] font-extrabold leading-[0.98] tracking-tight text-white sm:text-6xl lg:text-[5.5rem]">
       {LINES.map((line, i) => (
         <span key={i} className="block overflow-hidden py-[0.05em]">
           <motion.span
@@ -59,11 +59,18 @@ export default function Hero() {
       />
       <div className="absolute inset-0 z-[1] bg-[radial-gradient(120%_80%_at_20%_10%,rgba(0,0,0,0.35),transparent)]" />
 
-      {/* Live markers */}
-      <div className="pointer-events-none absolute inset-0">
+      {/* Live markers (hidden on very small screens to keep hero text clean) */}
+      <div className="pointer-events-none absolute inset-0 hidden sm:block">
         <div className="pointer-events-auto absolute inset-0">
           <MarkerField />
         </div>
+      </div>
+
+      {/* Mobile-only floating pin accents (decorative, non-overlapping) */}
+      <div className="pointer-events-none absolute inset-0 sm:hidden" data-testid="hero-mobile-pins">
+        <span className="absolute right-6 top-[16%] h-3.5 w-3.5 animate-marker-pulse rounded-full ring-4 ring-white/50" style={{ backgroundColor: "var(--m-verified)" }} />
+        <span className="absolute right-16 top-[26%] h-3 w-3 animate-marker-pulse rounded-full ring-4 ring-white/40" style={{ backgroundColor: "var(--m-premium)" }} />
+        <span className="absolute left-8 top-[20%] h-3 w-3 animate-marker-pulse rounded-full ring-4 ring-white/40" style={{ backgroundColor: "var(--m-available)" }} />
       </div>
 
       {/* Legend */}
@@ -84,7 +91,7 @@ export default function Hero() {
       </motion.div>
 
       {/* Content */}
-      <div className="relative z-10 mx-auto flex h-full max-w-[1400px] flex-col justify-end px-6 pb-28 md:px-12 md:pb-32">
+      <div className="relative z-10 mx-auto flex h-full max-w-[1400px] flex-col justify-end px-6 pb-24 md:px-12 md:pb-32">
         <motion.p
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -110,23 +117,23 @@ export default function Hero() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.05, duration: 0.8 }}
-          className="mt-9 flex flex-wrap items-center gap-4"
+          className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4"
         >
-          <Magnetic>
+          <Magnetic className="w-full sm:w-auto">
             <button
               onClick={() => openForm("waiting_list")}
               data-testid="hero-getapp-btn"
-              className="group flex items-center gap-2 rounded-full bg-brand-emerald px-8 py-4 text-sm font-semibold text-white shadow-glow transition-transform hover:scale-[1.03]"
+              className="group flex w-full items-center justify-center gap-2 rounded-full bg-brand-emerald px-8 py-4 text-sm font-semibold text-white shadow-glow transition-transform hover:scale-[1.03] sm:w-auto"
             >
               Get Early Access
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </button>
           </Magnetic>
-          <Magnetic>
+          <Magnetic className="w-full sm:w-auto">
             <button
               onClick={() => openForm("become_agent")}
               data-testid="hero-agent-btn"
-              className="rounded-full border border-white/30 glass-dark px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white hover:text-black"
+              className="w-full rounded-full border border-white/30 glass-dark px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white hover:text-black sm:w-auto"
             >
               Become an Agent
             </button>

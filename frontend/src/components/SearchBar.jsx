@@ -26,7 +26,7 @@ export default function SearchBar() {
   };
 
   return (
-    <div className="relative z-40 mx-auto -mt-16 w-full max-w-[1100px] px-6">
+    <div className="relative z-40 mx-auto -mt-10 w-full max-w-[1100px] px-4 sm:-mt-16 sm:px-6">
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         whileInView={{ opacity: 1, y: 0 }}

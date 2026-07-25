@@ -10,12 +10,19 @@ export default function FinalCTA() {
   const { openForm } = useLeadForm();
   return (
     <section className="px-4 pb-4 md:px-6 md:pb-6">
-      <div className="relative mx-auto max-w-[1600px] overflow-hidden rounded-[2.5rem] bg-brand-charcoal py-24 md:py-40">
+      <div className="relative mx-auto max-w-[1600px] overflow-hidden rounded-[2.5rem] bg-brand-charcoal py-20 sm:py-24 md:py-40">
         <div className="absolute inset-0 opacity-30">
           <img src={IMAGES.heroAerial} alt="" className="h-full w-full object-cover" loading="lazy" />
         </div>
         <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/85" />
         <div className="absolute inset-0 grain opacity-10" />
+        <div className="pointer-events-none absolute inset-0 pattern-african opacity-[0.05]" />
+        {/* Pan-African tricolour accent */}
+        <div className="absolute inset-x-0 top-0 flex h-1.5">
+          <span className="flex-1 bg-[#0F8B4C]" />
+          <span className="flex-1 bg-brand-gold" />
+          <span className="flex-1 bg-[#E11D2A]" />
+        </div>
 
         <div className="relative mx-auto max-w-3xl px-6 text-center">
           <Reveal>

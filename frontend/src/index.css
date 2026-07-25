@@ -132,6 +132,20 @@
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Pan-African kente / adire-inspired woven accent (subtle) */
+    .pattern-african {
+        background-image:
+            linear-gradient(135deg, transparent 45%, rgba(212,175,55,0.5) 46%, rgba(212,175,55,0.5) 54%, transparent 55%),
+            linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.35) 46%, rgba(255,255,255,0.35) 54%, transparent 55%);
+        background-size: 26px 26px;
+    }
+    .pattern-diamonds {
+        background-image:
+            repeating-linear-gradient(45deg, rgba(212,175,55,0.35) 0 2px, transparent 2px 14px),
+            repeating-linear-gradient(-45deg, rgba(212,175,55,0.35) 0 2px, transparent 2px 14px);
+        background-size: 28px 28px;
+    }
 }
 
 html { scroll-behavior: auto; }

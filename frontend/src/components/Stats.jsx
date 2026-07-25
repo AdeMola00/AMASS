@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
-import { STATS } from "@/data/content";
+import { STATS, AFRICAN_CITIES } from "@/data/content";
 import { Reveal } from "@/components/anim/Reveal";
 
 const FEATURES = [
@@ -43,14 +43,15 @@ function CountUp({ value }) {
 
 export default function Stats() {
   return (
-    <section className="relative overflow-hidden bg-brand-emerald py-24 md:py-32" data-testid="stats">
+    <section className="relative overflow-hidden bg-brand-emerald py-16 sm:py-24 md:py-32" data-testid="stats">
       <div className="absolute inset-0 grain opacity-[0.15]" />
+      <div className="pointer-events-none absolute inset-0 pattern-african opacity-[0.07]" />
       <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
       <div className="relative mx-auto max-w-[1400px] px-6 md:px-12">
         <Reveal>
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/70">Why Choose AMASS</p>
           <h2 className="mt-4 max-w-3xl font-display text-4xl font-extrabold leading-tight tracking-tight text-white md:text-6xl">
-            Trusted by a nation. Built for a continent.
+            Built for Africa. Trusted across the continent.
           </h2>
         </Reveal>
 
@@ -78,6 +79,22 @@ export default function Stats() {
               {f}
             </span>
           ))}
+        </div>
+
+        {/* Pan-African coverage strip */}
+        <div className="mt-14 border-t border-white/15 pt-10" data-testid="africa-coverage">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-white/70">
+            <span className="h-2.5 w-2.5 animate-marker-pulse rounded-full bg-brand-gold" />
+            Live in 20+ cities across Africa
+          </p>
+          <div className="mt-5 flex flex-wrap gap-x-6 gap-y-3">
+            {AFRICAN_CITIES.map((c) => (
+              <span key={c} className="font-display text-lg font-bold text-white/85 sm:text-2xl">
+                {c}
+                <span className="ml-6 text-brand-gold/70">·</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </section>

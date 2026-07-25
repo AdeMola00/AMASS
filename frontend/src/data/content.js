@@ -116,9 +116,15 @@ export const STATS = [
   { value: "48,000+", label: "Properties Listed" },
   { value: "3,200+", label: "Verified Agents" },
   { value: "120k+", label: "Verified Documents" },
-  { value: "36 States", label: "Nationwide Coverage" },
+  { value: "20+", label: "Cities Across Africa" },
   { value: "0.4s", label: "Avg. Search Speed" },
   { value: "₦900B+", label: "Transactions Secured" },
+];
+
+// Pan-African coverage — cities AMASS is expanding across.
+export const AFRICAN_CITIES = [
+  "Lagos", "Abuja", "Accra", "Nairobi", "Kigali", "Cape Town",
+  "Kampala", "Dar es Salaam", "Dakar", "Addis Ababa", "Johannesburg", "Kumasi",
 ];
 
 export const PROPERTIES = [
@@ -169,15 +175,15 @@ export const HOME_PRODUCTS = [
 ];
 
 export const TESTIMONIALS = [
-  { name: "Adebayo Ogunlesi", role: "Property Investor", quote: "AMASS turned a 3-month search into a weekend. The verification alone saved me from two fraudulent listings.", avatar: "https://images.pexels.com/photos/36053652/pexels-photo-36053652.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
-  { name: "Fatima Bello", role: "First-time Buyer", quote: "I bought my first apartment in Lekki entirely through AMASS. Escrow made the payment feel completely safe.", avatar: "https://images.pexels.com/photos/5999896/pexels-photo-5999896.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
-  { name: "Chinedu Okafor", role: "Verified Agent", quote: "My leads tripled in the first month. The CRM and analytics are genuinely better than tools I paid for.", avatar: "https://images.pexels.com/photos/13801446/pexels-photo-13801446.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
-  { name: "Zainab Yusuf", role: "Developer", quote: "We sold out a 40-unit development off-plan using AMASS new-development tools. Remarkable reach.", avatar: "https://images.pexels.com/photos/5905901/pexels-photo-5905901.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
-  { name: "Emeka Nwankwo", role: "Construction Co.", quote: "Sourcing materials and vetted professionals in one marketplace cut our procurement time in half.", avatar: "https://images.pexels.com/photos/13801474/pexels-photo-13801474.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
+  { name: "Adebayo Ogunlesi", role: "Property Investor · Lagos", quote: "AMASS turned a 3-month search into a weekend. The verification alone saved me from two fraudulent listings.", avatar: "https://images.pexels.com/photos/36053652/pexels-photo-36053652.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
+  { name: "Ama Mensah", role: "First-time Buyer · Accra", quote: "I bought my first apartment in East Legon entirely through AMASS. Escrow made the payment feel completely safe.", avatar: "https://images.pexels.com/photos/5999896/pexels-photo-5999896.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
+  { name: "Chinedu Okafor", role: "Verified Agent · Abuja", quote: "My leads tripled in the first month. The CRM and analytics are genuinely better than tools I paid for.", avatar: "https://images.pexels.com/photos/13801446/pexels-photo-13801446.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
+  { name: "Wanjiru Kamau", role: "Developer · Nairobi", quote: "We sold out a 40-unit development off-plan using AMASS new-development tools. Remarkable reach across Africa.", avatar: "https://images.pexels.com/photos/5905901/pexels-photo-5905901.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
+  { name: "Emeka Nwankwo", role: "Construction Co. · Kigali", quote: "Sourcing materials and vetted professionals in one marketplace cut our procurement time in half.", avatar: "https://images.pexels.com/photos/13801474/pexels-photo-13801474.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop" },
 ];
 
 export const FAQS = [
-  { q: "Is AMASS available across Nigeria?", a: "Yes. AMASS covers all 36 states with the deepest inventory in Lagos, Abuja and Port Harcourt, expanding across Africa." },
+  { q: "Where is AMASS available across Africa?", a: "AMASS is live in 20+ cities with the deepest inventory in Lagos, Abuja, Accra and Nairobi — and expanding rapidly across the continent." },
   { q: "How does AMASS verify listings?", a: "Every listing passes document checks, ownership validation and agent identity verification before it earns a verified badge." },
   { q: "Are transactions safe?", a: "All payments can move through AMASS Escrow, so funds are only released when both parties meet agreed conditions." },
   { q: "What is AMASS Property Intelligence?", a: "It's our AI + satellite layer delivering valuations, neighbourhood scores, risk analysis and market predictions on any property." },

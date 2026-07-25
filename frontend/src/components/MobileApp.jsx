@@ -16,11 +16,11 @@ function Phone({ screen, index }) {
       whileInView={{ opacity: 1, y: screen.y, rotate: screen.rotate }}
       viewport={{ once: true }}
       transition={{ delay: index * 0.15, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-      className={`relative ${index === 1 ? "z-20" : "z-10"} animate-float`}
+      className={`relative ${index === 1 ? "z-20" : "z-10 hidden sm:block"} animate-float`}
       style={{ animationDelay: `${index * 0.6}s` }}
       data-testid={`phone-${screen.label.toLowerCase().replace(/\s/g, "-")}`}
     >
-      <div className="relative h-[460px] w-[224px] rounded-[2.6rem] border-[10px] border-brand-charcoal bg-brand-charcoal shadow-floating dark:border-[#22242a]">
+      <div className="relative h-[400px] w-[196px] rounded-[2.6rem] border-[10px] border-brand-charcoal bg-brand-charcoal shadow-floating dark:border-[#22242a] sm:h-[460px] sm:w-[224px]">
         <div className="absolute left-1/2 top-2.5 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-black" />
         <div className="relative h-full w-full overflow-hidden rounded-[2rem]">
           <img src={screen.img} alt={screen.label} loading="lazy" className="h-full w-full object-cover" />

@@ -30,12 +30,17 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-brand-charcoal pt-20 text-white" data-testid="footer">
+    <footer className="relative bg-brand-charcoal pt-20 text-white" data-testid="footer">
+      <div className="absolute inset-x-0 top-0 flex h-1.5">
+        <span className="flex-1 bg-[#0F8B4C]" />
+        <span className="flex-1 bg-brand-gold" />
+        <span className="flex-1 bg-[#E11D2A]" />
+      </div>
       <div className="mx-auto max-w-[1400px] px-6 md:px-12">
         <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr]">
           <div>
             <button onClick={() => scrollToSection("#top")} className="flex items-center">
-              <Logo pinSize={34} textClass="text-white" />
+              <Logo height={30} chip />
             </button>
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/60">
               Africa's intelligent property discovery, real estate, construction and home
