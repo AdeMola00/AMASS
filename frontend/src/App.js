@@ -1,55 +1,70 @@
-import { useEffect } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/context/ThemeProvider";
+import SmoothScroll from "@/context/SmoothScroll";
+import { LeadFormProvider } from "@/context/LeadFormProvider";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import Navbar from "@/components/Navbar";
+import Hero from "@/components/Hero";
+import SearchBar from "@/components/SearchBar";
+import CategorySection from "@/components/CategorySection";
+import Marquee from "@/components/Marquee";
+import Pillars from "@/components/Pillars";
+import PropertyShowcase from "@/components/PropertyShowcase";
+import Stats from "@/components/Stats";
+import HowItWorks from "@/components/HowItWorks";
+import Agents from "@/components/Agents";
+import ConstructionPros from "@/components/ConstructionPros";
+import HomeMarketplace from "@/components/HomeMarketplace";
+import MobileApp from "@/components/MobileApp";
+import Testimonials from "@/components/Testimonials";
+import FAQSection from "@/components/FAQSection";
+import FinalCTA from "@/components/FinalCTA";
+import Footer from "@/components/Footer";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
+function Landing() {
   return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
+    <>
+      <Navbar />
+      <main>
+        <Hero />
+        <SearchBar />
+        <Marquee />
+        <CategorySection />
+        <Pillars />
+        <PropertyShowcase />
+        <Stats />
+        <HowItWorks />
+        <Agents />
+        <ConstructionPros />
+        <HomeMarketplace />
+        <MobileApp />
+        <Testimonials />
+        <FAQSection />
+        <FinalCTA />
+      </main>
+      <Footer />
+    </>
   );
-};
+}
 
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <ThemeProvider>
+      <LeadFormProvider>
+        <SmoothScroll>
+          <div className="App bg-background">
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Landing />} />
+              </Routes>
+            </BrowserRouter>
+            <Toaster position="top-center" richColors />
+          </div>
+        </SmoothScroll>
+      </LeadFormProvider>
+    </ThemeProvider>
   );
 }
 
