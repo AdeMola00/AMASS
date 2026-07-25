@@ -1,0 +1,75 @@
+{
+  "project_name": "AMASS Admin Portal",
+  "theme": {
+    "mode": "light",
+    "description": "Premium modern interface inspired by Stripe, Vercel, Linear. Focus on progressive disclosure and functional clarity.",
+    "support": "Light and Dark mode toggle required in Top Nav. Defaults to light."
+  },
+  "colors": {
+    "primary": "Emerald Green (#10B981) - Used for primary actions and key positive metrics.",
+    "secondary": "Gold Accents (#D4AF37) - Used for premium features, pending states, or special highlights.",
+    "neutral_light": "White background, off-white surface (#FAFAFA), slate-50 to slate-200 for borders.",
+    "neutral_dark": "Charcoal Black (#121212) for text, (#1A1A1A) for dark mode backgrounds.",
+    "rules": "Color is Function Only. 95% of the UI should be monochrome. Color exists only to guide action. No full-screen gradients."
+  },
+  "typography": {
+    "headings": "Manrope (Anti-default alternative to Inter). Use tight tracking (`tracking-tight`) for H1-H2.",
+    "body": "IBM Plex Sans (Sterile Mono/Clean Body).",
+    "hierarchy_rules": "H1 max text-4xl on desktop, H2 text-2xl. Overlines must be uppercase + tiny + wide spacing. No Inter, Roboto, or Open Sans."
+  },
+  "surfaces_and_micro_themes": {
+    "dashboard_cards": "Flat background, 1px subtle border (`border-border`), no shadow by default. On hover: `-translate-y-1` and `shadow-md`.",
+    "navigation": "Clean Sidebar Navigation + Top Navigation. Solid background for Top Nav, no transparent glass over scrolling content.",
+    "modals_and_overlays": "Glassmorphism with heavy blur (`backdrop-blur-xl`) and `bg-black/60` (dark) or `bg-white/70` (light)."
+  },
+  "layout_and_grids": {
+    "spacing_philosophy": "Generous Spacing. Use 2-3x more spacing. Containers with borders must have padding (`p-6` or `p-8`).",
+    "grid_strategy": "High Density Grid (Bento Protocol B). Tight gaps (`gap-4` or `gap-6`). Summary stats: `col-span-1`. Main chart: `col-span-2 row-span-2`.",
+    "alignment": "Left-align dense content. Top-left focus for North Star metric (Progressive disclosure pattern)."
+  },
+  "components_and_interactions": {
+    "buttons": "Pill-shaped or slightly rounded (`rounded-lg`) with interaction animations (hover states).",
+    "tables": "Lead Management data table: search, filter, status badges, row actions, CSV export. Left-aligned tabular data.",
+    "forms": "CMS editor needs section-based forms with visibility toggles. Use Shadcn components heavily customized (no standard Vercel look).",
+    "motion": "Micro-animations for hover, click, focus. Entrance animations staggered for lists. Respect `prefers-reduced-motion`."
+  },
+  "image_urls": {
+    "description": "Images for CMS preview and placeholder pages. NEVER use generic dummy image placeholders.",
+    "users_and_agents": [
+      "https://images.pexels.com/photos/31647492/pexels-photo-31647492.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "https://images.unsplash.com/photo-1527201987695-67c06571957e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwzfHxhZnJpY2FuJTIwcHJvZmVzc2lvbmFsJTIwcG9ydHJhaXR8ZW58MHx8fHwxNzg0OTk1MDI1fDA&ixlib=rb-4.1.0&q=85",
+      "https://images.pexels.com/photos/37118089/pexels-photo-37118089.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+    ],
+    "properties": [
+      "https://images.pexels.com/photos/19219055/pexels-photo-19219055.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "https://images.pexels.com/photos/8134821/pexels-photo-8134821.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+    ]
+  },
+  "icons_and_assets": {
+    "library": "lucide-react (default) or @phosphor-icons/react for premium duotone aesthetic. Command: `yarn add @phosphor-icons/react`.",
+    "rules": "No AI assistant emojis for icons."
+  },
+  "accessibility": {
+    "contrast": "Minimum 4.5:1 for text below 18px. Always explicitly set text color on hover. Use APCA contrast calculator over WCAG 2.",
+    "testing": "All interactive and key informational elements MUST include `data-testid` attribute (e.g., `data-testid=\"login-form-submit-button\"`)."
+  },
+  "instructions_to_main_agent": [
+    "Use .js/.jsx extensions instead of .tsx for your files.",
+    "You tend to converge toward generic outputs. Avoid 'AI slop' aesthetic.",
+    "DO NOT apply universal transition (`transition: all`).",
+    "DO NOT center align the app container (`.App { text-align: center; }`).",
+    "DO NOT use pure transparent backgrounds for overlays or headers.",
+    "Use sonner for toasts.",
+    "Use Shadcn UI components but heavily customize the spacing, border radius, and shadows to match the AMASS brand.",
+    "Implement light and dark themes using Tailwind's `dark:` classes.",
+    "Create the placeholder pages (Properties, Agents, Users, etc.) as empty states with clear calls-to-action.",
+    "Implement the CMS Editor as a section-based form with visibility toggles and a live-preview feel using split panes or a prominent preview button."
+  ],
+  "general_ui_ux_guidelines": [
+    "Prioritize progressive disclosure: surface the health/status signal first, then let users drill down.",
+    "Ensure top-left quadrant focuses on the primary North Star metric.",
+    "Keep standard F-pattern reading flow. Sidebar left, Top Nav, Content Area.",
+    "Pair charts with 'next best action' or task widgets.",
+    "Use empty states effectively to guide users on what to do next."
+  ]
+}
