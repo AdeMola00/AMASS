@@ -36,6 +36,16 @@ function Breadcrumbs() {
   );
 }
 
+function MobileTitle() {
+  const location = useLocation();
+  const item = findNavItem(location.pathname);
+  return (
+    <div className="md:hidden flex-1 min-w-0" data-testid="mobile-page-title">
+      <span className="font-heading font-semibold text-sm truncate block">{item?.label || "Dashboard"}</span>
+    </div>
+  );
+}
+
 function GlobalSearch() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
@@ -126,7 +136,8 @@ export default function Topbar() {
       </Sheet>
 
       <Breadcrumbs />
-      <div className="flex-1 flex justify-center lg:justify-start lg:pl-6">
+      <MobileTitle />
+      <div className="hidden md:flex flex-1 justify-center lg:justify-start lg:pl-6">
         <GlobalSearch />
       </div>
 
