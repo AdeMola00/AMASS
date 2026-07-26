@@ -1,0 +1,176 @@
+{
+  "app_name": "AMASS Mobile App",
+  "personality": "1 iOS-Native Clean structure with 6 Glass / Luxe surfaces",
+  "personality_one_liner": "An elegant, Apple-like, map-first real estate experience with premium glassmorphic surfaces floating over rich map layers.",
+  "color": {
+    "surface": "#FFFFFF",
+    "onSurface": "#1C1C1E",
+    "surfaceSecondary": "#F4F4F5",
+    "onSurfaceSecondary": "#3F3F46",
+    "surfaceTertiary": "#E4E4E7",
+    "onSurfaceTertiary": "#52525B",
+    "surfaceInverse": "#1C1C1E",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#059669",
+    "brandPrimary": "#059669",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#D97706",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#D1FAE5",
+    "onBrandTertiary": "#065F46",
+    "success": "#059669",
+    "onSuccess": "#FFFFFF",
+    "warning": "#F59E0B",
+    "onWarning": "#FFFFFF",
+    "error": "#DC2626",
+    "onError": "#FFFFFF",
+    "info": "#71717A",
+    "onInfo": "#FFFFFF",
+    "border": "#E4E4E7",
+    "borderStrong": "#A1A1AA",
+    "divider": "#F4F4F5",
+    "amassRed": "#DC2626"
+  },
+  "typography": {
+    "displayFontFamily": "Satoshi",
+    "textFontFamily": "Satoshi",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous white space, highly intentional breathing room like an Apple product. Avoid cramped margins.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "pill": 999
+  },
+  "shadow_tier": 2,
+  "navigation": "bottom_tabs",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Floating search pill at top of Map",
+      "Floating bottom navigation bar",
+      "Property preview cards layered over the map",
+      "Bottom-sheet headers and drag handles"
+    ],
+    "dont's": [
+      "Form fields",
+      "Body text regions",
+      "Standard list rows"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Splash & Onboarding",
+      "purpose": "Introduce the premium AMASS brand with a cinematic full-bleed experience.",
+      "states": {
+        "loading": "Centered spinner",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Full-bleed imagery with a bottom gradient scrim (transparent to surfaceInverse). Elegant display typography showcasing value props. Sticky primary CTA at the bottom."
+    },
+    {
+      "name": "Home (Map-First)",
+      "purpose": "Primary discovery interface mimicking Redfin/Airbnb map UI.",
+      "states": {
+        "loading": "Map loading skeleton or subtle pulse",
+        "empty": "No properties found in this area map state",
+        "error": "Map load error with retry"
+      },
+      "layout": "Full-screen interactive map. Floating top glass search pill with secondary filter chips right below it. AMASS Red map pins (clustered). Floating bottom navigation bar with a prominent, elevated central AI FAB. Tapping a pin brings up a glassmorphic floating property preview card just above the bottom nav."
+    },
+    {
+      "name": "Discover",
+      "purpose": "Surfaces neighborhood insights and market trends.",
+      "states": {
+        "loading": "Skeleton rows",
+        "empty": "No insights available icon",
+        "error": "Failed to load insights"
+      },
+      "layout": "Editorial-style layout. Large typography, rich imagery with subtle corner radiuses. Heat map preview cards and horizontally scrolling trend chips."
+    },
+    {
+      "name": "Property Details",
+      "purpose": "Deep dive into a specific property, driving contact/tour actions.",
+      "states": {
+        "loading": "Skeleton image and text blocks",
+        "empty": "Property removed state",
+        "error": "Failed to load property details"
+      },
+      "layout": "Full-bleed image gallery at the top with gradient scrim for header icons (back, favorite in AMASS red). Content sits in a bottom sheet-style overlapping container. Sections for details, Mortgage Calculator, AI Valuation. Sticky primary 'Contact Agent' / 'Book Tour' button at the bottom above safe area."
+    },
+    {
+      "name": "Marketplace",
+      "purpose": "Tabbed browsing for Properties, Construction, and Home Items.",
+      "states": {
+        "loading": "Skeleton grid",
+        "empty": "No items found in this category",
+        "error": "Failed to load marketplace"
+      },
+      "layout": "Clean, spacious 2-column masonry grid for items or single-column for large property cards. Segmented control at the top to switch between tabs (Properties/Construction/Home)."
+    },
+    {
+      "name": "AI Search Assistant",
+      "purpose": "Conversational AI to help users find exact properties.",
+      "states": {
+        "loading": "Typing indicator...",
+        "empty": "Welcome message with prompt suggestions",
+        "error": "Failed to connect to AI"
+      },
+      "layout": "Chat-like interface accessed via the central FAB. Clean bubbles. AI responses can render inline property cards (miniature versions of marketplace cards)."
+    }
+  ],
+  "images": {
+    "property_hero_1": {
+      "url": "https://images.unsplash.com/photo-1628144688607-c373d8e3f31b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwzfHxsdXh1cnklMjBtb2Rlcm4lMjByZWFsJTIwZXN0YXRlJTIwaG9tZSUyMGV4dGVyaW9yJTIwbGVra2klMjBuaWdlcmlhfGVufDB8fHx8MTc4NTEwOTAxMXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Luxury modern real estate home exterior"
+    },
+    "property_interior_1": {
+      "url": "https://images.unsplash.com/photo-1600121848594-d8644e57abab?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxtaW5pbWFsaXN0JTIwZWxlZ2FudCUyMGxpdmluZyUyMHJvb20lMjBpbnRlcmlvciUyMHVwc2NhbGV8ZW58MHx8fHwxNzg1MTA5MDEyfDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Elegant minimalist living room interior"
+    },
+    "amass_map_pin": {
+      "url": "https://images.unsplash.com/photo-1524661135-423995f22d0b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwxfHxyZWQlMjBwaW58ZW58MHx8fHwxNzg1MTEwMTEwfDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Red map pin (use SVG icon instead in implementation)"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the color palette: Emerald Green (Primary), AMASS Red (Accent - exclusively for map pins, favorites, alerts), Gold (Secondary). Do not use any shades of blue anywhere in the app.",
+    "Implement a Map-First Home screen as the core feature. The map should be full-bleed with floating UI elements (Search pill, filter chips, bottom nav) layered over it using glassmorphism (`expo-blur`).",
+    "Use custom AMASS red map pins (via SVG or custom marker components) on the map. Tapping a pin must open a floating property preview card or a bottom sheet.",
+    "The Bottom Navigation must be floating (not anchored directly to the bottom edge, but hovering above the safe area) with a prominent, visually distinct central FAB for AI Search.",
+    "Ensure 'Apple-like' aesthetics: generous white space, large `Satoshi` typography, rounded cards (`lg` radius), and soft shadows/blur instead of hard borders.",
+    "Property detail screens must use a gradient scrim (transparent to dark) over the top hero image to ensure icons (Back, Favorite) are legible.",
+    "Ensure the Marketplace uses a clean tabbed layout (Properties / Construction / Home) with a segmented control or top tab bar.",
+    "Implement haptics on map pin taps, bottom nav changes, and primary actions."
+  ]
+}
