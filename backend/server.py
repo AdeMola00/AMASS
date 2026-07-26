@@ -729,9 +729,18 @@ async def public_property(pid: str):
 
 @api.post("/public/properties")
 async def public_submit_property(body: PropertyInput):
+    # Validate agent_id against real agents; drop it if it doesn't exist (anti-injection)
+    agent_id = body.agent_id
+    agent_name = ""
+    if agent_id:
+        a = await db.agents.find_one({"id": agent_id}, {"_id": 0, "name": 1})
+        if a:
+            agent_name = a["name"]
+        else:
+            agent_id = None
     doc = body.model_dump()
     doc.update({"id": new_id(), "status": "pending", "verified": False,
-                "agent_name": await _agent_name(body.agent_id), "created_at": now_iso()})
+                "agent_id": agent_id, "agent_name": agent_name, "created_at": now_iso()})
     await db.properties.insert_one(doc)
     return {"success": True, "id": doc["id"], "status": "pending"}
 

@@ -29,12 +29,20 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - CMS now manages 17 real sections: Hero, Category Map, 6 Pillars, Property Showcase, Statistics (Why Choose AMASS), How It Works, For Agents, Construction Professionals, Home Marketplace, AMASS Mobile, Testimonials, FAQ, Final CTA, Contact, Social, Footer, SEO — all with real headings, stats, listings, testimonials and answered FAQs.
 - Fixed a CMS editor bug: recursive `ValueEditor` crashed the visual-edits babel plugin (stack overflow). Replaced with non-recursive `ArrayEditor` + `ObjectEditor`; nested item cards (e.g. showcase properties) now edit correctly and save round-trips through `/api/public/landing`.
 
+## Updated (2026-07-26) — Shared backend + real marketplace modules
+- Confirmed the AMASS consumer app runs on **this same FastAPI + MongoDB backend**.
+- Converted placeholders into real shared modules: **Properties** (CRUD, status pending/approved/rejected/sold, verification, filters, rich schema), **Property Verification** (Approve/Reject + Verify queue), **Agents** (CRUD/verify + listings_count), **Users** (suspend/reactivate).
+- Public no-auth app endpoints: `GET/POST /api/public/properties` (approved-only reads; validated agent_id on submit), `GET /api/public/properties/{id}`, `GET /api/public/agents` (verified-only).
+- Rebranded to the AMASS logo palette (red primary + charcoal + white) with the red location-pin mark.
+- Verified: 49/49 backend tests pass; all new frontend flows pass; RBAC enforced.
+
 ## Backlog
-- **P1**: Build out Properties, Agents, Users, Property Verification modules (list/detail/actions).
 - **P1**: Wire AI Management to a real LLM (Emergent Universal key) for pricing/valuation intelligence.
+- **P1**: Property Owners & Developers modules (extend the shared property/agent pattern).
 - **P2**: Finance modules (Transactions/Payments/Subscriptions), Analytics & Reports with real charts.
-- **P2**: Messages & Notifications, image upload (object storage) for CMS media.
-- **P2**: Public landing page renderer consuming the CMS.
+- **P2**: Messages & Notifications, image upload (object storage) for CMS media & property photos.
+- **P2**: Wire the live landing page to consume `/api/public/landing` + `/api/public/leads`.
+- **Tech debt**: split server.py (~1100 lines) into modular routers before adding Finance modules.
 
 ## Next Tasks
-Pick highest-value module from P1 to fully implement next (recommend Properties + Property Verification).
+Recommend wiring the live landing page to the CMS/leads API, or building Transactions/Payments next.
