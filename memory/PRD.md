@@ -24,6 +24,11 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - 16 foundation module placeholder pages (models + nav + RBAC wired).
 - Verified: 31/31 backend tests pass, all critical frontend flows pass.
 
+## Updated (2026-07-26)
+- Reviewed the live AMASS landing page (discover-properties-1.preview) and rebuilt the CMS to mirror it exactly (CMS_VERSION=2, version-gated re-seed).
+- CMS now manages 17 real sections: Hero, Category Map, 6 Pillars, Property Showcase, Statistics (Why Choose AMASS), How It Works, For Agents, Construction Professionals, Home Marketplace, AMASS Mobile, Testimonials, FAQ, Final CTA, Contact, Social, Footer, SEO — all with real headings, stats, listings, testimonials and answered FAQs.
+- Fixed a CMS editor bug: recursive `ValueEditor` crashed the visual-edits babel plugin (stack overflow). Replaced with non-recursive `ArrayEditor` + `ObjectEditor`; nested item cards (e.g. showcase properties) now edit correctly and save round-trips through `/api/public/landing`.
+
 ## Backlog
 - **P1**: Build out Properties, Agents, Users, Property Verification modules (list/detail/actions).
 - **P1**: Wire AI Management to a real LLM (Emergent Universal key) for pricing/valuation intelligence.

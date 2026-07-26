@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2, Save, Plus, Trash2, Eye, EyeOff, ExternalLink } from "lucide-react";
 
-const LONG_KEYS = ["message", "description", "quote", "subheadline", "meta_description", "a", "tagline"];
+const LONG_KEYS = ["message", "description", "quote", "subheadline", "subtitle", "meta_description", "a", "tagline", "features", "cities", "tags"];
 
 function humanize(k) {
   return k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -34,44 +34,59 @@ function FieldEditor({ path, value, onChange, disabled }) {
   );
 }
 
-function ValueEditor({ path, value, onChange, onArrayAdd, onArrayRemove, disabled }) {
-  if (Array.isArray(value)) {
-    return (
-      <div className="space-y-3">
-        {value.map((item, idx) => (
-          <div key={idx} className="rounded-lg border border-border p-4 relative bg-muted/30">
-            {!disabled && (
-              <Button size="icon" variant="ghost" className="absolute top-2 right-2 h-7 w-7 text-destructive" onClick={() => onArrayRemove(path, idx)} data-testid={`cms-remove-${path}-${idx}`}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            <div className="grid sm:grid-cols-2 gap-3 pr-8">
-              {typeof item === "object"
-                ? Object.entries(item).map(([k, v]) => (
-                    <FieldEditor key={k} path={`${path}[${idx}].${k}`} value={v} onChange={onChange} disabled={disabled} />
-                  ))
-                : <FieldEditor path={`${path}[${idx}]`} value={item} onChange={onChange} disabled={disabled} />}
-            </div>
+function ArrayEditor({ path, items, onChange, onArrayAdd, onArrayRemove, disabled }) {
+  return (
+    <div className="space-y-3">
+      {items.map((item, idx) => (
+        <div key={idx} className="rounded-lg border border-border p-4 relative bg-muted/30">
+          {!disabled && (
+            <Button size="icon" variant="ghost" className="absolute top-2 right-2 h-7 w-7 text-destructive" onClick={() => onArrayRemove(path, idx)} data-testid={`cms-remove-${path}-${idx}`}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <div className="grid sm:grid-cols-2 gap-3 pr-8">
+            {item && typeof item === "object"
+              ? Object.entries(item).map(([k, v]) => (
+                  <FieldEditor key={k} path={`${path}[${idx}].${k}`} value={v} onChange={onChange} disabled={disabled} />
+                ))
+              : <FieldEditor path={`${path}[${idx}]`} value={item} onChange={onChange} disabled={disabled} />}
           </div>
-        ))}
-        {!disabled && (
-          <Button variant="outline" size="sm" onClick={() => onArrayAdd(path)} data-testid={`cms-add-${path}`}>
-            <Plus className="h-4 w-4 mr-1.5" /> Add Item
-          </Button>
-        )}
-      </div>
-    );
-  }
-  if (value && typeof value === "object") {
-    return (
-      <div className="grid sm:grid-cols-2 gap-3">
-        {Object.entries(value).map(([k, v]) => (
-          <FieldEditor key={k} path={`${path}.${k}`} value={v} onChange={onChange} disabled={disabled} />
-        ))}
-      </div>
-    );
-  }
-  return <FieldEditor path={path} value={value} onChange={onChange} disabled={disabled} />;
+        </div>
+      ))}
+      {!disabled && (
+        <Button variant="outline" size="sm" onClick={() => onArrayAdd(path)} data-testid={`cms-add-${path}`}>
+          <Plus className="h-4 w-4 mr-1.5" /> Add Item
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function ObjectEditor({ data, onChange, onArrayAdd, onArrayRemove, disabled }) {
+  const entries = Object.entries(data || {});
+  const scalars = entries.filter(([, v]) => !(v && typeof v === "object"));
+  const arrays = entries.filter(([, v]) => v && typeof v === "object");
+  return (
+    <div className="space-y-5">
+      {scalars.length > 0 && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          {scalars.map(([k, v]) => (
+            <FieldEditor key={k} path={k} value={v} onChange={onChange} disabled={disabled} />
+          ))}
+        </div>
+      )}
+      {arrays.map(([k, v]) => (
+        <div key={k} className="space-y-2.5 rounded-lg border border-border/70 p-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-primary">{humanize(k)}</div>
+          <ArrayEditor
+            path={k}
+            items={Array.isArray(v) ? v : [v]}
+            onChange={onChange} onArrayAdd={onArrayAdd} onArrayRemove={onArrayRemove} disabled={disabled}
+          />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function SectionForm({ section, onSaved, canEdit }) {
@@ -121,7 +136,7 @@ function SectionForm({ section, onSaved, canEdit }) {
         </div>
       </div>
       <div className="space-y-4">
-        <ValueEditor path="" value={data} onChange={(p, v) => onChange(p.replace(/^\./, ""), v)} onArrayAdd={(p) => onArrayAdd(p.replace(/^\./, ""))} onArrayRemove={(p, i) => onArrayRemove(p.replace(/^\./, ""), i)} disabled={!canEdit} />
+        <ObjectEditor data={data} onChange={onChange} onArrayAdd={onArrayAdd} onArrayRemove={onArrayRemove} disabled={!canEdit} />
       </div>
       {canEdit && (
         <div className="mt-6 pt-4 border-t border-border flex justify-end">

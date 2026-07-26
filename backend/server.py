@@ -552,10 +552,11 @@ async def seed():
                 "status": "active", "permissions_override": None, "created_at": now_iso(), "last_login": None,
             })
 
-    # CMS sections
-    if await db.cms_sections.count_documents({}) == 0:
+    # CMS sections (version-gated re-seed so content stays aligned with the live landing page)
+    if await db.cms_sections.find_one({"version": CMS_VERSION}) is None:
+        await db.cms_sections.delete_many({})
         await db.cms_sections.insert_many(default_cms_sections())
-        logger.info("Seeded CMS sections")
+        logger.info("Seeded CMS sections (v%s)", CMS_VERSION)
 
     # Demo data
     if await db.leads.count_documents({}) == 0:
@@ -563,50 +564,172 @@ async def seed():
         logger.info("Seeded demo data")
 
 
+CMS_VERSION = 2  # bump to force a re-seed of landing page content
+
+
 def default_cms_sections():
     order = 0
     def s(key, title, data, visible=True):
         nonlocal order
         order += 1
-        return {"key": key, "title": title, "data": data, "visible": visible, "order": order, "updated_at": now_iso()}
+        return {"key": key, "title": title, "data": data, "visible": visible,
+                "order": order, "version": CMS_VERSION, "updated_at": now_iso()}
     return [
         s("hero", "Hero Section", {
-            "overline": "Africa's Property Intelligence Platform",
-            "headline": "Discover, invest and build across Africa with confidence",
-            "subheadline": "AMASS connects buyers, agents, developers and investors on one trusted marketplace powered by real data.",
-            "primary_cta_label": "Get Started", "primary_cta_link": "/signup",
-            "secondary_cta_label": "Book a Demo", "secondary_cta_link": "/demo",
-            "background_image": "https://images.pexels.com/photos/19219055/pexels-photo-19219055.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+            "overline": "The Google Maps of African Real Estate",
+            "headline": "Discover Africa's Properties Like Never Before",
+            "subheadline": "The AMASS app lets you search, verify, buy, rent, finance and explore properties with intelligent maps, verified listings and AI-powered property intelligence.",
+            "primary_cta_label": "Get Early Access", "primary_cta_link": "#waitlist",
+            "secondary_cta_label": "Become an Agent", "secondary_cta_link": "#agents",
+            "trust_badges": [
+                {"label": "Verified Listings"}, {"label": "AI Powered"},
+                {"label": "Secure Transactions"}, {"label": "Nationwide Coverage"},
+            ],
+            "background_image": "https://images.pexels.com/photos/27741697/pexels-photo-27741697.jpeg?auto=compress&cs=tinysrgb&w=2400",
         }),
-        s("statistics", "Statistics", {"items": [
-            {"label": "Properties Listed", "value": "12,400+"},
-            {"label": "Verified Agents", "value": "3,200+"},
-            {"label": "Cities Covered", "value": "48"},
-            {"label": "Happy Clients", "value": "58,000+"},
-        ]}),
-        s("categories", "Property Categories", {"items": [
-            {"name": "Residential", "count": "6,200 listings"},
-            {"name": "Commercial", "count": "1,800 listings"},
-            {"name": "Land", "count": "2,900 listings"},
-            {"name": "Short-let", "count": "1,500 listings"},
-        ]}),
-        s("showcase", "Property Showcase", {"items": [
-            {"title": "Modern Villa, Lagos", "price": "$420,000",
-             "image": "https://images.pexels.com/photos/8134821/pexels-photo-8134821.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"},
-            {"title": "City Apartment, Nairobi", "price": "$180,000",
-             "image": "https://images.pexels.com/photos/19219055/pexels-photo-19219055.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"},
-        ]}),
-        s("testimonials", "Testimonials", {"items": [
-            {"name": "Amaka Obi", "role": "Investor", "quote": "AMASS made cross-border property investment effortless and transparent."},
-            {"name": "David Mwangi", "role": "Agent", "quote": "I closed 3x more deals within my first quarter on AMASS."},
-        ]}),
-        s("faq", "FAQ", {"items": [
-            {"q": "Is AMASS available across Africa?", "a": "We currently operate in 48 cities and are expanding rapidly."},
-            {"q": "How are agents verified?", "a": "Every agent goes through KYC and license verification before listing."},
-        ]}),
-        s("partners", "Partners", {"items": [
-            {"name": "AfriBank"}, {"name": "PayStack"}, {"name": "Flutterwave"}, {"name": "MTN"},
-        ]}),
+        s("categories", "Category Map", {
+            "overline": "Live Map Experience",
+            "title": "One intelligent map. Every category of property.",
+            "items": [
+                {"name": "Luxury Homes", "count": "2,400+"},
+                {"name": "Apartments", "count": "8,100+"},
+                {"name": "Commercial", "count": "1,900+"},
+                {"name": "Land", "count": "5,300+"},
+                {"name": "Short Lets", "count": "3,700+"},
+                {"name": "New Developments", "count": "640+"},
+                {"name": "Construction Projects", "count": "310+"},
+            ],
+        }),
+        s("pillars", "What AMASS Does (Pillars)", {
+            "overline": "What AMASS Does",
+            "title": "A single platform for the entire property lifecycle.",
+            "subtitle": "Six intelligent pillars — from discovery and verification to construction, furnishing and finance — working together in one elegant interface.",
+            "items": [
+                {"number": "01", "title": "Property Marketplace", "description": "Buy, sell, rent, lease — from luxury homes and commercial to land and short lets.", "tags": "Buy, Sell, Rent, Lease, Commercial, Land, Short Let, Luxury Homes"},
+                {"number": "02", "title": "Property Intelligence", "description": "Satellite discovery, verification and analytics that turn guesswork into certainty.", "tags": "Satellite Discovery, Verification, Market Analytics, Valuation, Ownership Insights, Neighbourhood Intel"},
+                {"number": "03", "title": "Construction Marketplace", "description": "Everything to build — materials, equipment and vetted professionals in one place.", "tags": "Building Materials, Equipment Rental, Professionals, Architects, Engineers, Surveyors, Project Mgmt"},
+                {"number": "04", "title": "Home Marketplace", "description": "Furnish and finish your space with curated furniture, appliances and decor.", "tags": "Furniture, Appliances, Electronics, Kitchen, Garden, Decoration, Office, Lifestyle"},
+                {"number": "05", "title": "AI Services", "description": "An intelligent copilot for search, valuation, risk and market predictions.", "tags": "AI Search, Investment Assistant, AI Valuation, Recommendations, Risk Analysis, Predictions"},
+                {"number": "06", "title": "Financial Services", "description": "Mortgages, BNPL, financing and escrow — secure money movement, end to end.", "tags": "Mortgage, BNPL, Financing, Loans, Insurance, Escrow, Secure Payments"},
+            ],
+        }),
+        s("showcase", "Property Showcase", {
+            "overline": "Property Showcase",
+            "title": "Handpicked homes, verified to the last detail.",
+            "cta_label": "Browse 48,000+ listings in the app",
+            "items": [
+                {"title": "Ocean-View Penthouse", "price": "₦420M", "location": "Eko Atlantic, VI", "badge": "Premium", "specs": "5 bed · 6 bath · 610m²", "agent": "Adaeze O.", "image": "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1200&auto=format&fit=crop"},
+                {"title": "Waterfront Duplex", "price": "₦185M", "location": "Banana Island, Ikoyi", "badge": "Available", "specs": "4 bed · 5 bath · 420m²", "agent": "Tunde A.", "image": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1200&auto=format&fit=crop"},
+                {"title": "Smart 3-Bed Apartment", "price": "₦95M", "location": "Lekki Phase 1", "badge": "Verified", "specs": "3 bed · 3 bath · 210m²", "agent": "Ngozi E.", "image": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=1200&auto=format&fit=crop"},
+                {"title": "Contemporary Terrace", "price": "₦260M", "location": "Ikate, Lekki", "badge": "Coming Soon", "specs": "4 bed · 4 bath · 340m²", "agent": "Emeka N.", "image": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200&auto=format&fit=crop"},
+                {"title": "Serviced Short-Let Studio", "price": "₦72M", "location": "Victoria Island", "badge": "Short Let", "specs": "1 bed · 1 bath · 65m²", "agent": "Bisi K.", "image": "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=1200&auto=format&fit=crop"},
+                {"title": "Signature Smart Home", "price": "₦310M", "location": "Osborne, Ikoyi", "badge": "Premium", "specs": "5 bed · 5 bath · 520m²", "agent": "Chidi U.", "image": "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?q=80&w=1200&auto=format&fit=crop"},
+            ],
+        }),
+        s("statistics", "Statistics (Why Choose AMASS)", {
+            "overline": "Why Choose AMASS",
+            "title": "Built for Africa. Trusted across the continent.",
+            "cities": "Lagos, Abuja, Accra, Nairobi, Kigali, Cape Town, Kampala, Dar es Salaam, Dakar, Addis Ababa, Johannesburg, Kumasi",
+            "items": [
+                {"value": "48,000+", "label": "Properties Listed"},
+                {"value": "3,200+", "label": "Verified Agents"},
+                {"value": "120k+", "label": "Verified Documents"},
+                {"value": "20+", "label": "Cities Across Africa"},
+                {"value": "0.4s", "label": "Avg. Search Speed"},
+                {"value": "₦900B+", "label": "Transactions Secured"},
+            ],
+        }),
+        s("how_it_works", "How It Works", {
+            "overline": "How It Works",
+            "title": "From first search to keys in hand — in five steps.",
+            "items": [
+                {"number": "01", "title": "Discover", "description": "Explore verified listings on an intelligent satellite map."},
+                {"number": "02", "title": "Verify", "description": "Confirm documents, ownership and agent identity instantly."},
+                {"number": "03", "title": "Inspect", "description": "Book physical or virtual tours with a single tap."},
+                {"number": "04", "title": "Chat", "description": "Negotiate securely with verified agents in real time."},
+                {"number": "05", "title": "Complete", "description": "Close with escrow-protected, secure transactions."},
+            ],
+        }),
+        s("for_agents", "For Agents", {
+            "overline": "For Agents",
+            "title": "Grow faster with the tools top agents use.",
+            "description": "List once, reach millions. Manage every property, lead and transaction from a dashboard designed to close deals.",
+            "cta_label": "Become an AMASS Agent",
+            "items": [
+                {"title": "More Leads", "description": "Reach millions of active, verified property seekers."},
+                {"title": "Verified Profile", "description": "A trusted blue badge that converts browsers to buyers."},
+                {"title": "Property Management", "description": "Manage every listing from one elegant dashboard."},
+                {"title": "Analytics Dashboard", "description": "Understand views, leads and market demand live."},
+                {"title": "Powerful CRM", "description": "Never lose a lead with an intelligent pipeline."},
+                {"title": "Marketing Tools", "description": "Boost, promote and syndicate listings effortlessly."},
+            ],
+        }),
+        s("construction", "Construction Professionals", {
+            "overline": "Construction Professionals",
+            "title": "Verified experts for every build.",
+            "cta_label": "Join as a Professional",
+            "items": [
+                {"name": "Electricians", "count": "1,200+ verified"},
+                {"name": "Plumbers", "count": "980+ verified"},
+                {"name": "Architects", "count": "640+ verified"},
+                {"name": "Builders", "count": "1,800+ verified"},
+                {"name": "Painters", "count": "760+ verified"},
+                {"name": "Surveyors", "count": "420+ verified"},
+                {"name": "Interior Designers", "count": "530+ verified"},
+                {"name": "Equipment Vendors", "count": "310+ verified"},
+            ],
+        }),
+        s("home_marketplace", "Home Marketplace", {
+            "overline": "Home Marketplace",
+            "title": "Furnish every corner, beautifully.",
+            "items": [
+                {"name": "Furniture", "price": "from ₦85k", "image": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=800&auto=format&fit=crop"},
+                {"name": "Kitchen", "price": "from ₦40k", "image": "https://images.unsplash.com/photo-1556909212-d5b604d0c90d?q=80&w=800&auto=format&fit=crop"},
+                {"name": "Electronics", "price": "from ₦120k", "image": "https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=800&auto=format&fit=crop"},
+                {"name": "Appliances", "price": "from ₦95k", "image": "https://images.unsplash.com/photo-1585659722983-3a675dabf23d?q=80&w=800&auto=format&fit=crop"},
+                {"name": "Lighting", "price": "from ₦18k", "image": "https://images.unsplash.com/photo-1524758631624-e2822e304c36?q=80&w=800&auto=format&fit=crop"},
+                {"name": "Decoration", "price": "from ₦12k", "image": "https://images.unsplash.com/photo-1513161455079-7dc1de15ef3e?q=80&w=800&auto=format&fit=crop"},
+            ],
+        }),
+        s("mobile", "AMASS Mobile", {
+            "overline": "AMASS Mobile",
+            "title": "The entire property market, in your pocket.",
+            "description": "Explore satellite maps, chat with verified agents, get AI valuations and complete transactions — with a beautiful light and dark experience.",
+            "features": "Live Map, AI Assistant, Secure Messages",
+            "app_store_link": "#", "play_store_link": "#",
+        }),
+        s("testimonials", "Testimonials", {
+            "overline": "Testimonials",
+            "title": "Loved by buyers, investors and builders alike.",
+            "items": [
+                {"quote": "AMASS turned a 3-month search into a weekend. The verification alone saved me from two fraudulent listings.", "name": "Adebayo Ogunlesi", "role": "Property Investor · Lagos", "image": "https://images.pexels.com/photos/36053652/pexels-photo-36053652.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop"},
+                {"quote": "I bought my first apartment in East Legon entirely through AMASS. Escrow made the payment feel completely safe.", "name": "Ama Mensah", "role": "First-time Buyer · Accra", "image": "https://images.pexels.com/photos/5999896/pexels-photo-5999896.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop"},
+                {"quote": "My leads tripled in the first month. The CRM and analytics are genuinely better than tools I paid for.", "name": "Chinedu Okafor", "role": "Verified Agent · Abuja", "image": "https://images.pexels.com/photos/13801446/pexels-photo-13801446.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop"},
+                {"quote": "We sold out a 40-unit development off-plan using AMASS new-development tools. Remarkable reach across Africa.", "name": "Wanjiru Kamau", "role": "Developer · Nairobi", "image": "https://images.pexels.com/photos/5905901/pexels-photo-5905901.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop"},
+                {"quote": "Sourcing materials and vetted professionals in one marketplace cut our procurement time in half.", "name": "Emeka Nwankwo", "role": "Construction Co. · Kigali", "image": "https://images.pexels.com/photos/13801474/pexels-photo-13801474.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop"},
+            ],
+        }),
+        s("faq", "FAQ", {
+            "overline": "FAQ",
+            "title": "Questions, answered.",
+            "subtitle": "Everything you need to know about buying, listing and building with AMASS.",
+            "items": [
+                {"q": "Where is AMASS available across Africa?", "a": "AMASS is live in 20+ cities including Lagos, Abuja, Accra, Nairobi, Kigali and Cape Town, and is expanding rapidly across the continent."},
+                {"q": "How does AMASS verify listings?", "a": "Every listing goes through document checks, ownership validation and agent identity verification before it is published."},
+                {"q": "Are transactions safe?", "a": "Yes. All payments are escrow-protected and processed through secure, regulated payment partners."},
+                {"q": "What is AMASS Property Intelligence?", "a": "It combines satellite discovery, market analytics, valuations and neighbourhood insights to turn guesswork into certainty."},
+                {"q": "How do I become an AMASS agent?", "a": "Tap 'Become an Agent', complete your verified profile and start listing to reach millions of active buyers."},
+                {"q": "Does AMASS offer financing?", "a": "Yes — mortgages, BNPL, loans and insurance are available directly through our Financial Services pillar."},
+            ],
+        }),
+        s("final_cta", "Final CTA", {
+            "overline": "Start Today",
+            "title": "Find Your Next Property Today",
+            "description": "Join the platform redefining how Africa discovers, verifies and owns property.",
+            "primary_cta_label": "Get Early Access", "primary_cta_link": "#waitlist",
+            "secondary_cta_label": "Download App", "secondary_cta_link": "#download",
+            "background_image": "https://images.pexels.com/photos/27741697/pexels-photo-27741697.jpeg?auto=compress&cs=tinysrgb&w=2400",
+        }),
         s("contact", "Contact Information", {
             "email": "hello@amass.africa", "phone": "+234 800 000 0000",
             "address": "Victoria Island, Lagos, Nigeria",
@@ -616,14 +739,14 @@ def default_cms_sections():
             "instagram": "https://instagram.com/amass", "facebook": "https://facebook.com/amass",
         }),
         s("footer", "Footer", {
-            "tagline": "Building Africa's property future, together.",
+            "tagline": "Africa's intelligent property discovery, real estate, construction and home marketplace.",
             "copyright": "© 2026 AMASS. All rights reserved.",
         }),
         s("seo", "SEO Settings", {
-            "meta_title": "AMASS — Africa's Property Intelligence & Marketplace",
-            "meta_description": "Discover, invest and build across Africa with AMASS, the trusted property marketplace.",
-            "meta_keywords": "africa real estate, property marketplace, invest, agents",
-            "og_image": "https://images.pexels.com/photos/19219055/pexels-photo-19219055.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+            "meta_title": "AMASS | Discover Africa's Properties Like Never Before",
+            "meta_description": "AMASS — Africa's intelligent property discovery, real estate, construction and home marketplace. Search, verify, buy, rent and finance properties with AI-powered intelligence and interactive maps.",
+            "meta_keywords": "africa real estate, property marketplace, verified listings, property intelligence, construction marketplace, mortgage",
+            "og_image": "https://images.pexels.com/photos/27741697/pexels-photo-27741697.jpeg?auto=compress&cs=tinysrgb&w=2400",
         }),
     ]
 
