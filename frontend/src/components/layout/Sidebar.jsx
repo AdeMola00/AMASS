@@ -4,12 +4,13 @@ import { motion } from "framer-motion";
 import { NAV_GROUPS } from "@/config/nav";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
+import { AmassPin } from "@/components/Logo";
 import { Lock } from "lucide-react";
 
 function BrandMark() {
   return (
     <div className="flex items-center gap-2.5 px-4 h-16 shrink-0" data-testid="sidebar-brand">
-      <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-heading font-extrabold text-lg">A</div>
+      <AmassPin className="h-8 w-8 drop-shadow-sm" />
       <div className="leading-tight">
         <div className="font-heading font-extrabold tracking-tight text-[15px]">AMASS</div>
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Admin Portal</div>

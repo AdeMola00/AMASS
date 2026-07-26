@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { AmassPin } from "@/components/Logo";
 
 export default function Login() {
   const { login } = useAuth();
@@ -29,14 +30,14 @@ export default function Login() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-background">
       {/* Left brand panel */}
-      <div className="relative hidden lg:flex flex-col justify-between p-12 bg-[#0f1512] text-white overflow-hidden">
+      <div className="relative hidden lg:flex flex-col justify-between p-12 bg-[#0d0d0d] text-white overflow-hidden">
         <div
-          className="absolute inset-0 opacity-25"
-          style={{ backgroundImage: "url(https://images.pexels.com/photos/19219055/pexels-photo-19219055.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940)", backgroundSize: "cover", backgroundPosition: "center" }}
+          className="absolute inset-0 opacity-20"
+          style={{ backgroundImage: "url(https://images.pexels.com/photos/27741697/pexels-photo-27741697.jpeg?auto=compress&cs=tinysrgb&w=2400)", backgroundSize: "cover", backgroundPosition: "center" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0f1512] via-[#0f1512]/70 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d]/75 to-[#0d0d0d]/30" />
         <div className="relative flex items-center gap-2.5">
-          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center font-heading font-extrabold text-lg">A</div>
+          <AmassPin className="h-9 w-9 drop-shadow" />
           <span className="font-heading font-extrabold tracking-tight text-lg">AMASS</span>
         </div>
         <div className="relative">
@@ -59,7 +60,7 @@ export default function Login() {
           className="w-full max-w-sm"
         >
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-heading font-extrabold">A</div>
+            <AmassPin className="h-8 w-8" />
             <span className="font-heading font-extrabold tracking-tight">AMASS Admin</span>
           </div>
           <h2 className="font-heading text-2xl font-bold tracking-tight">Welcome back</h2>
