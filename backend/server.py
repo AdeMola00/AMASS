@@ -207,6 +207,44 @@ class ProfileInput(BaseModel):
     name: str
 
 
+class PropertyInput(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    type: str = "Apartment"
+    listing: str = "Sale"
+    city: str
+    address: Optional[str] = ""
+    price: int
+    currency: str = "NGN"
+    bedrooms: int = 0
+    bathrooms: int = 0
+    area_sqm: int = 0
+    image: Optional[str] = ""
+    agent_id: Optional[str] = None
+
+
+class StatusInput(BaseModel):
+    status: str
+
+
+class VerifyInput(BaseModel):
+    verified: bool
+
+
+class AgentInput(BaseModel):
+    name: str
+    email: EmailStr
+    phone: Optional[str] = ""
+    city: str
+    agency: Optional[str] = ""
+
+
+PROPERTY_TYPES = ["Apartment", "Duplex", "Penthouse", "Terrace", "Detached", "Studio", "Land", "Commercial"]
+PROPERTY_LISTINGS = ["Sale", "Rent", "Short Let"]
+PROPERTY_STATUSES = ["pending", "approved", "rejected", "sold"]
+CITIES = ["Lagos", "Abuja", "Accra", "Nairobi", "Kigali", "Cape Town"]
+
+
 # ---------------------------------------------------------------------------
 # Auth endpoints
 # ---------------------------------------------------------------------------
@@ -500,16 +538,210 @@ async def delete_admin_user(uid: str, user: dict = Depends(require("settings", "
 
 
 # ---------------------------------------------------------------------------
-# Generic module stats (placeholder modules)
+# Properties  (shared by Admin portal + AMASS app, single MongoDB)
 # ---------------------------------------------------------------------------
-@api.get("/modules/{module}/summary")
-async def module_summary(module: str, user: dict = Depends(get_current_user)):
-    counts = {
-        "properties": await db.properties.count_documents({}),
-        "agents": await db.agents.count_documents({}),
-        "users": await db.platform_users.count_documents({}),
-    }
-    return {"module": module, "counts": counts}
+async def _agent_name(agent_id):
+    if not agent_id:
+        return ""
+    a = await db.agents.find_one({"id": agent_id}, {"_id": 0, "name": 1})
+    return a["name"] if a else ""
+
+
+@api.get("/properties")
+async def list_properties(
+    user: dict = Depends(require("properties")),
+    search: Optional[str] = None, city: Optional[str] = None,
+    type: Optional[str] = None, status: Optional[str] = None, verified: Optional[str] = None,
+):
+    q: Dict[str, Any] = {}
+    if city and city != "all": q["city"] = city
+    if type and type != "all": q["type"] = type
+    if status and status != "all": q["status"] = status
+    if verified in ("true", "false"): q["verified"] = (verified == "true")
+    if search:
+        q["$or"] = [{"title": {"$regex": search, "$options": "i"}},
+                    {"address": {"$regex": search, "$options": "i"}},
+                    {"agent_name": {"$regex": search, "$options": "i"}}]
+    rows = await db.properties.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    return rows
+
+
+@api.post("/properties")
+async def create_property(body: PropertyInput, user: dict = Depends(require("properties", "create"))):
+    doc = body.model_dump()
+    doc.update({"id": new_id(), "status": "pending", "verified": False,
+                "agent_name": await _agent_name(body.agent_id), "created_at": now_iso()})
+    await db.properties.insert_one(doc)
+    await log_activity("listed a new property", "property", user, doc["title"])
+    return {"success": True, "id": doc["id"]}
+
+
+@api.put("/properties/{pid}")
+async def update_property(pid: str, body: PropertyInput, user: dict = Depends(require("properties", "edit"))):
+    update = body.model_dump()
+    update["agent_name"] = await _agent_name(body.agent_id)
+    res = await db.properties.update_one({"id": pid}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return {"success": True}
+
+
+@api.patch("/properties/{pid}/status")
+async def set_property_status(pid: str, body: StatusInput, user: dict = Depends(require("properties", "edit"))):
+    if body.status not in PROPERTY_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    res = await db.properties.update_one({"id": pid}, {"$set": {"status": body.status}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Property not found")
+    await log_activity(f"{body.status} a property", "property", user, pid)
+    return {"success": True}
+
+
+@api.patch("/properties/{pid}/verify")
+async def verify_property(pid: str, body: VerifyInput, user: dict = Depends(require("property_verification", "edit"))):
+    res = await db.properties.update_one({"id": pid}, {"$set": {"verified": body.verified}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Property not found")
+    await log_activity(("verified" if body.verified else "unverified") + " a property", "property", user, pid)
+    return {"success": True}
+
+
+@api.delete("/properties/{pid}")
+async def delete_property(pid: str, user: dict = Depends(require("properties", "delete"))):
+    res = await db.properties.delete_one({"id": pid})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Property not found")
+    await log_activity("deleted a property", "property", user, pid)
+    return {"success": True}
+
+
+@api.get("/properties-meta")
+async def properties_meta(user: dict = Depends(require("properties"))):
+    return {"types": PROPERTY_TYPES, "listings": PROPERTY_LISTINGS,
+            "statuses": PROPERTY_STATUSES, "cities": CITIES}
+
+
+# ---------------------------------------------------------------------------
+# Agents
+# ---------------------------------------------------------------------------
+@api.get("/agents")
+async def list_agents(user: dict = Depends(require("agents")),
+                      search: Optional[str] = None, city: Optional[str] = None, verified: Optional[str] = None):
+    q: Dict[str, Any] = {}
+    if city and city != "all": q["city"] = city
+    if verified in ("true", "false"): q["verified"] = (verified == "true")
+    if search:
+        q["$or"] = [{"name": {"$regex": search, "$options": "i"}},
+                    {"email": {"$regex": search, "$options": "i"}},
+                    {"agency": {"$regex": search, "$options": "i"}}]
+    rows = await db.agents.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    for r in rows:
+        r["listings_count"] = await db.properties.count_documents({"agent_id": r["id"]})
+    return rows
+
+
+@api.post("/agents")
+async def create_agent(body: AgentInput, user: dict = Depends(require("agents", "create"))):
+    email = body.email.lower().strip()
+    if await db.agents.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Agent email already exists")
+    doc = body.model_dump()
+    doc.update({"id": new_id(), "email": email, "verified": False, "created_at": now_iso()})
+    await db.agents.insert_one(doc)
+    await log_activity("added an agent", "agent", user, doc["name"])
+    return {"success": True, "id": doc["id"]}
+
+
+@api.patch("/agents/{aid}/verify")
+async def verify_agent(aid: str, body: VerifyInput, user: dict = Depends(require("agents", "edit"))):
+    res = await db.agents.update_one({"id": aid}, {"$set": {"verified": body.verified}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    await log_activity(("verified" if body.verified else "unverified") + " an agent", "agent", user, aid)
+    return {"success": True}
+
+
+@api.delete("/agents/{aid}")
+async def delete_agent(aid: str, user: dict = Depends(require("agents", "delete"))):
+    res = await db.agents.delete_one({"id": aid})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    await log_activity("removed an agent", "agent", user, aid)
+    return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# Platform users (end-users of the AMASS app)
+# ---------------------------------------------------------------------------
+@api.get("/platform-users")
+async def list_platform_users(user: dict = Depends(require("users")), search: Optional[str] = None):
+    q: Dict[str, Any] = {}
+    if search:
+        q["$or"] = [{"name": {"$regex": search, "$options": "i"}},
+                    {"email": {"$regex": search, "$options": "i"}}]
+    rows = await db.platform_users.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    return rows
+
+
+@api.patch("/platform-users/{uid}/status")
+async def set_platform_user_status(uid: str, body: StatusInput, user: dict = Depends(require("users", "edit"))):
+    if body.status not in ("active", "suspended"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+    res = await db.platform_users.update_one({"id": uid}, {"$set": {"status": body.status}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    await log_activity(f"{body.status} a user", "user", user, uid)
+    return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# Public / AMASS app endpoints (no auth) — read approved marketplace data
+# ---------------------------------------------------------------------------
+@api.get("/public/properties")
+async def public_properties(
+    search: Optional[str] = None, city: Optional[str] = None, type: Optional[str] = None,
+    listing: Optional[str] = None, min_price: Optional[int] = None, max_price: Optional[int] = None,
+    bedrooms: Optional[int] = None, limit: int = 60,
+):
+    q: Dict[str, Any] = {"status": "approved"}
+    if city and city != "all": q["city"] = city
+    if type and type != "all": q["type"] = type
+    if listing and listing != "all": q["listing"] = listing
+    if bedrooms: q["bedrooms"] = {"$gte": bedrooms}
+    if min_price or max_price:
+        q["price"] = {}
+        if min_price: q["price"]["$gte"] = min_price
+        if max_price: q["price"]["$lte"] = max_price
+    if search:
+        q["$or"] = [{"title": {"$regex": search, "$options": "i"}},
+                    {"city": {"$regex": search, "$options": "i"}}]
+    rows = await db.properties.find(q, {"_id": 0}).sort("created_at", -1).to_list(min(limit, 200))
+    return rows
+
+
+@api.get("/public/properties/{pid}")
+async def public_property(pid: str):
+    doc = await db.properties.find_one({"id": pid, "status": "approved"}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return doc
+
+
+@api.post("/public/properties")
+async def public_submit_property(body: PropertyInput):
+    doc = body.model_dump()
+    doc.update({"id": new_id(), "status": "pending", "verified": False,
+                "agent_name": await _agent_name(body.agent_id), "created_at": now_iso()})
+    await db.properties.insert_one(doc)
+    return {"success": True, "id": doc["id"], "status": "pending"}
+
+
+@api.get("/public/agents")
+async def public_agents(city: Optional[str] = None):
+    q: Dict[str, Any] = {"verified": True}
+    if city and city != "all": q["city"] = city
+    rows = await db.agents.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return rows
 
 
 # ---------------------------------------------------------------------------
@@ -558,13 +790,17 @@ async def seed():
         await db.cms_sections.insert_many(default_cms_sections())
         logger.info("Seeded CMS sections (v%s)", CMS_VERSION)
 
-    # Demo data
-    if await db.leads.count_documents({}) == 0:
+    # Demo data (version-gated)
+    if await db.app_meta.find_one({"key": "demo_version", "value": DEMO_VERSION}) is None:
+        for coll in ("leads", "agents", "platform_users", "properties", "activities"):
+            await db[coll].delete_many({})
         await seed_demo_data()
-        logger.info("Seeded demo data")
+        await db.app_meta.update_one({"key": "demo_version"}, {"$set": {"value": DEMO_VERSION}}, upsert=True)
+        logger.info("Seeded demo data (v%s)", DEMO_VERSION)
 
 
 CMS_VERSION = 2  # bump to force a re-seed of landing page content
+DEMO_VERSION = 4  # bump to force a re-seed of demo marketplace data
 
 
 def default_cms_sections():
@@ -783,22 +1019,51 @@ async def seed_demo_data():
                       "message": "New enquiry today.", "status": "New", "created_at": now_iso()})
     await db.leads.insert_many(leads)
 
-    agents = [{"id": new_id(), "name": f"{random.choice(first)} {random.choice(last)}",
-               "email": f"agent{i}@amass.africa", "city": random.choice(["Lagos", "Nairobi", "Accra", "Cairo"]),
-               "verified": random.choice([True, False]), "created_at": now_iso()} for i in range(14)]
+    prop_images = [
+        "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1200&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1200&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=1200&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?q=80&w=1200&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=1200&auto=format&fit=crop",
+    ]
+    agencies = ["AMASS Homes", "Prime Realty", "Urban Nest", "Coastal Estates", "Landmark Africa"]
+    agents = []
+    for i in range(14):
+        fn, ln = random.choice(first), random.choice(last)
+        agents.append({"id": new_id(), "name": f"{fn} {ln}", "email": f"agent{i}@amass.africa",
+                       "phone": f"+234 80{random.randint(10000000, 99999999)}", "city": random.choice(CITIES),
+                       "agency": random.choice(agencies), "verified": random.random() > 0.4,
+                       "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 40))).isoformat()})
     await db.agents.insert_many(agents)
 
-    users = [{"id": new_id(), "name": f"{random.choice(first)} {random.choice(last)}",
-              "email": f"user{i}@example.com", "created_at": now_iso()} for i in range(52)]
+    users = []
+    for i in range(52):
+        fn, ln = random.choice(first), random.choice(last)
+        users.append({"id": new_id(), "name": f"{fn} {ln}", "email": f"user{i}@example.com",
+                      "phone": f"+234 81{random.randint(10000000, 99999999)}", "city": random.choice(CITIES),
+                      "status": "suspended" if random.random() > 0.92 else "active",
+                      "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 60))).isoformat()})
     await db.platform_users.insert_many(users)
 
+    prefixes = ["Modern", "Luxury", "Smart", "Serviced", "Signature", "Contemporary", "Waterfront"]
     props = []
     for i in range(38):
-        props.append({"id": new_id(), "title": f"Property #{1000 + i}",
-                      "city": random.choice(["Lagos", "Nairobi", "Accra", "Cairo", "Kigali"]),
-                      "price": random.randint(50, 800) * 1000,
-                      "status": random.choice(["approved", "approved", "approved", "pending"]),
-                      "created_at": now_iso()})
+        ag = random.choice(agents)
+        beds = random.randint(1, 6)
+        ptype = random.choice(PROPERTY_TYPES)
+        props.append({"id": new_id(),
+                      "title": f"{random.choice(prefixes)} {ptype}",
+                      "description": "A beautifully finished property in a prime location with fully verified documents and title.",
+                      "type": ptype, "listing": random.choice(PROPERTY_LISTINGS),
+                      "city": random.choice(CITIES),
+                      "address": f"{random.randint(1, 60)} {random.choice(['Palm', 'Ocean', 'Hill', 'Garden', 'Cedar'])} Street",
+                      "price": random.randint(20, 500) * 1000000, "currency": "NGN",
+                      "bedrooms": beds, "bathrooms": random.randint(1, beds + 1), "area_sqm": random.randint(60, 650),
+                      "image": random.choice(prop_images), "agent_id": ag["id"], "agent_name": ag["name"],
+                      "status": random.choice(["approved", "approved", "approved", "pending", "pending", "rejected", "sold"]),
+                      "verified": random.random() > 0.5,
+                      "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 20))).isoformat()})
     await db.properties.insert_many(props)
 
     acts = [

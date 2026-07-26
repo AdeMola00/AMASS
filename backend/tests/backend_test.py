@@ -145,7 +145,7 @@ class TestCMS:
         assert r.status_code == 200
         keys = [s["key"] for s in r.json()]
         for expected in ["hero", "statistics", "categories", "showcase", "testimonials",
-                         "faq", "partners", "contact", "social", "footer", "seo"]:
+                         "faq", "contact", "social", "footer", "seo"]:
             assert expected in keys
 
     def test_update_and_public(self, super_token):
@@ -163,11 +163,11 @@ class TestCMS:
                      json={"data": cur["data"], "visible": True})
 
     def test_visibility_toggle(self, super_token):
-        r = requests.put(f"{BASE_URL}/api/cms/sections/partners", headers=_h(super_token), json={"visible": False})
+        r = requests.put(f"{BASE_URL}/api/cms/sections/faq", headers=_h(super_token), json={"visible": False})
         assert r.status_code == 200
         pub = requests.get(f"{BASE_URL}/api/public/landing").json()
-        assert "partners" not in pub
-        requests.put(f"{BASE_URL}/api/cms/sections/partners", headers=_h(super_token), json={"visible": True})
+        assert "faq" not in pub
+        requests.put(f"{BASE_URL}/api/cms/sections/faq", headers=_h(super_token), json={"visible": True})
 
 
 # ------------------- Roles -------------------
@@ -274,3 +274,206 @@ class TestProfile:
         r = requests.post(f"{BASE_URL}/api/auth/change-password", headers=_h(super_token),
                           json={"current_password": "wrong", "new_password": "NewP@ss123"})
         assert r.status_code == 400
+
+
+# ------------------- Admin Properties -------------------
+class TestProperties:
+    def test_list_properties(self, super_token):
+        r = requests.get(f"{BASE_URL}/api/properties", headers=_h(super_token))
+        assert r.status_code == 200
+        rows = r.json()
+        assert len(rows) > 0
+        p = rows[0]
+        for k in ["id", "title", "type", "listing", "city", "price", "status", "verified", "agent_name"]:
+            assert k in p, f"missing {k} in property doc"
+
+    def test_filter_by_city_and_status(self, super_token):
+        r = requests.get(f"{BASE_URL}/api/properties?city=Lagos&status=approved", headers=_h(super_token))
+        assert r.status_code == 200
+        for p in r.json():
+            assert p["city"] == "Lagos"
+            assert p["status"] == "approved"
+
+    def test_search_and_type(self, super_token):
+        # any type
+        meta = requests.get(f"{BASE_URL}/api/properties-meta", headers=_h(super_token)).json()
+        t = meta["types"][0]
+        r = requests.get(f"{BASE_URL}/api/properties?type={t}", headers=_h(super_token))
+        assert r.status_code == 200
+        for p in r.json():
+            assert p["type"] == t
+
+    def test_create_defaults_pending_unverified(self, super_token):
+        payload = {"title": "TEST_Prop_XYZ", "type": "Apartment", "listing": "Sale",
+                   "city": "Lagos", "price": 12345678, "bedrooms": 2, "bathrooms": 2, "area_sqm": 80}
+        r = requests.post(f"{BASE_URL}/api/properties", headers=_h(super_token), json=payload)
+        assert r.status_code == 200, r.text
+        pid = r.json()["id"]
+        # GET back via list search
+        rows = requests.get(f"{BASE_URL}/api/properties?search=TEST_Prop_XYZ", headers=_h(super_token)).json()
+        p = next(x for x in rows if x["id"] == pid)
+        assert p["status"] == "pending"
+        assert p["verified"] is False
+        assert p["title"] == "TEST_Prop_XYZ"
+        # status change -> approved
+        r2 = requests.patch(f"{BASE_URL}/api/properties/{pid}/status", headers=_h(super_token), json={"status": "approved"})
+        assert r2.status_code == 200
+        # verify toggle
+        r3 = requests.patch(f"{BASE_URL}/api/properties/{pid}/verify", headers=_h(super_token), json={"verified": True})
+        assert r3.status_code == 200
+        rows = requests.get(f"{BASE_URL}/api/properties?search=TEST_Prop_XYZ", headers=_h(super_token)).json()
+        p = next(x for x in rows if x["id"] == pid)
+        assert p["status"] == "approved" and p["verified"] is True
+        # invalid status
+        rb = requests.patch(f"{BASE_URL}/api/properties/{pid}/status", headers=_h(super_token), json={"status": "bogus"})
+        assert rb.status_code == 400
+        # delete
+        d = requests.delete(f"{BASE_URL}/api/properties/{pid}", headers=_h(super_token))
+        assert d.status_code == 200
+        rows = requests.get(f"{BASE_URL}/api/properties?search=TEST_Prop_XYZ", headers=_h(super_token)).json()
+        assert not any(x["id"] == pid for x in rows)
+
+
+# ------------------- Admin Agents -------------------
+class TestAgents:
+    def test_list_with_listings_count(self, super_token):
+        r = requests.get(f"{BASE_URL}/api/agents", headers=_h(super_token))
+        assert r.status_code == 200
+        rows = r.json()
+        assert len(rows) > 0
+        assert "listings_count" in rows[0]
+        assert isinstance(rows[0]["listings_count"], int)
+
+    def test_verified_filter(self, super_token):
+        r = requests.get(f"{BASE_URL}/api/agents?verified=true", headers=_h(super_token))
+        assert r.status_code == 200
+        for a in r.json():
+            assert a["verified"] is True
+
+    def test_create_verify_delete(self, super_token):
+        payload = {"name": "TEST_Agent", "email": "test_agent_xyz@example.com",
+                   "phone": "+234800", "city": "Lagos", "agency": "TEST Agency"}
+        # cleanup
+        rows = requests.get(f"{BASE_URL}/api/agents?search=test_agent_xyz", headers=_h(super_token)).json()
+        for a in rows:
+            requests.delete(f"{BASE_URL}/api/agents/{a['id']}", headers=_h(super_token))
+        r = requests.post(f"{BASE_URL}/api/agents", headers=_h(super_token), json=payload)
+        assert r.status_code == 200, r.text
+        aid = r.json()["id"]
+        # duplicate email
+        dup = requests.post(f"{BASE_URL}/api/agents", headers=_h(super_token), json=payload)
+        assert dup.status_code == 400
+        # verify toggle
+        v = requests.patch(f"{BASE_URL}/api/agents/{aid}/verify", headers=_h(super_token), json={"verified": True})
+        assert v.status_code == 200
+        rows = requests.get(f"{BASE_URL}/api/agents?search=test_agent_xyz", headers=_h(super_token)).json()
+        a = next(x for x in rows if x["id"] == aid)
+        assert a["verified"] is True
+        # delete
+        d = requests.delete(f"{BASE_URL}/api/agents/{aid}", headers=_h(super_token))
+        assert d.status_code == 200
+
+
+# ------------------- Platform users -------------------
+class TestPlatformUsers:
+    def test_list(self, super_token):
+        r = requests.get(f"{BASE_URL}/api/platform-users", headers=_h(super_token))
+        assert r.status_code == 200
+        rows = r.json()
+        assert len(rows) > 0
+        assert "status" in rows[0]
+
+    def test_suspend_and_reactivate(self, super_token):
+        rows = requests.get(f"{BASE_URL}/api/platform-users", headers=_h(super_token)).json()
+        uid = rows[0]["id"]
+        orig_status = rows[0].get("status", "active")
+        r = requests.patch(f"{BASE_URL}/api/platform-users/{uid}/status",
+                           headers=_h(super_token), json={"status": "suspended"})
+        assert r.status_code == 200
+        rows2 = requests.get(f"{BASE_URL}/api/platform-users?search={rows[0]['email']}", headers=_h(super_token)).json()
+        u = next(x for x in rows2 if x["id"] == uid)
+        assert u["status"] == "suspended"
+        # invalid
+        rb = requests.patch(f"{BASE_URL}/api/platform-users/{uid}/status",
+                            headers=_h(super_token), json={"status": "bogus"})
+        assert rb.status_code == 400
+        # restore
+        rr = requests.patch(f"{BASE_URL}/api/platform-users/{uid}/status",
+                            headers=_h(super_token), json={"status": orig_status})
+        assert rr.status_code == 200
+
+
+# ------------------- Public app endpoints -------------------
+class TestPublicApp:
+    def test_public_properties_only_approved(self):
+        r = requests.get(f"{BASE_URL}/api/public/properties")
+        assert r.status_code == 200
+        rows = r.json()
+        assert len(rows) > 0
+        for p in rows:
+            assert p["status"] == "approved"
+
+    def test_public_filters(self):
+        r = requests.get(f"{BASE_URL}/api/public/properties?city=Lagos&listing=Sale&min_price=1&max_price=10000000000&bedrooms=1")
+        assert r.status_code == 200
+        for p in r.json():
+            assert p["city"] == "Lagos"
+            assert p["listing"] == "Sale"
+            assert p["bedrooms"] >= 1
+
+    def test_public_detail_404_for_non_approved(self, super_token):
+        # create a pending property, GET public/{id} must 404
+        payload = {"title": "TEST_PublicHidden", "type": "Apartment", "listing": "Sale",
+                   "city": "Lagos", "price": 5000000}
+        pid = requests.post(f"{BASE_URL}/api/properties", headers=_h(super_token), json=payload).json()["id"]
+        r = requests.get(f"{BASE_URL}/api/public/properties/{pid}")
+        assert r.status_code == 404
+        # approve then public/{id} should return
+        requests.patch(f"{BASE_URL}/api/properties/{pid}/status", headers=_h(super_token), json={"status": "approved"})
+        r2 = requests.get(f"{BASE_URL}/api/public/properties/{pid}")
+        assert r2.status_code == 200 and r2.json()["id"] == pid
+        # cleanup
+        requests.delete(f"{BASE_URL}/api/properties/{pid}", headers=_h(super_token))
+
+    def test_public_submit_property_pending(self, super_token):
+        payload = {"title": "TEST_PublicSubmit", "type": "Apartment", "listing": "Rent",
+                   "city": "Abuja", "price": 900000}
+        r = requests.post(f"{BASE_URL}/api/public/properties", json=payload)
+        assert r.status_code == 200
+        pid = r.json()["id"]
+        assert r.json()["status"] == "pending"
+        # verify via admin listing
+        rows = requests.get(f"{BASE_URL}/api/properties?search=TEST_PublicSubmit", headers=_h(super_token)).json()
+        p = next(x for x in rows if x["id"] == pid)
+        assert p["status"] == "pending" and p["verified"] is False
+        # cleanup
+        requests.delete(f"{BASE_URL}/api/properties/{pid}", headers=_h(super_token))
+
+    def test_public_agents_only_verified(self):
+        r = requests.get(f"{BASE_URL}/api/public/agents")
+        assert r.status_code == 200
+        rows = r.json()
+        assert len(rows) > 0
+        for a in rows:
+            assert a["verified"] is True
+
+
+# ------------------- RBAC on new modules -------------------
+class TestRBACNew:
+    def test_content_manager_properties_403(self, content_token):
+        r = requests.get(f"{BASE_URL}/api/properties", headers=_h(content_token))
+        assert r.status_code == 403
+
+    def test_content_manager_agents_403(self, content_token):
+        r = requests.get(f"{BASE_URL}/api/agents", headers=_h(content_token))
+        assert r.status_code == 403
+
+    def test_finance_properties_403(self, finance_token):
+        r = requests.get(f"{BASE_URL}/api/properties", headers=_h(finance_token))
+        assert r.status_code == 403
+
+    def test_public_endpoints_no_auth(self):
+        # No Authorization header -> still 200
+        r1 = requests.get(f"{BASE_URL}/api/public/properties")
+        r2 = requests.get(f"{BASE_URL}/api/public/agents")
+        assert r1.status_code == 200 and r2.status_code == 200

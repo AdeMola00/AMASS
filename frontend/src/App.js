@@ -11,11 +11,14 @@ import Leads from "@/pages/Leads";
 import LandingCMS from "@/pages/LandingCMS";
 import RolesPermissions from "@/pages/RolesPermissions";
 import Settings from "@/pages/Settings";
+import Properties from "@/pages/Properties";
+import PropertyVerification from "@/pages/PropertyVerification";
+import Agents from "@/pages/Agents";
+import Users from "@/pages/Users";
 import Placeholder from "@/pages/Placeholder";
 
 const PLACEHOLDER_PATHS = [
-  "analytics", "reports", "properties", "property-verification", "agents", "users",
-  "property-owners", "developers", "construction", "home-marketplace",
+  "analytics", "reports", "property-owners", "developers", "construction", "home-marketplace",
   "transactions", "payments", "subscriptions", "messages", "notifications", "ai",
 ];
 
@@ -35,6 +38,10 @@ function App() {
                 <Route index element={<Dashboard />} />
                 <Route path="leads" element={<Leads />} />
                 <Route path="cms" element={<LandingCMS />} />
+                <Route path="properties" element={<Properties />} />
+                <Route path="property-verification" element={<PropertyVerification />} />
+                <Route path="agents" element={<Agents />} />
+                <Route path="users" element={<Users />} />
                 <Route path="roles" element={<RolesPermissions />} />
                 <Route path="settings" element={<Settings />} />
                 {PLACEHOLDER_PATHS.map((p) => (
