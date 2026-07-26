@@ -1,0 +1,65 @@
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { storage } from "@/src/utils/storage";
+import { api, AUTH_STORAGE_KEY, UserProfile } from "@/src/lib/api";
+
+type AuthContextValue = {
+  user: UserProfile | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, full_name: string, phone?: string) => Promise<void>;
+  signOut: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const token = await storage.secureGet<string>(AUTH_STORAGE_KEY, "");
+      if (token) {
+        try {
+          const me = await api.me();
+          setUser(me);
+        } catch {
+          await storage.secureRemove(AUTH_STORAGE_KEY);
+        }
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const res = await api.login({ email, password });
+    await storage.secureSet(AUTH_STORAGE_KEY, res.access_token);
+    setUser(res.user);
+  }, []);
+
+  const signUp = useCallback(
+    async (email: string, password: string, full_name: string, phone?: string) => {
+      const res = await api.register({ email, password, full_name, phone });
+      await storage.secureSet(AUTH_STORAGE_KEY, res.access_token);
+      setUser(res.user);
+    },
+    []
+  );
+
+  const signOut = useCallback(async () => {
+    await storage.secureRemove(AUTH_STORAGE_KEY);
+    setUser(null);
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be within AuthProvider");
+  return ctx;
+}

@@ -1,24 +1,35 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "AMASS",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
-    "userInterfaceStyle": "automatic",
+    "scheme": "amass",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.propertyosafrica.znbqmw"
+      "bundleIdentifier": "com.emergent.propertyosafrica.znbqmw",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Discover properties near you on the map",
+        "NSPhotoLibraryUsageDescription": "Choose photos for your property listings",
+        "NSCameraUsageDescription": "Take photos of properties to list on AMASS"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#FFFFFF"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.propertyosafrica.znbqmw"
+      "package": "com.emergent.propertyosafrica.znbqmw",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -33,7 +44,7 @@
           "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#FFFFFF"
         }
       ]
     ],

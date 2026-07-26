@@ -1,16 +1,46 @@
-import { Text, View, StyleSheet, Image } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, StyleSheet, Animated, Text } from "react-native";
+import { useRouter } from "expo-router";
+import { useAuth } from "@/src/contexts/auth";
+import { AmassLogo } from "@/src/components/AmassLogo";
+import { colors, typography } from "@/src/constants/theme";
 
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+export default function Splash() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.9)).current;
 
-export default function Index() {
-  console.log(EXPO_PUBLIC_BACKEND_URL, "EXPO_PUBLIC_BACKEND_URL");
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [opacity, scale]);
+
+  useEffect(() => {
+    if (loading) return;
+    const t = setTimeout(() => {
+      if (user) router.replace("/(tabs)");
+      else router.replace("/onboarding");
+    }, 1600);
+    return () => clearTimeout(t);
+  }, [loading, user, router]);
 
   return (
-    <View style={styles.container}>
-      <Image
-        source={require("../assets/images/app-image.png")}
-        style={styles.image}
-      />
+    <View style={styles.container} testID="splash-screen">
+      <Animated.View style={{ opacity, transform: [{ scale }], alignItems: "center" }}>
+        <AmassLogo size="xl" />
+        <Text style={styles.tagline}>Africa&apos;s Property Operating System</Text>
+      </Animated.View>
     </View>
   );
 }
@@ -18,13 +48,14 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0c0c0c",
+    backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
   },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
+  tagline: {
+    ...typography.body,
+    color: colors.textTertiary,
+    marginTop: 28,
+    letterSpacing: 0.5,
   },
 });
