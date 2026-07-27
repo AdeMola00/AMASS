@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
@@ -10,15 +10,6 @@ import { colors, shadows } from "@/src/constants/theme";
 import { Redirect } from "expo-router";
 
 type IconName = keyof typeof Ionicons.glyphMap;
-
-const TABS: { name: string; label: string; icon: IconName; iconActive: IconName }[] = [
-  { name: "index", label: "Home", icon: "map-outline", iconActive: "map" },
-  { name: "discover", label: "Discover", icon: "compass-outline", iconActive: "compass" },
-  { name: "_ai", label: "AI", icon: "sparkles", iconActive: "sparkles" },
-  { name: "marketplace", label: "Market", icon: "grid-outline", iconActive: "grid" },
-  { name: "messages", label: "Messages", icon: "chatbubbles-outline", iconActive: "chatbubbles" },
-  { name: "profile", label: "Profile", icon: "person-outline", iconActive: "person" },
-];
 
 export default function TabsLayout() {
   const { user, loading } = useAuth();
@@ -41,13 +32,7 @@ export default function TabsLayout() {
 
 function FloatingBottomBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const bottomInset = Math.max(insets.bottom, 12);
-
-  const openAI = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    router.push("/ai-search");
-  };
 
   const orderedRoutes = state.routes;
 
@@ -64,7 +49,7 @@ function FloatingBottomBar({ state, navigation }: any) {
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.96)" }]} />
         )}
         <View style={styles.bar}>
-          {orderedRoutes.slice(0, 2).map((r: any, i: number) => (
+          {orderedRoutes.map((r: any, i: number) => (
             <TabButton
               key={r.key}
               route={r}
@@ -73,28 +58,8 @@ function FloatingBottomBar({ state, navigation }: any) {
               onPress={() => navigation.navigate(r.name)}
             />
           ))}
-
-          <View style={styles.fabSlot} />
-
-          {orderedRoutes.slice(2).map((r: any, i: number) => (
-            <TabButton
-              key={r.key}
-              route={r}
-              index={i + 2}
-              active={state.index === i + 2}
-              onPress={() => navigation.navigate(r.name)}
-            />
-          ))}
         </View>
       </View>
-
-      <Pressable
-        onPress={openAI}
-        style={[styles.fab, shadows.floating, { bottom: 12 }]}
-        testID="ai-search-fab"
-      >
-        <Ionicons name="sparkles" size={22} color="#fff" />
-      </Pressable>
     </View>
   );
 }
@@ -175,20 +140,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     color: colors.textTertiary,
-  },
-  fabSlot: {
-    width: 72,
-  },
-  fab: {
-    position: "absolute",
-    alignSelf: "center",
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 4,
-    borderColor: "#fff",
   },
 });
