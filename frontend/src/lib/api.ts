@@ -171,13 +171,27 @@ export const api = {
         active: number;
         verified: number;
         views_30d: number;
-        leads_30d: number;
-        appointments_30d: number;
+        favorites_30d: number;
         total_value: number;
       };
       recent: Property[];
     }>("/agent/dashboard"),
   agentListings: () => req<Property[]>("/agent/listings"),
+  agentListingsAnalytics: () =>
+    req<
+      {
+        property_id: string;
+        title: string;
+        image: string;
+        price: number;
+        status: string;
+        verified: boolean;
+        views: number;
+        favorites: number;
+      }[]
+    >("/agent/listings-analytics"),
+  recordView: (property_id: string) =>
+    req<{ ok: boolean }>(`/properties/${property_id}/view`, { method: "POST" }),
   agentLeads: () =>
     req<
       {

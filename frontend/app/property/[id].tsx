@@ -41,6 +41,8 @@ export default function PropertyDetails() {
       .then(setProperty)
       .finally(() => setLoading(false));
     api.favoriteIds().then((r) => setFavorited(r.ids.includes(id))).catch(() => {});
+    // fire-and-forget view event
+    api.recordView(id).catch(() => {});
   }, [id]);
 
   const toggleFav = async () => {

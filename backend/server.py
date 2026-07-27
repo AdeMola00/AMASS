@@ -277,6 +277,54 @@ async def get_property(property_id: str):
     return doc
 
 
+# ─── Analytics events ────────────────────────────────────
+async def log_event(property_id: str, event_type: str, user_id: Optional[str] = None):
+    """Insert an event. `view` events are deduped per user+property per day
+    to avoid inflating counts on refreshes."""
+    now = datetime.now(timezone.utc)
+    if event_type == "view":
+        # Dedupe key
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        existing = await db.property_events.find_one(
+            {
+                "property_id": property_id,
+                "event_type": "view",
+                "user_id": user_id,
+                "created_at": {"$gte": day_start},
+            }
+        )
+        if existing:
+            return
+    await db.property_events.insert_one(
+        {
+            "id": str(uuid.uuid4()),
+            "property_id": property_id,
+            "user_id": user_id,
+            "event_type": event_type,
+            "created_at": now,
+        }
+    )
+
+
+@api.post("/properties/{property_id}/view")
+async def record_view(
+    property_id: str,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+):
+    prop = await db.properties.find_one({"id": property_id}, {"id": 1, "_id": 0})
+    if not prop:
+        raise HTTPException(404, "Property not found")
+    user_id: Optional[str] = None
+    if creds:
+        try:
+            payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+            user_id = payload.get("sub")
+        except jwt.PyJWTError:
+            user_id = None
+    await log_event(property_id, "view", user_id)
+    return {"ok": True}
+
+
 # ─── Property submission (Agent) ─────────────────────────
 class PropertyCreateIn(BaseModel):
     title: str
@@ -330,20 +378,78 @@ async def agent_dashboard(user: dict = Depends(get_current_user)):
     verified = [p for p in listings if p.get("verified")]
     total_value = sum(int(p.get("price", 0)) for p in active)
 
-    # Deterministic mock analytics off the listing count for now.
-    n = len(listings)
+    listing_ids = [p["id"] for p in listings]
+    since = datetime.now(timezone.utc) - timedelta(days=30)
+
+    views_30d = 0
+    favorites_30d = 0
+    if listing_ids:
+        views_30d = await db.property_events.count_documents(
+            {
+                "property_id": {"$in": listing_ids},
+                "event_type": "view",
+                "created_at": {"$gte": since},
+            }
+        )
+        favorites_30d = await db.property_events.count_documents(
+            {
+                "property_id": {"$in": listing_ids},
+                "event_type": "favorite",
+                "created_at": {"$gte": since},
+            }
+        )
+
     return {
         "stats": {
             "listings": len(listings),
             "active": len(active),
             "verified": len(verified),
-            "views_30d": n * 137 + 42,
-            "leads_30d": n * 6 + 3,
-            "appointments_30d": n * 2 + 1,
+            "views_30d": views_30d,
+            "favorites_30d": favorites_30d,
             "total_value": total_value,
         },
         "recent": listings[:5],
     }
+
+
+@api.get("/agent/listings-analytics")
+async def agent_listings_analytics(user: dict = Depends(get_current_user)):
+    """Per-listing view + favorite counts for the current agent."""
+    listings = await db.properties.find({"agent_id": user["id"]}, {"_id": 0}).to_list(500)
+    listing_ids = [p["id"] for p in listings]
+    if not listing_ids:
+        return []
+
+    pipeline = [
+        {"$match": {"property_id": {"$in": listing_ids}}},
+        {"$group": {"_id": {"pid": "$property_id", "type": "$event_type"}, "count": {"$sum": 1}}},
+    ]
+    agg = await db.property_events.aggregate(pipeline).to_list(1000)
+
+    counts: dict = {pid: {"views": 0, "favorites": 0} for pid in listing_ids}
+    for row in agg:
+        pid = row["_id"]["pid"]
+        t = row["_id"]["type"]
+        if pid not in counts:
+            continue
+        if t == "view":
+            counts[pid]["views"] = row["count"]
+        elif t == "favorite":
+            counts[pid]["favorites"] = row["count"]
+
+    return [
+        {
+            "property_id": p["id"],
+            "title": p["title"],
+            "image": (p.get("images") or [""])[0],
+            "price": p["price"],
+            "status": p.get("status"),
+            "verified": p.get("verified", False),
+            "views": counts[p["id"]]["views"],
+            "favorites": counts[p["id"]]["favorites"],
+        }
+        for p in listings
+    ]
 
 
 @api.get("/agent/leads")
@@ -396,6 +502,7 @@ async def toggle_favorite(
         await db.favorites.delete_one(
             {"user_id": user["id"], "property_id": data.property_id}
         )
+        await log_event(data.property_id, "unfavorite", user["id"])
         return {"favorited": False}
     await db.favorites.insert_one(
         {
@@ -405,6 +512,7 @@ async def toggle_favorite(
             "created_at": datetime.now(timezone.utc),
         }
     )
+    await log_event(data.property_id, "favorite", user["id"])
     return {"favorited": True}
 
 

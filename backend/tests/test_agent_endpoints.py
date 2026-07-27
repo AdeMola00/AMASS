@@ -179,8 +179,11 @@ class TestAgentDashboard:
         # Shape
         assert "stats" in data and "recent" in data
         stats = data["stats"]
-        for key in ("listings", "active", "verified", "views_30d", "leads_30d", "appointments_30d", "total_value"):
+        for key in ("listings", "active", "verified", "views_30d", "favorites_30d", "total_value"):
             assert key in stats, f"Missing stats.{key}"
+        # Removed keys should NOT be present
+        assert "leads_30d" not in stats
+        assert "appointments_30d" not in stats
 
         # Counts
         assert stats["listings"] == 3

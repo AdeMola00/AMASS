@@ -47,6 +47,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose photos of your property to list on AMASS",
+          "cameraPermission": "Take photos of your property to list on AMASS"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-image.png",

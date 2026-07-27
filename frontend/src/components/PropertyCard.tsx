@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     ...shadows.floating,
   },
   imageWrap: {
-    height: 180,
+    height: 140,
     position: "relative",
   },
   image: {

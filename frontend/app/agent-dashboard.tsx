@@ -39,11 +39,21 @@ type Dashboard = {
     active: number;
     verified: number;
     views_30d: number;
-    leads_30d: number;
-    appointments_30d: number;
+    favorites_30d: number;
     total_value: number;
   };
   recent: Property[];
+};
+
+type ListingAnalytics = {
+  property_id: string;
+  title: string;
+  image: string;
+  price: number;
+  status: string;
+  verified: boolean;
+  views: number;
+  favorites: number;
 };
 
 export default function AgentDashboard() {
@@ -52,19 +62,22 @@ export default function AgentDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [listings, setListings] = useState<Property[]>([]);
+  const [analytics, setAnalytics] = useState<ListingAnalytics[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [d, l, ld] = await Promise.all([
+      const [d, l, a, ld] = await Promise.all([
         api.agentDashboard(),
         api.agentListings(),
+        api.agentListingsAnalytics(),
         api.agentLeads(),
       ]);
       setDashboard(d);
       setListings(l);
+      setAnalytics(a);
       setLeads(ld);
     } catch {
       /* ignore */
@@ -137,13 +150,18 @@ export default function AgentDashboard() {
                   <Text style={styles.link}>View all</Text>
                 </Pressable>
               </View>
-              {dashboard.recent.slice(0, 3).map((p) => (
-                <ListingRow
-                  key={p.id}
-                  property={p}
-                  onPress={() => router.push(`/property/${p.id}`)}
-                />
-              ))}
+              {dashboard.recent.slice(0, 3).map((p) => {
+                const a = analytics.find((x) => x.property_id === p.id);
+                return (
+                  <ListingRow
+                    key={p.id}
+                    property={p}
+                    views={a?.views ?? 0}
+                    favorites={a?.favorites ?? 0}
+                    onPress={() => router.push(`/property/${p.id}`)}
+                  />
+                );
+              })}
             </>
           )}
         </ScrollView>
@@ -154,12 +172,17 @@ export default function AgentDashboard() {
           contentContainerStyle={{ padding: spacing.xl, paddingBottom: 140, gap: spacing.md }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.red} />}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <ListingRow
-              property={item}
-              onPress={() => router.push(`/property/${item.id}`)}
-            />
-          )}
+          renderItem={({ item }) => {
+            const a = analytics.find((x) => x.property_id === item.id);
+            return (
+              <ListingRow
+                property={item}
+                views={a?.views ?? 0}
+                favorites={a?.favorites ?? 0}
+                onPress={() => router.push(`/property/${item.id}`)}
+              />
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="business-outline" size={48} color={colors.textMuted} />
@@ -214,9 +237,9 @@ function Overview({ dashboard, onNew }: { dashboard: Dashboard | null; onNew: ()
 
       <View style={styles.statsGrid}>
         <StatBlock label="Views · 30d" value={s?.views_30d ?? 0} icon="eye" color={colors.info} />
-        <StatBlock label="Leads · 30d" value={s?.leads_30d ?? 0} icon="mail-unread" color={colors.red} />
-        <StatBlock label="Tours · 30d" value={s?.appointments_30d ?? 0} icon="calendar" color={colors.gold} />
-        <StatBlock label="Listings" value={s?.listings ?? 0} icon="business" color={colors.ink} />
+        <StatBlock label="Favorites · 30d" value={s?.favorites_30d ?? 0} icon="heart" color={colors.red} />
+        <StatBlock label="Active" value={s?.active ?? 0} icon="business" color={colors.ink} />
+        <StatBlock label="Verified" value={s?.verified ?? 0} icon="shield-checkmark" color={colors.success} />
       </View>
 
       <Pressable style={[styles.actionCard, shadows.soft]} onPress={onNew} testID="quick-new-listing">
@@ -255,7 +278,17 @@ function StatBlock({
   );
 }
 
-function ListingRow({ property, onPress }: { property: Property; onPress: () => void }) {
+function ListingRow({
+  property,
+  views,
+  favorites,
+  onPress,
+}: {
+  property: Property;
+  views: number;
+  favorites: number;
+  onPress: () => void;
+}) {
   const statusColor =
     property.status === "sold"
       ? colors.red
@@ -286,7 +319,17 @@ function ListingRow({ property, onPress }: { property: Property; onPress: () => 
         <Text numberOfLines={1} style={styles.listingLoc}>
           {property.location}
         </Text>
-        <Text style={styles.listingPrice}>{formatNaira(property.price)}</Text>
+        <View style={styles.listingFooter}>
+          <Text style={styles.listingPrice}>{formatNaira(property.price)}</Text>
+          <View style={styles.metricPill}>
+            <Ionicons name="eye" size={11} color={colors.textSecondary} />
+            <Text style={styles.metricPillText}>{views}</Text>
+          </View>
+          <View style={styles.metricPill}>
+            <Ionicons name="heart" size={11} color={colors.red} />
+            <Text style={styles.metricPillText}>{favorites}</Text>
+          </View>
+        </View>
       </View>
     </Pressable>
   );
@@ -448,6 +491,27 @@ const styles = StyleSheet.create({
   listingTitle: { fontSize: 14, fontWeight: "700", color: colors.text },
   listingLoc: { fontSize: 12, color: colors.textTertiary },
   listingPrice: { fontSize: 16, fontWeight: "800", color: colors.text, marginTop: 2 },
+  listingFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+    flexWrap: "wrap",
+  },
+  metricPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  metricPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
   lead: {
     flexDirection: "row",
     alignItems: "center",

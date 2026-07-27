@@ -7,6 +7,7 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -14,6 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { api } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
@@ -43,17 +45,6 @@ const PROPERTY_TYPES: { key: PropertyType; label: string; icon: keyof typeof Ion
 const AMENITIES = [
   "Swimming Pool", "Gym", "24/7 Security", "Smart Home", "Solar Power",
   "CCTV", "Borehole", "BQ", "Garden", "Parking", "Furnished", "Elevator",
-];
-
-const SAMPLE_IMAGES = [
-  "https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200",
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200",
-  "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200",
-  "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200",
-  "https://images.unsplash.com/photo-1600585152220-90363fe7e115?w=1200",
-  "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=1200",
-  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200",
-  "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200",
 ];
 
 export default function SubmitProperty() {
@@ -102,8 +93,11 @@ export default function SubmitProperty() {
   const toggleAmenity = (a: string) => {
     setSelectedAmenities((s) => (s.includes(a) ? s.filter((x) => x !== a) : [...s, a]));
   };
-  const toggleImage = (u: string) => {
-    setSelectedImages((s) => (s.includes(u) ? s.filter((x) => x !== u) : [...s, u]));
+  const removeImage = (u: string) => {
+    setSelectedImages((s) => s.filter((x) => x !== u));
+  };
+  const addImages = (uris: string[]) => {
+    setSelectedImages((s) => [...s, ...uris].slice(0, 10));
   };
 
   const submit = async () => {
@@ -204,7 +198,8 @@ export default function SubmitProperty() {
             selectedAmenities={selectedAmenities}
             toggleAmenity={toggleAmenity}
             selectedImages={selectedImages}
-            toggleImage={toggleImage}
+            addImages={addImages}
+            removeImage={removeImage}
           />
         )}
         {step === 4 && (
@@ -390,13 +385,72 @@ function Step3({
   selectedAmenities,
   toggleAmenity,
   selectedImages,
-  toggleImage,
+  addImages,
+  removeImage,
 }: any) {
+  const [picking, setPicking] = useState<null | "library" | "camera">(null);
+
+  const pickFromLibrary = async () => {
+    setPicking("library");
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        setPicking(null);
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"] as any,
+        allowsMultipleSelection: true,
+        selectionLimit: 8,
+        quality: 0.6,
+        base64: true,
+      });
+      if (!res.canceled) {
+        const uris = res.assets
+          .map((a) => (a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri))
+          .filter(Boolean);
+        addImages(uris);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setPicking(null);
+    }
+  };
+
+  const captureFromCamera = async () => {
+    setPicking("camera");
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        setPicking(null);
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        quality: 0.6,
+        base64: true,
+      });
+      if (!res.canceled) {
+        const a = res.assets[0];
+        const uri = a?.base64 ? `data:image/jpeg;base64,${a.base64}` : a?.uri;
+        if (uri) {
+          addImages([uri]);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        }
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setPicking(null);
+    }
+  };
+
   return (
     <View style={{ gap: spacing.xl }}>
       <View>
         <Text style={styles.h1}>Highlights & photos</Text>
-        <Text style={styles.sub}>Select amenities and photos for the listing.</Text>
+        <Text style={styles.sub}>Select amenities and add photos for the listing.</Text>
       </View>
 
       <View>
@@ -420,26 +474,74 @@ function Step3({
       </View>
 
       <View>
-        <Text style={styles.h2}>Photos ({selectedImages.length} selected)</Text>
-        <Text style={styles.sub}>Tap to select photos for your listing.</Text>
-        <View style={styles.photoGrid}>
-          {SAMPLE_IMAGES.map((u) => {
-            const on = selectedImages.includes(u);
-            const idx = selectedImages.indexOf(u);
-            return (
-              <Pressable key={u} onPress={() => toggleImage(u)} style={styles.photoWrap} testID={`photo-${u.substring(u.length - 10)}`}>
-                <Image source={{ uri: u }} style={styles.photo} contentFit="cover" />
-                <View style={[styles.photoOverlay, on && styles.photoOverlayOn]}>
-                  {on && (
-                    <View style={styles.photoBadge}>
-                      <Text style={styles.photoBadgeText}>{idx + 1}</Text>
-                    </View>
-                  )}
-                </View>
-              </Pressable>
-            );
-          })}
+        <Text style={styles.h2}>Photos ({selectedImages.length}/10)</Text>
+        <Text style={styles.sub}>
+          Add high-quality shots that highlight the property. First photo is the cover.
+        </Text>
+
+        <View style={styles.pickerRow}>
+          <Pressable
+            onPress={pickFromLibrary}
+            disabled={!!picking || selectedImages.length >= 10}
+            style={[styles.pickerBtn, (picking === "library") && { opacity: 0.5 }]}
+            testID="picker-library"
+          >
+            {picking === "library" ? (
+              <ActivityIndicator color={colors.text} />
+            ) : (
+              <>
+                <Ionicons name="images" size={20} color={colors.text} />
+                <Text style={styles.pickerBtnText}>Gallery</Text>
+              </>
+            )}
+          </Pressable>
+          <Pressable
+            onPress={captureFromCamera}
+            disabled={!!picking || selectedImages.length >= 10 || Platform.OS === "web"}
+            style={[
+              styles.pickerBtn,
+              (picking === "camera" || Platform.OS === "web") && { opacity: 0.5 },
+            ]}
+            testID="picker-camera"
+          >
+            {picking === "camera" ? (
+              <ActivityIndicator color={colors.text} />
+            ) : (
+              <>
+                <Ionicons name="camera" size={20} color={colors.text} />
+                <Text style={styles.pickerBtnText}>Camera</Text>
+              </>
+            )}
+          </Pressable>
         </View>
+
+        {selectedImages.length === 0 ? (
+          <View style={styles.emptyPhotos} testID="photos-empty">
+            <Ionicons name="camera-outline" size={30} color={colors.textMuted} />
+            <Text style={styles.emptyPhotosText}>No photos yet — add at least one to continue.</Text>
+          </View>
+        ) : (
+          <View style={styles.photoGrid}>
+            {selectedImages.map((u: string, idx: number) => (
+              <View key={`${idx}-${u.substring(0, 24)}`} style={styles.photoWrap}>
+                <Image source={{ uri: u }} style={styles.photo} contentFit="cover" />
+                {idx === 0 && (
+                  <View style={styles.coverBadge}>
+                    <Text style={styles.coverBadgeText}>COVER</Text>
+                  </View>
+                )}
+                <Pressable
+                  onPress={() => removeImage(u)}
+                  style={styles.removeBtn}
+                  hitSlop={8}
+                  testID={`remove-photo-${idx}`}
+                >
+                  <Ionicons name="close" size={16} color="#fff" />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -582,37 +684,81 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSecondary,
   },
   coordText: { textAlign: "center", fontSize: 12, color: colors.textTertiary, fontWeight: "600" },
-  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   photoWrap: {
     width: "48%",
     aspectRatio: 1.3,
     borderRadius: radius.md,
     overflow: "hidden",
     backgroundColor: colors.surfaceSecondary,
+    position: "relative",
   },
   photo: { width: "100%", height: "100%" },
-  photoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "transparent",
-    justifyContent: "flex-end",
-    padding: 8,
+  coverBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: colors.red,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
   },
-  photoOverlayOn: {
-    backgroundColor: "rgba(225,27,34,0.2)",
-    borderWidth: 3,
-    borderColor: colors.red,
-    borderRadius: radius.md,
+  coverBadgeText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.6,
   },
-  photoBadge: {
+  removeBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: colors.red,
+    backgroundColor: "rgba(0,0,0,0.6)",
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "flex-start",
   },
-  photoBadgeText: { color: "#fff", fontWeight: "800", fontSize: 12 },
+  pickerRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  pickerBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  pickerBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  emptyPhotos: {
+    marginTop: 12,
+    padding: 24,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: colors.border,
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  emptyPhotosText: {
+    fontSize: 13,
+    color: colors.textTertiary,
+    textAlign: "center",
+    fontWeight: "500",
+  },
   previewImgWrap: {
     height: 200,
     borderRadius: radius.lg,
