@@ -1,11 +1,12 @@
-// AMASS design tokens — Apple-like premium
+// AMASS design tokens — driven directly by the AMASS logo:
+// AMASS RED (bright), CHARCOAL BLACK, PURE WHITE.
 export const colors = {
   // Surfaces
   bg: "#FFFFFF",
   bgAlt: "#FAFAFA",
   surface: "#FFFFFF",
-  surfaceSecondary: "#F4F4F5",
-  surfaceTertiary: "#E4E4E7",
+  surfaceSecondary: "#F5F5F5",
+  surfaceTertiary: "#EAEAEA",
   surfaceInverse: "#0A0A0A",
 
   // Text
@@ -15,41 +16,50 @@ export const colors = {
   textMuted: "#A1A1AA",
   textInverse: "#FFFFFF",
 
-  // Brand
-  emerald: "#059669",
-  emeraldDark: "#047857",
-  emeraldLight: "#D1FAE5",
-  emeraldSurface: "#ECFDF5",
+  // BRAND — driven by the logo
+  red: "#E11B22",         // AMASS red (pin)
+  redDark: "#B7141A",
+  redLight: "#FDECEC",
+  redSurface: "#FEF2F2",
+
+  // Charcoal black — used as premium primary/interactive alongside red
+  ink: "#0A0A0A",
+  inkSoft: "#1C1C1E",
+  inkSurface: "#18181B",
+
+  // Legacy accent kept for success chips only
   gold: "#D97706",
   goldLight: "#FEF3C7",
 
-  // AMASS red — for pins, favorites, alerts only
-  red: "#DC2626",
-  redDark: "#B91C1C",
-  redLight: "#FEE2E2",
-
-  // States
+  // Semantic state colors
   success: "#059669",
   warning: "#F59E0B",
-  error: "#DC2626",
+  error: "#E11B22",
   info: "#3F3F46",
 
   // Borders
-  border: "#E4E4E7",
+  border: "#EAEAEA",
   borderStrong: "#D4D4D8",
-  divider: "#F4F4F5",
+  divider: "#F0F0F0",
 
   // Status ring colors for map markers
-  statusAvailable: "#10B981",
+  statusAvailable: "#059669",
   statusComingSoon: "#F59E0B",
-  statusVerified: "#3B82F6",
+  statusVerified: "#0A0A0A",
   statusPremium: "#8B5CF6",
-  statusSold: "#DC2626",
+  statusSold: "#E11B22",
 
   // Glass
   glassLight: "rgba(255,255,255,0.72)",
   glassDark: "rgba(10,10,10,0.55)",
   scrim: "rgba(0,0,0,0.35)",
+
+  // ─── LEGACY ALIASES (kept so existing imports still compile) ───
+  // These map former "emerald" / "info" tokens to the new red-black identity.
+  emerald: "#0A0A0A",         // was primary green → now premium black
+  emeraldDark: "#000000",
+  emeraldLight: "#F5F5F5",
+  emeraldSurface: "#F5F5F5",
 } as const;
 
 export const spacing = {
@@ -94,7 +104,7 @@ export const shadows = {
     elevation: 12,
   },
   pin: {
-    shadowColor: "#DC2626",
+    shadowColor: "#E11B22",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,

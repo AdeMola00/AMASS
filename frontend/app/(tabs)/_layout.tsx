@@ -113,9 +113,9 @@ function TabButton({ route, index, active, onPress }: any) {
       <Ionicons
         name={active ? cfg.iconActive : cfg.icon}
         size={22}
-        color={active ? colors.emerald : colors.textTertiary}
+        color={active ? colors.red : colors.textTertiary}
       />
-      <Text style={[styles.tabLabel, active && { color: colors.emerald, fontWeight: "700" }]}>
+      <Text style={[styles.tabLabel, active && { color: colors.red, fontWeight: "700" }]}>
         {cfg.label}
       </Text>
     </Pressable>
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: colors.emerald,
+    backgroundColor: colors.red,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 4,

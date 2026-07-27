@@ -101,7 +101,7 @@ export default function Marketplace() {
       )}
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.emerald} />
+        <ActivityIndicator style={{ marginTop: 40 }} color={colors.red} />
       ) : (
         <FlatList
           data={items}

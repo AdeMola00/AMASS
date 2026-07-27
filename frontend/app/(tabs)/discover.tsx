@@ -36,7 +36,7 @@ export default function Discover() {
         </View>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color={colors.emerald} />
+          <ActivityIndicator style={{ marginTop: 40 }} color={colors.red} />
         ) : (
           <>
             <SectionHeader title="Trending Areas" caption="Fastest-appreciating markets" />
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: colors.emerald,
+    backgroundColor: colors.red,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: radius.pill,
