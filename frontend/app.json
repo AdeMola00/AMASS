@@ -11,6 +11,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.propertyosafrica.znbqmw",
+      "config": {
+        "googleMapsApiKey": "AIzaSyAknqfu3Tx0v_XwLHMaGRj5fMQ7rJxYYLY"
+      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Discover properties near you on the map",
         "NSPhotoLibraryUsageDescription": "Choose photos for your property listings",
@@ -24,6 +27,11 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.propertyosafrica.znbqmw",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAknqfu3Tx0v_XwLHMaGRj5fMQ7rJxYYLY"
+        }
+      },
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",

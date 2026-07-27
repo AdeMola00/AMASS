@@ -277,6 +277,105 @@ async def get_property(property_id: str):
     return doc
 
 
+# ─── Property submission (Agent) ─────────────────────────
+class PropertyCreateIn(BaseModel):
+    title: str
+    description: str
+    price: int
+    listing_type: Literal["buy", "rent", "lease", "shortlet"]
+    property_type: Literal["duplex", "apartment", "bungalow", "land", "commercial", "penthouse", "terrace"]
+    bedrooms: int = 0
+    bathrooms: int = 0
+    size_sqm: int
+    location: str
+    city: str
+    state: str
+    country: str = "Nigeria"
+    latitude: float
+    longitude: float
+    images: List[str] = []
+    amenities: List[str] = []
+    year_built: Optional[int] = None
+    parking: Optional[int] = None
+
+
+@api.post("/properties", response_model=Property)
+async def create_property(data: PropertyCreateIn, user: dict = Depends(get_current_user)):
+    prop = Property(
+        **data.model_dump(),
+        status="coming_soon",
+        verified=False,
+        agent_id=user["id"],
+        agent_name=user["full_name"],
+        agent_avatar=user.get("avatar_url"),
+    )
+    await db.properties.insert_one(prop.model_dump())
+    # Promote the user to agent on first listing
+    if not user.get("is_agent"):
+        await db.users.update_one({"id": user["id"]}, {"$set": {"is_agent": True}})
+    return prop
+
+
+# ─── Agent dashboard ─────────────────────────────────────
+@api.get("/agent/listings")
+async def agent_listings(user: dict = Depends(get_current_user)):
+    docs = await db.properties.find({"agent_id": user["id"]}, {"_id": 0}).to_list(500)
+    return docs
+
+
+@api.get("/agent/dashboard")
+async def agent_dashboard(user: dict = Depends(get_current_user)):
+    listings = await db.properties.find({"agent_id": user["id"]}, {"_id": 0}).to_list(500)
+    active = [p for p in listings if p.get("status") != "sold"]
+    verified = [p for p in listings if p.get("verified")]
+    total_value = sum(int(p.get("price", 0)) for p in active)
+
+    # Deterministic mock analytics off the listing count for now.
+    n = len(listings)
+    return {
+        "stats": {
+            "listings": len(listings),
+            "active": len(active),
+            "verified": len(verified),
+            "views_30d": n * 137 + 42,
+            "leads_30d": n * 6 + 3,
+            "appointments_30d": n * 2 + 1,
+            "total_value": total_value,
+        },
+        "recent": listings[:5],
+    }
+
+
+@api.get("/agent/leads")
+async def agent_leads(user: dict = Depends(get_current_user)):
+    listings = await db.properties.find({"agent_id": user["id"]}, {"_id": 0}).to_list(500)
+    if not listings:
+        return []
+    # Generate mock leads tied to real listings so the dashboard feels live.
+    LEAD_TEMPLATES = [
+        {"name": "Chidinma Eze", "avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200", "channel": "chat", "message": "Is this still available? Can I inspect on Saturday?"},
+        {"name": "Tobi Adeyemi", "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200", "channel": "call", "message": "Missed call — interested in a viewing this week."},
+        {"name": "Amaka Nwosu", "avatar": "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200", "channel": "chat", "message": "What's the minimum down payment for this unit?"},
+        {"name": "Fola Ojo", "avatar": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200", "channel": "email", "message": "Requesting the C of O documents ahead of inspection."},
+        {"name": "Zainab Musa", "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200", "channel": "chat", "message": "Any flexibility on the price? Serious buyer."},
+    ]
+    leads = []
+    for i, tmpl in enumerate(LEAD_TEMPLATES):
+        prop = listings[i % len(listings)]
+        leads.append(
+            {
+                "id": f"lead-{i}",
+                **tmpl,
+                "property_id": prop["id"],
+                "property_title": prop["title"],
+                "property_image": (prop.get("images") or [""])[0],
+                "created_at": (datetime.now(timezone.utc) - timedelta(hours=i * 6 + 1)).isoformat(),
+                "unread": i < 2,
+            }
+        )
+    return leads
+
+
 # ─── Favorites ────────────────────────────────────────────
 @api.get("/favorites")
 async def list_favorites(user: dict = Depends(get_current_user)):

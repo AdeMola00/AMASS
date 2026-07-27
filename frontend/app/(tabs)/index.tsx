@@ -136,6 +136,7 @@ export default function HomeMap() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_DEFAULT}
+        mapType="hybrid"
         initialRegion={INITIAL_REGION}
         showsCompass={false}
         showsMyLocationButton={false}

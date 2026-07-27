@@ -11,6 +11,8 @@ import { AmassPinIcon } from "@/src/components/AmassLogo";
 type IconName = keyof typeof Ionicons.glyphMap;
 
 const MENU: { icon: IconName; label: string; route?: string; caption?: string }[] = [
+  { icon: "briefcase-outline", label: "Agent Dashboard", route: "/agent-dashboard", caption: "Listings, leads & analytics" },
+  { icon: "add-circle-outline", label: "List a Property", route: "/submit-property", caption: "Publish a new listing" },
   { icon: "heart-outline", label: "Saved Properties", caption: "Your favorites" },
   { icon: "document-text-outline", label: "My Documents", caption: "Contracts & titles" },
   { icon: "shield-checkmark-outline", label: "Identity Verification", caption: "Enhance trust" },

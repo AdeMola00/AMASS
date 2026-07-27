@@ -140,6 +140,60 @@ export const api = {
   // Neighborhoods
   neighborhoods: () => req<Neighborhood[]>("/neighborhoods"),
 
+  // Agent
+  createProperty: (data: {
+    title: string;
+    description: string;
+    price: number;
+    listing_type: string;
+    property_type: string;
+    bedrooms: number;
+    bathrooms: number;
+    size_sqm: number;
+    location: string;
+    city: string;
+    state: string;
+    latitude: number;
+    longitude: number;
+    images: string[];
+    amenities: string[];
+    year_built?: number;
+    parking?: number;
+  }) =>
+    req<Property>("/properties", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  agentDashboard: () =>
+    req<{
+      stats: {
+        listings: number;
+        active: number;
+        verified: number;
+        views_30d: number;
+        leads_30d: number;
+        appointments_30d: number;
+        total_value: number;
+      };
+      recent: Property[];
+    }>("/agent/dashboard"),
+  agentListings: () => req<Property[]>("/agent/listings"),
+  agentLeads: () =>
+    req<
+      {
+        id: string;
+        name: string;
+        avatar: string;
+        channel: "chat" | "call" | "email";
+        message: string;
+        property_id: string;
+        property_title: string;
+        property_image: string;
+        created_at: string;
+        unread: boolean;
+      }[]
+    >("/agent/leads"),
+
   // AI
   aiSearchSync: (query: string, session_id?: string) =>
     req<{ reply: string }>("/ai/search/sync", {

@@ -12,10 +12,12 @@ type MapProps = {
   style?: any;
   initialRegion?: Region;
   provider?: any;
+  mapType?: string;
   showsCompass?: boolean;
   showsMyLocationButton?: boolean;
   toolbarEnabled?: boolean;
   pointerEvents?: any;
+  onPress?: (e: any) => void;
 };
 
 export const PROVIDER_DEFAULT = undefined;
@@ -43,7 +45,7 @@ export const MapView = React.forwardRef<any, MapProps>(function MapView(
   );
 });
 
-export function Marker({ children }: { children?: React.ReactNode; coordinate?: LatLng; anchor?: any; onPress?: () => void; tracksViewChanges?: boolean }) {
+export function Marker({ children }: { children?: React.ReactNode; coordinate?: LatLng; anchor?: any; onPress?: () => void; tracksViewChanges?: boolean; draggable?: boolean; onDragEnd?: (e: any) => void }) {
   // On web we only render the first few markers roughly to give a hint of density.
   return <View style={styles.marker}>{children}</View>;
 }
