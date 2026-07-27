@@ -49,11 +49,56 @@ export type MarketplaceItem = {
   name: string;
   description: string;
   price: number;
+  original_price?: number;
   image: string;
+  images: string[];
   vendor: string;
+  vendor_id?: string;
   rating: number;
   reviews: number;
+  location?: string;
+  verified: boolean;
+  delivery: boolean;
+  delivery_days: number;
+  brand?: string;
+  condition: "new" | "used" | "refurbished";
+  stock: number;
+  specs: Record<string, string>;
+  tags: string[];
+  popular: boolean;
+  on_sale: boolean;
 };
+
+export type Vendor = {
+  id: string;
+  name: string;
+  tagline: string;
+  logo: string;
+  cover: string;
+  verified: boolean;
+  rating: number;
+  reviews: number;
+  followers: number;
+  location: string;
+  about: string;
+  contact_phone: string;
+  contact_email: string;
+  joined_year: number;
+};
+
+export type Collection = {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  banner: string;
+  accent: string;
+  tag_filter?: string;
+  category_filter?: string;
+};
+
+export type CartLine = { item: MarketplaceItem; quantity: number };
+export type Cart = { items: CartLine[]; subtotal: number };
 
 export type Neighborhood = {
   id: string;
@@ -134,8 +179,35 @@ export const api = {
   listFavorites: () => req<Property[]>("/favorites"),
 
   // Marketplace
-  marketplace: (category?: string) =>
-    req<MarketplaceItem[]>(`/marketplace${category ? `?category=${category}` : ""}`),
+  marketplace: (params?: Record<string, string | number | boolean | undefined>) => {
+    const qs = params
+      ? "?" +
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined && v !== "" && v !== null)
+          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+          .join("&")
+      : "";
+    return req<MarketplaceItem[]>(`/marketplace${qs}`);
+  },
+  marketplaceItem: (id: string) =>
+    req<{ item: MarketplaceItem; related: MarketplaceItem[] }>(`/marketplace/items/${id}`),
+  marketplaceCollections: () => req<Collection[]>("/marketplace/collections"),
+  marketplaceVendors: () => req<Vendor[]>("/marketplace/vendors"),
+  marketplaceVendor: (id: string) =>
+    req<{ vendor: Vendor; items: MarketplaceItem[] }>(`/marketplace/vendors/${id}`),
+  marketplaceRecordView: (id: string) =>
+    req<{ ok: boolean }>(`/marketplace/items/${id}/view`, { method: "POST" }),
+  marketplaceRecentlyViewed: () => req<MarketplaceItem[]>("/marketplace/recently-viewed"),
+
+  // Cart
+  getCart: () => req<Cart>("/cart"),
+  cartAdd: (item_id: string, quantity: number = 1) =>
+    req<Cart>("/cart/add", { method: "POST", body: JSON.stringify({ item_id, quantity }) }),
+  cartUpdate: (item_id: string, quantity: number) =>
+    req<Cart>("/cart/update", { method: "POST", body: JSON.stringify({ item_id, quantity }) }),
+  cartRemove: (item_id: string) => req<Cart>(`/cart/${item_id}`, { method: "DELETE" }),
+  cartClear: () => req<Cart>("/cart/clear", { method: "POST" }),
+  checkout: () => req<{ order_id: string; subtotal: number; eta_days: number }>("/checkout", { method: "POST" }),
 
   // Neighborhoods
   neighborhoods: () => req<Neighborhood[]>("/neighborhoods"),

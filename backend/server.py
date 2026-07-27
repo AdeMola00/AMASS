@@ -18,6 +18,8 @@ from pydantic import BaseModel, EmailStr, Field
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
+from marketplace_seed import VENDORS, COLLECTIONS, MARKET_ITEMS
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
@@ -109,12 +111,53 @@ class MarketplaceItem(BaseModel):
     name: str
     description: str
     price: int
+    original_price: Optional[int] = None
     currency: str = "NGN"
     image: str
+    images: List[str] = []
     vendor: str
+    vendor_id: Optional[str] = None
     rating: float = 4.5
     reviews: int = 0
     location: Optional[str] = None
+    verified: bool = False
+    delivery: bool = True
+    delivery_days: int = 3
+    brand: Optional[str] = None
+    condition: Literal["new", "used", "refurbished"] = "new"
+    stock: int = 25
+    specs: dict = Field(default_factory=dict)
+    tags: List[str] = []
+    popular: bool = False
+    on_sale: bool = False
+
+
+class Vendor(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    tagline: str
+    logo: str
+    cover: str
+    verified: bool = True
+    rating: float
+    reviews: int
+    followers: int
+    location: str
+    about: str
+    contact_phone: str
+    contact_email: str
+    joined_year: int
+
+
+class Collection(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    slug: str
+    title: str
+    subtitle: str
+    banner: str
+    accent: str
+    tag_filter: Optional[str] = None
+    category_filter: Optional[str] = None
 
 
 class Neighborhood(BaseModel):
@@ -524,14 +567,236 @@ async def favorite_ids(user: dict = Depends(get_current_user)):
 
 # ─── Marketplace ──────────────────────────────────────────
 @api.get("/marketplace")
-async def marketplace(category: Optional[str] = None, subcategory: Optional[str] = None):
-    q: dict = {}
+async def marketplace(
+    category: Optional[str] = None,
+    subcategory: Optional[str] = None,
+    q: Optional[str] = None,
+    tag: Optional[str] = None,
+    popular: Optional[bool] = None,
+    on_sale: Optional[bool] = None,
+    min_price: Optional[int] = None,
+    max_price: Optional[int] = None,
+    verified: Optional[bool] = None,
+    limit: int = 200,
+):
+    query: dict = {}
     if category:
-        q["category"] = category
+        query["category"] = category
     if subcategory:
-        q["subcategory"] = subcategory
-    docs = await db.marketplace.find(q, {"_id": 0}).to_list(500)
+        query["subcategory"] = subcategory
+    if tag:
+        query["tags"] = tag
+    if popular is not None:
+        query["popular"] = popular
+    if on_sale is not None:
+        query["on_sale"] = on_sale
+    if verified is not None:
+        query["verified"] = verified
+    if min_price is not None or max_price is not None:
+        price_q: dict = {}
+        if min_price is not None:
+            price_q["$gte"] = min_price
+        if max_price is not None:
+            price_q["$lte"] = max_price
+        query["price"] = price_q
+    if q:
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+            {"subcategory": {"$regex": q, "$options": "i"}},
+            {"brand": {"$regex": q, "$options": "i"}},
+        ]
+    docs = await db.marketplace.find(query, {"_id": 0}).limit(limit).to_list(limit)
     return docs
+
+
+@api.get("/marketplace/collections")
+async def marketplace_collections():
+    docs = await db.collections.find({}, {"_id": 0}).to_list(100)
+    return docs
+
+
+@api.get("/marketplace/vendors")
+async def marketplace_vendors():
+    docs = await db.vendors.find({}, {"_id": 0}).to_list(100)
+    return docs
+
+
+@api.get("/marketplace/vendors/{vendor_id}")
+async def marketplace_vendor(vendor_id: str):
+    v = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
+    if not v:
+        raise HTTPException(404, "Vendor not found")
+    items = await db.marketplace.find({"vendor_id": vendor_id}, {"_id": 0}).to_list(200)
+    return {"vendor": v, "items": items}
+
+
+@api.get("/marketplace/items/{item_id}")
+async def marketplace_item(item_id: str):
+    it = await db.marketplace.find_one({"id": item_id}, {"_id": 0})
+    if not it:
+        raise HTTPException(404, "Item not found")
+    # Related items from the same subcategory
+    related = await db.marketplace.find(
+        {"subcategory": it["subcategory"], "id": {"$ne": it["id"]}},
+        {"_id": 0},
+    ).limit(6).to_list(6)
+    return {"item": it, "related": related}
+
+
+@api.post("/marketplace/items/{item_id}/view")
+async def record_marketplace_view(item_id: str, user: dict = Depends(get_current_user)):
+    it = await db.marketplace.find_one({"id": item_id}, {"id": 1, "_id": 0})
+    if not it:
+        raise HTTPException(404, "Item not found")
+    now = datetime.now(timezone.utc)
+    # Pull existing then re-insert to keep newest-first & dedupe
+    await db.users.update_one(
+        {"id": user["id"]},
+        {
+            "$pull": {"recently_viewed_market": {"item_id": item_id}},
+        },
+    )
+    await db.users.update_one(
+        {"id": user["id"]},
+        {
+            "$push": {
+                "recently_viewed_market": {
+                    "$each": [{"item_id": item_id, "viewed_at": now}],
+                    "$position": 0,
+                    "$slice": 20,
+                }
+            }
+        },
+    )
+    return {"ok": True}
+
+
+@api.get("/marketplace/recently-viewed")
+async def marketplace_recently_viewed(user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "recently_viewed_market": 1})
+    if not u:
+        return []
+    rows = u.get("recently_viewed_market", []) or []
+    ids = [r["item_id"] for r in rows][:12]
+    if not ids:
+        return []
+    docs = await db.marketplace.find({"id": {"$in": ids}}, {"_id": 0}).to_list(50)
+    order = {i: idx for idx, i in enumerate(ids)}
+    docs.sort(key=lambda d: order.get(d["id"], 999))
+    return docs
+
+
+# ─── Cart ─────────────────────────────────────────────────
+class CartItemIn(BaseModel):
+    item_id: str
+    quantity: int = 1
+
+
+@api.get("/cart")
+async def get_cart(user: dict = Depends(get_current_user)):
+    doc = await db.carts.find_one({"user_id": user["id"]}, {"_id": 0})
+    lines = (doc or {}).get("items", []) if doc else []
+    if not lines:
+        return {"items": [], "subtotal": 0}
+    ids = [l["item_id"] for l in lines]
+    items = await db.marketplace.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+    id_map = {i["id"]: i for i in items}
+    detailed = []
+    subtotal = 0
+    for l in lines:
+        it = id_map.get(l["item_id"])
+        if not it:
+            continue
+        qty = int(l.get("quantity", 1))
+        subtotal += it["price"] * qty
+        detailed.append({"item": it, "quantity": qty})
+    return {"items": detailed, "subtotal": subtotal}
+
+
+@api.post("/cart/add")
+async def cart_add(data: CartItemIn, user: dict = Depends(get_current_user)):
+    it = await db.marketplace.find_one({"id": data.item_id}, {"id": 1, "_id": 0})
+    if not it:
+        raise HTTPException(404, "Item not found")
+    doc = await db.carts.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not doc:
+        await db.carts.insert_one(
+            {
+                "id": str(uuid.uuid4()),
+                "user_id": user["id"],
+                "items": [{"item_id": data.item_id, "quantity": max(1, data.quantity)}],
+                "updated_at": datetime.now(timezone.utc),
+            }
+        )
+    else:
+        items = doc.get("items", []) or []
+        found = False
+        for line in items:
+            if line["item_id"] == data.item_id:
+                line["quantity"] = max(1, int(line.get("quantity", 1)) + data.quantity)
+                found = True
+                break
+        if not found:
+            items.append({"item_id": data.item_id, "quantity": max(1, data.quantity)})
+        await db.carts.update_one(
+            {"user_id": user["id"]},
+            {"$set": {"items": items, "updated_at": datetime.now(timezone.utc)}},
+        )
+    return await get_cart(user)
+
+
+@api.post("/cart/update")
+async def cart_update(data: CartItemIn, user: dict = Depends(get_current_user)):
+    if data.quantity <= 0:
+        await db.carts.update_one(
+            {"user_id": user["id"]},
+            {"$pull": {"items": {"item_id": data.item_id}}},
+        )
+    else:
+        await db.carts.update_one(
+            {"user_id": user["id"], "items.item_id": data.item_id},
+            {"$set": {"items.$.quantity": data.quantity}},
+        )
+    return await get_cart(user)
+
+
+@api.delete("/cart/{item_id}")
+async def cart_remove(item_id: str, user: dict = Depends(get_current_user)):
+    await db.carts.update_one(
+        {"user_id": user["id"]},
+        {"$pull": {"items": {"item_id": item_id}}},
+    )
+    return await get_cart(user)
+
+
+@api.post("/cart/clear")
+async def cart_clear(user: dict = Depends(get_current_user)):
+    await db.carts.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"items": []}},
+    )
+    return {"items": [], "subtotal": 0}
+
+
+@api.post("/checkout")
+async def checkout(user: dict = Depends(get_current_user)):
+    """Mock checkout — clears the cart and returns a fake order confirmation."""
+    cart = await get_cart(user)
+    if not cart["items"]:
+        raise HTTPException(400, "Cart is empty")
+    order_id = f"AMS-{str(uuid.uuid4())[:8].upper()}"
+    await db.orders.insert_one(
+        {
+            "id": order_id,
+            "user_id": user["id"],
+            "items": cart["items"],
+            "subtotal": cart["subtotal"],
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+    await db.carts.update_one({"user_id": user["id"]}, {"$set": {"items": []}})
+    return {"order_id": order_id, "subtotal": cart["subtotal"], "eta_days": 3}
 
 
 # ─── Neighborhoods / Discover ─────────────────────────────
@@ -855,21 +1120,11 @@ SEED_PROPERTIES = [
     },
 ]
 
-SEED_MARKETPLACE = [
-    # Construction
-    {"category": "construction", "subcategory": "Building Materials", "name": "Dangote Cement 50kg", "description": "Premium Portland cement, per bag.", "price": 8500, "image": "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800", "vendor": "BuildMart NG", "rating": 4.7, "reviews": 342},
-    {"category": "construction", "subcategory": "Building Materials", "name": "Ceramic Floor Tiles (60x60)", "description": "Italian design ceramic tiles per m².", "price": 5500, "image": "https://images.unsplash.com/photo-1615529162924-f8605388461d?w=800", "vendor": "TileHub", "rating": 4.5, "reviews": 128},
-    {"category": "construction", "subcategory": "Equipment Rental", "name": "Concrete Mixer (Daily)", "description": "500L capacity concrete mixer rental.", "price": 25000, "image": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=800", "vendor": "SiteGear", "rating": 4.4, "reviews": 76},
-    {"category": "construction", "subcategory": "Professionals", "name": "Chief Architect - Adewale K.", "description": "Award-winning architect, 15+ years experience.", "price": 500000, "image": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=800", "vendor": "AKD Studio", "rating": 4.9, "reviews": 54},
-    {"category": "construction", "subcategory": "Professionals", "name": "Structural Engineer", "description": "Certified structural engineering consultation.", "price": 250000, "image": "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=800", "vendor": "StructPro", "rating": 4.6, "reviews": 89},
-    # Home
-    {"category": "home", "subcategory": "Furniture", "name": "Milano 3-Seater Sofa", "description": "Premium leather sofa, imported.", "price": 850000, "image": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800", "vendor": "Casa Milano", "rating": 4.8, "reviews": 213},
-    {"category": "home", "subcategory": "Kitchen", "name": "Modular Kitchen Set", "description": "Complete modern kitchen cabinetry.", "price": 2450000, "image": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800", "vendor": "Kitchen Republic", "rating": 4.7, "reviews": 65},
-    {"category": "home", "subcategory": "Electronics", "name": "Samsung 65\" QLED TV", "description": "4K QLED Smart TV.", "price": 1200000, "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800", "vendor": "Slot Nigeria", "rating": 4.9, "reviews": 401},
-    {"category": "home", "subcategory": "Lighting", "name": "Crystal Chandelier", "description": "European crystal statement chandelier.", "price": 380000, "image": "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?w=800", "vendor": "Lumi", "rating": 4.6, "reviews": 44},
-    {"category": "home", "subcategory": "Decoration", "name": "Abstract Wall Art Set", "description": "Set of 3 canvas prints, gold framed.", "price": 95000, "image": "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800", "vendor": "Artistry Lagos", "rating": 4.8, "reviews": 156},
-    {"category": "home", "subcategory": "Appliances", "name": "LG Double-Door Fridge 620L", "description": "Inverter, energy efficient.", "price": 950000, "image": "https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=800", "vendor": "LG Nigeria", "rating": 4.7, "reviews": 220},
-]
+SEED_MARKETPLACE = MARKET_ITEMS
+
+SEED_VENDORS = VENDORS
+
+SEED_COLLECTIONS = COLLECTIONS
 
 SEED_NEIGHBORHOODS = [
     {"id": "n1", "name": "Lekki Phase 1", "city": "Lekki", "state": "Lagos", "image": "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=1200", "avg_price": 155_000_000, "price_change_pct": 8.2, "walk_score": 72, "school_score": 85, "safety_score": 82, "infrastructure_score": 88, "overall_score": 87, "latitude": 6.4361, "longitude": 3.4739, "trending": True},
@@ -894,6 +1149,16 @@ async def seed_data():
         item = MarketplaceItem(**m)
         await db.marketplace.insert_one(item.model_dump())
 
+    # Seed vendors
+    await db.vendors.delete_many({})
+    for v in SEED_VENDORS:
+        await db.vendors.insert_one(v.copy())
+
+    # Seed collections
+    await db.collections.delete_many({})
+    for c in SEED_COLLECTIONS:
+        await db.collections.insert_one(c.copy())
+
     # Seed neighborhoods
     await db.neighborhoods.delete_many({})
     for n in SEED_NEIGHBORHOODS:
@@ -902,6 +1167,8 @@ async def seed_data():
     return {
         "properties": len(SEED_PROPERTIES),
         "marketplace": len(SEED_MARKETPLACE),
+        "vendors": len(SEED_VENDORS),
+        "collections": len(SEED_COLLECTIONS),
         "neighborhoods": len(SEED_NEIGHBORHOODS),
     }
 
