@@ -101,6 +101,11 @@ class Property(BaseModel):
     parking: Optional[int] = None
     investment_score: Optional[int] = None  # 0-100
     ai_valuation: Optional[int] = None
+    # Trust & authority — first-class metadata
+    listing_source: Literal[
+        "owner_listed", "mandated", "independent", "pending"
+    ] = "pending"
+    mandate: Optional[dict] = None  # {owner_name, owner_phone, mandate_type, mandate_expiry, docs[]}
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -280,6 +285,7 @@ async def list_properties(
     bedrooms: Optional[int] = None,
     city: Optional[str] = None,
     verified: Optional[bool] = None,
+    listing_source: Optional[str] = None,
     q: Optional[str] = None,
     limit: int = 100,
 ):
@@ -294,6 +300,8 @@ async def list_properties(
         query["city"] = {"$regex": city, "$options": "i"}
     if verified is not None:
         query["verified"] = verified
+    if listing_source:
+        query["listing_source"] = listing_source
     if min_price is not None or max_price is not None:
         price_q: dict = {}
         if min_price is not None:
@@ -369,6 +377,14 @@ async def record_view(
 
 
 # ─── Property submission (Agent) ─────────────────────────
+class MandateIn(BaseModel):
+    owner_name: str
+    owner_phone: str
+    mandate_type: Literal["exclusive", "sole", "open", "verbal"]
+    mandate_expiry: Optional[str] = None  # ISO date
+    documents: List[str] = []
+
+
 class PropertyCreateIn(BaseModel):
     title: str
     description: str
@@ -388,23 +404,226 @@ class PropertyCreateIn(BaseModel):
     amenities: List[str] = []
     year_built: Optional[int] = None
     parking: Optional[int] = None
+    # Trust & authority
+    is_owner: bool = False
+    has_mandate: bool = False
+    mandate: Optional[MandateIn] = None
 
 
 @api.post("/properties", response_model=Property)
 async def create_property(data: PropertyCreateIn, user: dict = Depends(get_current_user)):
+    # Determine listing_source
+    if data.is_owner:
+        listing_source: str = "owner_listed"
+    elif data.has_mandate and data.mandate:
+        # Mandate submitted — starts as pending until admin verifies (unless the
+        # agent is already an approved Level-3 mandated agent).
+        agent_app = await db.agent_applications.find_one(
+            {"user_id": user["id"], "status": "approved", "verification_level": {"$gte": 3}}
+        )
+        listing_source = "mandated" if agent_app else "pending"
+    else:
+        # Agent is marketing without a confirmed mandate
+        listing_source = "independent"
+
+    prop_kwargs = data.model_dump(exclude={"is_owner", "has_mandate", "mandate"})
     prop = Property(
-        **data.model_dump(),
+        **prop_kwargs,
         status="coming_soon",
         verified=False,
         agent_id=user["id"],
         agent_name=user["full_name"],
         agent_avatar=user.get("avatar_url"),
+        listing_source=listing_source,
+        mandate=data.mandate.model_dump() if data.mandate else None,
     )
     await db.properties.insert_one(prop.model_dump())
-    # Promote the user to agent on first listing
     if not user.get("is_agent"):
         await db.users.update_one({"id": user["id"]}, {"$set": {"is_agent": True}})
     return prop
+
+
+# ─── Become an Agent ─────────────────────────────────────
+class AgentApplyIn(BaseModel):
+    # Personal
+    full_name: str
+    phone: str
+    email: str
+    nin: Optional[str] = None
+    id_document_url: Optional[str] = None
+    selfie_url: Optional[str] = None
+    # Business
+    agency_name: Optional[str] = None
+    cac_number: Optional[str] = None
+    office_address: Optional[str] = None
+    state: str
+    lga: Optional[str] = None
+    years_experience: int = 0
+    # Coverage & specialisation
+    areas_of_operation: List[str] = []
+    specialisations: List[str] = []
+    # Mandate declaration
+    has_mandate_authority: bool = False
+
+
+class AgentPublic(BaseModel):
+    id: str
+    user_id: str
+    full_name: str
+    phone: str
+    email: str
+    agency_name: Optional[str] = None
+    office_address: Optional[str] = None
+    state: str
+    lga: Optional[str] = None
+    years_experience: int
+    areas_of_operation: List[str]
+    specialisations: List[str]
+    verification_level: int  # 1 basic, 2 identity, 3 mandated
+    verification_badge: str  # "Registered Agent" | "Identity Verified" | "Verified Mandated Agent"
+    status: Literal["pending", "approved", "rejected", "suspended"]
+    avatar_url: Optional[str] = None
+    rating: float = 0.0
+    reviews_count: int = 0
+    active_listings: int = 0
+    total_sold: int = 0
+    total_rented: int = 0
+    mandate_verification_rate: float = 0.0
+    created_at: datetime
+
+
+def _badge_for(level: int) -> str:
+    if level >= 3:
+        return "Verified Mandated Agent"
+    if level == 2:
+        return "Identity Verified"
+    return "Registered Agent"
+
+
+@api.post("/agents/apply", response_model=AgentPublic)
+async def agent_apply(data: AgentApplyIn, user: dict = Depends(get_current_user)):
+    existing = await db.agent_applications.find_one({"user_id": user["id"]})
+
+    # Compute initial verification level (self-declared, admin later upgrades).
+    verification_level = 1
+    if data.id_document_url and data.selfie_url:
+        verification_level = 2
+
+    now = datetime.now(timezone.utc)
+    doc = {
+        "user_id": user["id"],
+        "full_name": data.full_name,
+        "phone": data.phone,
+        "email": data.email,
+        "nin": data.nin,
+        "id_document_url": data.id_document_url,
+        "selfie_url": data.selfie_url,
+        "agency_name": data.agency_name,
+        "cac_number": data.cac_number,
+        "office_address": data.office_address,
+        "state": data.state,
+        "lga": data.lga,
+        "years_experience": data.years_experience,
+        "areas_of_operation": data.areas_of_operation,
+        "specialisations": data.specialisations,
+        "has_mandate_authority": data.has_mandate_authority,
+        "verification_level": verification_level,
+        "status": "pending",
+        "updated_at": now,
+    }
+
+    if existing:
+        await db.agent_applications.update_one({"user_id": user["id"]}, {"$set": doc})
+        agent = await db.agent_applications.find_one({"user_id": user["id"]}, {"_id": 0})
+    else:
+        doc["id"] = str(uuid.uuid4())
+        doc["created_at"] = now
+        doc["avatar_url"] = user.get("avatar_url")
+        doc["rating"] = 0.0
+        doc["reviews_count"] = 0
+        await db.agent_applications.insert_one(doc)
+        agent = doc
+
+    # Mark user as agent
+    await db.users.update_one({"id": user["id"]}, {"$set": {"is_agent": True}})
+
+    return _agent_to_public(agent)
+
+
+async def _agent_stats(user_id: str) -> dict:
+    listings = await db.properties.find({"agent_id": user_id}, {"_id": 0, "status": 1, "listing_source": 1}).to_list(500)
+    active = [p for p in listings if p.get("status") not in ("sold",)]
+    sold = [p for p in listings if p.get("status") == "sold"]
+    mandated = [p for p in listings if p.get("listing_source") == "mandated"]
+    rate = (len(mandated) / len(listings)) if listings else 0.0
+    return {
+        "active_listings": len(active),
+        "total_sold": len(sold),
+        "total_rented": 0,
+        "mandate_verification_rate": round(rate, 2),
+    }
+
+
+def _agent_to_public(doc: dict) -> AgentPublic:
+    return AgentPublic(
+        id=doc.get("id", ""),
+        user_id=doc["user_id"],
+        full_name=doc["full_name"],
+        phone=doc["phone"],
+        email=doc["email"],
+        agency_name=doc.get("agency_name"),
+        office_address=doc.get("office_address"),
+        state=doc["state"],
+        lga=doc.get("lga"),
+        years_experience=doc.get("years_experience", 0),
+        areas_of_operation=doc.get("areas_of_operation", []) or [],
+        specialisations=doc.get("specialisations", []) or [],
+        verification_level=doc.get("verification_level", 1),
+        verification_badge=_badge_for(doc.get("verification_level", 1)),
+        status=doc.get("status", "pending"),
+        avatar_url=doc.get("avatar_url"),
+        rating=doc.get("rating", 0.0),
+        reviews_count=doc.get("reviews_count", 0),
+        active_listings=0,
+        total_sold=0,
+        total_rented=0,
+        mandate_verification_rate=0.0,
+        created_at=doc.get("created_at", datetime.now(timezone.utc)),
+    )
+
+
+@api.get("/agents/me", response_model=AgentPublic)
+async def agent_me(user: dict = Depends(get_current_user)):
+    doc = await db.agent_applications.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "No agent application yet")
+    out = _agent_to_public(doc)
+    stats = await _agent_stats(user["id"])
+    out.active_listings = stats["active_listings"]
+    out.total_sold = stats["total_sold"]
+    out.total_rented = stats["total_rented"]
+    out.mandate_verification_rate = stats["mandate_verification_rate"]
+    return out
+
+
+@api.get("/agents/{user_id}", response_model=AgentPublic)
+async def get_agent(user_id: str):
+    doc = await db.agent_applications.find_one({"user_id": user_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Agent not found")
+    out = _agent_to_public(doc)
+    stats = await _agent_stats(user_id)
+    out.active_listings = stats["active_listings"]
+    out.total_sold = stats["total_sold"]
+    out.total_rented = stats["total_rented"]
+    out.mandate_verification_rate = stats["mandate_verification_rate"]
+    return out
+
+
+@api.get("/agents/{user_id}/listings")
+async def agent_listings_public(user_id: str):
+    docs = await db.properties.find({"agent_id": user_id}, {"_id": 0}).to_list(200)
+    return docs
 
 
 # ─── Agent dashboard ─────────────────────────────────────

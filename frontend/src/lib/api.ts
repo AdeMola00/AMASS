@@ -24,6 +24,14 @@ export type Property = {
   amenities: string[];
   status: "available" | "coming_soon" | "verified" | "premium" | "sold";
   verified: boolean;
+  listing_source?: "owner_listed" | "mandated" | "independent" | "pending";
+  mandate?: {
+    owner_name?: string;
+    owner_phone?: string;
+    mandate_type?: "exclusive" | "sole" | "open" | "verbal";
+    mandate_expiry?: string;
+    documents?: string[];
+  } | null;
   agent_name?: string;
   agent_avatar?: string;
   year_built?: number;
@@ -95,6 +103,32 @@ export type Collection = {
   accent: string;
   tag_filter?: string;
   category_filter?: string;
+};
+
+export type AgentPublic = {
+  id: string;
+  user_id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  agency_name?: string;
+  office_address?: string;
+  state: string;
+  lga?: string;
+  years_experience: number;
+  areas_of_operation: string[];
+  specialisations: string[];
+  verification_level: 1 | 2 | 3;
+  verification_badge: string;
+  status: "pending" | "approved" | "rejected" | "suspended";
+  avatar_url?: string;
+  rating: number;
+  reviews_count: number;
+  active_listings: number;
+  total_sold: number;
+  total_rented: number;
+  mandate_verification_rate: number;
+  created_at: string;
 };
 
 export type CartLine = { item: MarketplaceItem; quantity: number };
@@ -231,11 +265,44 @@ export const api = {
     amenities: string[];
     year_built?: number;
     parking?: number;
+    is_owner?: boolean;
+    has_mandate?: boolean;
+    mandate?: {
+      owner_name: string;
+      owner_phone: string;
+      mandate_type: "exclusive" | "sole" | "open" | "verbal";
+      mandate_expiry?: string;
+      documents?: string[];
+    };
   }) =>
     req<Property>("/properties", {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  agentApply: (data: {
+    full_name: string;
+    phone: string;
+    email: string;
+    nin?: string;
+    id_document_url?: string;
+    selfie_url?: string;
+    agency_name?: string;
+    cac_number?: string;
+    office_address?: string;
+    state: string;
+    lga?: string;
+    years_experience: number;
+    areas_of_operation: string[];
+    specialisations: string[];
+    has_mandate_authority: boolean;
+  }) =>
+    req<AgentPublic>("/agents/apply", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  agentMe: () => req<AgentPublic>("/agents/me"),
+  agentPublic: (user_id: string) => req<AgentPublic>(`/agents/${user_id}`),
+  agentPublicListings: (user_id: string) => req<Property[]>(`/agents/${user_id}/listings`),
   agentDashboard: () =>
     req<{
       stats: {

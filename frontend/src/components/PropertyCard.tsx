@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { listingSourceMeta } from "@/src/constants/listingSource";
 import type { Property } from "@/src/lib/api";
 
 export function PropertyCard({
@@ -19,6 +20,7 @@ export function PropertyCard({
   variant?: "large" | "compact" | "floating";
 }) {
   const img = property.images?.[0];
+  const source = listingSourceMeta(property.listing_source);
   return (
     <Pressable
       onPress={onPress}
@@ -31,6 +33,13 @@ export function PropertyCard({
         ) : (
           <View style={[styles.image, { backgroundColor: colors.surfaceSecondary }]} />
         )}
+        <View
+          style={[styles.sourceBadge, { backgroundColor: source.color }]}
+          testID={`source-badge-${property.listing_source ?? "pending"}`}
+        >
+          <Ionicons name={source.icon} size={11} color="#fff" />
+          <Text style={styles.sourceText}>{source.short}</Text>
+        </View>
         {property.verified && (
           <View style={styles.verifiedBadge} testID="verified-badge">
             <Ionicons name="shield-checkmark" size={12} color="#fff" />
@@ -112,7 +121,7 @@ const styles = StyleSheet.create({
   verifiedBadge: {
     position: "absolute",
     top: spacing.md,
-    left: spacing.md,
+    right: 52,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -125,6 +134,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 11,
     fontWeight: "700",
+  },
+  sourceBadge: {
+    position: "absolute",
+    top: spacing.md,
+    left: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  sourceText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.3,
   },
   favBtn: {
     position: "absolute",

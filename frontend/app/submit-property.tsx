@@ -71,6 +71,13 @@ export default function SubmitProperty() {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
+  // Trust / mandate
+  const [isOwner, setIsOwner] = useState(false);
+  const [hasMandate, setHasMandate] = useState(false);
+  const [mandateOwnerName, setMandateOwnerName] = useState("");
+  const [mandateOwnerPhone, setMandateOwnerPhone] = useState("");
+  const [mandateType, setMandateType] = useState<"exclusive" | "sole" | "open" | "verbal">("exclusive");
+
   const canNext = (): boolean => {
     if (step === 0) return true;
     if (step === 1) return !!title && !!description && !!price && !!sizeSqm;
@@ -103,6 +110,14 @@ export default function SubmitProperty() {
   const submit = async () => {
     setSubmitting(true);
     try {
+      const mandatePayload =
+        !isOwner && hasMandate && mandateOwnerName && mandateOwnerPhone
+          ? {
+              owner_name: mandateOwnerName,
+              owner_phone: mandateOwnerPhone,
+              mandate_type: mandateType,
+            }
+          : undefined;
       const created = await api.createProperty({
         title,
         description,
@@ -121,6 +136,9 @@ export default function SubmitProperty() {
         amenities: selectedAmenities,
         year_built: yearBuilt ? parseInt(yearBuilt, 10) : undefined,
         parking: parking ? parseInt(parking, 10) : undefined,
+        is_owner: isOwner,
+        has_mandate: !isOwner && hasMandate,
+        mandate: mandatePayload,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       router.replace(`/property/${created.id}`);
@@ -159,6 +177,16 @@ export default function SubmitProperty() {
             setListingType={setListingType}
             propertyType={propertyType}
             setPropertyType={setPropertyType}
+            isOwner={isOwner}
+            setIsOwner={setIsOwner}
+            hasMandate={hasMandate}
+            setHasMandate={setHasMandate}
+            mandateOwnerName={mandateOwnerName}
+            setMandateOwnerName={setMandateOwnerName}
+            mandateOwnerPhone={mandateOwnerPhone}
+            setMandateOwnerPhone={setMandateOwnerPhone}
+            mandateType={mandateType}
+            setMandateType={setMandateType}
           />
         )}
         {step === 1 && (
@@ -239,12 +267,109 @@ function Step0({
   setListingType,
   propertyType,
   setPropertyType,
+  isOwner,
+  setIsOwner,
+  hasMandate,
+  setHasMandate,
+  mandateOwnerName,
+  setMandateOwnerName,
+  mandateOwnerPhone,
+  setMandateOwnerPhone,
+  mandateType,
+  setMandateType,
 }: any) {
   return (
     <View style={{ gap: spacing.xl }}>
       <View>
-        <Text style={styles.h1}>What are you listing?</Text>
-        <Text style={styles.sub}>Pick how you want to list this property.</Text>
+        <Text style={styles.h1}>Who&apos;s selling this?</Text>
+        <Text style={styles.sub}>
+          AMASS shows this on every listing so buyers know your authority to market it.
+        </Text>
+      </View>
+
+      <View style={styles.trustBox}>
+        <Text style={styles.trustQ}>Are you the property owner?</Text>
+        <View style={styles.mandateOpts}>
+          <Pressable
+            onPress={() => setIsOwner(true)}
+            style={[styles.mandateOpt, isOwner && styles.mandateOptOn]}
+            testID="sp-owner-yes"
+          >
+            <Ionicons name="checkmark-circle" size={18} color={isOwner ? "#fff" : colors.emerald} />
+            <Text style={[styles.mandateOptText, isOwner && { color: "#fff" }]}>Yes, I&apos;m the owner</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setIsOwner(false)}
+            style={[styles.mandateOpt, !isOwner && styles.mandateOptOff]}
+            testID="sp-owner-no"
+          >
+            <Ionicons name="person-outline" size={18} color={!isOwner ? "#fff" : colors.textSecondary} />
+            <Text style={[styles.mandateOptText, !isOwner && { color: "#fff" }]}>No, I&apos;m an agent</Text>
+          </Pressable>
+        </View>
+
+        {!isOwner && (
+          <>
+            <Text style={styles.trustQ}>Do you have the owner&apos;s mandate?</Text>
+            <View style={styles.mandateOpts}>
+              <Pressable
+                onPress={() => setHasMandate(true)}
+                style={[styles.mandateOpt, hasMandate && styles.mandateOptOn]}
+                testID="sp-mandate-yes"
+              >
+                <Ionicons name="shield-checkmark" size={18} color={hasMandate ? "#fff" : colors.emerald} />
+                <Text style={[styles.mandateOptText, hasMandate && { color: "#fff" }]}>Yes</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setHasMandate(false)}
+                style={[styles.mandateOpt, !hasMandate && styles.mandateOptWarn]}
+                testID="sp-mandate-no"
+              >
+                <Ionicons name="alert-circle" size={18} color={!hasMandate ? "#fff" : colors.gold} />
+                <Text style={[styles.mandateOptText, !hasMandate && { color: "#fff" }]}>No</Text>
+              </Pressable>
+            </View>
+
+            {hasMandate && (
+              <View style={{ gap: 10 }}>
+                <Field label="Owner name" value={mandateOwnerName} onChangeText={setMandateOwnerName} testID="sp-owner-name" />
+                <Field label="Owner phone" value={mandateOwnerPhone} onChangeText={setMandateOwnerPhone} keyboardType="phone-pad" testID="sp-owner-phone" />
+                <Text style={styles.fieldLabel}>Mandate type</Text>
+                <View style={styles.chipWrap}>
+                  {(["exclusive", "sole", "open", "verbal"] as const).map((m) => {
+                    const on = mandateType === m;
+                    return (
+                      <Pressable
+                        key={m}
+                        onPress={() => setMandateType(m)}
+                        style={[styles.chip, on && styles.chipActive]}
+                        testID={`sp-mtype-${m}`}
+                      >
+                        <Text style={[styles.chipText, on && { color: "#fff" }]}>{m.toUpperCase()}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={styles.trustHint}>
+                  Mandates are reviewed by AMASS. Once approved, your listing gets the blue “Verified Mandated Agent” badge.
+                </Text>
+              </View>
+            )}
+
+            {!hasMandate && (
+              <View style={styles.warn}>
+                <Ionicons name="alert-circle" size={16} color={colors.gold} />
+                <Text style={styles.warnText}>
+                  This listing will be shown as “Independent Agent” with a trust warning to buyers.
+                </Text>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      <View>
+        <Text style={styles.h2}>Listing type</Text>
       </View>
       <View style={styles.grid2}>
         {LISTING_TYPES.map((t) => (
@@ -269,7 +394,6 @@ function Step0({
 
       <View>
         <Text style={styles.h2}>Property type</Text>
-        <Text style={styles.sub}>What kind of property is this?</Text>
       </View>
       <View style={styles.chipWrap}>
         {PROPERTY_TYPES.map((p) => (
@@ -666,6 +790,40 @@ const styles = StyleSheet.create({
   },
   chipActive: { backgroundColor: colors.text, borderColor: colors.text },
   chipText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
+  trustBox: {
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSecondary,
+    gap: 12,
+  },
+  trustQ: { fontSize: 14, fontWeight: "800", color: colors.text },
+  mandateOpts: { flexDirection: "row", gap: 8 },
+  mandateOpt: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 48,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: "#fff",
+  },
+  mandateOptOn: { backgroundColor: colors.emerald, borderColor: colors.emerald },
+  mandateOptOff: { backgroundColor: colors.ink, borderColor: colors.ink },
+  mandateOptWarn: { backgroundColor: colors.gold, borderColor: colors.gold },
+  mandateOptText: { fontSize: 13, fontWeight: "800", color: colors.text },
+  trustHint: { fontSize: 12, color: colors.textTertiary, lineHeight: 17 },
+  warn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.goldLight,
+  },
+  warnText: { flex: 1, fontSize: 12, color: colors.text, lineHeight: 17 },
   row2: { flexDirection: "row", gap: 12 },
   fieldLabel: { fontSize: 12, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.3, marginLeft: 4 },
   input: {

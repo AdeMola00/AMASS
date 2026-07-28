@@ -20,6 +20,7 @@ import * as Haptics from "expo-haptics";
 import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { api, Property } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { listingSourceMeta } from "@/src/constants/listingSource";
 import { PropertyMarker } from "@/src/components/PropertyMarker";
 
 const { width } = Dimensions.get("window");
@@ -134,6 +135,8 @@ export default function PropertyDetails() {
               </View>
             )}
           </View>
+
+          <TrustBanner source={property.listing_source} mandate={property.mandate ?? null} />
 
           <Text style={styles.title}>{property.title}</Text>
           <View style={styles.locRow}>
@@ -349,6 +352,24 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 11, fontWeight: "700" },
+  trustBanner: {
+    flexDirection: "row",
+    gap: 12,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginTop: spacing.md,
+  },
+  trustIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trustLabel: { fontSize: 13, fontWeight: "800" },
+  trustBody: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: 2 },
+  trustMeta: { fontSize: 11, color: colors.textTertiary, fontWeight: "700", marginTop: 4, letterSpacing: 0.3 },
   verifiedBadge: {
     flexDirection: "row",
     alignItems: "center",
