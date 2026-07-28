@@ -15,6 +15,8 @@ type MapProps = {
   mapType?: string;
   showsCompass?: boolean;
   showsMyLocationButton?: boolean;
+  showsUserLocation?: boolean;
+  followsUserLocation?: boolean;
   toolbarEnabled?: boolean;
   pointerEvents?: any;
   onPress?: (e: any) => void;

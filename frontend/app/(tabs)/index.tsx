@@ -10,6 +10,7 @@ import {
   Platform,
   FlatList,
   Dimensions,
+  Linking,
 } from "react-native";
 import { MapView, Marker, PROVIDER_DEFAULT, Region } from "@/src/lib/map";
 import { useRouter } from "expo-router";
@@ -17,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
+import * as Location from "expo-location";
 
 import { api, Property } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
@@ -58,6 +60,60 @@ export default function HomeMap() {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
+    null
+  );
+  const [locationPermission, setLocationPermission] = useState<
+    "unknown" | "granted" | "denied" | "blocked"
+  >("unknown");
+
+  // Request device location on mount — mapping apps have clear user intent.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (Platform.OS === "web") {
+        setLocationPermission("denied");
+        return;
+      }
+      try {
+        const existing = await Location.getForegroundPermissionsAsync();
+        let status = existing.status;
+        let canAskAgain = existing.canAskAgain;
+
+        if (status !== "granted") {
+          if (!canAskAgain) {
+            if (!cancelled) setLocationPermission("blocked");
+            return;
+          }
+          const req = await Location.requestForegroundPermissionsAsync();
+          status = req.status;
+          canAskAgain = req.canAskAgain;
+        }
+
+        if (status !== "granted") {
+          if (!cancelled) setLocationPermission(canAskAgain ? "denied" : "blocked");
+          return;
+        }
+
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (cancelled) return;
+        const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+        setUserLocation(coords);
+        setLocationPermission("granted");
+        mapRef.current?.animateToRegion(
+          { ...coords, latitudeDelta: 0.08, longitudeDelta: 0.08 },
+          800
+        );
+      } catch {
+        if (!cancelled) setLocationPermission("denied");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,6 +196,7 @@ export default function HomeMap() {
         initialRegion={INITIAL_REGION}
         showsCompass={false}
         showsMyLocationButton={false}
+        showsUserLocation={locationPermission === "granted"}
         toolbarEnabled={false}
       >
         {properties.map((p) => (
@@ -212,13 +269,61 @@ export default function HomeMap() {
       <View style={[styles.rightActions, { top: searchTop + 120 }]}>
         <ActionBtn
           icon="locate"
-          onPress={() =>
-            mapRef.current?.animateToRegion(INITIAL_REGION, 500)
-          }
+          onPress={async () => {
+            Haptics.selectionAsync().catch(() => {});
+            if (userLocation) {
+              mapRef.current?.animateToRegion(
+                { ...userLocation, latitudeDelta: 0.06, longitudeDelta: 0.06 },
+                500
+              );
+              return;
+            }
+            // Retry permission if we haven't gotten it yet
+            if (Platform.OS !== "web") {
+              const req = await Location.requestForegroundPermissionsAsync();
+              if (req.status === "granted") {
+                const loc = await Location.getCurrentPositionAsync({
+                  accuracy: Location.Accuracy.Balanced,
+                });
+                const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+                setUserLocation(coords);
+                setLocationPermission("granted");
+                mapRef.current?.animateToRegion(
+                  { ...coords, latitudeDelta: 0.06, longitudeDelta: 0.06 },
+                  500
+                );
+                return;
+              }
+              setLocationPermission(req.canAskAgain ? "denied" : "blocked");
+            }
+            mapRef.current?.animateToRegion(INITIAL_REGION, 500);
+          }}
           testID="recenter-btn"
         />
         <ActionBtn icon="layers-outline" onPress={() => {}} testID="layers-btn" />
       </View>
+
+      {/* Location permission banner */}
+      {locationPermission === "blocked" && (
+        <View style={[styles.permBanner, { top: searchTop + 120 }]} testID="location-perm-banner">
+          <View style={styles.permIcon}>
+            <Ionicons name="location" size={16} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.permTitle}>Location access is off</Text>
+            <Text style={styles.permBody}>
+              Enable location in Settings to see properties near you.
+            </Text>
+          </View>
+          <Pressable
+            style={styles.permBtn}
+            onPress={() => Linking.openSettings()}
+            testID="open-settings-btn"
+          >
+            <Text style={styles.permBtnText}>Open Settings</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* Loading indicator */}
       {loading && (
@@ -379,4 +484,35 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
   },
+  permBanner: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg + 60,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: "#fff",
+    ...shadows.card,
+  },
+  permIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.red,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  permTitle: { fontSize: 12, fontWeight: "800", color: colors.text },
+  permBody: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
+  permBtn: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    backgroundColor: colors.ink,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  permBtnText: { color: "#fff", fontSize: 11, fontWeight: "800" },
 });
