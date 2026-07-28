@@ -7,6 +7,7 @@ import { colors, radius, shadows, spacing, typography } from "@/src/constants/th
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { PriceText } from "@/src/components/PriceText";
 import { HotFlame } from "@/src/components/HotFlame";
+import { TokenIcon } from "@/src/components/TokenIcon";
 import type { Property } from "@/src/lib/api";
 
 export function PropertyCard({
@@ -96,16 +97,23 @@ export function PropertyCard({
 
         {/* Top row: source badge + hot flame + favorite */}
         <View style={styles.topRow}>
-          <View style={{ flexDirection: "row", gap: 6 }}>
-            <View
-              style={[styles.sourceBadge, { backgroundColor: source.color }]}
-              testID={`source-badge-${property.listing_source ?? "pending"}`}
-            >
-              <Ionicons name={source.icon} size={10} color="#fff" />
-              <Text style={styles.sourceText}>{source.short}</Text>
-            </View>
+          <View style={{ flexDirection: "row", gap: 6, alignItems: "center", flexShrink: 1 }}>
+            {property.is_amass_exclusive ? (
+              <View style={styles.freeBadge}>
+                <Ionicons name="star" size={10} color="#fff" />
+                <Text style={styles.freeBadgeText}>FREE · Listed by AMASS</Text>
+              </View>
+            ) : (
+              <View
+                style={[styles.sourceBadge, { backgroundColor: source.color }]}
+                testID={`source-badge-${property.listing_source ?? "pending"}`}
+              >
+                <Ionicons name={source.icon} size={10} color="#fff" />
+                <Text style={styles.sourceText}>{source.short}</Text>
+              </View>
+            )}
             {isHot && !isSold && <HotFlame />}
-            {isNew && !isHot && !isSold && (
+            {isNew && !isHot && !isSold && !property.is_amass_exclusive && (
               <View style={styles.newBadge}>
                 <Text style={styles.newText}>NEW</Text>
               </View>
@@ -127,13 +135,23 @@ export function PropertyCard({
           )}
         </View>
 
-        {/* Bottom row: verified badge */}
-        {property.verified && (
+        {/* Bottom-left: Verified OR Token cost pill */}
+        {property.is_amass_exclusive ? null : property.token_cost && property.token_cost > 0 ? (
+          <View style={styles.tokenBadge} testID={`token-badge-${property.id}`}>
+            <TokenIcon size={12} />
+            <Text style={styles.tokenBadgeText}>
+              {property.unlocked ? "Unlocked" : `Unlock for ${property.token_cost}`}
+            </Text>
+            {property.unlocked && (
+              <Ionicons name="checkmark-circle" size={12} color="#059669" />
+            )}
+          </View>
+        ) : property.verified ? (
           <View style={styles.verifiedBadge} testID="verified-badge">
             <Ionicons name="shield-checkmark" size={11} color="#fff" />
             <Text style={styles.verifiedText}>AMASS Verified</Text>
           </View>
-        )}
+        ) : null}
 
         {isSold && (
           <View style={styles.soldOverlay}>
@@ -241,6 +259,35 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   verifiedText: { color: "#fff", fontSize: 10, fontWeight: "700", letterSpacing: 0.2 },
+  freeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: "#059669",
+    shadowColor: "#059669",
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  freeBadgeText: { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.3 },
+  tokenBadge: {
+    position: "absolute",
+    bottom: spacing.md,
+    left: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(10,10,10,0.85)",
+    borderWidth: 1,
+    borderColor: "#F5B301",
+  },
+  tokenBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
   soldOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",

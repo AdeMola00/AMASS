@@ -41,6 +41,46 @@ export type Property = {
   views_recent?: number;
   favorites_recent?: number;
   created_at?: string;
+  // Token economy
+  is_amass_exclusive?: boolean;
+  token_cost?: number;
+  unlocked?: boolean;
+};
+
+export type WalletDto = {
+  balance: number;
+  bonus_balance: number;
+  spendable: number;
+  locked: number;
+  lifetime_earned: number;
+  lifetime_used: number;
+  subscription?: any | null;
+};
+
+export type TokenBundle = {
+  id: string;
+  name: string;
+  tokens: number;
+  bonus: number;
+  price_ngn: number;
+};
+
+export type SubscriptionPlan = {
+  id: string;
+  name: string;
+  price_ngn: number;
+  monthly_tokens: number;
+  perks: string[];
+};
+
+export type WalletTransaction = {
+  id: string;
+  kind: string;
+  amount: number;
+  balance_after: number;
+  description: string;
+  meta: Record<string, any>;
+  created_at: string;
 };
 
 export type UserProfile = {
@@ -356,6 +396,58 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ query, session_id }),
     }),
+
+  // ─── Token economy ────────────────────────────────────
+  wallet: () => req<WalletDto>("/wallet/me"),
+  walletTransactions: (limit = 40) =>
+    req<WalletTransaction[]>(`/wallet/transactions?limit=${limit}`),
+  walletUnlocks: () =>
+    req<
+      {
+        id: string;
+        user_id: string;
+        property_id: string;
+        tokens_paid: number;
+        expires_at: string | null;
+        created_at: string;
+        property?: {
+          id: string;
+          title: string;
+          images: string[];
+          location: string;
+          price: number;
+        };
+      }[]
+    >("/wallet/unlocks"),
+  listBundles: () => req<TokenBundle[]>("/tokens/bundles"),
+  purchaseTokens: (bundle_id: string, provider: "paystack" | "flutterwave" | "mock" = "mock") =>
+    req<{ ok: boolean; credited: number; balance: number }>("/tokens/purchase", {
+      method: "POST",
+      body: JSON.stringify({ bundle_id, provider }),
+    }),
+  listPlans: () => req<SubscriptionPlan[]>("/subscriptions/plans"),
+  mySubscription: () => req<any>("/subscriptions/me"),
+  subscribe: (plan_id: string, provider: "paystack" | "flutterwave" | "mock" = "mock") =>
+    req<{ ok: boolean; subscription: any; credited: number; balance: number }>(
+      "/subscriptions/subscribe",
+      { method: "POST", body: JSON.stringify({ plan_id, provider }) }
+    ),
+  cancelSubscription: () =>
+    req<{ ok: boolean; cancelled: number }>("/subscriptions/cancel", { method: "POST" }),
+  unlockProperty: (property_id: string) =>
+    req<{
+      ok: boolean;
+      already_unlocked?: boolean;
+      free?: boolean;
+      unlock: any;
+      tokens_paid?: number;
+      balance?: number;
+    }>("/properties/unlock", { method: "POST", body: JSON.stringify({ property_id }) }),
+  earnDailyLogin: () =>
+    req<{ ok: boolean; credited?: number; reason?: string }>(
+      "/wallet/earn?task_id=daily_login",
+      { method: "POST" }
+    ),
 };
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;

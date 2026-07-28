@@ -9,6 +9,11 @@ from typing import List, Optional, Literal, AsyncGenerator
 import bcrypt
 import jwt
 from dotenv import load_dotenv
+
+# CRITICAL: load .env BEFORE importing token module (which reads JWT_SECRET at import time)
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / ".env")
+
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -19,9 +24,7 @@ from pydantic import BaseModel, EmailStr, Field
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
 from marketplace_seed import VENDORS, COLLECTIONS, MARKET_ITEMS
-
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / ".env")
+from tokens import register_token_routes, compute_token_cost, has_unlocked
 
 # ─── Config ───────────────────────────────────────────────
 MONGO_URL = os.environ["MONGO_URL"]
@@ -106,6 +109,9 @@ class Property(BaseModel):
         "owner_listed", "mandated", "independent", "pending"
     ] = "pending"
     mandate: Optional[dict] = None  # {owner_name, owner_phone, mandate_type, mandate_expiry, docs[]}
+    # Token economy — Category 1 = AMASS Exclusive (free), Category 2 = token-gated
+    is_amass_exclusive: bool = False
+    token_cost: Optional[int] = None  # override; else computed from category
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -287,7 +293,9 @@ async def list_properties(
     verified: Optional[bool] = None,
     listing_source: Optional[str] = None,
     q: Optional[str] = None,
+    token_filter: Optional[Literal["free", "token", "amass_exclusive"]] = None,
     limit: int = 100,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
 ):
     query: dict = {}
     if listing_type:
@@ -302,6 +310,12 @@ async def list_properties(
         query["verified"] = verified
     if listing_source:
         query["listing_source"] = listing_source
+    if token_filter == "amass_exclusive":
+        query["is_amass_exclusive"] = True
+    elif token_filter == "free":
+        query["is_amass_exclusive"] = True
+    elif token_filter == "token":
+        query["is_amass_exclusive"] = {"$ne": True}
     if min_price is not None or max_price is not None:
         price_q: dict = {}
         if min_price is not None:
@@ -317,7 +331,31 @@ async def list_properties(
             {"description": {"$regex": q, "$options": "i"}},
         ]
     docs = await db.properties.find(query, {"_id": 0}).limit(limit).to_list(limit)
-    # Enrich with recent view/favorite counts (last 7 days) for hot-home badging.
+
+    # Determine current user (optional) for personalized unlock flags
+    user_id: Optional[str] = None
+    if creds:
+        try:
+            payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+            user_id = payload.get("sub")
+        except jwt.PyJWTError:
+            user_id = None
+
+    unlocked_ids: set = set()
+    if user_id and docs:
+        now = datetime.now(timezone.utc)
+        cursor = db.property_unlocks.find(
+            {
+                "user_id": user_id,
+                "property_id": {"$in": [d["id"] for d in docs]},
+                "$or": [{"expires_at": None}, {"expires_at": {"$gt": now}}],
+            },
+            {"_id": 0, "property_id": 1},
+        )
+        async for r in cursor:
+            unlocked_ids.add(r["property_id"])
+
+    # Enrich with recent view/favorite counts (last 7 days) + token economy fields.
     if docs:
         ids = [p["id"] for p in docs]
         since = datetime.now(timezone.utc) - timedelta(days=7)
@@ -337,14 +375,86 @@ async def list_properties(
             c = counts.get(p["id"], {"views_recent": 0, "favorites_recent": 0})
             p["views_recent"] = c["views_recent"]
             p["favorites_recent"] = c["favorites_recent"]
+    # Always add token economy fields on each item
+    for p in docs:
+        p["is_amass_exclusive"] = bool(p.get("is_amass_exclusive", False))
+        p["token_cost"] = compute_token_cost(p)
+        p["unlocked"] = p["id"] in unlocked_ids if user_id else False
     return docs
 
 
 @api.get("/properties/{property_id}")
-async def get_property(property_id: str):
+async def get_property(
+    property_id: str,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+):
     doc = await db.properties.find_one({"id": property_id}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "Property not found")
+    user_id: Optional[str] = None
+    if creds:
+        try:
+            payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+            user_id = payload.get("sub")
+        except jwt.PyJWTError:
+            user_id = None
+
+    is_exclusive = bool(doc.get("is_amass_exclusive", False))
+    token_cost = compute_token_cost(doc)
+    doc["is_amass_exclusive"] = is_exclusive
+    doc["token_cost"] = token_cost
+
+    unlocked = is_exclusive
+    if not unlocked and user_id:
+        unlocked = await has_unlocked(db, user_id, property_id)
+
+    doc["unlocked"] = unlocked
+
+    if not unlocked:
+        # Return only public preview — strip premium information.
+        # Keep only first image, city-level location, no exact address / agent contact.
+        first_image = doc["images"][0] if doc.get("images") else None
+        preview_desc = (doc.get("description") or "")[:120]
+        if len(doc.get("description") or "") > 120:
+            preview_desc += "…"
+        return {
+            "id": doc["id"],
+            "title": doc["title"],
+            "description": preview_desc,
+            "price": doc["price"],
+            "currency": doc.get("currency", "NGN"),
+            "listing_type": doc["listing_type"],
+            "property_type": doc["property_type"],
+            "bedrooms": doc["bedrooms"],
+            "bathrooms": doc.get("bathrooms", 0),
+            "size_sqm": doc.get("size_sqm", 0),
+            "location": doc.get("city", ""),  # City-level only
+            "city": doc.get("city", ""),
+            "state": doc.get("state", ""),
+            "country": doc.get("country", "Nigeria"),
+            "latitude": doc["latitude"],
+            "longitude": doc["longitude"],
+            "images": [first_image] if first_image else [],
+            "amenities": [],
+            "status": doc.get("status", "available"),
+            "verified": doc.get("verified", False),
+            "listing_source": doc.get("listing_source", "pending"),
+            "agent_name": None,
+            "agent_avatar": None,
+            "agent_id": None,
+            "year_built": None,
+            "parking": None,
+            "investment_score": None,
+            "ai_valuation": None,
+            "mandate": None,
+            "views_recent": doc.get("views_recent", 0),
+            "favorites_recent": doc.get("favorites_recent", 0),
+            "is_amass_exclusive": False,
+            "token_cost": token_cost,
+            "unlocked": False,
+        }
+    doc["views_recent"] = doc.get("views_recent", 0)
+    doc["favorites_recent"] = doc.get("favorites_recent", 0)
     return doc
 
 
@@ -1419,6 +1529,7 @@ async def root():
 
 # ─── Mount ────────────────────────────────────────────────
 app.include_router(api)
+app.include_router(register_token_routes(db))
 
 app.add_middleware(
     CORSMiddleware,
@@ -1436,6 +1547,25 @@ async def on_startup():
     if count == 0:
         logger.info("Seeding initial data …")
         await seed_data()
+    # Mark AMASS Exclusive listings (Category 1 — free forever)
+    # Marketing inventory: keep a small handful as AMASS Exclusive.
+    # First, unmark all so we can converge to a deterministic state each boot.
+    await db.properties.update_many({}, {"$set": {"is_amass_exclusive": False}})
+    exclusive_ids: list = []
+    # Pick 1 top-price verified + 1 owner_listed as exclusive if available.
+    top_verified = await db.properties.find(
+        {"verified": True}, {"id": 1, "_id": 0}
+    ).sort("price", -1).limit(1).to_list(1)
+    exclusive_ids.extend([d["id"] for d in top_verified])
+    owner_listed = await db.properties.find(
+        {"listing_source": "owner_listed"}, {"id": 1, "_id": 0}
+    ).limit(1).to_list(1)
+    exclusive_ids.extend([d["id"] for d in owner_listed])
+    if exclusive_ids:
+        await db.properties.update_many(
+            {"id": {"$in": exclusive_ids}},
+            {"$set": {"is_amass_exclusive": True}},
+        )
 
 
 @app.on_event("shutdown")

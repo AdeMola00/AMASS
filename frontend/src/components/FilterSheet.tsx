@@ -13,6 +13,7 @@ export type FilterState = {
   bathrooms?: number;
   propertyType?: string;
   verifiedOnly?: boolean;
+  tokenFilter?: "free" | "token" | "amass_exclusive";
 };
 
 export type FilterSheetRef = {

@@ -5,20 +5,22 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/src/contexts/auth";
+import { useWallet } from "@/src/contexts/wallet";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 import { AmassPinIcon } from "@/src/components/AmassLogo";
+import { TokenIcon } from "@/src/components/TokenIcon";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 const MENU: { icon: IconName; label: string; route?: string; caption?: string }[] = [
+  { icon: "wallet-outline", label: "AMASS Wallet", route: "/wallet", caption: "Tokens · Transactions · Subscriptions" },
+  { icon: "lock-open-outline", label: "My Unlocks", route: "/unlocks", caption: "Properties you've unlocked" },
   { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", caption: "Verified authority to market properties" },
   { icon: "briefcase-outline", label: "Agent Dashboard", route: "/agent-dashboard", caption: "Listings, leads & analytics" },
   { icon: "add-circle-outline", label: "List a Property", route: "/submit-property", caption: "Publish a new listing" },
   { icon: "heart-outline", label: "Saved Properties", caption: "Your favorites" },
   { icon: "document-text-outline", label: "My Documents", caption: "Contracts & titles" },
   { icon: "shield-checkmark-outline", label: "Identity Verification", caption: "Enhance trust" },
-  { icon: "wallet-outline", label: "Transactions" },
-  { icon: "card-outline", label: "Payment Methods" },
   { icon: "notifications-outline", label: "Notifications", route: "/notifications" },
   { icon: "settings-outline", label: "Settings", route: "/settings" },
   { icon: "help-circle-outline", label: "Help & Support" },
@@ -28,6 +30,7 @@ const MENU: { icon: IconName; label: string; route?: string; caption?: string }[
 export default function Profile() {
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { wallet } = useWallet();
 
   const initials = user?.full_name
     ? user.full_name
@@ -71,6 +74,23 @@ export default function Profile() {
             </View>
           </View>
         </View>
+
+        <Pressable style={styles.walletCard} onPress={() => router.push("/wallet")} testID="wallet-card">
+          <View style={styles.walletCoin}>
+            <TokenIcon size={40} animated />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.walletLabel}>AMASS Tokens</Text>
+            <Text style={styles.walletBalance}>
+              {(wallet?.spendable ?? 0).toLocaleString()}
+              <Text style={styles.walletUnit}> tokens</Text>
+            </Text>
+          </View>
+          <View style={styles.walletCta}>
+            <Text style={styles.walletCtaText}>Top up</Text>
+            <Ionicons name="add" size={14} color="#fff" />
+          </View>
+        </Pressable>
 
         <View style={styles.stats}>
           <StatCard label="Saved" value="12" icon="heart" color={colors.red} />
@@ -180,6 +200,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     marginBottom: spacing.xl,
   },
+  walletCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: "#0A0A0A",
+  },
+  walletCoin: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(245,179,1,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  walletLabel: { color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  walletBalance: { color: "#fff", fontSize: 26, fontWeight: "900", letterSpacing: -1, marginTop: 2 },
+  walletUnit: { fontSize: 13, color: "rgba(255,255,255,0.5)", fontWeight: "600" },
+  walletCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: colors.red,
+  },
+  walletCtaText: { color: "#fff", fontSize: 12, fontWeight: "800" },
   statCard: {
     flex: 1,
     backgroundColor: "#fff",

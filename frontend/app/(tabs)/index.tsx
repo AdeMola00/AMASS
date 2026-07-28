@@ -46,6 +46,7 @@ const QUICK_FILTERS: {
   isActive: (f: FilterState) => boolean;
 }[] = [
   { key: "all", label: "All", apply: () => ({}), isActive: (f) => Object.keys(f).length === 0 },
+  { key: "free", label: "Free · AMASS", icon: "star", apply: (f) => ({ ...f, tokenFilter: f.tokenFilter === "amass_exclusive" ? undefined : "amass_exclusive" }), isActive: (f) => f.tokenFilter === "amass_exclusive" },
   { key: "buy", label: "Buy", apply: (f) => ({ ...f, listingType: "buy" }), isActive: (f) => f.listingType === "buy" },
   { key: "rent", label: "Rent", apply: (f) => ({ ...f, listingType: "rent" }), isActive: (f) => f.listingType === "rent" },
   { key: "shortlet", label: "Short Let", apply: (f) => ({ ...f, listingType: "shortlet" }), isActive: (f) => f.listingType === "shortlet" },
@@ -160,6 +161,7 @@ export default function HomeMap() {
       if (filters.minPrice) params.min_price = filters.minPrice;
       if (filters.maxPrice) params.max_price = filters.maxPrice;
       if (filters.verifiedOnly) params.verified = true;
+      if (filters.tokenFilter) params.token_filter = filters.tokenFilter;
       if (query.trim()) params.q = query.trim();
       const list = await api.listProperties(params);
       setProperties(list);
@@ -337,7 +339,7 @@ export default function HomeMap() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_DEFAULT}
-        mapType="standard"
+        mapType="hybrid"
         initialRegion={INITIAL_REGION}
         showsCompass={false}
         showsMyLocationButton={false}

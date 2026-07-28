@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 6 (AMASS Token Economy Phase 1). BOTH backend and frontend verified end-to-end against the public preview URL. Backend: added /app/backend/tests/test_token_economy.py — 19/19 pass (7.06s). Covers wallet welcome grant (15 bonus tokens), bundle catalog (5 bundles with hunter=150+10 bonus), plan catalog (4 plans), purchase (hunter credits 150 to balance + 10 to bonus_balance, welcome/purchase/bonus tx logged), professional subscription grants 500 tokens & marks sub active, cancel marks all active subs cancelled, unlock debits bonus-first (welcome 15 consumed before purchased balance), locked view returns city-level location + agent_name=None + mandate=None + <=1 image, full view after unlock returns agent_name+images, AMASS Exclusive properties return unlocked=true & token_cost=0 without any unlock record, 402 Payment Required carries detail.error=insufficient_tokens + required/balance/shortfall, /wallet/unlocks attaches property{id,title,images,location,price}, /wallet/earn?task_id=daily_login credits 2 then returns already_claimed_today, unknown task 400, GET /api/properties enriches every item with is_amass_exclusive + token_cost, existing endpoints (auth, properties list, view increment) still working. Frontend (mobile 390x844, Playwright, logged in demo@amass.africa): /wallet renders balance card (35 tokens: 20 primary + 15 bonus), Buy Tokens/Subscribe/Earn quick actions, Recent activity log; /buy-tokens shows all 5 bundle testIDs (bundle-starter/explorer/hunter/investor/professional), provider-paystack + provider-flutterwave selectors, confirm-purchase-btn; /subscribe shows all 4 plan-* testIDs and confirm-subscribe-btn; /unlocks renders 'My Unlocked Properties' with empty state; Home lists show 9 token-badge-{id} pills + FREE · Listed by AMASS badge + 'Free · AMASS' filter chip and 10 property cards; property/[id] token-gated detail contains locked banner, 'Unlock' text, and unlock-cta-btn — tapping it opens UnlockSheet with unlock-confirm-btn visible; /profile shows AMASS Wallet card (35 tokens) + AMASS Wallet + My Unlocks menu entries. NOTE: Paystack + Flutterwave payment gateways are MOCKED — /api/tokens/purchase and /api/subscriptions/subscribe credit instantly. UnlockSheet's buy-tokens-cta was NOT visible in test because logged-in user had enough balance (correct fallback logic, only shows on shortfall).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "React Native Web deprecations", "issue": "Console repeatedly logs 'shadow* style props are deprecated. Use boxShadow', 'props.pointerEvents is deprecated. Use style.pointerEvents', 'Image: style.resizeMode is deprecated. Please use props.resizeMode', and 'Animated: useNativeDriver is not supported'. These come from wallet/buy-tokens/subscribe/UnlockSheet StyleSheets and are advisory-only on web; native builds unaffected. Reference: /app/frontend/src/theme/* and component StyleSheets."},
+      {"component": "React 19 element.ref", "issue": "Console error 'Accessing element.ref was removed in React 19. ref is now a regular prop.' fires when opening UnlockSheet on property detail — likely from a third-party sheet lib (reanimated / bottom-sheet). Not blocking. Reference: /app/frontend/src/components/UnlockSheet.tsx."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_token_economy.py",
+    "/app/test_reports/pytest/pytest_iteration6.xml"
+  ],
+  "action_items": [
+    "OPTIONAL POLISH: Migrate shadow* → boxShadow, style.resizeMode → props.resizeMode, and props.pointerEvents → style.pointerEvents across the new wallet/buy-tokens/subscribe/UnlockSheet StyleSheets to silence RN Web warnings.",
+    "OPTIONAL: Investigate the React 19 element.ref console error triggered by opening UnlockSheet on property detail — verify the sheet library (react-native-bottom-sheet / gorhom) is on a version compatible with React 19.",
+    "REMINDER: Wire real Paystack + Flutterwave once user provides keys — the /tokens/purchase and /subscriptions/subscribe endpoints are currently MOCKED and credit tokens without an actual payment callback. Recommend adding a POST /api/payments/webhook endpoint and swapping the immediate credit for a pending-tx state until webhook confirms."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/server.py is now ~1570 lines — modularize routers (auth, properties, marketplace, tokens are already split; do the rest).",
+    "tokens.py Wallet.spendable @property is defined on the Pydantic model but the code paths bypass it and recompute w['balance'] + w['bonus_balance'] inline everywhere — either drop the property or use it consistently for readability.",
+    "tokens.py debit() raises HTTPException(402, 'Insufficient tokens') and the unlock handler catches + re-raises with a rich detail dict — this works because FastAPI serializes dict details as JSON, but consumers must parse detail as object, not string. Documented in test.",
+    "tokens.py compute_token_cost() checks 'if prop.get('token_cost'):' which treats 0 as falsy and would recompute for a property with explicit token_cost=0. Fine now (0 = free, same as default), but ambiguous if admins want to force-free a property that would otherwise be premium — use `is not None`.",
+    "server.py locked-view builder strips agent_name/agent_avatar/mandate/investment_score/ai_valuation but keeps investment_score=None + ai_valuation=None — good. It also sets is_amass_exclusive=False on the locked view even for token-gated properties (this is the correct hide-the-flag stance for privacy, but the frontend's is_amass_exclusive check on the detail page relies on the ORIGINAL flag being echoed. Since gated properties are_amass_exclusive=false anyway, no regression, but call this out if a Category 1 property is ever locked to a user.)",
+    "startup auto-marks 1 top-verified + 1 owner_listed as amass_exclusive on every boot. Since seed has NO owner_listed properties, only 1 exclusive property (the top-price verified duplex/penthouse) is actually flagged per boot — matches product spec but only gives 1 free-badge card on Home. Consider seeding a listing_source='owner_listed' property so both categories are demonstrated."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_token_economy.py (new, 19 tests, all pass)"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19 token-economy tests)",
+    "frontend": "100% of token-economy acceptance items verified (wallet, buy-tokens, subscribe, unlocks, property detail unlock CTA + sheet, profile wallet card + My Unlocks menu, FREE · Listed by AMASS badge, Free · AMASS quick chip, token-badge pills on cards)"
+  },
+  "seed_data_creation": "Test suite registers fresh TEST_tok_<uuid>@example.com users per test (~14 users) to keep welcome-token, purchase, subscribe, and unlock flows independent. Leftover users accumulate in db.users — recommend adding a periodic cleanup script that drops users with email prefix TEST_.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_token_economy.py for regression on token economy. IMPORTANT: email domain 'amass.test' is rejected by Pydantic EmailStr (reserved TLD) — always register test users with @example.com. Frontend testIDs: /buy-tokens uses bundle-<id> + provider-<paystack|flutterwave> + confirm-purchase-btn; /subscribe uses plan-<id> + confirm-subscribe-btn; property detail exposes unlock-cta-btn which opens UnlockSheet (testIDs: unlock-confirm-btn, buy-tokens-cta [only when balance<cost]). Category-1 (amass_exclusive) properties are randomized-by-boot: only 1 property (top-price verified) is marked exclusive because seed has no listing_source='owner_listed' inventory. token_cost defaults: premium/verified≥₦100M=10, luxury/status=premium or ≥₦300M=20, land=15, commercial=25, basic=5. Paystack + Flutterwave are MOCKED — do NOT try to test a real payment callback.",
+  "rca_of_issue": "N/A — token economy Phase 1 verified end-to-end. Only advisory items are RN Web style deprecations (harmless on device) and a React 19 element.ref console warning inside UnlockSheet's sheet library."
+}

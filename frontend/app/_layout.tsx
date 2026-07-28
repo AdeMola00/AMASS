@@ -10,6 +10,7 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider } from "@/src/contexts/auth";
 import { CartProvider } from "@/src/contexts/cart";
+import { WalletProvider } from "@/src/contexts/wallet";
 
 LogBox.ignoreAllLogs(true);
 SplashScreen.preventAutoHideAsync();
@@ -31,16 +32,18 @@ export default function RootLayout() {
         <KeyboardProvider>
           <BottomSheetModalProvider>
             <AuthProvider>
-              <CartProvider>
-                <StatusBar barStyle="dark-content" />
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: "#FFFFFF" },
-                    animation: "fade",
-                  }}
-                />
-              </CartProvider>
+              <WalletProvider>
+                <CartProvider>
+                  <StatusBar barStyle="dark-content" />
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: "#FFFFFF" },
+                      animation: "fade",
+                    }}
+                  />
+                </CartProvider>
+              </WalletProvider>
             </AuthProvider>
           </BottomSheetModalProvider>
         </KeyboardProvider>

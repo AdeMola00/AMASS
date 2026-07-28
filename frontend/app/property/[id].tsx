@@ -29,6 +29,9 @@ import { PriceText } from "@/src/components/PriceText";
 import { PropertyCard } from "@/src/components/PropertyCard";
 import { HotFlame } from "@/src/components/HotFlame";
 import { Skeleton } from "@/src/components/Skeleton";
+import { TokenIcon } from "@/src/components/TokenIcon";
+import { UnlockSheet, UnlockSheetRef } from "@/src/components/UnlockSheet";
+import { useWallet } from "@/src/contexts/wallet";
 
 const { width } = Dimensions.get("window");
 const GALLERY_H = 400;
@@ -38,6 +41,8 @@ export default function PropertyDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { wallet } = useWallet();
+  const unlockRef = React.useRef<UnlockSheetRef>(null);
   const [property, setProperty] = useState<Property | null>(null);
   const [similar, setSimilar] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,24 +50,28 @@ export default function PropertyDetails() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
 
-  useEffect(() => {
+  const reload = useCallback(async () => {
     if (!id) return;
-    (async () => {
+    try {
+      const p = await api.getProperty(id);
+      setProperty(p);
+      // Similar homes — same city, different id
       try {
-        const p = await api.getProperty(id);
-        setProperty(p);
-        // Similar homes — same city, different id
-        try {
-          const list = await api.listProperties({ city: p.city, listing_type: p.listing_type });
-          setSimilar(list.filter((x) => x.id !== p.id).slice(0, 6));
-        } catch {}
-      } finally {
-        setLoading(false);
-      }
-    })();
-    api.favoriteIds().then((r) => setFavorited(r.ids.includes(id))).catch(() => {});
-    api.recordView(id).catch(() => {});
+        const list = await api.listProperties({ city: p.city, listing_type: p.listing_type });
+        setSimilar(list.filter((x) => x.id !== p.id).slice(0, 6));
+      } catch {}
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    reload();
+    if (id) {
+      api.favoriteIds().then((r) => setFavorited(r.ids.includes(id))).catch(() => {});
+      api.recordView(id).catch(() => {});
+    }
+  }, [id, reload]);
 
   const isHot = useMemo(
     () =>
@@ -208,10 +217,36 @@ export default function PropertyDetails() {
                 <Text style={styles.verifiedText}>Verified</Text>
               </View>
             )}
+            {property.is_amass_exclusive && (
+              <View style={styles.freeChip}>
+                <Ionicons name="star" size={11} color="#fff" />
+                <Text style={styles.freeChipText}>FREE · Listed by AMASS</Text>
+              </View>
+            )}
           </View>
 
           {/* Trust banner */}
           <TrustBanner source={property.listing_source} mandate={property.mandate ?? null} />
+
+          {/* Locked notice */}
+          {!property.unlocked && !property.is_amass_exclusive && (
+            <View style={styles.lockedBanner} testID="locked-banner">
+              <View style={styles.lockedIconWrap}>
+                <Ionicons name="lock-closed" size={18} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.lockedTitle}>Premium details locked</Text>
+                <Text style={styles.lockedBody}>
+                  Unlock this property to reveal full address, agent contact, all photos,
+                  documents and AI insights.
+                </Text>
+              </View>
+              <View style={styles.lockedCostPill}>
+                <TokenIcon size={12} />
+                <Text style={styles.lockedCostText}>{property.token_cost ?? 10}</Text>
+              </View>
+            </View>
+          )}
 
           <View style={{ marginTop: spacing.lg }}>
             <PriceText value={property.price} size={38} suffix={priceSuffix} />
@@ -384,23 +419,52 @@ export default function PropertyDetails() {
         </View>
       </ScrollView>
 
-      {/* Sticky CTA — Redfin triad: Save · Chat · Tour */}
-      <View style={[styles.stickyCta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <Pressable style={styles.ctaGhost} onPress={toggleFav} testID="save-btn">
-          <Ionicons
-            name={favorited ? "heart" : "heart-outline"}
-            size={22}
-            color={favorited ? colors.red : colors.text}
-          />
-        </Pressable>
-        <Pressable style={styles.ctaGhost} testID="chat-agent-btn">
-          <Ionicons name="chatbubbles-outline" size={22} color={colors.text} />
-        </Pressable>
-        <Pressable style={styles.ctaPrimary} testID="book-tour-btn">
-          <Ionicons name="calendar-outline" size={18} color="#fff" />
-          <Text style={styles.ctaPrimaryText}>Schedule Tour</Text>
-        </Pressable>
-      </View>
+      {/* Sticky CTA */}
+      {property.unlocked || property.is_amass_exclusive ? (
+        <View style={[styles.stickyCta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <Pressable style={styles.ctaGhost} onPress={toggleFav} testID="save-btn">
+            <Ionicons
+              name={favorited ? "heart" : "heart-outline"}
+              size={22}
+              color={favorited ? colors.red : colors.text}
+            />
+          </Pressable>
+          <Pressable style={styles.ctaGhost} testID="chat-agent-btn">
+            <Ionicons name="chatbubbles-outline" size={22} color={colors.text} />
+          </Pressable>
+          <Pressable style={styles.ctaPrimary} testID="book-tour-btn">
+            <Ionicons name="calendar-outline" size={18} color="#fff" />
+            <Text style={styles.ctaPrimaryText}>Schedule Tour</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={[styles.stickyCta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <Pressable style={styles.ctaGhost} onPress={toggleFav} testID="save-btn">
+            <Ionicons
+              name={favorited ? "heart" : "heart-outline"}
+              size={22}
+              color={favorited ? colors.red : colors.text}
+            />
+          </Pressable>
+          <Pressable
+            style={[styles.ctaPrimary, { flexDirection: "row", gap: 8 }]}
+            onPress={() =>
+              unlockRef.current?.open({
+                propertyId: property.id,
+                propertyTitle: property.title,
+                tokenCost: property.token_cost ?? 10,
+              })
+            }
+            testID="unlock-cta-btn"
+          >
+            <TokenIcon size={18} tone="white" />
+            <Text style={styles.ctaPrimaryText}>
+              Unlock for {property.token_cost ?? 10} tokens
+            </Text>
+          </Pressable>
+        </View>
+      )}
+      <UnlockSheet ref={unlockRef} onSuccess={reload} />
 
       {/* Fullscreen gallery modal */}
       <Modal visible={fullscreen} animationType="fade" onRequestClose={() => setFullscreen(false)}>
@@ -633,6 +697,47 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   verifiedText: { color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.2 },
+  freeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: "#059669",
+  },
+  freeChipText: { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.3 },
+  lockedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: "#0A0A0A",
+  },
+  lockedIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.red,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lockedTitle: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  lockedBody: { color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 2, lineHeight: 17 },
+  lockedCostPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "#FFF7DB",
+    borderWidth: 1,
+    borderColor: "#F5B301",
+  },
+  lockedCostText: { color: "#7A5B00", fontSize: 12, fontWeight: "900" },
   title: { ...typography.h2, fontSize: 20, marginTop: spacing.sm, color: colors.text },
   locRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   location: { ...typography.body, color: colors.textSecondary },
