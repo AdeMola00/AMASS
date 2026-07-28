@@ -24,7 +24,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="discover" options={{ title: "Discover" }} />
       <Tabs.Screen name="marketplace" options={{ title: "Market" }} />
-      <Tabs.Screen name="messages" options={{ title: "Messages" }} />
+      <Tabs.Screen name="messages" options={{ title: "Inbox" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
@@ -34,8 +34,6 @@ function FloatingBottomBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 12);
 
-  const orderedRoutes = state.routes;
-
   return (
     <View
       style={[styles.container, { bottom: bottomInset }]}
@@ -44,16 +42,15 @@ function FloatingBottomBar({ state, navigation }: any) {
     >
       <View style={[styles.barShadow, shadows.floating]}>
         {Platform.OS === "ios" ? (
-          <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
         ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.96)" }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.98)" }]} />
         )}
         <View style={styles.bar}>
-          {orderedRoutes.map((r: any, i: number) => (
+          {state.routes.map((r: any, i: number) => (
             <TabButton
               key={r.key}
               route={r}
-              index={i}
               active={state.index === i}
               onPress={() => navigation.navigate(r.name)}
             />
@@ -64,7 +61,7 @@ function FloatingBottomBar({ state, navigation }: any) {
   );
 }
 
-function TabButton({ route, index, active, onPress }: any) {
+function TabButton({ route, active, onPress }: any) {
   const cfg = tabConfig(route.name);
   return (
     <Pressable
@@ -75,14 +72,13 @@ function TabButton({ route, index, active, onPress }: any) {
       style={styles.tab}
       testID={`tab-${route.name}`}
     >
+      {active && <View style={styles.activeIndicator} />}
       <Ionicons
         name={active ? cfg.iconActive : cfg.icon}
         size={22}
-        color={active ? colors.red : colors.textTertiary}
+        color={active ? colors.text : colors.textTertiary}
       />
-      <Text style={[styles.tabLabel, active && { color: colors.red, fontWeight: "700" }]}>
-        {cfg.label}
-      </Text>
+      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{cfg.label}</Text>
     </Pressable>
   );
 }
@@ -96,11 +92,7 @@ function tabConfig(routeName: string) {
     case "marketplace":
       return { label: "Market", icon: "grid-outline" as IconName, iconActive: "grid" as IconName };
     case "messages":
-      return {
-        label: "Messages",
-        icon: "chatbubbles-outline" as IconName,
-        iconActive: "chatbubbles" as IconName,
-      };
+      return { label: "Inbox", icon: "chatbubbles-outline" as IconName, iconActive: "chatbubbles" as IconName };
     case "profile":
       return { label: "Profile", icon: "person-outline" as IconName, iconActive: "person" as IconName };
     default:
@@ -135,10 +127,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 3,
+    height: "100%",
+    position: "relative",
+  },
+  activeIndicator: {
+    position: "absolute",
+    top: 8,
+    width: 26,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.red,
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: "600",
     color: colors.textTertiary,
+    letterSpacing: -0.1,
+  },
+  tabLabelActive: {
+    color: colors.text,
+    fontWeight: "800",
   },
 });

@@ -74,8 +74,8 @@ export default function Profile() {
 
         <View style={styles.stats}>
           <StatCard label="Saved" value="12" icon="heart" color={colors.red} />
-          <StatCard label="Viewed" value="47" icon="eye" color={colors.emerald} />
-          <StatCard label="Inspected" value="3" icon="calendar" color={colors.gold} />
+          <StatCard label="Viewed" value="47" icon="eye" color={colors.text} />
+          <StatCard label="Tours" value="3" icon="calendar" color={colors.gold} />
         </View>
 
         <View style={styles.menu}>

@@ -1,9 +1,12 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
+import { PriceText } from "@/src/components/PriceText";
+import { HotFlame } from "@/src/components/HotFlame";
 import type { Property } from "@/src/lib/api";
 
 export function PropertyCard({
@@ -17,10 +20,61 @@ export function PropertyCard({
   onPress?: () => void;
   onFavorite?: () => void;
   favorited?: boolean;
-  variant?: "large" | "compact" | "floating";
+  variant?: "large" | "compact" | "floating" | "row";
 }) {
   const img = property.images?.[0];
   const source = listingSourceMeta(property.listing_source);
+  const isHot = (property.views_recent ?? 0) >= 5 || (property.favorites_recent ?? 0) >= 3;
+  const isSold = property.status === "sold";
+  const isNew = property.created_at
+    ? Date.now() - new Date(property.created_at).getTime() < 7 * 24 * 60 * 60 * 1000
+    : false;
+
+  const priceSuffix =
+    property.listing_type === "rent"
+      ? "/year"
+      : property.listing_type === "shortlet"
+      ? "/night"
+      : "";
+
+  if (variant === "row") {
+    return (
+      <Pressable onPress={onPress} style={styles.rowCard} testID={`property-row-${property.id}`}>
+        <View style={styles.rowImageWrap}>
+          {img ? (
+            <Image source={{ uri: img }} style={styles.rowImage} contentFit="cover" transition={200} />
+          ) : (
+            <View style={[styles.rowImage, { backgroundColor: colors.surfaceSecondary }]} />
+          )}
+          {isHot && !isSold && (
+            <View style={styles.rowHot}>
+              <HotFlame compact />
+            </View>
+          )}
+        </View>
+        <View style={styles.rowBody}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <PriceText value={property.price} size={20} suffix={priceSuffix} />
+          </View>
+          <Text numberOfLines={1} style={styles.rowTitle}>
+            {property.title}
+          </Text>
+          <View style={styles.locRow}>
+            <Ionicons name="location" size={11} color={colors.red} />
+            <Text numberOfLines={1} style={styles.location}>
+              {property.location}
+            </Text>
+          </View>
+          <View style={styles.specs}>
+            {property.bedrooms > 0 && <Spec icon="bed-outline" value={property.bedrooms} />}
+            {property.bathrooms > 0 && <Spec icon="water-outline" value={property.bathrooms} />}
+            <Spec icon="resize-outline" value={`${property.size_sqm}m²`} />
+          </View>
+        </View>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       onPress={onPress}
@@ -29,45 +83,67 @@ export function PropertyCard({
     >
       <View style={styles.imageWrap}>
         {img ? (
-          <Image source={{ uri: img }} style={styles.image} contentFit="cover" transition={200} />
+          <Image source={{ uri: img }} style={styles.image} contentFit="cover" transition={250} />
         ) : (
           <View style={[styles.image, { backgroundColor: colors.surfaceSecondary }]} />
         )}
-        <View
-          style={[styles.sourceBadge, { backgroundColor: source.color }]}
-          testID={`source-badge-${property.listing_source ?? "pending"}`}
-        >
-          <Ionicons name={source.icon} size={11} color="#fff" />
-          <Text style={styles.sourceText}>{source.short}</Text>
+        <LinearGradient
+          colors={["rgba(0,0,0,0.35)", "transparent", "rgba(0,0,0,0.25)"]}
+          locations={[0, 0.4, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+
+        {/* Top row: source badge + hot flame + favorite */}
+        <View style={styles.topRow}>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            <View
+              style={[styles.sourceBadge, { backgroundColor: source.color }]}
+              testID={`source-badge-${property.listing_source ?? "pending"}`}
+            >
+              <Ionicons name={source.icon} size={10} color="#fff" />
+              <Text style={styles.sourceText}>{source.short}</Text>
+            </View>
+            {isHot && !isSold && <HotFlame />}
+            {isNew && !isHot && !isSold && (
+              <View style={styles.newBadge}>
+                <Text style={styles.newText}>NEW</Text>
+              </View>
+            )}
+          </View>
+          {onFavorite && (
+            <Pressable
+              onPress={onFavorite}
+              style={styles.favBtn}
+              hitSlop={12}
+              testID={`favorite-${property.id}`}
+            >
+              <Ionicons
+                name={favorited ? "heart" : "heart-outline"}
+                size={20}
+                color={favorited ? colors.red : "#fff"}
+              />
+            </Pressable>
+          )}
         </View>
+
+        {/* Bottom row: verified badge */}
         {property.verified && (
           <View style={styles.verifiedBadge} testID="verified-badge">
-            <Ionicons name="shield-checkmark" size={12} color="#fff" />
-            <Text style={styles.verifiedText}>Verified</Text>
+            <Ionicons name="shield-checkmark" size={11} color="#fff" />
+            <Text style={styles.verifiedText}>AMASS Verified</Text>
           </View>
         )}
-        {onFavorite && (
-          <Pressable
-            onPress={onFavorite}
-            style={styles.favBtn}
-            hitSlop={12}
-            testID={`favorite-${property.id}`}
-          >
-            <Ionicons
-              name={favorited ? "heart" : "heart-outline"}
-              size={20}
-              color={favorited ? colors.red : "#fff"}
-            />
-          </Pressable>
+
+        {isSold && (
+          <View style={styles.soldOverlay}>
+            <Text style={styles.soldText}>SOLD</Text>
+          </View>
         )}
       </View>
+
       <View style={styles.body}>
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>{formatNaira(property.price)}</Text>
-          <Text style={styles.listingType}>
-            {property.listing_type === "rent" ? "/year" : property.listing_type === "shortlet" ? "/night" : ""}
-          </Text>
-        </View>
+        <PriceText value={property.price} suffix={priceSuffix} />
         <Text numberOfLines={1} style={styles.title}>
           {property.title}
         </Text>
@@ -78,25 +154,32 @@ export function PropertyCard({
           </Text>
         </View>
         <View style={styles.specs}>
-          {property.bedrooms > 0 && (
-            <View style={styles.spec}>
-              <Ionicons name="bed-outline" size={14} color={colors.textSecondary} />
-              <Text style={styles.specText}>{property.bedrooms}</Text>
-            </View>
-          )}
-          {property.bathrooms > 0 && (
-            <View style={styles.spec}>
-              <Ionicons name="water-outline" size={14} color={colors.textSecondary} />
-              <Text style={styles.specText}>{property.bathrooms}</Text>
-            </View>
-          )}
-          <View style={styles.spec}>
-            <Ionicons name="resize-outline" size={14} color={colors.textSecondary} />
-            <Text style={styles.specText}>{property.size_sqm}m²</Text>
-          </View>
+          {property.bedrooms > 0 && <Spec icon="bed-outline" value={property.bedrooms} label="bed" />}
+          {property.bathrooms > 0 && <Spec icon="water-outline" value={property.bathrooms} label="bath" />}
+          <Spec icon="resize-outline" value={`${property.size_sqm}`} label="m²" />
         </View>
       </View>
     </Pressable>
+  );
+}
+
+function Spec({
+  icon,
+  value,
+  label,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  value: string | number;
+  label?: string;
+}) {
+  return (
+    <View style={styles.spec}>
+      <Ionicons name={icon} size={13} color={colors.textSecondary} />
+      <Text style={styles.specText}>
+        {value}
+        {label ? ` ${label}` : ""}
+      </Text>
+    </View>
   );
 }
 
@@ -105,40 +188,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadows.card,
   },
-  floating: {
-    ...shadows.floating,
-  },
-  imageWrap: {
-    height: 140,
-    position: "relative",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-  },
-  verifiedBadge: {
-    position: "absolute",
-    top: spacing.md,
-    right: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: colors.red,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  verifiedText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  sourceBadge: {
+  floating: { ...shadows.floating, borderWidth: 0 },
+  imageWrap: { height: 190, position: "relative" },
+  image: { width: "100%", height: "100%" },
+  topRow: {
     position: "absolute",
     top: spacing.md,
     left: spacing.md,
+    right: spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  sourceBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -146,16 +212,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radius.pill,
   },
-  sourceText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.3,
+  sourceText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
+  newBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.statusNew,
   },
+  newText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
   favBtn: {
-    position: "absolute",
-    top: spacing.md,
-    right: spacing.md,
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -163,49 +228,53 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  body: {
-    padding: spacing.lg,
-    gap: 6,
-  },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 4,
-  },
-  price: {
-    ...typography.h2,
-    color: colors.text,
-  },
-  listingType: {
-    ...typography.caption,
-    color: colors.textTertiary,
-  },
-  title: {
-    ...typography.body,
-    color: colors.text,
-  },
-  locRow: {
+  verifiedBadge: {
+    position: "absolute",
+    bottom: spacing.md,
+    left: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    backgroundColor: "rgba(10,10,10,0.85)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
   },
-  location: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    flex: 1,
+  verifiedText: { color: "#fff", fontSize: 10, fontWeight: "700", letterSpacing: 0.2 },
+  soldOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(10,10,10,0.35)",
   },
-  specs: {
+  soldText: {
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: 6,
+    transform: [{ rotate: "-8deg" }],
+  },
+  body: { padding: spacing.lg, gap: 6 },
+  title: { ...typography.body, color: colors.text, fontWeight: "600" },
+  locRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+  location: { ...typography.caption, color: colors.textSecondary, flex: 1 },
+  specs: { flexDirection: "row", gap: spacing.md, marginTop: 4 },
+  spec: { flexDirection: "row", alignItems: "center", gap: 4 },
+  specText: { fontSize: 12, color: colors.textSecondary, fontWeight: "600" },
+
+  // Row variant (list view)
+  rowCard: {
     flexDirection: "row",
     gap: spacing.md,
-    marginTop: 6,
+    padding: spacing.md,
+    backgroundColor: "#fff",
+    borderRadius: radius.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
   },
-  spec: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  specText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
+  rowImageWrap: { width: 120, height: 100, borderRadius: 12, overflow: "hidden" },
+  rowImage: { width: "100%", height: "100%" },
+  rowHot: { position: "absolute", top: 6, left: 6 },
+  rowBody: { flex: 1, gap: 4, justifyContent: "center" },
+  rowTitle: { fontSize: 13, fontWeight: "600", color: colors.text },
 });

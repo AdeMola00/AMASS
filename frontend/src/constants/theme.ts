@@ -1,5 +1,7 @@
 // AMASS design tokens — driven directly by the AMASS logo:
 // AMASS RED (bright), CHARCOAL BLACK, PURE WHITE.
+import { Platform } from "react-native";
+
 export const colors = {
   // Surfaces
   bg: "#FFFFFF",
@@ -43,11 +45,14 @@ export const colors = {
   divider: "#F0F0F0",
 
   // Status ring colors for map markers
-  statusAvailable: "#059669",
+  statusAvailable: "#0A0A0A",
   statusComingSoon: "#F59E0B",
   statusVerified: "#0A0A0A",
   statusPremium: "#8B5CF6",
-  statusSold: "#E11B22",
+  statusSold: "#71717A",
+  statusHot: "#E11B22",
+  statusNew: "#0369A1",
+  statusReduced: "#B45309",
 
   // Glass
   glassLight: "rgba(255,255,255,0.72)",
@@ -122,6 +127,21 @@ export const typography = {
   caption: { fontSize: 13, fontWeight: "500" as const },
   micro: { fontSize: 11, fontWeight: "600" as const, letterSpacing: 0.4 },
 } as const;
+
+// Premium serif font stack — for prices & luxury headlines (magazine feel).
+// Uses system serif fonts to avoid extra bundle weight or FOUT.
+export const fonts = {
+  serif: Platform.select({
+    ios: "Georgia",
+    android: "serif",
+    default: "Georgia, 'Times New Roman', serif",
+  }) as string,
+  serifBold: Platform.select({
+    ios: "Georgia-Bold",
+    android: "serif",
+    default: "Georgia, 'Times New Roman', serif",
+  }) as string,
+};
 
 // Format naira nicely: ₦145M, ₦8.5M, ₦65k
 export function formatNaira(n: number): string {

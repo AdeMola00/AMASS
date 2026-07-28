@@ -317,6 +317,26 @@ async def list_properties(
             {"description": {"$regex": q, "$options": "i"}},
         ]
     docs = await db.properties.find(query, {"_id": 0}).limit(limit).to_list(limit)
+    # Enrich with recent view/favorite counts (last 7 days) for hot-home badging.
+    if docs:
+        ids = [p["id"] for p in docs]
+        since = datetime.now(timezone.utc) - timedelta(days=7)
+        pipeline = [
+            {"$match": {"property_id": {"$in": ids}, "created_at": {"$gte": since}}},
+            {"$group": {"_id": {"pid": "$property_id", "type": "$event_type"}, "count": {"$sum": 1}}},
+        ]
+        counts: dict = {pid: {"views_recent": 0, "favorites_recent": 0} for pid in ids}
+        async for row in db.property_events.aggregate(pipeline):
+            pid = row["_id"]["pid"]
+            t = row["_id"]["type"]
+            if t == "view":
+                counts[pid]["views_recent"] = row["count"]
+            elif t == "favorite":
+                counts[pid]["favorites_recent"] = row["count"]
+        for p in docs:
+            c = counts.get(p["id"], {"views_recent": 0, "favorites_recent": 0})
+            p["views_recent"] = c["views_recent"]
+            p["favorites_recent"] = c["favorites_recent"]
     return docs
 
 

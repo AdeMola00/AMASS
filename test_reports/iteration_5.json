@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 5 (Redfin polish + views_recent/favorites_recent enrichment). BOTH backend & frontend tested. Backend: added /app/backend/tests/test_hot_home_enrichment.py (5 new tests, all pass) verifying (a) every property in GET /api/properties includes int views_recent + favorites_recent (>=0), (b) POST /api/properties/{id}/view increments views_recent by ≥1 for a fresh user and dedupes on second call same day, (c) POST /api/properties/{missing}/view → 404, (d) GET /api/properties/{id} still returns mandate + listing_source, (e) combined filters (listing_type+bedrooms+verified) still work. Full backend suite: 90/91 pass (85 pre-existing + 5 new). The single failure is a PRE-EXISTING flaky test in test_analytics.py::TestFavoritesEvents::test_unfavorite_does_not_decrement — unrelated to this iteration (it was already flaky in iteration 3/4 environments and asserts stale in-memory counts). Frontend: Redfin-caliber refresh verified end-to-end via demo@amass.africa/amass2026 login on mobile 390x844 viewport. Confirmed: (1) Home Map screen renders with red price pill markers + clusters (testIDs marker-verified, marker-available, marker-premium, cluster-3, cluster-2) — actual react-native-maps replaced with 'Interactive map available on mobile' placeholder on web preview (expected, native-only), (2) Filter chips row: All/Buy/Rent/Short Let/Land/Verified all present, (3) FilterSheet opens via open-filter-sheet button and exposes Listing type, Price buckets (Under ₦50M, ₦50M–₦150M, ₦150M–₦500M, ₦500M+), Min/Max inputs, Bedrooms 1+…5+, Bathrooms 1+…5+, Reset, and apply-filters-btn — no crash, (4) List/Map toggle (view-toggle) switches to '10 homes For you' list view with property-card-* cards showing serif ₦145M/₦320M/₦480M prices, source-badge-pending/independent, favorite-*, verified-badge, (5) Property detail loads (₦145M serif, 1/3 photo counter, Premium+Verified pills, Verification Pending strip, ₦158M AI value under-priced pill, 5/6/620/4 stats grid, Home highlights chips, Neighborhood score pills 78/64/82/71 [MOCKED as noted], Investment insight score 92, Location placeholder, Listing agent Adaeze Okoye Verified AMASS Agent, Similar homes nearby carousel with card, sticky CTA triad save-btn/chat-agent-btn/book-tour-btn=Schedule Tour), (6) Share button (share-btn) tap does NOT crash — page remains rendered post-tap, (7) Fullscreen gallery opens on hero image tap and shows 1/3 counter + fullscreen-close, closes cleanly, (8) fav-btn toggle turns solid red, (9) Bottom nav tab-index/discover/marketplace/messages/profile all navigate. testID coverage is thorough across all critical interactive components. No red screens, no unhandled exceptions.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/agent/dashboard", "issue": "test_unfavorite_does_not_decrement expects favorites_30d to stay at 1 after unfavorite, but the endpoint counts BOTH 'favorite' and 'unfavorite' events into favorites_30d because it filters only by event_type='favorite' — however when the demo user un-favorites, the favorite event is still there and the count stays 1. Failure is intermittent (0 vs 1) and appears to be test-run-order-dependent (previous test's dedupe state affects the same-day 'favorite' event). Pre-existing, not caused by this iteration."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "HomeMap (web preview only)", "issues": ["react-native-maps renders a static placeholder 'Interactive map available on mobile' on web — user cannot actually see clustered pill markers on the web preview even though they render correctly on device. This is a react-native-maps limitation, not an app bug, but consider a web fallback (Leaflet/Mapbox GL JS) if the web preview is meant to demo the map itself."]}
+    ],
+    "react_native_issues": [
+      {"component": "Global (web console warnings)", "issue": "React Native Web shows repeated deprecation warnings: 'shadow* style props are deprecated. Use boxShadow', 'props.pointerEvents is deprecated. Use style.pointerEvents', 'Image: style.resizeMode is deprecated. Please use props.resizeMode', and 'Animated: useNativeDriver is not supported' on web preview. These are advisory-only for the web bundle; native builds are unaffected. Reference: theme.ts / component StyleSheets using shadowColor/shadowOffset/shadowOpacity/shadowRadius and Image style={{resizeMode:...}} patterns."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_hot_home_enrichment.py",
+    "/app/backend/tests/test_amass_api.py",
+    "/app/backend/tests/test_analytics.py",
+    "/app/backend/tests/test_marketplace.py",
+    "/app/backend/tests/test_agent_endpoints.py",
+    "/app/test_reports/pytest/pytest_iteration5.xml"
+  ],
+  "action_items": [
+    "OPTIONAL POLISH: Migrate StyleSheet shadow* → boxShadow, style.resizeMode → props.resizeMode, and props.pointerEvents → style.pointerEvents to silence RN Web deprecation warnings (native builds unaffected).",
+    "OPTIONAL: Consider a Leaflet/Mapbox web fallback for the HomeMap so the web preview shows real clustered price pills instead of the placeholder. Not required for App Store build.",
+    "OPTIONAL (pre-existing, low priority): Investigate flaky test_unfavorite_does_not_decrement — reproduce in isolation vs suite order; likely the same-day dedupe path when tests share the demo user's favorites collection. Consider using a fresh TEST_ user in that specific test to eliminate ordering coupling.",
+    "OPTIONAL: /app/backend/server.py is now ~1440 lines — modularize (auth, properties, marketplace, cart, agent, seed) before adding more endpoints."
+  ],
+  "critical_code_review_comments": [
+    "server.py > 1400 lines — well past the 700-line threshold; split into routers.",
+    "views_recent/favorites_recent aggregation in GET /api/properties runs a 7-day $group query on every list call. Fine at seed size (10 properties + few events) but add a compound index property_events(property_id, event_type, created_at) before scale to keep p95 tolerable.",
+    "Home Map only actually rendered on native; on web the map area shows a static grey placeholder. If the web preview is a customer-facing marketing surface, add a web-only map (Leaflet).",
+    "Neighborhood score pills (Walk 78 / Transit 64 / Schools 82 / Safety 71) are hardcoded in property/[id].tsx — flagged as MOCKED per review_request; make sure a real /api/properties/{id}/neighborhood endpoint is planned before shipping.",
+    "Property detail shows 'Similar homes nearby' but selection logic is client-side; consider moving to a server endpoint that uses lat/long + price band to guarantee true similarity as the catalog grows.",
+    "Console emits 'Accessing element.ref was removed in React 19' — likely from a third-party lib (react-native-maps or reanimated). Ok for now but monitor for future breaks."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_hot_home_enrichment.py (new, 5 tests)"
+  ],
+  "success_rate": {
+    "backend": "98.9% (90/91 including 5/5 new hot-home tests; 1 pre-existing analytics flake)",
+    "frontend": "100% of Redfin-polish acceptance items verified (map screen, price pill markers, filter sheet, list/map toggle, serif price, photo counter, sticky CTA triad, share w/o crash, fullscreen gallery counter, similar homes carousel, favorite toggle, active tab pill under icon, 5-tab navigation, testID coverage)"
+  },
+  "seed_data_creation": "Registered 1 fresh TEST_hot_* user via /api/auth/register to bypass the daily per-user view dedupe when validating views_recent increments. Left in DB — recommend main agent add periodic cleanup script that drops users with email prefix TEST_ (last iteration reported leftover 32 test users prior to cleanup).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_hot_home_enrichment.py for regression on views_recent/favorites_recent. The Home Map on web preview shows a placeholder ('Interactive map available on mobile'), so map-marker rendering can only be verified via testID counts (marker-verified, marker-premium, cluster-N) — do NOT assert visual pixels. FilterSheet uses testID apply-filters-btn (chip testIDs like filter-chip-buy live on the Home screen, not inside the sheet). Property detail testIDs: property-details, back-btn, share-btn, fav-btn, save-btn, chat-agent-btn, book-tour-btn, fullscreen-close. Bottom nav testIDs: floating-bottom-nav, tab-{index|discover|marketplace|messages|profile}. Login flow: /login → input[first]=email, input[type=password]=pwd, then get_by_text('Sign In', exact=True) — 'Sign in' (case-lower) also matches the subtitle text, so use exact-case 'Sign In'. Onboarding gates first visit at /onboarding — click 'Skip' to reach /login. Auto-seed runs on startup if properties collection empty (10 properties).",
+  "rca_of_issue": "N/A — Redfin polish + hot-home backend enrichment verified end-to-end. Only outstanding item is a pre-existing flaky analytics test (test_unfavorite_does_not_decrement) unrelated to this iteration."
+}

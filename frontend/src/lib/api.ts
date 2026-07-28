@@ -38,6 +38,9 @@ export type Property = {
   parking?: number;
   investment_score?: number;
   ai_valuation?: number;
+  views_recent?: number;
+  favorites_recent?: number;
+  created_at?: string;
 };
 
 export type UserProfile = {

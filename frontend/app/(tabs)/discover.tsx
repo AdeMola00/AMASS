@@ -59,9 +59,9 @@ export default function Discover() {
 
             <SectionHeader title="Market Signals" caption="What's moving right now" />
             <View style={styles.stack}>
-              <SignalRow icon="trending-up" color={colors.emerald} label="Lekki Ph 1 prices" value="+8.2%" caption="YoY" />
+              <SignalRow icon="trending-up" color={colors.text} label="Lekki Ph 1 prices" value="+8.2%" caption="YoY" />
               <SignalRow icon="pulse" color={colors.gold} label="Ikoyi rental yield" value="6.4%" caption="Gross" />
-              <SignalRow icon="business" color={colors.info} label="VI office demand" value="High" caption="Q1 2026" />
+              <SignalRow icon="business" color={colors.textSecondary} label="VI office demand" value="High" caption="Q1 2026" />
               <SignalRow icon="rocket" color={colors.red} label="Abeokuta land deals" value="+12.3%" caption="Trending" />
             </View>
           </>
@@ -121,7 +121,7 @@ function ScoreCard({ n }: { n: Neighborhood }) {
 
 function Metric({ label, value }: { label: string; value: number }) {
   const color =
-    value >= 85 ? colors.emerald : value >= 70 ? colors.gold : colors.textSecondary;
+    value >= 85 ? colors.text : value >= 70 ? colors.gold : colors.textTertiary;
   return (
     <View style={styles.metric}>
       <Text style={[styles.metricValue, { color }]}>{value}</Text>
@@ -214,12 +214,12 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.emeraldSurface,
+    backgroundColor: colors.text,
     alignItems: "center",
     justifyContent: "center",
   },
-  scoreCircleNumber: { ...typography.h2, color: colors.emerald, letterSpacing: -1 },
-  scoreCircleLabel: { fontSize: 9, color: colors.emerald, fontWeight: "700" },
+  scoreCircleNumber: { ...typography.h2, color: "#fff", letterSpacing: -1 },
+  scoreCircleLabel: { fontSize: 9, color: "rgba(255,255,255,0.85)", fontWeight: "700" },
   scoreRow: { flexDirection: "row", gap: spacing.md },
   metric: { flex: 1, gap: 4 },
   metricValue: { fontSize: 18, fontWeight: "800" },
