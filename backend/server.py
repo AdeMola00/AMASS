@@ -55,8 +55,12 @@ class UserOut(BaseModel):
     email: str
     full_name: str
     phone: Optional[str] = None
+    phone_verified: bool = False
     avatar_url: Optional[str] = None
+    city: Optional[str] = None
+    bio: Optional[str] = None
     is_agent: bool = False
+    referral_code: Optional[str] = None
     created_at: datetime
 
 
@@ -1652,6 +1656,25 @@ async def on_startup():
             status="active",
         )
         await db.advertisements.insert_one(demo_ad.model_dump())
+
+    # Assign 2 seed properties to the demo user so /agent-dashboard is
+    # populated for demo E2E flow (Boost / Leads UI).
+    demo_user = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0})
+    if demo_user:
+        demo_props = await db.properties.find(
+            {"agent_id": {"$ne": demo_user["id"]}}, {"_id": 0}
+        ).sort("price", -1).limit(2).to_list(2)
+        if demo_props:
+            await db.properties.update_many(
+                {"id": {"$in": [p["id"] for p in demo_props]}},
+                {
+                    "$set": {
+                        "agent_id": demo_user["id"],
+                        "agent_name": demo_user.get("full_name", "Ada Demo"),
+                    }
+                },
+            )
+            await db.users.update_one({"id": demo_user["id"]}, {"$set": {"is_agent": True}})
 
 
 @app.on_event("shutdown")
