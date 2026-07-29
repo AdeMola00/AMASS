@@ -126,7 +126,7 @@ export default function WalletScreen() {
         <View style={styles.quickActions}>
           <QuickBtn icon="add" label="Buy Tokens" primary onPress={() => router.push("/buy-tokens")} />
           <QuickBtn icon="star" label="Subscribe" onPress={() => router.push("/subscribe")} />
-          <QuickBtn icon="gift" label="Earn" onPress={claim} />
+          <QuickBtn icon="gift" label="Earn" onPress={() => router.push("/earn")} />
         </View>
 
         {claimStatus && (

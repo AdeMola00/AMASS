@@ -448,6 +448,143 @@ export const api = {
       "/wallet/earn?task_id=daily_login",
       { method: "POST" }
     ),
+
+  // ─── Earn / Referrals ─────────────────────────────────
+  earnTasks: () =>
+    req<{
+      tasks: {
+        id: string;
+        label: string;
+        tokens: number;
+        icon: string;
+        one_time: boolean;
+        completed: boolean;
+        claimable_today: boolean;
+      }[];
+      streak: number;
+    }>("/earn/tasks"),
+  claimTask: (task_id: string) =>
+    req<{ ok: boolean; credited?: number; reason?: string; task_id?: string }>(
+      "/earn/claim",
+      { method: "POST", body: JSON.stringify({ task_id }) }
+    ),
+  phoneVerifyStart: (phone: string) =>
+    req<{ ok: boolean; mocked?: boolean; hint?: string }>(
+      "/earn/phone/start",
+      { method: "POST", body: JSON.stringify({ phone }) }
+    ),
+  phoneVerifyConfirm: (phone: string, code: string) =>
+    req<{ ok: boolean; reward?: any }>(
+      "/earn/phone/confirm",
+      { method: "POST", body: JSON.stringify({ phone, code }) }
+    ),
+  completeProfile: (payload: {
+    full_name?: string;
+    phone?: string;
+    city?: string;
+    bio?: string;
+    avatar_url?: string;
+  }) =>
+    req<{ ok: boolean; reward?: any; filled: number; needed?: number }>(
+      "/earn/profile",
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
+  myReferral: () =>
+    req<{
+      code: string;
+      share_url: string;
+      referred_count: number;
+      tokens_per_referral: number;
+    }>("/earn/referral/me"),
+  applyReferral: (code: string) =>
+    req<{ ok: boolean; you_get: number; referrer_gets: number }>(
+      "/earn/referral/apply",
+      { method: "POST", body: JSON.stringify({ code }) }
+    ),
+
+  // ─── Agent tools ──────────────────────────────────────
+  promotionsConfig: () =>
+    req<Record<string, { tokens: number; days: number; label: string; perk: string }>>(
+      "/agent/promotions/config"
+    ),
+  promoteListing: (property_id: string, tier: "promote" | "feature" | "boost") =>
+    req<{ ok: boolean; tier: string; expires_at: string; cost: number }>(
+      "/agent/promote",
+      { method: "POST", body: JSON.stringify({ property_id, tier }) }
+    ),
+  listLeads: (property_id: string) =>
+    req<{
+      leads: {
+        favorite_user_id: string;
+        name: string;
+        avatar_url?: string;
+        phone?: string;
+        email?: string;
+        unlocked: boolean;
+        cost: number;
+        saved_at: string;
+      }[];
+      unlock_cost: number;
+    }>(`/agent/leads/${property_id}`),
+  unlockLead: (property_id: string, favorite_user_id: string) =>
+    req<{ ok: boolean; cost: number; contact: { name: string; phone: string; email: string } }>(
+      "/agent/leads/unlock",
+      { method: "POST", body: JSON.stringify({ property_id, favorite_user_id }) }
+    ),
+  aiDescription: (params: {
+    title: string;
+    property_type?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+    size_sqm?: number;
+    location?: string;
+    amenities?: string[];
+    tone?: "luxurious" | "family" | "investor" | "concise";
+  }) =>
+    req<{ description: string; cost: number }>("/agent/ai/description", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+  aiParseSearch: (query: string) =>
+    req<{
+      ok: boolean;
+      filters?: {
+        listing_type?: string;
+        property_type?: string;
+        min_price?: number;
+        max_price?: number;
+        bedrooms?: number;
+        city?: string;
+        verified?: boolean;
+        keywords?: string[];
+        summary?: string;
+      };
+      error?: string;
+    }>("/agent/ai/parse-search", { method: "POST", body: JSON.stringify({ query }) }),
+
+  // ─── Ads ──────────────────────────────────────────────
+  adTiers: () =>
+    req<Record<string, { tokens: number; days: number; label: string; perk: string }>>(
+      "/ads/tiers"
+    ),
+  nextAd: (context = "marketplace_home", exclude: string[] = []) =>
+    req<{ ad: any | null; reason?: string }>(
+      `/ads/next?context=${encodeURIComponent(context)}${
+        exclude.length ? `&exclude=${exclude.join(",")}` : ""
+      }`
+    ),
+  trackAd: (
+    ad_id: string,
+    event: "impression" | "click" | "save" | "chat" | "call" | "dismiss" | "not_interested" | "hide_similar" | "report",
+    context?: string
+  ) =>
+    req<{ ok: boolean }>("/ads/track", {
+      method: "POST",
+      body: JSON.stringify({ ad_id, event, context }),
+    }),
+  myAds: () => req<any[]>("/ads/mine"),
+  createAd: (payload: any) =>
+    req<any>("/ads", { method: "POST", body: JSON.stringify(payload) }),
 };
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;

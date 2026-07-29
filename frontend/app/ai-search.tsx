@@ -17,7 +17,7 @@ import { api } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 import { AmassPinIcon } from "@/src/components/AmassLogo";
 
-type Msg = { id: string; role: "user" | "ai"; text: string };
+type Msg = { id: string; role: "user" | "ai"; text: string; filters?: any };
 
 const SUGGESTIONS = [
   "Show me a duplex under ₦150M in Lekki",
@@ -25,6 +25,16 @@ const SUGGESTIONS = [
   "Which areas have the highest rental yield?",
   "Compare Ikoyi with Victoria Island",
 ];
+
+function FilterTag({ label }: { label: string }) {
+  return (
+    <View style={styles.filterTag}>
+      <Text style={styles.filterTagText} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
 
 export default function AiSearch() {
   const router = useRouter();
@@ -44,9 +54,14 @@ export default function AiSearch() {
     setThinking(true);
 
     try {
-      const res = await api.aiSearchSync(text.trim(), sessionId);
-      setMsgs((m) => [...m, { id: `a-${Date.now()}`, role: "ai", text: res.reply }]);
-    } catch (e: any) {
+      // Fire chat + filter parse in parallel for a snappy dual-answer.
+      const [res, parsed] = await Promise.all([
+        api.aiSearchSync(text.trim(), sessionId),
+        api.aiParseSearch(text.trim()).catch(() => ({ ok: false } as any)),
+      ]);
+      const filters = parsed?.ok ? parsed.filters : undefined;
+      setMsgs((m) => [...m, { id: `a-${Date.now()}`, role: "ai", text: res.reply, filters }]);
+    } catch {
       setMsgs((m) => [
         ...m,
         {
@@ -132,6 +147,40 @@ export default function AiSearch() {
                   >
                     {m.text}
                   </Text>
+                  {m.filters && Object.keys(m.filters).length > 0 && (
+                    <View style={styles.filterPreview}>
+                      <View style={styles.filterChipsRow}>
+                        {m.filters.listing_type && (
+                          <FilterTag label={m.filters.listing_type} />
+                        )}
+                        {m.filters.property_type && (
+                          <FilterTag label={m.filters.property_type} />
+                        )}
+                        {m.filters.bedrooms && (
+                          <FilterTag label={`${m.filters.bedrooms}+ beds`} />
+                        )}
+                        {m.filters.city && <FilterTag label={m.filters.city} />}
+                        {m.filters.max_price && (
+                          <FilterTag label={`≤ ₦${(m.filters.max_price / 1_000_000).toFixed(0)}M`} />
+                        )}
+                        {m.filters.verified && <FilterTag label="Verified" />}
+                      </View>
+                      <Pressable
+                        style={styles.applyFiltersBtn}
+                        onPress={() => {
+                          Haptics.selectionAsync().catch(() => {});
+                          router.replace({
+                            pathname: "/(tabs)",
+                            params: { ai_filters: JSON.stringify(m.filters) },
+                          } as any);
+                        }}
+                        testID="ai-apply-filters"
+                      >
+                        <Ionicons name="map" size={14} color="#fff" />
+                        <Text style={styles.applyFiltersText}>Apply to map</Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
               </View>
             ))}
@@ -182,6 +231,39 @@ export default function AiSearch() {
 }
 
 const styles = StyleSheet.create({
+  filterPreview: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+    gap: 8,
+  },
+  filterChipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  filterTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#0A0A0A",
+  },
+  filterTagText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+    textTransform: "capitalize",
+  },
+  applyFiltersBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: colors.red,
+    alignSelf: "flex-start",
+  },
+  applyFiltersText: { color: "#fff", fontSize: 12, fontWeight: "800" },
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: "row",

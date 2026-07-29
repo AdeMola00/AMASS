@@ -12,24 +12,25 @@ import {
   Linking,
 } from "react-native";
 import { MapView, Marker, PROVIDER_DEFAULT, Region } from "@/src/lib/map";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
+import BottomSheet, { BottomSheetFlatList, BottomSheetView } from "@gorhom/bottom-sheet";
 
 import { api, Property } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { PropertyMarker, ClusterMarker } from "@/src/components/PropertyMarker";
 import { FilterChip } from "@/src/components/FilterChip";
 import { PropertyCard } from "@/src/components/PropertyCard";
+import { MiniPropertyCard } from "@/src/components/MiniPropertyCard";
 import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
 import { PropertyCardSkeleton } from "@/src/components/Skeleton";
 
-const { width } = Dimensions.get("window");
-const CARD_WIDTH = width - 48;
+const SNAP_POINTS = [180, "55%", "92%"] as const;
 
 const INITIAL_REGION: Region = {
   latitude: 6.5244,
@@ -87,9 +88,11 @@ function cluster(properties: Property[], region: Region) {
 export default function HomeMap() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const searchParams = useLocalSearchParams<{ ai_filters?: string }>();
   const mapRef = useRef<MapView>(null);
-  const carouselRef = useRef<FlatList<Property>>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const [sheetIndex, setSheetIndex] = useState(0);
 
   const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [filters, setFilters] = useState<FilterState>({});
@@ -178,6 +181,29 @@ export default function HomeMap() {
     load();
   }, [load]);
 
+  // Apply filters passed from AI Search screen
+  useEffect(() => {
+    if (!searchParams.ai_filters) return;
+    try {
+      const parsed = JSON.parse(searchParams.ai_filters as string);
+      const next: FilterState = {};
+      if (parsed.listing_type && ["buy", "rent", "shortlet"].includes(parsed.listing_type)) {
+        next.listingType = parsed.listing_type;
+      }
+      if (parsed.property_type) next.propertyType = parsed.property_type;
+      if (parsed.min_price) next.minPrice = parsed.min_price;
+      if (parsed.max_price) next.maxPrice = parsed.max_price;
+      if (parsed.bedrooms) next.bedrooms = parsed.bedrooms;
+      if (parsed.verified) next.verifiedOnly = true;
+      setFilters(next);
+      if (parsed.city) {
+        setQuery(parsed.city);
+      }
+      // Clear param
+      router.setParams({ ai_filters: undefined } as any);
+    } catch {}
+  }, [searchParams.ai_filters, router]);
+
   useEffect(() => {
     api
       .favoriteIds()
@@ -187,8 +213,8 @@ export default function HomeMap() {
 
   const clusters = useMemo(() => cluster(properties, region), [properties, region]);
 
-  const activeIndex = useMemo(
-    () => Math.max(0, properties.findIndex((p) => p.id === activeId)),
+  const activeProperty = useMemo(
+    () => properties.find((p) => p.id === activeId) ?? properties[0],
     [properties, activeId]
   );
 
@@ -202,8 +228,8 @@ export default function HomeMap() {
   const onMarkerPress = (p: Property) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setActiveId(p.id);
-    const i = properties.findIndex((x) => x.id === p.id);
-    if (i >= 0) carouselRef.current?.scrollToIndex({ index: i, animated: true });
+    // Snap to peek so user always sees the newly-selected card
+    bottomSheetRef.current?.snapToIndex(0);
     focusProperty(p);
   };
 
@@ -436,78 +462,84 @@ export default function HomeMap() {
         </View>
       )}
 
-      {/* Results count pill */}
-      {!loading && properties.length > 0 && (
-        <View style={[styles.resultsPill, { bottom: bottomBase + 280 }]} pointerEvents="box-none">
-          <View style={[styles.resultsBubble, shadows.floating]}>
-            <View style={styles.resultsDot} />
-            <Text style={styles.resultsText}>
-              {properties.length} {properties.length === 1 ? "home" : "homes"} in view
+      {/* Bottom Sheet — Google Maps / Airbnb style */}
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={0}
+        snapPoints={SNAP_POINTS}
+        onChange={setSheetIndex}
+        bottomInset={bottomBase - 12}
+        handleIndicatorStyle={styles.sheetHandle}
+        backgroundStyle={styles.sheetBg}
+        enableDynamicSizing={false}
+        detached={false}
+        style={styles.sheetShadow}
+      >
+        <BottomSheetView style={styles.sheetHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sheetTitle}>
+              {loading ? "Searching…" : `${properties.length} ${properties.length === 1 ? "home" : "homes"}`}
+            </Text>
+            <Text style={styles.sheetSub}>
+              {activeProperty
+                ? "Tap card to view details"
+                : filters.listingType
+                ? `For ${filters.listingType}`
+                : "Explore the map"}
             </Text>
           </View>
-        </View>
-      )}
-
-      {/* Bottom carousel */}
-      {loading ? (
-        <View style={[styles.carousel, { bottom: bottomBase }]}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md }}
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              bottomSheetRef.current?.snapToIndex(sheetIndex >= 2 ? 0 : sheetIndex + 1);
+            }}
+            style={styles.expandBtn}
+            testID="sheet-expand-btn"
           >
-            {Array.from({ length: 3 }).map((_, i) => (
-              <View key={i} style={{ width: CARD_WIDTH }}>
-                <PropertyCardSkeleton />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      ) : properties.length > 0 ? (
-        <View style={[styles.carousel, { bottom: bottomBase }]} pointerEvents="box-none">
-          <FlatList
-            ref={carouselRef}
+            <Ionicons
+              name={sheetIndex >= 2 ? "chevron-down" : "chevron-up"}
+              size={16}
+              color={colors.text}
+            />
+          </Pressable>
+        </BottomSheetView>
+
+        {loading ? (
+          <BottomSheetView style={{ paddingHorizontal: spacing.lg, paddingTop: 8 }}>
+            <PropertyCardSkeleton />
+          </BottomSheetView>
+        ) : sheetIndex === 0 && activeProperty ? (
+          // Peek state: show only the selected mini card
+          <BottomSheetView style={{ paddingHorizontal: spacing.lg, paddingTop: 8 }}>
+            <MiniPropertyCard
+              property={activeProperty}
+              onPress={() => router.push(`/property/${activeProperty.id}`)}
+              onFavorite={() => onFavorite(activeProperty.id)}
+              favorited={favorites.has(activeProperty.id)}
+            />
+          </BottomSheetView>
+        ) : (
+          // Mid / Full state: scrollable list
+          <BottomSheetFlatList
             data={properties}
             keyExtractor={(p) => p.id}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={CARD_WIDTH + 12}
-            decelerationRate="fast"
-            contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: 12 }}
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + 12));
-              const p = properties[idx];
-              if (p) {
-                setActiveId(p.id);
-                focusProperty(p);
-              }
+            contentContainerStyle={{
+              paddingHorizontal: spacing.lg,
+              paddingTop: 8,
+              paddingBottom: 40,
+              gap: spacing.md,
             }}
             renderItem={({ item }) => (
-              <View style={{ width: CARD_WIDTH }}>
-                <PropertyCard
-                  property={item}
-                  onPress={() => router.push(`/property/${item.id}`)}
-                  onFavorite={() => onFavorite(item.id)}
-                  favorited={favorites.has(item.id)}
-                  variant="floating"
-                />
-              </View>
+              <MiniPropertyCard
+                property={item}
+                onPress={() => router.push(`/property/${item.id}`)}
+                onFavorite={() => onFavorite(item.id)}
+                favorited={favorites.has(item.id)}
+              />
             )}
-            getItemLayout={(_, index) => ({
-              length: CARD_WIDTH + 12,
-              offset: (CARD_WIDTH + 12) * index,
-              index,
-            })}
-            initialScrollIndex={activeIndex}
           />
-        </View>
-      ) : (
-        <View style={[styles.emptyBanner, { bottom: bottomBase + 40 }]}>
-          <Ionicons name="home-outline" size={16} color={colors.textTertiary} />
-          <Text style={styles.emptyText}>No properties match your filters.</Text>
-        </View>
-      )}
+        )}
+      </BottomSheet>
 
       <FilterSheet ref={filterSheetRef} value={filters} onApply={setFilters} />
     </View>
@@ -751,6 +783,50 @@ const styles = StyleSheet.create({
   resultsDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.red },
   resultsText: { fontSize: 12, fontWeight: "800", color: colors.text, letterSpacing: -0.2 },
   carousel: { position: "absolute", left: 0, right: 0 },
+  sheetShadow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  sheetBg: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+  },
+  sheetHandle: {
+    backgroundColor: colors.borderStrong,
+    width: 44,
+    height: 5,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: -0.3,
+  },
+  sheetSub: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  expandBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   emptyBanner: {
     position: "absolute",
     alignSelf: "center",

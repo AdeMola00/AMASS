@@ -21,6 +21,8 @@ import { ProductCard } from "@/src/components/ProductCard";
 import { CategoryTile, CategoryDef } from "@/src/components/CategoryTile";
 import { CollectionBanner } from "@/src/components/CollectionBanner";
 import { VendorCard } from "@/src/components/VendorCard";
+import { AdModal } from "@/src/components/AdModal";
+import { useAdTrigger } from "@/src/hooks/useAdTrigger";
 
 const CATEGORIES: CategoryDef[] = [
   { key: "furniture", label: "Furniture", icon: "cube", color: "#0A0A0A", category: "home", subcategory: "Furniture" },
@@ -44,6 +46,11 @@ const TRENDING = [
 export default function Marketplace() {
   const router = useRouter();
   const { cart, count, add } = useCart();
+  const { ad, visible: adVisible, dismiss: adDismiss, noteInteraction } = useAdTrigger({
+    triggerAfter: 6,
+    context: "marketplace_home",
+    mountDelayMs: 2500,
+  });
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
@@ -80,8 +87,7 @@ export default function Marketplace() {
   const deals = useMemo(() => items.filter((i) => i.on_sale).slice(0, 8), [items]);
   const recommended = useMemo(() => {
     // A shuffled tail — top-rated first
-    return [...items].sort((a, b) => b.rating - a.rating).slice(0, 8);
-  }, [items]);
+    return [...items].sort((a, b) => b.rating - a.rating).slice(0, 8);  }, [items]);
 
   const quickAdd = async (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -385,6 +391,7 @@ export default function Marketplace() {
           <Text style={styles.cartPeekTotal}>{formatNaira(cart.subtotal)}</Text>
         </Pressable>
       )}
+      <AdModal ad={ad} visible={adVisible} onClose={adDismiss} context="marketplace_home" />
     </SafeAreaView>
   );
 }

@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   FlatList,
+  Modal,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -16,7 +18,9 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { api, Property } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
+import { useWallet } from "@/src/contexts/wallet";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { TokenIcon } from "@/src/components/TokenIcon";
 
 type Tab = "overview" | "listings" | "leads";
 
@@ -66,6 +70,7 @@ export default function AgentDashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [boostProperty, setBoostProperty] = useState<Property | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -180,6 +185,7 @@ export default function AgentDashboard() {
                 views={a?.views ?? 0}
                 favorites={a?.favorites ?? 0}
                 onPress={() => router.push(`/property/${item.id}`)}
+                onBoost={() => setBoostProperty(item)}
               />
             );
           }}
@@ -212,6 +218,11 @@ export default function AgentDashboard() {
           }
         />
       )}
+      <BoostSheet
+        property={boostProperty}
+        onClose={() => setBoostProperty(null)}
+        onSuccess={load}
+      />
     </SafeAreaView>
   );
 }
@@ -283,11 +294,13 @@ function ListingRow({
   views,
   favorites,
   onPress,
+  onBoost,
 }: {
   property: Property;
   views: number;
   favorites: number;
   onPress: () => void;
+  onBoost?: () => void;
 }) {
   const statusColor =
     property.status === "sold"
@@ -329,11 +342,205 @@ function ListingRow({
             <Ionicons name="heart" size={11} color={colors.red} />
             <Text style={styles.metricPillText}>{favorites}</Text>
           </View>
+          {onBoost && (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                onBoost();
+              }}
+              style={styles.boostChip}
+              testID={`boost-${property.id}`}
+            >
+              <Ionicons name="rocket" size={11} color="#fff" />
+              <Text style={styles.boostChipText}>Boost</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </Pressable>
   );
 }
+
+function BoostSheet({
+  property,
+  onClose,
+  onSuccess,
+}: {
+  property: Property | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { wallet, refresh } = useWallet();
+  const [tiers, setTiers] = useState<Record<string, any>>({});
+  const [selectedTier, setSelectedTier] = useState<"promote" | "feature" | "boost">("promote");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (property) {
+      api.promotionsConfig().then(setTiers).catch(() => {});
+    }
+  }, [property]);
+
+  if (!property) return null;
+
+  const balance = wallet?.spendable ?? 0;
+  const cost = tiers[selectedTier]?.tokens ?? 0;
+  const canAfford = balance >= cost;
+
+  const submit = async () => {
+    if (!canAfford) return;
+    setBusy(true);
+    try {
+      await api.promoteListing(property.id, selectedTier);
+      await refresh();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert(
+        "Boosted!",
+        `${tiers[selectedTier]?.label} is now active on this listing for ${tiers[selectedTier]?.days} days.`,
+        [{ text: "OK", onPress: () => { onClose(); onSuccess(); } }]
+      );
+    } catch (e: any) {
+      Alert.alert("Could not boost", e?.message ?? "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal visible={!!property} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={boostStyles.backdrop} onPress={onClose}>
+        <Pressable style={boostStyles.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={boostStyles.handle} />
+          <Text style={boostStyles.title}>Boost your listing</Text>
+          <Text style={boostStyles.body} numberOfLines={2}>
+            {property.title}
+          </Text>
+          <View style={boostStyles.balanceRow}>
+            <TokenIcon size={16} />
+            <Text style={boostStyles.balanceText}>Balance: {balance} tokens</Text>
+          </View>
+
+          <View style={boostStyles.tiersRow}>
+            {(["promote", "feature", "boost"] as const).map((k) => {
+              const t = tiers[k];
+              if (!t) return null;
+              const active = selectedTier === k;
+              return (
+                <Pressable
+                  key={k}
+                  onPress={() => setSelectedTier(k)}
+                  style={[boostStyles.tier, active && boostStyles.tierActive]}
+                  testID={`boost-tier-${k}`}
+                >
+                  <Ionicons
+                    name={k === "boost" ? "rocket" : k === "feature" ? "star" : "trending-up"}
+                    size={20}
+                    color={active ? "#fff" : colors.text}
+                  />
+                  <Text style={[boostStyles.tierName, active && { color: "#fff" }]}>
+                    {t.label}
+                  </Text>
+                  <View style={boostStyles.tierCost}>
+                    <TokenIcon size={10} />
+                    <Text style={[boostStyles.tierCostText, active && { color: "#fff" }]}>
+                      {t.tokens}
+                    </Text>
+                  </View>
+                  <Text style={[boostStyles.tierDays, active && { color: "rgba(255,255,255,0.7)" }]}>
+                    {t.days} days
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {selectedTier && tiers[selectedTier] && (
+            <Text style={boostStyles.perk}>{tiers[selectedTier].perk}</Text>
+          )}
+
+          <Pressable
+            onPress={submit}
+            style={[boostStyles.cta, (!canAfford || busy) && { opacity: 0.5 }]}
+            disabled={!canAfford || busy}
+            testID="boost-submit"
+          >
+            {busy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="rocket" size={16} color="#fff" />
+                <Text style={boostStyles.ctaText}>
+                  {canAfford ? `Activate for ${cost} tokens` : `Need ${cost - balance} more tokens`}
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const boostStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: 40,
+    gap: 12,
+  },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, alignSelf: "center" },
+  title: { fontSize: 22, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
+  body: { fontSize: 13, color: colors.textSecondary },
+  balanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  balanceText: { fontSize: 12, fontWeight: "800", color: colors.text },
+  tiersRow: { flexDirection: "row", gap: 8, marginTop: 6 },
+  tier: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    gap: 4,
+  },
+  tierActive: { backgroundColor: colors.text, borderColor: colors.text },
+  tierName: { fontSize: 12, fontWeight: "800", color: colors.text, marginTop: 4 },
+  tierCost: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 4 },
+  tierCostText: { fontSize: 13, fontWeight: "900", color: colors.text },
+  tierDays: { fontSize: 10, color: colors.textTertiary, fontWeight: "700" },
+  perk: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: "italic",
+    backgroundColor: colors.surfaceSecondary,
+    padding: 10,
+    borderRadius: 12,
+  },
+  cta: {
+    height: 54,
+    borderRadius: 999,
+    backgroundColor: colors.red,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 6,
+  },
+  ctaText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+});
 
 function LeadRow({ lead }: { lead: Lead }) {
   const channelIcon: Record<Lead["channel"], keyof typeof Ionicons.glyphMap> = {
@@ -512,6 +719,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.textSecondary,
   },
+  boostChip: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: colors.red,
+  },
+  boostChipText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   lead: {
     flexDirection: "row",
     alignItems: "center",

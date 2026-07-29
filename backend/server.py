@@ -25,6 +25,8 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, Strea
 
 from marketplace_seed import VENDORS, COLLECTIONS, MARKET_ITEMS
 from tokens import register_token_routes, compute_token_cost, has_unlocked
+from earn_and_tools import register_earn_routes, register_agent_tool_routes
+from ads import register_ads_routes
 
 # ─── Config ───────────────────────────────────────────────
 MONGO_URL = os.environ["MONGO_URL"]
@@ -570,6 +572,29 @@ async def create_property(data: PropertyCreateIn, user: dict = Depends(get_curre
     await db.properties.insert_one(prop.model_dump())
     if not user.get("is_agent"):
         await db.users.update_one({"id": user["id"]}, {"$set": {"is_agent": True}})
+    # Reward: 40 tokens for uploading a property (rate-limited to 5/day server-side).
+    try:
+        from tokens import WalletService as _WS
+        _svc = _WS(db)
+        today = datetime.now(timezone.utc).date().isoformat()
+        cnt = await db.token_transactions.count_documents(
+            {
+                "user_id": user["id"],
+                "kind": "earn_reward",
+                "meta.task_id": "upload_property",
+                "meta.date": today,
+            }
+        )
+        if cnt < 5:
+            await _svc.credit(
+                user["id"],
+                40,
+                "earn_reward",
+                "Reward: Uploaded a property",
+                meta={"task_id": "upload_property", "date": today, "property_id": prop.id},
+            )
+    except Exception:
+        logger.exception("failed to award upload_property")
     return prop
 
 
@@ -1531,6 +1556,34 @@ async def root():
 app.include_router(api)
 app.include_router(register_token_routes(db))
 
+
+# AI helper — used by agent tools (description gen + search parser)
+class _ChatWrapper:
+    def __init__(self, system: str):
+        self._chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=str(uuid.uuid4()),
+            system_message=system,
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+
+    async def ask(self, text: str) -> str:
+        parts: list = []
+        async for ev in self._chat.stream_message(UserMessage(text=text)):
+            if isinstance(ev, TextDelta):
+                parts.append(ev.content)
+            elif isinstance(ev, StreamDone):
+                break
+        return "".join(parts)
+
+
+def _chat_factory(system: str) -> _ChatWrapper:
+    return _ChatWrapper(system)
+
+
+app.include_router(register_earn_routes(db))
+app.include_router(register_agent_tool_routes(db, _chat_factory))
+app.include_router(register_ads_routes(db))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1566,6 +1619,39 @@ async def on_startup():
             {"id": {"$in": exclusive_ids}},
             {"$set": {"is_amass_exclusive": True}},
         )
+
+    # Seed a single always-on demo advertisement (marketplace-facing) so the
+    # smart ad delivery flow is testable end-to-end.
+    from ads import Ad, AdMedia  # local import to avoid circular
+    ad_count = await db.advertisements.count_documents({"seller_id": "demo-system"})
+    if ad_count == 0:
+        # Pick a marketplace item to advertise
+        sample_item = await db.marketplace_items.find_one({}, {"_id": 0})
+        cover = None
+        if sample_item:
+            imgs = sample_item.get("images") or []
+            cover = imgs[0] if imgs else None
+        demo_ad = Ad(
+            seller_id="demo-system",
+            marketplace_item_id=sample_item["id"] if sample_item else None,
+            tier="premium",
+            title=(sample_item.get("title") if sample_item else "Discover premium home essentials"),
+            description="Handpicked pieces from AMASS-verified vendors. Free delivery on your first order.",
+            cta_label="Shop the collection",
+            media=[
+                AdMedia(
+                    kind="image",
+                    url=cover
+                    or "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1080",
+                    aspect_ratio=1.6,
+                )
+            ],
+            target_cities=["Lagos", "Abuja"],
+            tokens_paid=0,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=180),
+            status="active",
+        )
+        await db.advertisements.insert_one(demo_ad.model_dump())
 
 
 @app.on_event("shutdown")

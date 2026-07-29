@@ -14,6 +14,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 const MENU: { icon: IconName; label: string; route?: string; caption?: string }[] = [
   { icon: "wallet-outline", label: "AMASS Wallet", route: "/wallet", caption: "Tokens · Transactions · Subscriptions" },
+  { icon: "gift-outline", label: "Earn Tokens", route: "/earn", caption: "Tasks · Referrals · Daily bonuses" },
   { icon: "lock-open-outline", label: "My Unlocks", route: "/unlocks", caption: "Properties you've unlocked" },
   { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", caption: "Verified authority to market properties" },
   { icon: "briefcase-outline", label: "Agent Dashboard", route: "/agent-dashboard", caption: "Listings, leads & analytics" },

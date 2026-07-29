@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  ScrollView,
   TextInput,
   ActivityIndicator,
   Platform,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -20,6 +20,8 @@ import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { api } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { PropertyMarker } from "@/src/components/PropertyMarker";
+import { TokenIcon } from "@/src/components/TokenIcon";
+import { useWallet } from "@/src/contexts/wallet";
 
 type Step = 0 | 1 | 2 | 3 | 4;
 type ListingType = "buy" | "rent" | "lease" | "shortlet";
@@ -419,6 +421,74 @@ function Step0({
 }
 
 // ─── Step 1: details ─────────────────────────────────────
+function AiDescriptionButton({
+  title,
+  propertyType,
+  bedrooms,
+  bathrooms,
+  sizeSqm,
+  location,
+  onGenerated,
+}: {
+  title?: string;
+  propertyType?: string;
+  bedrooms?: string;
+  bathrooms?: string;
+  sizeSqm?: string;
+  location?: string;
+  onGenerated: (text: string) => void;
+}) {
+  const { wallet, refresh } = useWallet();
+  const [busy, setBusy] = useState(false);
+  const balance = wallet?.spendable ?? 0;
+  const COST = 5;
+
+  const generate = async () => {
+    if (!title) {
+      Alert.alert("Add a title first", "Give your listing a title, then let AI write the rest.");
+      return;
+    }
+    if (balance < COST) {
+      Alert.alert("Not enough tokens", `You need ${COST} tokens to generate. You have ${balance}.`);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setBusy(true);
+    try {
+      const r = await api.aiDescription({
+        title,
+        property_type: propertyType,
+        bedrooms: bedrooms ? Number(bedrooms) : undefined,
+        bathrooms: bathrooms ? Number(bathrooms) : undefined,
+        size_sqm: sizeSqm ? Number(sizeSqm) : undefined,
+        location,
+        tone: "luxurious",
+      });
+      onGenerated(r.description);
+      await refresh();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (e: any) {
+      Alert.alert("AI unavailable", e?.message ?? "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Pressable style={styles.aiBtn} onPress={generate} disabled={busy} testID="ai-desc-btn">
+      {busy ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <>
+          <Ionicons name="sparkles" size={12} color="#fff" />
+          <Text style={styles.aiBtnText}>AI · {COST}</Text>
+          <TokenIcon size={10} tone="gold" />
+        </>
+      )}
+    </Pressable>
+  );
+}
+
 function Step1(props: any) {
   return (
     <View style={{ gap: spacing.lg }}>
@@ -427,15 +497,30 @@ function Step1(props: any) {
         <Text style={styles.sub}>The essentials buyers will see first.</Text>
       </View>
       <Field label="Listing title" value={props.title} onChangeText={props.setTitle} placeholder="e.g. Ocean-view duplex, Lekki Phase 1" testID="input-title" />
-      <Field
-        label="Description"
-        value={props.description}
-        onChangeText={props.setDescription}
-        placeholder="Highlight what makes this property special…"
-        testID="input-description"
-        multiline
-        numberOfLines={4}
-      />
+      <View>
+        <View style={styles.aiDescRow}>
+          <Text style={styles.fieldLabel}>Description</Text>
+          <AiDescriptionButton
+            title={props.title}
+            propertyType={props.propertyType}
+            bedrooms={props.bedrooms}
+            bathrooms={props.bathrooms}
+            sizeSqm={props.sizeSqm}
+            location={props.city}
+            onGenerated={props.setDescription}
+          />
+        </View>
+        <TextInput
+          value={props.description}
+          onChangeText={props.setDescription}
+          placeholder="Highlight what makes this property special…"
+          placeholderTextColor={colors.textMuted}
+          style={[styles.input, { minHeight: 100, textAlignVertical: "top" }]}
+          testID="input-description"
+          multiline
+          numberOfLines={4}
+        />
+      </View>
       <Field
         label="Price (₦)"
         value={props.price}
@@ -826,6 +911,24 @@ const styles = StyleSheet.create({
   warnText: { flex: 1, fontSize: 12, color: colors.text, lineHeight: 17 },
   row2: { flexDirection: "row", gap: 12 },
   fieldLabel: { fontSize: 12, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.3, marginLeft: 4 },
+  aiDescRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  aiBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: colors.red,
+    minWidth: 70,
+    justifyContent: "center",
+  },
+  aiBtnText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.2 },
   input: {
     minHeight: 52,
     borderRadius: radius.md,
