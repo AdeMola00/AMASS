@@ -1548,14 +1548,14 @@ async def on_startup():
         logger.info("Seeding initial data …")
         await seed_data()
     # Mark AMASS Exclusive listings (Category 1 — free forever)
-    # Marketing inventory: keep a small handful as AMASS Exclusive.
+    # Marketing inventory: keep a curated handful as AMASS Exclusive.
     # First, unmark all so we can converge to a deterministic state each boot.
     await db.properties.update_many({}, {"$set": {"is_amass_exclusive": False}})
     exclusive_ids: list = []
-    # Pick 1 top-price verified + 1 owner_listed as exclusive if available.
+    # Pick top 2 verified + 1 owner_listed as exclusive if available.
     top_verified = await db.properties.find(
         {"verified": True}, {"id": 1, "_id": 0}
-    ).sort("price", -1).limit(1).to_list(1)
+    ).sort("price", -1).limit(2).to_list(2)
     exclusive_ids.extend([d["id"] for d in top_verified])
     owner_listed = await db.properties.find(
         {"listing_source": "owner_listed"}, {"id": 1, "_id": 0}
