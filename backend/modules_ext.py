@@ -689,12 +689,203 @@ async def ai_history(user: dict = Depends(require("ai_management"))):
 
 
 # =====================================================================
+# Developers & off-plan projects  |  Property Owners
+# =====================================================================
+PROJECT_STATUSES = ("planning", "selling", "sold_out", "completed")
+
+
+class DeveloperInput(BaseModel):
+    name: str
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+    company: Optional[str] = ""
+    city: Optional[str] = ""
+
+
+class ProjectInput(BaseModel):
+    developer_id: Optional[str] = ""
+    name: str
+    city: Optional[str] = ""
+    units: int = 0
+    price_from: int = 0
+    status: str = "planning"
+    completion_date: Optional[str] = ""
+    image: Optional[str] = ""
+
+
+class OwnerInput(BaseModel):
+    name: str
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+    city: Optional[str] = ""
+
+
+class AssignOwnerInput(BaseModel):
+    owner_id: str
+
+
+async def _dev_name(did):
+    if not did:
+        return ""
+    d = await db.developers.find_one({"id": did}, {"_id": 0, "name": 1})
+    return d["name"] if d else ""
+
+
+# ---- Developers ----
+@api.get("/developers")
+async def developers_list(user: dict = Depends(require("developers")), search: Optional[str] = None):
+    q = {"$or": [{"name": {"$regex": search, "$options": "i"}}, {"company": {"$regex": search, "$options": "i"}}]} if search else {}
+    rows = await db.developers.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    for r in rows:
+        r["projects_count"] = await db.dev_projects.count_documents({"developer_id": r["id"]})
+    return rows
+
+@api.post("/developers")
+async def developers_create(body: DeveloperInput, user: dict = Depends(require("developers", "create"))):
+    d = {**body.model_dump(), "verified": False}
+    return await _create("developers", d, user, "developer")
+
+@api.put("/developers/{did}")
+async def developers_update(did: str, body: DeveloperInput, user: dict = Depends(require("developers", "edit"))):
+    return await _update("developers", did, body.model_dump())
+
+@api.patch("/developers/{did}/verify")
+async def developers_verify(did: str, body: VerifyInput, user: dict = Depends(require("developers", "edit"))):
+    return await _update("developers", did, {"verified": body.verified})
+
+@api.delete("/developers/{did}")
+async def developers_delete(did: str, user: dict = Depends(require("developers", "delete"))):
+    return await _delete("developers", did)
+
+@api.get("/developers/projects")
+async def projects_list(user: dict = Depends(require("developers")), developer_id: Optional[str] = None):
+    q = {"developer_id": developer_id} if developer_id and developer_id != "all" else {}
+    return await db.dev_projects.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
+
+@api.post("/developers/projects")
+async def projects_create(body: ProjectInput, user: dict = Depends(require("developers", "create"))):
+    d = body.model_dump()
+    if d.get("status") not in PROJECT_STATUSES: d["status"] = "planning"
+    d["developer_name"] = await _dev_name(body.developer_id)
+    return await _create("dev_projects", d, user, "project")
+
+@api.put("/developers/projects/{pid}")
+async def projects_update(pid: str, body: ProjectInput, user: dict = Depends(require("developers", "edit"))):
+    d = body.model_dump()
+    if d.get("status") not in PROJECT_STATUSES: d["status"] = "planning"
+    d["developer_name"] = await _dev_name(body.developer_id)
+    return await _update("dev_projects", pid, d)
+
+@api.delete("/developers/projects/{pid}")
+async def projects_delete(pid: str, user: dict = Depends(require("developers", "delete"))):
+    return await _delete("dev_projects", pid)
+
+
+# ---- Property Owners ----
+@api.get("/property-owners")
+async def owners_list(user: dict = Depends(require("property_owners")), search: Optional[str] = None):
+    q = {"$or": [{"name": {"$regex": search, "$options": "i"}}, {"email": {"$regex": search, "$options": "i"}}]} if search else {}
+    rows = await db.property_owners.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    for r in rows:
+        r["properties_count"] = await db.properties.count_documents({"owner_id": r["id"]})
+    return rows
+
+@api.post("/property-owners")
+async def owners_create(body: OwnerInput, user: dict = Depends(require("property_owners", "create"))):
+    return await _create("property_owners", {**body.model_dump(), "verified": False}, user, "property owner")
+
+@api.put("/property-owners/{oid}")
+async def owners_update(oid: str, body: OwnerInput, user: dict = Depends(require("property_owners", "edit"))):
+    return await _update("property_owners", oid, body.model_dump())
+
+@api.patch("/property-owners/{oid}/verify")
+async def owners_verify(oid: str, body: VerifyInput, user: dict = Depends(require("property_owners", "edit"))):
+    return await _update("property_owners", oid, {"verified": body.verified})
+
+@api.delete("/property-owners/{oid}")
+async def owners_delete(oid: str, user: dict = Depends(require("property_owners", "delete"))):
+    await db.properties.update_many({"owner_id": oid}, {"$set": {"owner_id": None, "owner_name": ""}})
+    return await _delete("property_owners", oid)
+
+@api.get("/property-owners/{oid}/properties")
+async def owner_properties(oid: str, user: dict = Depends(require("property_owners"))):
+    return await db.properties.find({"owner_id": oid}, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+@api.patch("/property-owners/assign/{pid}")
+async def assign_owner(pid: str, body: AssignOwnerInput, user: dict = Depends(require("property_owners", "edit"))):
+    owner = await db.property_owners.find_one({"id": body.owner_id}, {"_id": 0, "name": 1})
+    if not owner:
+        raise HTTPException(status_code=404, detail="Owner not found")
+    res = await db.properties.update_one({"id": pid}, {"$set": {"owner_id": body.owner_id, "owner_name": owner["name"]}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return {"success": True}
+
+
+@api.get("/public/developers")
+async def pub_developers():
+    return await db.developers.find({"verified": True}, {"_id": 0}).to_list(500)
+
+@api.get("/public/projects")
+async def pub_projects():
+    return await db.dev_projects.find({"status": "selling"}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+async def _seed_pipeline():
+    if await db.app_meta.find_one({"key": "pipeline_version", "value": 1}):
+        return
+    import random
+    cities = ["Lagos", "Abuja", "Accra", "Nairobi", "Kigali", "Cape Town"]
+    first = ["Amara", "David", "Chinwe", "Kwame", "Zainab", "Tunde", "Fatima", "Emeka", "Lerato", "Kofi"]
+    last = ["Okafor", "Mwangi", "Bello", "Mensah", "Adeyemi", "Dlamini", "Nwosu", "Osei", "Kamau", "Achebe"]
+    firms = ["Skyline Developments", "Atlas Estates", "Horizon Group", "Cedar Properties", "Summit Builders", "Delta Realty"]
+
+    devs = []
+    for i in range(6):
+        devs.append({"id": new_id(), "name": firms[i], "company": firms[i],
+                     "email": f"contact@{firms[i].split()[0].lower()}.africa", "phone": f"+234 80{random.randint(10000000,99999999)}",
+                     "city": random.choice(cities), "verified": random.random() > 0.35, "created_at": now_iso()})
+    await db.developers.insert_many(devs)
+
+    proj_img = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=1200&auto=format&fit=crop"
+    projects = []
+    for i in range(11):
+        d = random.choice(devs)
+        st = random.choice(["planning", "selling", "selling", "sold_out", "completed"])
+        projects.append({"id": new_id(), "developer_id": d["id"], "developer_name": d["name"],
+                         "name": f"{random.choice(['The', 'Royal', 'Grand', 'Palm', 'Marina'])} {random.choice(['Heights', 'Residences', 'Court', 'Gardens', 'Towers'])}",
+                         "city": random.choice(cities), "units": random.randint(12, 240),
+                         "price_from": random.randint(25, 300) * 1000000, "status": st,
+                         "completion_date": f"Q{random.randint(1,4)} 202{random.randint(6,9)}",
+                         "image": proj_img, "created_at": now_iso()})
+    await db.dev_projects.insert_many(projects)
+
+    owners = []
+    for i in range(12):
+        fn, ln = random.choice(first), random.choice(last)
+        owners.append({"id": new_id(), "name": f"{fn} {ln}", "email": f"{fn.lower()}.{ln.lower()}@owners.amass.africa",
+                       "phone": f"+234 81{random.randint(10000000,99999999)}", "city": random.choice(cities),
+                       "verified": random.random() > 0.4, "created_at": now_iso()})
+    await db.property_owners.insert_many(owners)
+
+    # link ~18 properties to owners
+    props = await db.properties.find({}, {"_id": 0, "id": 1}).limit(18).to_list(18)
+    for p in props:
+        o = random.choice(owners)
+        await db.properties.update_one({"id": p["id"]}, {"$set": {"owner_id": o["id"], "owner_name": o["name"]}})
+
+    await db.app_meta.update_one({"key": "pipeline_version"}, {"$set": {"value": 1}}, upsert=True)
+    logger.info("Seeded developers/owners pipeline")
+
+
+# =====================================================================
 # Seeding
 # =====================================================================
 EXT_VERSION = 1
 
 
 async def seed_ext():
+    await _seed_pipeline()
     if await db.app_meta.find_one({"key": "ext_version", "value": EXT_VERSION}):
         return
     for coll in ("mp_categories", "mp_products", "mp_promotions", "mp_pricing_rules",

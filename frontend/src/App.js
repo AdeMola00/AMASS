@@ -23,10 +23,12 @@ import Analytics from "@/pages/Analytics";
 import Notifications from "@/pages/Notifications";
 import Reports from "@/pages/Reports";
 import AIManagement from "@/pages/AIManagement";
+import Developers from "@/pages/Developers";
+import PropertyOwners from "@/pages/PropertyOwners";
 import Placeholder from "@/pages/Placeholder";
 
 const PLACEHOLDER_PATHS = [
-  "property-owners", "developers", "construction", "home-marketplace",
+  "construction", "home-marketplace",
   "transactions", "payments", "subscriptions", "messages",
 ];
 
@@ -58,6 +60,8 @@ function App() {
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="ai" element={<AIManagement />} />
+                <Route path="developers" element={<Developers />} />
+                <Route path="property-owners" element={<PropertyOwners />} />
                 <Route path="roles" element={<RolesPermissions />} />
                 <Route path="settings" element={<Settings />} />
                 {PLACEHOLDER_PATHS.map((p) => (
