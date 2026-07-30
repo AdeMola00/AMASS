@@ -324,3 +324,134 @@ class TestExtRBAC:
     def test_finance_403(self, finance_token, path):
         r = requests.get(f"{BASE_URL}{path}", headers=_h(finance_token))
         assert r.status_code == 403, f"{path} expected 403, got {r.status_code}"
+
+
+
+# ---------------- Analytics ----------------
+class TestAnalytics:
+    def test_overview_shape_and_values(self, super_token):
+        r = requests.get(f"{BASE_URL}/api/analytics/overview", headers=_h(super_token))
+        assert r.status_code == 200, r.text
+        j = r.json()
+        assert "kpis" in j and isinstance(j["kpis"], dict)
+        for k in ["active_users", "total_users", "total_listings", "approved_listings",
+                  "pending_listings", "agents", "verified_agents", "products",
+                  "token_circulation", "est_token_revenue", "active_plans"]:
+            assert k in j["kpis"], f"missing kpi {k}"
+            assert isinstance(j["kpis"][k], (int, float)), f"kpi {k} not numeric"
+        assert isinstance(j.get("listings_by_status"), list)
+        assert isinstance(j.get("listings_by_city"), list)
+        assert isinstance(j.get("top_agents"), list)
+        assert isinstance(j.get("leads_trend"), list)
+        assert len(j["leads_trend"]) == 14
+        for pt in j["leads_trend"]:
+            assert "date" in pt and "leads" in pt
+
+    def test_analytics_forbidden_for_content(self, content_token):
+        r = requests.get(f"{BASE_URL}/api/analytics/overview", headers=_h(content_token))
+        assert r.status_code == 403
+
+    def test_analytics_forbidden_for_finance(self, finance_token):
+        r = requests.get(f"{BASE_URL}/api/analytics/overview", headers=_h(finance_token))
+        assert r.status_code == 403
+
+
+# ---------------- Notifications ----------------
+class TestNotifications:
+    created_ids = []
+
+    def test_create_multi_channel(self, super_token):
+        payload = {"title": "TEST_Broadcast", "message": "hello test",
+                   "channels": ["in_app", "email", "push"], "audience": "all"}
+        r = requests.post(f"{BASE_URL}/api/notifications", headers=_h(super_token), json=payload)
+        assert r.status_code == 200, r.text
+        j = r.json()
+        assert j["title"] == "TEST_Broadcast"
+        assert j["active"] is True
+        cs = j["channel_status"]
+        assert cs.get("in_app") == "sent"
+        assert cs.get("email") == "queued"
+        assert cs.get("push") == "queued"
+        assert "id" in j
+        TestNotifications.created_ids.append(j["id"])
+
+    def test_list_includes_created(self, super_token):
+        r = requests.get(f"{BASE_URL}/api/notifications", headers=_h(super_token))
+        assert r.status_code == 200
+        ids = [n["id"] for n in r.json()]
+        assert TestNotifications.created_ids[0] in ids
+
+    def test_public_announcements_lists_active_in_app(self):
+        r = requests.get(f"{BASE_URL}/api/public/announcements")
+        assert r.status_code == 200
+        rows = r.json()
+        assert any(n["id"] == TestNotifications.created_ids[0] for n in rows)
+
+    def test_toggle_flips_active(self, super_token):
+        nid = TestNotifications.created_ids[0]
+        r = requests.patch(f"{BASE_URL}/api/notifications/{nid}/toggle", headers=_h(super_token))
+        assert r.status_code == 200
+        # now inactive -> should NOT appear in public announcements
+        pub = requests.get(f"{BASE_URL}/api/public/announcements").json()
+        assert not any(n["id"] == nid for n in pub)
+        # toggle back
+        requests.patch(f"{BASE_URL}/api/notifications/{nid}/toggle", headers=_h(super_token))
+
+    def test_email_only_not_active(self, super_token):
+        # in_app not included -> active should be False
+        payload = {"title": "TEST_EmailOnly", "message": "m", "channels": ["email"], "audience": "all"}
+        r = requests.post(f"{BASE_URL}/api/notifications", headers=_h(super_token), json=payload)
+        assert r.status_code == 200
+        j = r.json()
+        assert j["active"] is False
+        assert j["channel_status"]["email"] == "queued"
+        TestNotifications.created_ids.append(j["id"])
+
+    def test_delete_and_cleanup(self, super_token):
+        for nid in TestNotifications.created_ids:
+            d = requests.delete(f"{BASE_URL}/api/notifications/{nid}", headers=_h(super_token))
+            assert d.status_code == 200
+        # verify gone
+        rows = requests.get(f"{BASE_URL}/api/notifications", headers=_h(super_token)).json()
+        ids = [n["id"] for n in rows]
+        for nid in TestNotifications.created_ids:
+            assert nid not in ids
+
+    def test_notifications_forbidden_content(self, content_token):
+        r = requests.post(f"{BASE_URL}/api/notifications", headers=_h(content_token),
+                          json={"title": "x", "message": "y", "channels": ["in_app"]})
+        assert r.status_code == 403
+
+    def test_notifications_forbidden_finance(self, finance_token):
+        r = requests.post(f"{BASE_URL}/api/notifications", headers=_h(finance_token),
+                          json={"title": "x", "message": "y", "channels": ["in_app"]})
+        assert r.status_code == 403
+
+
+# ---------------- Bootstrap ----------------
+class TestBootstrap:
+    def test_public_bootstrap_shape(self):
+        r = requests.get(f"{BASE_URL}/api/public/bootstrap")
+        assert r.status_code == 200
+        j = r.json()
+        for k in ["landing", "app_config", "marketplace_categories", "featured_products",
+                  "featured_properties", "token_bundles", "subscription_plans", "announcements"]:
+            assert k in j, f"missing bootstrap key {k}"
+        assert isinstance(j["marketplace_categories"], list)
+        assert isinstance(j["featured_products"], list)
+        # featured_products only active & featured
+        for p in j["featured_products"]:
+            assert p.get("status") == "active"
+            assert p.get("featured") is True
+        # featured_properties only approved
+        for p in j["featured_properties"]:
+            assert p.get("status") == "approved"
+        # token bundles active only
+        for b in j["token_bundles"]:
+            assert b.get("active", True) is True
+        # plans active only
+        for pl in j["subscription_plans"]:
+            assert pl.get("active", True) is True
+        # dicts
+        assert isinstance(j["landing"], dict)
+        assert isinstance(j["app_config"], dict)

@@ -18,7 +18,7 @@ export const NAV_GROUPS = [
     items: [
       { key: "leads", label: "Lead Management", path: "/admin/leads", icon: Inbox, module: "leads", built: true },
       { key: "cms", label: "Landing Page CMS", path: "/admin/cms", icon: LayoutTemplate, module: "cms", built: true },
-      { key: "analytics", label: "Analytics", path: "/admin/analytics", icon: BarChart3, module: "analytics" },
+      { key: "analytics", label: "Analytics", path: "/admin/analytics", icon: BarChart3, module: "analytics", built: true },
       { key: "reports", label: "Reports", path: "/admin/reports", icon: FileText, module: "reports" },
     ],
   },
@@ -56,7 +56,7 @@ export const NAV_GROUPS = [
     label: "Engagement",
     items: [
       { key: "messages", label: "Messages", path: "/admin/messages", icon: MessageSquare, module: "messages" },
-      { key: "notifications", label: "Notifications", path: "/admin/notifications", icon: Bell, module: "notifications" },
+      { key: "notifications", label: "Notifications", path: "/admin/notifications", icon: Bell, module: "notifications", built: true },
     ],
   },
   {

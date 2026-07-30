@@ -8,6 +8,7 @@ import logging
 import requests
 from typing import Optional, Dict, Any, List
 from pymongo import ReturnDocument
+from datetime import datetime, timezone, timedelta
 from fastapi import UploadFile, File, Depends, HTTPException, Response, Query
 from pydantic import BaseModel
 
@@ -418,6 +419,125 @@ async def pub_bundles():
 @api.get("/public/tokens/plans")
 async def pub_plans():
     return await db.subscription_plans.find({"active": True}, {"_id": 0}).to_list(200)
+
+
+# =====================================================================
+# Analytics
+# =====================================================================
+@api.get("/analytics/overview")
+async def analytics_overview(user: dict = Depends(require("analytics"))):
+    total_users = await db.platform_users.count_documents({})
+    active_users = await db.platform_users.count_documents({"status": "active"})
+    total_props = await db.properties.count_documents({})
+    approved = await db.properties.count_documents({"status": "approved"})
+    pending = await db.properties.count_documents({"status": "pending"})
+    agents_total = await db.agents.count_documents({})
+    agents_verified = await db.agents.count_documents({"verified": True})
+    products = await db.mp_products.count_documents({})
+
+    status_rows = await db.properties.aggregate([{"$group": {"_id": "$status", "value": {"$sum": 1}}}]).to_list(20)
+    city_rows = await db.properties.aggregate([{"$group": {"_id": "$city", "value": {"$sum": 1}}}, {"$sort": {"value": -1}}]).to_list(12)
+    top = await db.properties.aggregate([
+        {"$match": {"agent_name": {"$nin": [None, ""]}}},
+        {"$group": {"_id": "$agent_name", "listings": {"$sum": 1}}},
+        {"$sort": {"listings": -1}}, {"$limit": 6}]).to_list(6)
+
+    wallet_agg = await db.wallets.aggregate([{"$group": {"_id": None, "c": {"$sum": "$balance"}}}]).to_list(1)
+    circulation = wallet_agg[0]["c"] if wallet_agg else 0
+    bundles = await db.token_bundles.find({"active": True}, {"_id": 0}).to_list(100)
+    ppt = (sum(b["price"] / max(1, b["tokens"]) for b in bundles) / len(bundles)) if bundles else 0
+    est_revenue = int(circulation * ppt)
+    active_plans = await db.subscription_plans.count_documents({"active": True})
+
+    trend = []
+    for i in range(13, -1, -1):
+        day = datetime.now(timezone.utc) - timedelta(days=i)
+        c = await db.leads.count_documents({"created_at": {"$regex": f"^{day.strftime('%Y-%m-%d')}"}})
+        trend.append({"date": day.strftime("%b %d"), "leads": c})
+
+    return {
+        "kpis": {"active_users": active_users, "total_users": total_users, "total_listings": total_props,
+                 "approved_listings": approved, "pending_listings": pending, "agents": agents_total,
+                 "verified_agents": agents_verified, "products": products,
+                 "token_circulation": circulation, "est_token_revenue": est_revenue, "active_plans": active_plans},
+        "listings_by_status": [{"name": r["_id"], "value": r["value"]} for r in status_rows],
+        "listings_by_city": [{"name": r["_id"], "value": r["value"]} for r in city_rows],
+        "top_agents": [{"name": r["_id"], "listings": r["listings"]} for r in top],
+        "leads_trend": trend,
+    }
+
+
+# =====================================================================
+# Notifications broadcaster
+# =====================================================================
+class NotificationInput(BaseModel):
+    title: str
+    message: str
+    channels: List[str] = ["in_app"]
+    audience: str = "all"
+
+
+@api.post("/notifications")
+async def create_notification(body: NotificationInput, user: dict = Depends(require("notifications", "create"))):
+    # in_app announcements are delivered live; email/push/sms are queued (provider not yet connected)
+    channel_status = {ch: ("sent" if ch == "in_app" else "queued") for ch in body.channels}
+    doc = {"id": new_id(), "title": body.title, "message": body.message, "channels": body.channels,
+           "audience": body.audience, "channel_status": channel_status,
+           "active": "in_app" in body.channels, "created_by": user.get("email", ""), "created_at": now_iso()}
+    await db.notifications.insert_one(doc)
+    await log_activity("sent a broadcast", "notification", user, body.title)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api.get("/notifications")
+async def list_notifications(user: dict = Depends(require("notifications"))):
+    return await db.notifications.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+
+@api.patch("/notifications/{nid}/toggle")
+async def toggle_notification(nid: str, user: dict = Depends(require("notifications", "edit"))):
+    n = await db.notifications.find_one({"id": nid})
+    if not n:
+        raise HTTPException(status_code=404, detail="Not found")
+    await db.notifications.update_one({"id": nid}, {"$set": {"active": not n.get("active", False)}})
+    return {"success": True}
+
+
+@api.delete("/notifications/{nid}")
+async def delete_notification(nid: str, user: dict = Depends(require("notifications", "delete"))):
+    return await _delete("notifications", nid)
+
+
+@api.get("/public/announcements")
+async def public_announcements():
+    return await db.notifications.find(
+        {"active": True, "channels": "in_app"},
+        {"_id": 0, "id": 1, "title": 1, "message": 1, "created_at": 1}).sort("created_at", -1).to_list(50)
+
+
+# =====================================================================
+# Unified bootstrap — one call for the Mobile App / Landing Page
+# =====================================================================
+@api.get("/public/bootstrap")
+async def public_bootstrap():
+    landing = await db.cms_sections.find({"visible": True}, {"_id": 0}).sort("order", 1).to_list(100)
+    cfg = await db.app_config.find({}, {"_id": 0}).to_list(100)
+    categories = await db.mp_categories.find({"active": True}, {"_id": 0}).sort("order", 1).to_list(200)
+    featured_products = await db.mp_products.find({"status": "active", "featured": True}, {"_id": 0}).to_list(30)
+    featured_props = await db.properties.find({"status": "approved"}, {"_id": 0}).sort("created_at", -1).to_list(12)
+    bundles = await db.token_bundles.find({"active": True}, {"_id": 0}).to_list(50)
+    plans = await db.subscription_plans.find({"active": True}, {"_id": 0}).to_list(50)
+    announcements = await db.notifications.find({"active": True, "channels": "in_app"}, {"_id": 0}).sort("created_at", -1).to_list(20)
+    return {
+        "landing": {s["key"]: s["data"] for s in landing},
+        "app_config": {c["key"]: c["data"] for c in cfg},
+        "marketplace_categories": categories,
+        "featured_products": featured_products,
+        "featured_properties": featured_props,
+        "token_bundles": bundles,
+        "subscription_plans": plans,
+        "announcements": announcements,
+    }
 
 
 # =====================================================================

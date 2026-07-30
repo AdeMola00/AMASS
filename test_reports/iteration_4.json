@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 4 validated the newly added Analytics, Notifications broadcaster, and public Bootstrap endpoint. Extended /app/backend/tests/test_ext.py with 12 new tests across 3 classes (TestAnalytics, TestNotifications, TestBootstrap) — full test_ext.py now has 44 tests, all PASSED in 6.91s (parallel gw0/gw1). Combined with backend_test.py (49 core tests, unchanged) the platform is at 93 backend tests, 100% green. Backend verified: GET /api/analytics/overview returns full KPI object (all 11 kpis present, all numeric), listings_by_status/city arrays, top_agents, leads_trend with exactly 14 data points; POST /api/notifications with channels [in_app,email,push] returns channel_status {in_app:sent, email:queued, push:queued} and active=true; email-only broadcast returns active=false; PATCH toggle flips active flag and hides it from /api/public/announcements; DELETE removes it; GET /api/public/announcements (no auth) lists only active in_app broadcasts; GET /api/public/bootstrap (no auth) returns all 8 keys and correctly filters featured_products to (status=active & featured=true) and featured_properties to status=approved and token_bundles/plans to active=true. RBAC: content_manager and finance both return 403 on GET /api/analytics/overview AND POST /api/notifications (verified). Frontend Playwright: super_admin login OK; /admin/analytics renders analytics-page with all 8 KPI cards (kpi-active_users=49, kpi-total_listings=36, kpi-approved_listings=17, kpi-verified_agents=11, kpi-products=8, kpi-token_circulation=4,260, kpi-est_token_revenue=383,400, kpi-active_plans=3), plus Leads trend area chart (14 days), Listings-by-Status donut, Listings-by-City bar chart, Top-Performing-Agents horizontal bars — all render with real data. /admin/notifications renders notifications-page; composing TEST_UI_Broadcast (title, message, +email +push channels) via notif-title/notif-message/notif-channel-* and notif-send successfully creates a new History card showing channel badges (In-App:Sent, Email:Queued, Push:Queued), notif-toggle-<id> flips active, notif-delete-<id> opens confirm dialog and removes it. Test data cleaned up (final state shows only the pre-existing 'Welcome to AMASS' demo broadcast).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Analytics", "issues": ["Recharts still emits width(-1)/height(-1) warnings on first paint (self-heals, cosmetic; carried over from prior iterations)"]},
+      {"screen": "RBAC gating (all locked pages)", "issues": ["When a user without a module (e.g., content_manager) directly navigates to /admin/analytics or /admin/notifications, the page SHELL still renders (data-testid=analytics-page / notifications-page visible) — API correctly returns 403 so no data is displayed, but showing an explicit 'Not authorized' state would be a nicer UX. Same pattern as other locked routes; not a regression."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ext.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_ext_iter4.xml"
+  ],
+  "action_items": [
+    "(Optional UX) On locked admin routes, render a 403/'Not authorized' fallback instead of the empty page shell when the user lacks the module — right now content_manager visiting /admin/analytics sees a blank Analytics page with 0/undefined KPI values.",
+    "(Optional hardening) /api/public/bootstrap has no rate limiting and returns everything unauthenticated (~few dozen rows). Consider ETag/If-None-Match + Cache-Control since mobile clients will hit it on every launch.",
+    "(Optional) analytics_overview leads_trend uses a $regex on a string date field — will get expensive as leads grow; store leads.created_at as a real BSON Date and use $gte/$lt range with $group by day for O(indexed) performance.",
+    "(Carryover) modules_ext.py now 650 LOC and server.py > 700 LOC — extract routers into /backend/routers/ soon."
+  ],
+  "critical_code_review_comments": [
+    "Analytics: est_token_revenue formula = circulation * avg(price/tokens) across all active bundles. If bundles have very different tokens-per-unit (e.g. one 500-token 'starter' vs one 100k 'enterprise'), the arithmetic mean of ppt skews the number. A weighted average (sum(price)/sum(tokens)) is more accurate.",
+    "Notifications: NotificationInput.channels is List[str] with no enum — a client can post {\"channels\": [\"whatsapp\", \"foo\"]} and it will be stored and dict-comprehended into channel_status. Restrict to Literal['in_app','push','email','sms'].",
+    "Notifications: `active` is set only at creation from 'in_app' in channels. If someone PATCH-toggles a broadcast whose channels never included in_app, it silently becomes active but public/announcements filters {channels:'in_app'} out — dead toggle state. Consider disallowing toggle when in_app not in channels or auto-adding in_app on activate.",
+    "Notifications: no soft delete / audit log for deleted broadcasts — DELETE removes them from history entirely. Prior admin activity log records the SEND but not the DELETE.",
+    "Bootstrap: featured_props is `properties.find({status:'approved'})` with no `featured` filter or limit-by-featured — returns 12 most-recent approved. Naming `featured_properties` while returning 'recently approved' is misleading; either rename to `recent_properties` or add a `featured:true` filter and expose that flag on Property.",
+    "Bootstrap: N MongoDB round-trips serialized (8 sequential awaits). Use asyncio.gather to parallelize for lower TTFB on mobile.",
+    "Public endpoints (bootstrap, announcements) are unrestricted — no rate-limiter. A single motivated client can hammer the DB. Add slowapi middleware or an nginx-level limiter."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_ext.py",
+    "/app/test_reports/iteration_4.json"
+  ],
+  "success_rate": {"backend": "100% (44/44 in test_ext.py; 93/93 total across backend_test.py + test_ext.py)", "frontend": "100% of Analytics + Notifications critical flows"},
+  "test_credentials": "admin@amass.africa / ya0y9os77F@c8TXXh5@A ; content@amass.africa / Amass@2026 ; finance@amass.africa / Amass@2026",
+  "seed_data_creation": "No new seed. Only transient TEST_Broadcast, TEST_EmailOnly, TEST_UI_Broadcast rows — all deleted at end. Pre-existing 'Welcome to AMASS' demo broadcast preserved.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Analytics + Notifications + Bootstrap modules verified end-to-end. New test classes in /app/backend/tests/test_ext.py: TestAnalytics (3), TestNotifications (8), TestBootstrap (1). Run all with `pytest backend/tests/ -v`. Data-testids confirmed live: analytics-page, kpi-<active_users|total_listings|approved_listings|verified_agents|products|token_circulation|est_token_revenue|active_plans>; notifications-page, notif-title, notif-message, notif-audience, notif-channel-<in_app|push|email|sms>, notif-send, notif-<id>, notif-toggle-<id>, notif-delete-<id>. Note: notif-toggle-<id> only renders when the broadcast's channels include in_app. Public bootstrap keys: landing, app_config, marketplace_categories, featured_products, featured_properties, token_bundles, subscription_plans, announcements.",
+  "rca of the issue": "N/A — no functional issues found this iteration; findings are all optional hardening / UX polish."
+}

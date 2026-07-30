@@ -19,11 +19,13 @@ import Marketplace from "@/pages/Marketplace";
 import AppConfig from "@/pages/AppConfig";
 import TokenEconomy from "@/pages/TokenEconomy";
 import MediaLibrary from "@/pages/MediaLibrary";
+import Analytics from "@/pages/Analytics";
+import Notifications from "@/pages/Notifications";
 import Placeholder from "@/pages/Placeholder";
 
 const PLACEHOLDER_PATHS = [
-  "analytics", "reports", "property-owners", "developers", "construction", "home-marketplace",
-  "transactions", "payments", "subscriptions", "messages", "notifications", "ai",
+  "reports", "property-owners", "developers", "construction", "home-marketplace",
+  "transactions", "payments", "subscriptions", "messages", "ai",
 ];
 
 function App() {
@@ -50,6 +52,8 @@ function App() {
                 <Route path="app-config" element={<AppConfig />} />
                 <Route path="tokens" element={<TokenEconomy />} />
                 <Route path="media" element={<MediaLibrary />} />
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="notifications" element={<Notifications />} />
                 <Route path="roles" element={<RolesPermissions />} />
                 <Route path="settings" element={<Settings />} />
                 {PLACEHOLDER_PATHS.map((p) => (
