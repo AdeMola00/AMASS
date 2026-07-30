@@ -29,7 +29,19 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - CMS now manages 17 real sections: Hero, Category Map, 6 Pillars, Property Showcase, Statistics (Why Choose AMASS), How It Works, For Agents, Construction Professionals, Home Marketplace, AMASS Mobile, Testimonials, FAQ, Final CTA, Contact, Social, Footer, SEO — all with real headings, stats, listings, testimonials and answered FAQs.
 - Fixed a CMS editor bug: recursive `ValueEditor` crashed the visual-edits babel plugin (stack overflow). Replaced with non-recursive `ArrayEditor` + `ObjectEditor`; nested item cards (e.g. showcase properties) now edit correctly and save round-trips through `/api/public/landing`.
 
-## Updated (2026-07-26) — Shared backend + real marketplace modules
+## Updated (2026-07-30) — Unified platform: Media, Marketplace, App Config, Token Economy
+- This repo is confirmed the **single shared backend + DB** for Admin Portal, Mobile App and Landing Page. Real-time sync = lightweight polling of shared `/api` + `/api/public` endpoints (best for low-bandwidth African networks).
+- **Media Library** on Emergent object storage: admin uploads (`POST /api/media/upload`, 20MB + image/video/pdf allow-list), public serving `GET /api/media/file/{path}` (no-auth, cached), soft-delete. Reusable `ImageUploader` used across modules.
+- **Marketplace**: categories, products (featured/sponsored/status), promotions, pricing rules — admin CRUD + public `/api/public/marketplace/*` (active/featured only).
+- **App Configuration**: homepage sections, map settings, marketplace config, app banners, notifications, featured properties — admin edits, `GET /api/public/app-config` drives the app with no code changes.
+- **Token Economy**: token bundles, subscription plans, rewards, user wallets (atomic `$inc` adjust, clamped ≥0) — admin CRUD + public catalog endpoints.
+- New RBAC modules (marketplace, app_config, tokens, media) enforced; new **Platform** nav group; mobile bottom tab bar retained.
+- Verified: **81/81 backend tests pass** (49 core + 32 new), all 4 new admin pages pass frontend flows; hardening applied (upload limits, atomic wallet, product-status validation).
+
+## Architecture note (extensibility)
+- New modules live in `/app/backend/modules_ext.py` registering on the shared `api` router — future modules (vehicles, auctions, tokenization, AI valuation, multi-country) follow the same additive pattern. Tech debt: extract a `routers/` package + `deps.py` as this grows.
+
+
 - Confirmed the AMASS consumer app runs on **this same FastAPI + MongoDB backend**.
 - Converted placeholders into real shared modules: **Properties** (CRUD, status pending/approved/rejected/sold, verification, filters, rich schema), **Property Verification** (Approve/Reject + Verify queue), **Agents** (CRUD/verify + listings_count), **Users** (suspend/reactivate).
 - Public no-auth app endpoints: `GET/POST /api/public/properties` (approved-only reads; validated agent_id on submit), `GET /api/public/properties/{id}`, `GET /api/public/agents` (verified-only).

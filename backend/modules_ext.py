@@ -7,6 +7,7 @@ import asyncio
 import logging
 import requests
 from typing import Optional, Dict, Any, List
+from pymongo import ReturnDocument
 from fastapi import UploadFile, File, Depends, HTTPException, Response, Query
 from pydantic import BaseModel
 
@@ -75,6 +76,10 @@ async def media_upload(file: UploadFile = File(...), folder: str = Query("genera
     content_type = file.content_type or MIME_TYPES.get(ext, "application/octet-stream")
     path = f"{APP_NAME}/{folder}/{uuid.uuid4()}.{ext}"
     data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large (max 20MB)")
+    if not (content_type.startswith("image/") or content_type in ("video/mp4", "video/webm", "application/pdf")):
+        raise HTTPException(status_code=400, detail="Unsupported file type")
     result = await asyncio.get_event_loop().run_in_executor(None, _put_object, path, data, content_type)
     doc = {"id": new_id(), "storage_path": result["path"], "url": f"/api/media/file/{result['path']}",
            "original_filename": file.filename, "content_type": content_type,
@@ -180,6 +185,9 @@ class MPPricingRule(BaseModel):
     active: bool = True
 
 
+PRODUCT_STATUSES = ("active", "archived")
+
+
 async def _category_name(cid):
     if not cid:
         return ""
@@ -219,11 +227,13 @@ async def mp_products(user: dict = Depends(require("marketplace")), search: Opti
 @api.post("/marketplace/products")
 async def mp_prod_create(body: MPProduct, user: dict = Depends(require("marketplace", "create"))):
     d = body.model_dump(); d["category_name"] = await _category_name(body.category_id)
+    if d.get("status") not in PRODUCT_STATUSES: d["status"] = "active"
     return await _create("mp_products", d, user, "product")
 
 @api.put("/marketplace/products/{pid}")
 async def mp_prod_update(pid: str, body: MPProduct, user: dict = Depends(require("marketplace", "edit"))):
     d = body.model_dump(); d["category_name"] = await _category_name(body.category_id)
+    if d.get("status") not in PRODUCT_STATUSES: d["status"] = "active"
     return await _update("mp_products", pid, d)
 
 @api.patch("/marketplace/products/{pid}/flags")
@@ -390,13 +400,14 @@ async def tok_wallets(user: dict = Depends(require("tokens")), search: Optional[
 
 @api.patch("/tokens/wallets/{wid}")
 async def tok_wallet_adjust(wid: str, body: WalletAdjust, user: dict = Depends(require("tokens", "edit"))):
-    w = await db.wallets.find_one({"id": wid})
-    if not w:
+    res = await db.wallets.find_one_and_update(
+        {"id": wid},
+        [{"$set": {"balance": {"$max": [0, {"$add": ["$balance", body.amount]}]}, "updated_at": now_iso()}}],
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if not res:
         raise HTTPException(status_code=404, detail="Wallet not found")
-    new_balance = max(0, w.get("balance", 0) + body.amount)
-    await db.wallets.update_one({"id": wid}, {"$set": {"balance": new_balance, "updated_at": now_iso()}})
     await log_activity(f"adjusted wallet by {body.amount} tokens", "wallet", user, body.reason)
-    return {"success": True, "balance": new_balance}
+    return {"success": True, "balance": res["balance"]}
 
 
 # Public token catalog (app)
