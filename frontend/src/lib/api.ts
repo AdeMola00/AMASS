@@ -305,6 +305,35 @@ export const api = {
   },
   getProperty: (id: string) => req<Property>(`/properties/${id}`),
 
+  // Neighborhood Intelligence + heatmap + polygon (map v2)
+  propertyIntelligence: (id: string) =>
+    req<{
+      property_id: string;
+      neighborhood_name?: string;
+      scores: { walk: number; school: number; safety: number; infra: number; lifestyle: number; rental_demand: number };
+      price: { listed: number; per_sqm: number; area_avg: number; vs_area_pct: number; appreciation_yoy_pct: number };
+      poi_km: { schools: number; hospitals: number; restaurants: number; supermarkets: number; fuel: number };
+      commute: { downtown_km: number; downtown_min: number };
+      signals: { views_30d: number; favorites_30d: number };
+    }>(`/properties/${id}/intelligence`),
+  mapHeatmap: (params: {
+    min_lat?: number; max_lat?: number; min_lng?: number; max_lng?: number;
+    metric?: "price_per_sqm" | "verified_density" | "views";
+    cells?: number;
+  }) => {
+    const qs = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== null && v !== "")
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join("&");
+    return req<{ cells: { lat: number; lng: number; count: number; weight: number }[]; metric: string }>(
+      `/map/heatmap${qs ? `?${qs}` : ""}`
+    );
+  },
+  mapPolygonSearch: (vertices: { latitude: number; longitude: number }[]) => {
+    const coords = vertices.map((v) => `${v.latitude},${v.longitude}`).join(";");
+    return req<Property[]>(`/map/polygon-search?coords=${encodeURIComponent(coords)}`);
+  },
+
   // Favorites
   toggleFavorite: (property_id: string) =>
     req<{ favorited: boolean }>(`/favorites/toggle`, {

@@ -11,7 +11,7 @@ import {
   Linking,
   Alert,
 } from "react-native";
-import { MapView, Marker, PROVIDER_DEFAULT, Region } from "@/src/lib/map";
+import { MapView, Marker, Circle, Polygon, PROVIDER_DEFAULT, Region } from "@/src/lib/map";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,9 +29,14 @@ import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
 import { PropertyCardSkeleton } from "@/src/components/Skeleton";
 import { LayerPickerSheet, LayerPickerRef, MapLayer } from "@/src/components/LayerPickerSheet";
+import { NeighborhoodSheet, NeighborhoodSheetRef } from "@/src/components/NeighborhoodSheet";
 import { mapMinimal } from "@/src/constants/mapStyle";
+import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 
 const LAYER_KEY = "amass_map_layer";
+const OVERLAY_KEY = "amass_map_overlay";
+
+type OverlayType = "none" | "price_per_sqm" | "verified_density" | "views";
 
 const INITIAL_REGION: Region = {
   latitude: 6.5244,
@@ -67,34 +72,6 @@ const QUICK_FILTERS: ChipConf[] = [
 
 type ViewMode = "map" | "list";
 
-function cluster(properties: Property[], region: Region) {
-  const shouldCluster = region.latitudeDelta > 0.5;
-  if (!shouldCluster) return properties.map((p) => ({ kind: "point" as const, p }));
-  const cellSize = region.latitudeDelta / 8;
-  const buckets = new Map<string, Property[]>();
-  for (const p of properties) {
-    const cx = Math.floor(p.latitude / cellSize);
-    const cy = Math.floor(p.longitude / cellSize);
-    const key = `${cx}:${cy}`;
-    const bucket = buckets.get(key);
-    if (bucket) bucket.push(p);
-    else buckets.set(key, [p]);
-  }
-  const out: (
-    | { kind: "point"; p: Property }
-    | { kind: "cluster"; latitude: number; longitude: number; count: number; ids: string[] }
-  )[] = [];
-  for (const [, list] of buckets) {
-    if (list.length === 1) out.push({ kind: "point", p: list[0] });
-    else {
-      const latitude = list.reduce((s, x) => s + x.latitude, 0) / list.length;
-      const longitude = list.reduce((s, x) => s + x.longitude, 0) / list.length;
-      out.push({ kind: "cluster", latitude, longitude, count: list.length, ids: list.map((x) => x.id) });
-    }
-  }
-  return out;
-}
-
 export default function HomeMap() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -102,6 +79,7 @@ export default function HomeMap() {
   const mapRef = useRef<MapView>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
   const layerSheetRef = useRef<LayerPickerRef>(null);
+  const insightsRef = useRef<NeighborhoodSheetRef>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [filters, setFilters] = useState<FilterState>({});
@@ -117,14 +95,23 @@ export default function HomeMap() {
     "unknown" | "granted" | "denied" | "blocked"
   >("unknown");
   const [layer, setLayer] = useState<MapLayer>("standard");
+  const [overlay, setOverlay] = useState<OverlayType>("none");
+  const [heatCells, setHeatCells] = useState<{ lat: number; lng: number; count: number; weight: number }[]>([]);
+  // Draw-area polygon: array of tap coordinates
+  const [drawing, setDrawing] = useState(false);
+  const [polygon, setPolygon] = useState<{ latitude: number; longitude: number }[]>([]);
   const initialRegionRef = useRef<Region>(INITIAL_REGION);
 
-  // Restore preferred layer
+  // Restore preferred layer + overlay
   useEffect(() => {
     (async () => {
       const saved = await storage.getItem<string>(LAYER_KEY, "standard");
       if (saved === "standard" || saved === "satellite" || saved === "hybrid" || saved === "terrain") {
         setLayer(saved);
+      }
+      const ov = await storage.getItem<string>(OVERLAY_KEY, "none");
+      if (ov === "none" || ov === "price_per_sqm" || ov === "verified_density" || ov === "views") {
+        setOverlay(ov);
       }
     })();
   }, []);
@@ -223,6 +210,34 @@ export default function HomeMap() {
     api.favoriteIds().then((r) => setFavorites(new Set(r.ids))).catch(() => {});
   }, []);
 
+  // ─── Supercluster: prebuild index whenever properties change ───────
+  const clusterIndex = useMemo(() => buildIndex(properties), [properties]);
+  const clusters = useMemo(() => getClusters(clusterIndex, region), [clusterIndex, region]);
+
+  // ─── Fetch heatmap cells whenever overlay OR region change (debounced) ───
+  useEffect(() => {
+    if (overlay === "none") {
+      setHeatCells([]);
+      return;
+    }
+    const handle = setTimeout(async () => {
+      try {
+        const res = await api.mapHeatmap({
+          metric: overlay,
+          cells: 18,
+          min_lat: region.latitude - region.latitudeDelta / 2,
+          max_lat: region.latitude + region.latitudeDelta / 2,
+          min_lng: region.longitude - region.longitudeDelta / 2,
+          max_lng: region.longitude + region.longitudeDelta / 2,
+        });
+        setHeatCells(res.cells);
+      } catch {
+        setHeatCells([]);
+      }
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [overlay, region]);
+
   // Set first property active by default so docked card has something visible
   useEffect(() => {
     if (!activeId && properties.length > 0) {
@@ -232,8 +247,6 @@ export default function HomeMap() {
       setActiveId(properties[0]?.id ?? null);
     }
   }, [properties, activeId]);
-
-  const clusters = useMemo(() => cluster(properties, region), [properties, region]);
 
   const focusProperty = useCallback((p: Property, zoomIn = false) => {
     mapRef.current?.animateToRegion(
@@ -330,12 +343,50 @@ export default function HomeMap() {
 
   const drawArea = () => {
     Haptics.selectionAsync().catch(() => {});
+    if (drawing) {
+      // Second tap: submit polygon if valid
+      if (polygon.length >= 3) {
+        (async () => {
+          try {
+            const list = await api.mapPolygonSearch(polygon);
+            setProperties(list);
+            setActiveId(list[0]?.id ?? null);
+          } catch {}
+        })();
+        Alert.alert("Area searched", `Found ${polygon.length}-vertex area — loading listings inside.`);
+      }
+      setDrawing(false);
+      setPolygon([]);
+      return;
+    }
+    setDrawing(true);
+    setPolygon([]);
     Alert.alert(
       "Draw Search Area",
-      "Pinch and pan to frame an area, then tap 'Search this area' to load listings within it. Full lasso drawing is coming soon.",
+      "Tap the map to add corners (min 3). Tap the Draw button again to finish and search inside the shape.",
       [{ text: "OK" }]
     );
-    setShowSearchArea(true);
+  };
+
+  const cycleOverlay = () => {
+    Haptics.selectionAsync().catch(() => {});
+    const order: OverlayType[] = ["none", "price_per_sqm", "verified_density", "views"];
+    const next = order[(order.indexOf(overlay) + 1) % order.length];
+    setOverlay(next);
+    storage.setItem(OVERLAY_KEY, next);
+  };
+
+  const openInsights = () => {
+    if (!activeId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    insightsRef.current?.open(activeId);
+  };
+
+  const overlayLabel: Record<OverlayType, string> = {
+    none: "Overlays",
+    price_per_sqm: "₦/m²",
+    verified_density: "Verified",
+    views: "Views",
   };
 
   const openFilterSheet = () => {
@@ -437,29 +488,88 @@ export default function HomeMap() {
         showsIndoors={false}
         toolbarEnabled={false}
         onRegionChangeComplete={onRegionChangeComplete}
+        onPress={(e: any) => {
+          if (!drawing) return;
+          const c = e?.nativeEvent?.coordinate;
+          if (c) {
+            Haptics.selectionAsync().catch(() => {});
+            setPolygon((prev) => [...prev, { latitude: c.latitude, longitude: c.longitude }]);
+          }
+        }}
       >
-        {clusters.map((c, i) => {
-          if (c.kind === "cluster") {
+        {/* Heatmap overlay — colored circles per cell */}
+        {overlay !== "none" && heatCells.map((c, i) => {
+          const w = c.weight;
+          // Normalize per metric — pick a color ramp per overlay type
+          let color = "rgba(220,38,38,0.35)";
+          if (overlay === "price_per_sqm") {
+            // Sort tiers
+            const tier = w > 500_000 ? 0.55 : w > 250_000 ? 0.4 : w > 100_000 ? 0.28 : 0.18;
+            color = `rgba(220,38,38,${tier})`;
+          } else if (overlay === "verified_density") {
+            const tier = w > 0.75 ? 0.5 : w > 0.5 ? 0.35 : w > 0.25 ? 0.22 : 0.12;
+            color = `rgba(5,150,105,${tier})`;
+          } else if (overlay === "views") {
+            const tier = w > 0.75 ? 0.55 : w > 0.5 ? 0.4 : w > 0.25 ? 0.25 : 0.15;
+            color = `rgba(245,158,11,${tier})`;
+          }
+          // radius in meters: scale with cell count
+          const radiusM = 900 + Math.min(1600, c.count * 220);
+          return (
+            <Circle
+              key={`heat-${i}`}
+              center={{ latitude: c.lat, longitude: c.lng }}
+              radius={radiusM}
+              fillColor={color}
+              strokeColor="rgba(0,0,0,0.05)"
+              strokeWidth={1}
+              zIndex={1}
+            />
+          );
+        })}
+
+        {/* Draw-area polygon */}
+        {polygon.length >= 3 && (
+          <Polygon
+            coordinates={polygon}
+            fillColor="rgba(225,27,34,0.15)"
+            strokeColor="#E11B22"
+            strokeWidth={2}
+          />
+        )}
+        {polygon.length > 0 && polygon.length < 3 && polygon.map((p, i) => (
+          <Marker key={`polypt-${i}`} coordinate={p} anchor={{ x: 0.5, y: 0.5 }}>
+            <View style={styles.drawDot} />
+          </Marker>
+        ))}
+
+        {clusters.map((c: any, i: number) => {
+          const isCluster = c.properties?.cluster;
+          if (isCluster) {
+            const [lng, lat] = c.geometry.coordinates as [number, number];
+            const count = c.properties.point_count as number;
             return (
               <Marker
-                key={`cluster-${i}`}
-                coordinate={{ latitude: c.latitude, longitude: c.longitude }}
+                key={`cluster-${c.properties.cluster_id}`}
+                coordinate={{ latitude: lat, longitude: lng }}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  const zoom = clusterIndex ? expandCluster(clusterIndex, c.properties.cluster_id) : 14;
+                  const targetDelta = 360 / Math.pow(2, Math.max(zoom, 8));
                   mapRef.current?.animateToRegion({
-                    latitude: c.latitude,
-                    longitude: c.longitude,
-                    latitudeDelta: Math.max(region.latitudeDelta / 2.5, 0.02),
-                    longitudeDelta: Math.max(region.longitudeDelta / 2.5, 0.02),
-                  }, 400);
+                    latitude: lat,
+                    longitude: lng,
+                    latitudeDelta: targetDelta,
+                    longitudeDelta: targetDelta,
+                  }, 380);
                 }}
                 tracksViewChanges={false}
               >
-                <ClusterMarker count={c.count} />
+                <ClusterMarker count={count} />
               </Marker>
             );
           }
-          const p = c.p;
+          const p = c.properties.property as Property;
           const isHot = (p.views_recent ?? 0) >= 5 || (p.favorites_recent ?? 0) >= 3;
           return (
             <Marker
@@ -468,6 +578,7 @@ export default function HomeMap() {
               onPress={() => onMarkerPress(p)}
               anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={Platform.OS === "android" || p.id === activeId}
+              zIndex={p.id === activeId ? 10 : 3}
             >
               <PropertyMarker
                 property={p}
@@ -502,8 +613,41 @@ export default function HomeMap() {
         <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" />
         <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" />
         <ActionBtn icon="layers-outline" onPress={openLayerSheet} testID="fab-layers" />
-        <ActionBtn icon="analytics-outline" onPress={drawArea} testID="fab-draw" />
+        <ActionBtn
+          icon={overlay === "none" ? "thermometer-outline" : "thermometer"}
+          onPress={cycleOverlay}
+          testID="fab-overlay"
+          highlight={overlay !== "none"}
+        />
+        <ActionBtn
+          icon={drawing ? "checkmark" : "analytics-outline"}
+          onPress={drawArea}
+          testID="fab-draw"
+          highlight={drawing}
+        />
       </View>
+
+      {/* Overlay label chip (shows current metric name) */}
+      {overlay !== "none" && (
+        <View style={[styles.overlayLabelWrap, { top: searchTop + 120 }]} pointerEvents="none">
+          <View style={styles.overlayLabel}>
+            <Ionicons name="thermometer" size={12} color="#fff" />
+            <Text style={styles.overlayLabelText}>{overlayLabel[overlay]}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Drawing hint */}
+      {drawing && (
+        <View style={[styles.overlayLabelWrap, { top: searchTop + 156 }]} pointerEvents="none">
+          <View style={[styles.overlayLabel, { backgroundColor: colors.red }]}>
+            <Ionicons name="brush" size={12} color="#fff" />
+            <Text style={styles.overlayLabelText}>
+              Draw: {polygon.length} {polygon.length === 1 ? "point" : "points"} — tap map to add
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* "Search this area" reload chip */}
       {showSearchArea && !loading && (
@@ -543,8 +687,21 @@ export default function HomeMap() {
         />
       </View>
 
+      {/* Insights CTA — sits just above the docked card */}
+      {activeId && (
+        <Pressable
+          onPress={openInsights}
+          style={[styles.insightsCta, { bottom: dockedBottom + 214 }, shadows.floating]}
+          testID="open-insights"
+        >
+          <Ionicons name="analytics" size={13} color="#fff" />
+          <Text style={styles.insightsCtaText}>Neighborhood Insights</Text>
+        </Pressable>
+      )}
+
       <FilterSheet ref={filterSheetRef} value={filters} onApply={setFilters} />
       <LayerPickerSheet ref={layerSheetRef} layer={layer} onLayerChange={changeLayer} />
+      <NeighborhoodSheet ref={insightsRef} />
     </View>
   );
 }
@@ -648,14 +805,20 @@ function ActionBtn({
   icon,
   onPress,
   testID,
+  highlight = false,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   testID?: string;
+  highlight?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.actionBtn, shadows.card]} testID={testID}>
-      <Ionicons name={icon} size={19} color={colors.text} />
+    <Pressable
+      onPress={onPress}
+      style={[styles.actionBtn, shadows.card, highlight && styles.actionBtnActive]}
+      testID={testID}
+    >
+      <Ionicons name={icon} size={19} color={highlight ? "#fff" : colors.text} />
     </Pressable>
   );
 }
@@ -733,6 +896,39 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: colors.border,
   },
+  actionBtnActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  overlayLabelWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+  overlayLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: colors.ink,
+  },
+  overlayLabelText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
+  drawDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.red,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  insightsCta: {
+    position: "absolute",
+    right: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: colors.ink,
+    zIndex: 10,
+  },
+  insightsCtaText: { color: "#fff", fontSize: 12, fontWeight: "800", letterSpacing: -0.2 },
   searchAreaWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   permBanner: {
     position: "absolute",

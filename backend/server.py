@@ -327,6 +327,11 @@ async def list_properties(
     listing_source: Optional[str] = None,
     q: Optional[str] = None,
     token_filter: Optional[Literal["free", "token", "amass_exclusive"]] = None,
+    # Viewport (bounding box) filter — lazy-load only listings visible on screen.
+    min_lat: Optional[float] = None,
+    max_lat: Optional[float] = None,
+    min_lng: Optional[float] = None,
+    max_lng: Optional[float] = None,
     limit: int = 100,
     creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
 ):
@@ -349,6 +354,10 @@ async def list_properties(
         query["is_amass_exclusive"] = True
     elif token_filter == "token":
         query["is_amass_exclusive"] = {"$ne": True}
+    if min_lat is not None and max_lat is not None:
+        query["latitude"] = {"$gte": min_lat, "$lte": max_lat}
+    if min_lng is not None and max_lng is not None:
+        query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
     if min_price is not None or max_price is not None:
         price_q: dict = {}
         if min_price is not None:
@@ -1649,6 +1658,8 @@ app.include_router(register_earn_routes(db))
 app.include_router(register_agent_tool_routes(db, _chat_factory))
 app.include_router(register_ads_routes(db))
 app.include_router(register_marketplace_v2_routes(db, get_current_user))
+from intelligence import register_intelligence_routes  # noqa: E402
+app.include_router(register_intelligence_routes(db))
 
 app.add_middleware(
     CORSMiddleware,

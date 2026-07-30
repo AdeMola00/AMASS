@@ -52,6 +52,11 @@ export function Marker({ children }: { children?: React.ReactNode; coordinate?: 
   return <View style={styles.marker}>{children}</View>;
 }
 
+// No-op web fallbacks for map overlays used on native.
+export function Circle(_props: any) { return null; }
+export function Heatmap(_props: any) { return null; }
+export function Polygon(_props: any) { return null; }
+
 const styles = StyleSheet.create({
   wrap: { backgroundColor: "#E4E4E7", overflow: "hidden" },
   tile: { position: "absolute", width: "100%", height: "100%", opacity: 0.6 },
