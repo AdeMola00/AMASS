@@ -352,7 +352,7 @@ export default function PropertyDetails() {
               >
                 <Marker coordinate={{ latitude: property.latitude, longitude: property.longitude }}>
                   <PropertyMarker
-                    status={property.status}
+                    property={property}
                     label={formatNaira(property.price)}
                     active
                   />

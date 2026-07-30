@@ -14,6 +14,8 @@ export type FilterState = {
   propertyType?: string;
   verifiedOnly?: boolean;
   tokenFilter?: "free" | "token" | "amass_exclusive";
+  recentOnly?: boolean;
+  openHouse?: boolean;
 };
 
 export type FilterSheetRef = {

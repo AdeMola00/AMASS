@@ -8,8 +8,8 @@ import {
   ScrollView,
   Platform,
   FlatList,
-  Dimensions,
   Linking,
+  Alert,
 } from "react-native";
 import { MapView, Marker, PROVIDER_DEFAULT, Region } from "@/src/lib/map";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -19,21 +19,19 @@ import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { api, Property } from "@/src/lib/api";
+import { storage } from "@/src/utils/storage";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { PropertyMarker, ClusterMarker } from "@/src/components/PropertyMarker";
 import { FilterChip } from "@/src/components/FilterChip";
 import { PropertyCard } from "@/src/components/PropertyCard";
-import { MapPreviewCarousel } from "@/src/components/MapPreviewCarousel";
+import { MapDockedCard } from "@/src/components/MapDockedCard";
 import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
 import { PropertyCardSkeleton } from "@/src/components/Skeleton";
+import { LayerPickerSheet, LayerPickerRef, MapLayer } from "@/src/components/LayerPickerSheet";
+import { mapMinimal } from "@/src/constants/mapStyle";
 
-// Bottom sheet snap heights:
-//   0 → 340: peek shows the full-size PropertyCard for the tapped marker
-//   1 → 55%: mid list view
-//   2 → 92%: full list view
-// Sheet is hidden by default (index = -1) until a marker is tapped.
-const SNAP_POINTS = [340, "55%", "92%"] as const;
+const LAYER_KEY = "amass_map_layer";
 
 const INITIAL_REGION: Region = {
   latitude: 6.5244,
@@ -42,20 +40,29 @@ const INITIAL_REGION: Region = {
   longitudeDelta: 1.2,
 };
 
-const QUICK_FILTERS: {
+const NOW = () => Date.now();
+const RECENT_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+// New Redfin-style filter chip set.
+type ChipConf = {
   key: string;
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
   apply: (f: FilterState) => FilterState;
   isActive: (f: FilterState) => boolean;
-}[] = [
-  { key: "all", label: "All", apply: () => ({}), isActive: (f) => Object.keys(f).length === 0 },
-  { key: "free", label: "Free · AMASS", icon: "star", apply: (f) => ({ ...f, tokenFilter: f.tokenFilter === "amass_exclusive" ? undefined : "amass_exclusive" }), isActive: (f) => f.tokenFilter === "amass_exclusive" },
-  { key: "buy", label: "Buy", apply: (f) => ({ ...f, listingType: "buy" }), isActive: (f) => f.listingType === "buy" },
-  { key: "rent", label: "Rent", apply: (f) => ({ ...f, listingType: "rent" }), isActive: (f) => f.listingType === "rent" },
-  { key: "shortlet", label: "Short Let", apply: (f) => ({ ...f, listingType: "shortlet" }), isActive: (f) => f.listingType === "shortlet" },
-  { key: "land", label: "Land", apply: (f) => ({ ...f, propertyType: "land" }), isActive: (f) => f.propertyType === "land" },
-  { key: "verified", label: "Verified", icon: "shield-checkmark", apply: (f) => ({ ...f, verifiedOnly: !f.verifiedOnly }), isActive: (f) => !!f.verifiedOnly },
+  // Optional client-side extra filter that runs after the API returns.
+  clientFilter?: (p: Property) => boolean;
+};
+
+const QUICK_FILTERS: ChipConf[] = [
+  { key: "sale",  label: "For Sale",       apply: (f) => ({ ...f, listingType: f.listingType === "buy" ? undefined : "buy" }),        isActive: (f) => f.listingType === "buy" },
+  { key: "rent",  label: "For Rent",       apply: (f) => ({ ...f, listingType: f.listingType === "rent" ? undefined : "rent" }),      isActive: (f) => f.listingType === "rent" },
+  { key: "land",  label: "Land",           apply: (f) => ({ ...f, propertyType: f.propertyType === "land" ? undefined : "land" }),    isActive: (f) => f.propertyType === "land" },
+  { key: "com",   label: "Commercial",     apply: (f) => ({ ...f, propertyType: f.propertyType === "commercial" ? undefined : "commercial" }), isActive: (f) => f.propertyType === "commercial" },
+  { key: "luxe",  label: "Luxury", icon: "diamond", apply: (f) => ({ ...f, minPrice: f.minPrice === 200_000_000 ? undefined : 200_000_000 }), isActive: (f) => f.minPrice === 200_000_000 },
+  { key: "ver",   label: "Verified", icon: "shield-checkmark", apply: (f) => ({ ...f, verifiedOnly: !f.verifiedOnly }), isActive: (f) => !!f.verifiedOnly },
+  { key: "new",   label: "Recently Added", icon: "sparkles", apply: (f) => ({ ...f, recentOnly: !f.recentOnly }), isActive: (f) => !!f.recentOnly, clientFilter: (p) => !!p.created_at && (NOW() - new Date(p.created_at).getTime()) < RECENT_DAYS_MS },
+  { key: "open",  label: "Open House", icon: "calendar", apply: (f) => ({ ...f, openHouse: !f.openHouse }), isActive: (f) => !!f.openHouse, clientFilter: (p) => (p.views_recent ?? 0) >= 3 },
 ];
 
 type ViewMode = "map" | "list";
@@ -94,6 +101,7 @@ export default function HomeMap() {
   const searchParams = useLocalSearchParams<{ ai_filters?: string }>();
   const mapRef = useRef<MapView>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
+  const layerSheetRef = useRef<LayerPickerRef>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [filters, setFilters] = useState<FilterState>({});
@@ -108,10 +116,20 @@ export default function HomeMap() {
   const [locationPermission, setLocationPermission] = useState<
     "unknown" | "granted" | "denied" | "blocked"
   >("unknown");
-
+  const [layer, setLayer] = useState<MapLayer>("standard");
   const initialRegionRef = useRef<Region>(INITIAL_REGION);
 
-  // Location
+  // Restore preferred layer
+  useEffect(() => {
+    (async () => {
+      const saved = await storage.getItem<string>(LAYER_KEY, "standard");
+      if (saved === "standard" || saved === "satellite" || saved === "hybrid" || saved === "terrain") {
+        setLayer(saved);
+      }
+    })();
+  }, []);
+
+  // Location bootstrap
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -148,9 +166,7 @@ export default function HomeMap() {
         if (!cancelled) setLocationPermission("denied");
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const load = useCallback(async () => {
@@ -167,9 +183,14 @@ export default function HomeMap() {
       if (filters.verifiedOnly) params.verified = true;
       if (filters.tokenFilter) params.token_filter = filters.tokenFilter;
       if (query.trim()) params.q = query.trim();
-      const list = await api.listProperties(params);
+      let list = await api.listProperties(params);
+      // Client-side chip filters
+      for (const f of QUICK_FILTERS) {
+        if (f.isActive(filters) && f.clientFilter) {
+          list = list.filter(f.clientFilter);
+        }
+      }
       setProperties(list);
-      // Do NOT auto-select a property — the sheet stays hidden until user taps a marker.
       setShowSearchArea(false);
     } catch {
       setProperties([]);
@@ -178,53 +199,53 @@ export default function HomeMap() {
     }
   }, [filters, query]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  // Apply filters passed from AI Search screen
+  // AI Search wire-up
   useEffect(() => {
     if (!searchParams.ai_filters) return;
     try {
       const parsed = JSON.parse(searchParams.ai_filters as string);
       const next: FilterState = {};
-      if (parsed.listing_type && ["buy", "rent", "shortlet"].includes(parsed.listing_type)) {
-        next.listingType = parsed.listing_type;
-      }
+      if (parsed.listing_type && ["buy", "rent", "shortlet"].includes(parsed.listing_type)) next.listingType = parsed.listing_type;
       if (parsed.property_type) next.propertyType = parsed.property_type;
       if (parsed.min_price) next.minPrice = parsed.min_price;
       if (parsed.max_price) next.maxPrice = parsed.max_price;
       if (parsed.bedrooms) next.bedrooms = parsed.bedrooms;
       if (parsed.verified) next.verifiedOnly = true;
       setFilters(next);
-      if (parsed.city) {
-        setQuery(parsed.city);
-      }
-      // Clear param
+      if (parsed.city) setQuery(parsed.city);
       router.setParams({ ai_filters: undefined } as any);
     } catch {}
   }, [searchParams.ai_filters, router]);
 
   useEffect(() => {
-    api
-      .favoriteIds()
-      .then((r) => setFavorites(new Set(r.ids)))
-      .catch(() => {});
+    api.favoriteIds().then((r) => setFavorites(new Set(r.ids))).catch(() => {});
   }, []);
+
+  // Set first property active by default so docked card has something visible
+  useEffect(() => {
+    if (!activeId && properties.length > 0) {
+      setActiveId(properties[0].id);
+    }
+    if (activeId && !properties.find((p) => p.id === activeId)) {
+      setActiveId(properties[0]?.id ?? null);
+    }
+  }, [properties, activeId]);
 
   const clusters = useMemo(() => cluster(properties, region), [properties, region]);
 
-  const activeProperty = useMemo(
-    () => (activeId ? properties.find((p) => p.id === activeId) ?? null : null),
-    [properties, activeId]
-  );
-
-  const focusProperty = useCallback((p: Property) => {
+  const focusProperty = useCallback((p: Property, zoomIn = false) => {
     mapRef.current?.animateToRegion(
-      { latitude: p.latitude, longitude: p.longitude, latitudeDelta: 0.04, longitudeDelta: 0.04 },
+      {
+        latitude: p.latitude,
+        longitude: p.longitude,
+        latitudeDelta: zoomIn ? 0.02 : Math.min(region.latitudeDelta, 0.04),
+        longitudeDelta: zoomIn ? 0.02 : Math.min(region.longitudeDelta, 0.04),
+      },
       450
     );
-  }, []);
+  }, [region.latitudeDelta, region.longitudeDelta]);
 
   const onMarkerPress = (p: Property) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -235,12 +256,9 @@ export default function HomeMap() {
   const onFavorite = async (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const next = new Set(favorites);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    if (next.has(id)) next.delete(id); else next.add(id);
     setFavorites(next);
-    try {
-      await api.toggleFavorite(id);
-    } catch {}
+    try { await api.toggleFavorite(id); } catch {}
   };
 
   const onRegionChangeComplete = (r: Region) => {
@@ -286,21 +304,65 @@ export default function HomeMap() {
     mapRef.current?.animateToRegion(INITIAL_REGION, 500);
   };
 
-  const searchTop = insets.top + spacing.sm;
-  const bottomBase = 68 + Math.max(insets.bottom, 12) + 16;
+  const zoomBy = (factor: number) => {
+    Haptics.selectionAsync().catch(() => {});
+    const r = region;
+    mapRef.current?.animateToRegion(
+      {
+        latitude: r.latitude,
+        longitude: r.longitude,
+        latitudeDelta: Math.max(0.001, r.latitudeDelta * factor),
+        longitudeDelta: Math.max(0.001, r.longitudeDelta * factor),
+      },
+      300
+    );
+  };
 
-  const activeQuickFilterCount = useMemo(
-    () =>
-      Object.entries(filters).filter(
-        ([, v]) => v !== undefined && v !== null && v !== false && v !== ""
-      ).length,
-    [filters]
-  );
+  const openLayerSheet = () => {
+    Haptics.selectionAsync().catch(() => {});
+    layerSheetRef.current?.open();
+  };
+
+  const changeLayer = (l: MapLayer) => {
+    setLayer(l);
+    storage.setItem(LAYER_KEY, l);
+  };
+
+  const drawArea = () => {
+    Haptics.selectionAsync().catch(() => {});
+    Alert.alert(
+      "Draw Search Area",
+      "Pinch and pan to frame an area, then tap 'Search this area' to load listings within it. Full lasso drawing is coming soon.",
+      [{ text: "OK" }]
+    );
+    setShowSearchArea(true);
+  };
 
   const openFilterSheet = () => {
     Haptics.selectionAsync().catch(() => {});
     filterSheetRef.current?.open();
   };
+
+  const activeQuickFilterCount = useMemo(
+    () => Object.entries(filters).filter(
+      ([, v]) => v !== undefined && v !== null && v !== false && v !== ""
+    ).length,
+    [filters]
+  );
+
+  const voiceHint = () => {
+    Alert.alert("Voice search", "Voice-to-text is coming soon. Try typing what you're looking for.");
+  };
+
+  const searchTop = insets.top + 6;
+  const dockedBottom = 68 + Math.max(insets.bottom, 12) + 12;
+
+  const layerMapType: "standard" | "satellite" | "hybrid" | "terrain" =
+    layer === "standard" ? "standard"
+    : layer === "satellite" ? "satellite"
+    : layer === "hybrid" ? "hybrid"
+    : "terrain";
+  const customStyle = layer === "standard" ? mapMinimal : undefined;
 
   // ────── LIST VIEW ──────
   if (viewMode === "list") {
@@ -312,6 +374,7 @@ export default function HomeMap() {
             setQuery={setQuery}
             onSubmit={load}
             onFilters={openFilterSheet}
+            onVoice={voiceHint}
             activeFilters={activeQuickFilterCount}
             filters={filters}
             setFilters={setFilters}
@@ -321,9 +384,7 @@ export default function HomeMap() {
         </View>
         {loading ? (
           <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <PropertyCardSkeleton key={i} />
-            ))}
+            {Array.from({ length: 5 }).map((_, i) => <PropertyCardSkeleton key={i} />)}
           </ScrollView>
         ) : properties.length === 0 ? (
           <EmptyState />
@@ -331,7 +392,7 @@ export default function HomeMap() {
           <FlatList
             data={properties}
             keyExtractor={(p) => p.id}
-            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: bottomBase + 20, gap: spacing.md, paddingTop: spacing.md }}
+            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: dockedBottom + 20, gap: spacing.md, paddingTop: spacing.md }}
             renderItem={({ item }) => (
               <PropertyCard
                 property={item}
@@ -364,11 +425,16 @@ export default function HomeMap() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_DEFAULT}
-        mapType="hybrid"
+        mapType={layerMapType}
+        customMapStyle={customStyle as any}
         initialRegion={INITIAL_REGION}
         showsCompass={false}
         showsMyLocationButton={false}
         showsUserLocation={locationPermission === "granted"}
+        showsPointsOfInterest={false}
+        showsBuildings={false}
+        showsTraffic={false}
+        showsIndoors={false}
         toolbarEnabled={false}
         onRegionChangeComplete={onRegionChangeComplete}
       >
@@ -380,15 +446,12 @@ export default function HomeMap() {
                 coordinate={{ latitude: c.latitude, longitude: c.longitude }}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  mapRef.current?.animateToRegion(
-                    {
-                      latitude: c.latitude,
-                      longitude: c.longitude,
-                      latitudeDelta: Math.max(region.latitudeDelta / 2.5, 0.02),
-                      longitudeDelta: Math.max(region.longitudeDelta / 2.5, 0.02),
-                    },
-                    400
-                  );
+                  mapRef.current?.animateToRegion({
+                    latitude: c.latitude,
+                    longitude: c.longitude,
+                    latitudeDelta: Math.max(region.latitudeDelta / 2.5, 0.02),
+                    longitudeDelta: Math.max(region.longitudeDelta / 2.5, 0.02),
+                  }, 400);
                 }}
                 tracksViewChanges={false}
               >
@@ -407,7 +470,7 @@ export default function HomeMap() {
               tracksViewChanges={Platform.OS === "android" || p.id === activeId}
             >
               <PropertyMarker
-                status={p.status}
+                property={p}
                 label={formatNaira(p.price)}
                 active={p.id === activeId}
                 hot={isHot}
@@ -417,13 +480,14 @@ export default function HomeMap() {
         })}
       </MapView>
 
-      {/* Top overlay */}
+      {/* Top overlay: floating search + filter chips */}
       <View style={[styles.topOverlay, { top: searchTop }]} pointerEvents="box-none">
         <TopOverlay
           query={query}
           setQuery={setQuery}
           onSubmit={load}
           onFilters={openFilterSheet}
+          onVoice={voiceHint}
           activeFilters={activeQuickFilterCount}
           filters={filters}
           setFilters={setFilters}
@@ -432,22 +496,25 @@ export default function HomeMap() {
         />
       </View>
 
-      {/* Right floating actions */}
-      <View style={[styles.rightActions, { top: searchTop + 128 }]}>
-        <ActionBtn icon="locate" onPress={recenter} testID="recenter-btn" />
-        <ActionBtn icon="layers-outline" onPress={() => {}} testID="layers-btn" />
+      {/* Right-side floating actions */}
+      <View style={[styles.rightActions, { top: searchTop + 140 }]} pointerEvents="box-none">
+        <ActionBtn icon="locate" onPress={recenter} testID="fab-locate" />
+        <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" />
+        <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" />
+        <ActionBtn icon="layers-outline" onPress={openLayerSheet} testID="fab-layers" />
+        <ActionBtn icon="analytics-outline" onPress={drawArea} testID="fab-draw" />
       </View>
 
-      {/* Search this area */}
+      {/* "Search this area" reload chip */}
       {showSearchArea && !loading && (
-        <View style={[styles.searchAreaWrap, { top: searchTop + 130 }]} pointerEvents="box-none">
+        <View style={[styles.searchAreaWrap, { top: searchTop + 128 }]} pointerEvents="box-none">
           <SearchThisArea onPress={applySearchThisArea} />
         </View>
       )}
 
-      {/* Location perm banner */}
+      {/* Location permission banner */}
       {locationPermission === "blocked" && (
-        <View style={[styles.permBanner, { top: searchTop + 130 }]} testID="location-perm-banner">
+        <View style={[styles.permBanner, { top: searchTop + 140 }]} testID="location-perm-banner">
           <View style={styles.permIcon}>
             <Ionicons name="location" size={16} color="#fff" />
           </View>
@@ -461,41 +528,23 @@ export default function HomeMap() {
         </View>
       )}
 
-      {/* Floating "N homes" pill — toggles list mode */}
-      {!loading && properties.length > 0 && !activeId && (
-        <View style={[styles.homesPillWrap, { bottom: bottomBase + 8 }]} pointerEvents="box-none">
-          <Pressable
-            style={[styles.homesPill, shadows.floating]}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              setViewMode("list");
-            }}
-            testID="show-homes-list"
-          >
-            <Ionicons name="list" size={14} color="#fff" />
-            <Text style={styles.homesPillText}>
-              {properties.length} {properties.length === 1 ? "home" : "homes"}
-            </Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* Redfin-style horizontal preview carousel — shown only when a marker is selected */}
-      <MapPreviewCarousel
-        properties={properties}
-        activeId={activeId}
-        favorites={favorites}
-        bottomOffset={bottomBase + 4}
-        onIndexChange={(p) => {
-          setActiveId(p.id);
-          focusProperty(p);
-        }}
-        onPressCard={(p) => router.push(`/property/${p.id}`)}
-        onFavorite={onFavorite}
-        onDismiss={() => setActiveId(null)}
-      />
+      {/* Docked bottom card — ALWAYS visible when there are listings */}
+      <View style={{ position: "absolute", left: 0, right: 0, bottom: dockedBottom }} pointerEvents="box-none">
+        <MapDockedCard
+          properties={properties}
+          activeId={activeId}
+          favorites={favorites}
+          onIndexChange={(p) => {
+            setActiveId(p.id);
+            focusProperty(p);
+          }}
+          onPressCard={(p) => router.push(`/property/${p.id}`)}
+          onFavorite={onFavorite}
+        />
+      </View>
 
       <FilterSheet ref={filterSheetRef} value={filters} onApply={setFilters} />
+      <LayerPickerSheet ref={layerSheetRef} layer={layer} onLayerChange={changeLayer} />
     </View>
   );
 }
@@ -505,6 +554,7 @@ function TopOverlay({
   setQuery,
   onSubmit,
   onFilters,
+  onVoice,
   activeFilters,
   filters,
   setFilters,
@@ -515,6 +565,7 @@ function TopOverlay({
   setQuery: (s: string) => void;
   onSubmit: () => void;
   onFilters: () => void;
+  onVoice: () => void;
   activeFilters: number;
   filters: FilterState;
   setFilters: (f: FilterState) => void;
@@ -526,13 +577,13 @@ function TopOverlay({
     <View>
       <View style={[styles.searchBar, shadows.card]}>
         {Platform.OS === "ios" ? (
-          <BlurView intensity={70} tint="light" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.98)" }]} />
         )}
         <Ionicons name="search" size={18} color={colors.textSecondary} />
         <TextInput
-          placeholder="City, neighborhood or address"
+          placeholder="Search cities, neighborhoods, landmarks…"
           placeholderTextColor={colors.textMuted}
           style={styles.searchInput}
           value={query}
@@ -541,6 +592,9 @@ function TopOverlay({
           returnKeyType="search"
           testID="home-search-input"
         />
+        <Pressable onPress={onVoice} style={styles.voiceBtn} hitSlop={8} testID="home-voice-btn">
+          <Ionicons name="mic" size={16} color={colors.textSecondary} />
+        </Pressable>
         <Pressable onPress={onFilters} style={styles.filterIcon} testID="open-filter-sheet">
           <Ionicons name="options" size={16} color="#fff" />
           {activeFilters > 0 && (
@@ -601,7 +655,7 @@ function ActionBtn({
 }) {
   return (
     <Pressable onPress={onPress} style={[styles.actionBtn, shadows.card]} testID={testID}>
-      <Ionicons name={icon} size={20} color={colors.text} />
+      <Ionicons name={icon} size={19} color={colors.text} />
     </Pressable>
   );
 }
@@ -624,46 +678,39 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     height: 54,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.lg,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.6)",
+    borderColor: "rgba(255,255,255,0.7)",
   },
   searchInput: { flex: 1, fontSize: 15, color: colors.text, fontWeight: "500" },
+  voiceBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: "center", justifyContent: "center",
+  },
   filterIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.text,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
     position: "relative",
   },
   filterDot: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    minWidth: 16,
-    height: 16,
-    paddingHorizontal: 3,
-    borderRadius: 8,
+    position: "absolute", top: -4, right: -4,
+    minWidth: 16, height: 16,
+    paddingHorizontal: 3, borderRadius: 8,
     backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: "#fff",
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1.5, borderColor: "#fff",
   },
   filterDotText: { color: "#fff", fontSize: 9, fontWeight: "800" },
   aiBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
   },
   chipsRowWrap: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: spacing.md },
   chipsRow: { gap: 8, paddingRight: 8 },
@@ -679,16 +726,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   viewToggleText: { fontSize: 12, fontWeight: "800", color: colors.text },
-  rightActions: { position: "absolute", right: spacing.lg, gap: spacing.sm },
+  rightActions: { position: "absolute", right: spacing.lg, gap: 10 },
   actionBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: colors.border,
   },
   searchAreaWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   permBanner: {
@@ -704,125 +747,24 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   permIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
   },
   permTitle: { fontSize: 12, fontWeight: "800", color: colors.text },
   permBody: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
   permBtn: {
-    height: 32,
-    paddingHorizontal: 12,
-    borderRadius: radius.pill,
+    height: 32, paddingHorizontal: 12, borderRadius: radius.pill,
     backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
   },
   permBtnText: { color: "#fff", fontSize: 11, fontWeight: "800" },
-  resultsPill: { position: "absolute", left: 0, right: 0, alignItems: "center" },
-  resultsBubble: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: radius.pill,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  resultsDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.red },
-  resultsText: { fontSize: 12, fontWeight: "800", color: colors.text, letterSpacing: -0.2 },
-  carousel: { position: "absolute", left: 0, right: 0 },
-  sheetShadow: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 20,
-  },
-  sheetBg: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-  },
-  sheetHandle: {
-    backgroundColor: colors.borderStrong,
-    width: 44,
-    height: 5,
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: colors.text,
-    letterSpacing: -0.3,
-  },
-  sheetSub: {
-    fontSize: 12,
-    color: colors.textTertiary,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  expandBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  homesPillWrap: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  homesPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    height: 44,
-    borderRadius: 999,
-    backgroundColor: "#0A0A0A",
-  },
-  homesPillText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: -0.2,
-  },
-  emptyBanner: {
-    position: "absolute",
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#fff",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: radius.pill,
-    ...shadows.card,
-  },
   emptyText: { ...typography.body, color: colors.textSecondary },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xxl, gap: 12 },
   emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 72, height: 72, borderRadius: 36,
     backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
   },
   emptyTitle: { fontSize: 18, fontWeight: "800", color: colors.text, textAlign: "center" },
   emptyBody: { fontSize: 13, color: colors.textTertiary, textAlign: "center", lineHeight: 18 },

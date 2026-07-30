@@ -578,7 +578,18 @@ function Step2(props: any) {
               e?.nativeEvent?.coordinate && props.setCoords(e.nativeEvent.coordinate)
             }
           >
-            <PropertyMarker status="premium" label="Your pin" active />
+            <PropertyMarker
+              property={{
+                id: "preview",
+                status: "premium",
+                verified: true,
+                is_amass_exclusive: true,
+                listing_type: "buy",
+                property_type: "duplex",
+              } as any}
+              label="Your pin"
+              active
+            />
           </Marker>
         </MapView>
       </View>
