@@ -479,11 +479,12 @@ class NotificationInput(BaseModel):
 
 @api.post("/notifications")
 async def create_notification(body: NotificationInput, user: dict = Depends(require("notifications", "create"))):
-    # in_app announcements are delivered live; email/push/sms are queued (provider not yet connected)
-    channel_status = {ch: ("sent" if ch == "in_app" else "queued") for ch in body.channels}
-    doc = {"id": new_id(), "title": body.title, "message": body.message, "channels": body.channels,
+    # validate channels against the known set; default to in_app
+    channels = [c for c in body.channels if c in ("in_app", "push", "email", "sms")] or ["in_app"]
+    channel_status = {ch: ("sent" if ch == "in_app" else "queued") for ch in channels}
+    doc = {"id": new_id(), "title": body.title, "message": body.message, "channels": channels,
            "audience": body.audience, "channel_status": channel_status,
-           "active": "in_app" in body.channels, "created_by": user.get("email", ""), "created_at": now_iso()}
+           "active": "in_app" in channels, "created_by": user.get("email", ""), "created_at": now_iso()}
     await db.notifications.insert_one(doc)
     await log_activity("sent a broadcast", "notification", user, body.title)
     return {k: v for k, v in doc.items() if k != "_id"}
@@ -520,14 +521,16 @@ async def public_announcements():
 # =====================================================================
 @api.get("/public/bootstrap")
 async def public_bootstrap():
-    landing = await db.cms_sections.find({"visible": True}, {"_id": 0}).sort("order", 1).to_list(100)
-    cfg = await db.app_config.find({}, {"_id": 0}).to_list(100)
-    categories = await db.mp_categories.find({"active": True}, {"_id": 0}).sort("order", 1).to_list(200)
-    featured_products = await db.mp_products.find({"status": "active", "featured": True}, {"_id": 0}).to_list(30)
-    featured_props = await db.properties.find({"status": "approved"}, {"_id": 0}).sort("created_at", -1).to_list(12)
-    bundles = await db.token_bundles.find({"active": True}, {"_id": 0}).to_list(50)
-    plans = await db.subscription_plans.find({"active": True}, {"_id": 0}).to_list(50)
-    announcements = await db.notifications.find({"active": True, "channels": "in_app"}, {"_id": 0}).sort("created_at", -1).to_list(20)
+    (landing, cfg, categories, featured_products, featured_props, bundles, plans, announcements) = await asyncio.gather(
+        db.cms_sections.find({"visible": True}, {"_id": 0}).sort("order", 1).to_list(100),
+        db.app_config.find({}, {"_id": 0}).to_list(100),
+        db.mp_categories.find({"active": True}, {"_id": 0}).sort("order", 1).to_list(200),
+        db.mp_products.find({"status": "active", "featured": True}, {"_id": 0}).to_list(30),
+        db.properties.find({"status": "approved"}, {"_id": 0}).sort("created_at", -1).to_list(12),
+        db.token_bundles.find({"active": True}, {"_id": 0}).to_list(50),
+        db.subscription_plans.find({"active": True}, {"_id": 0}).to_list(50),
+        db.notifications.find({"active": True, "channels": "in_app"}, {"_id": 0}).sort("created_at", -1).to_list(20),
+    )
     return {
         "landing": {s["key"]: s["data"] for s in landing},
         "app_config": {c["key"]: c["data"] for c in cfg},

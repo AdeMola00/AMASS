@@ -38,6 +38,13 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - New RBAC modules (marketplace, app_config, tokens, media) enforced; new **Platform** nav group; mobile bottom tab bar retained.
 - Verified: **81/81 backend tests pass** (49 core + 32 new), all 4 new admin pages pass frontend flows; hardening applied (upload limits, atomic wallet, product-status validation).
 
+## Updated (2026-07-30b) — Wiring, Analytics & Notifications
+- **Wire the apps**: added `GET /api/public/bootstrap` (one parallelized call → landing, app_config, categories, featured products/properties, token bundles/plans, announcements) + a drop-in client `integrations/amassClient.js` and `integrations/INTEGRATION_GUIDE.md`. The Landing Page & Mobile App copy the client, set the base URL, and every admin change shows up live (poll-based). Actual paste happens in those separate projects.
+- **Analytics** module (real charts): `GET /api/analytics/overview` → 11 KPIs (active users, listings, approved, verified agents, products, token circulation, est. revenue, plans) + listings-by-status donut, listings-by-city bars, top-agents, 14-day leads trend.
+- **Notifications** broadcaster: in-app delivers live via `GET /api/public/announcements`; push/email/sms stored as **queued** (no provider connected yet — MOCKED). Channel input validated; toggle/delete history.
+- UX: locked admin routes now show a proper "Not authorized" state instead of an empty shell.
+- Verified: **93/93 backend tests pass**; Analytics + Notifications frontend flows pass.
+
 ## Architecture note (extensibility)
 - New modules live in `/app/backend/modules_ext.py` registering on the shared `api` router — future modules (vehicles, auctions, tokenization, AI valuation, multi-country) follow the same additive pattern. Tech debt: extract a `routers/` package + `deps.py` as this grows.
 
