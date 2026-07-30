@@ -21,11 +21,13 @@ import TokenEconomy from "@/pages/TokenEconomy";
 import MediaLibrary from "@/pages/MediaLibrary";
 import Analytics from "@/pages/Analytics";
 import Notifications from "@/pages/Notifications";
+import Reports from "@/pages/Reports";
+import AIManagement from "@/pages/AIManagement";
 import Placeholder from "@/pages/Placeholder";
 
 const PLACEHOLDER_PATHS = [
-  "reports", "property-owners", "developers", "construction", "home-marketplace",
-  "transactions", "payments", "subscriptions", "messages", "ai",
+  "property-owners", "developers", "construction", "home-marketplace",
+  "transactions", "payments", "subscriptions", "messages",
 ];
 
 function App() {
@@ -54,6 +56,8 @@ function App() {
                 <Route path="media" element={<MediaLibrary />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="notifications" element={<Notifications />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="ai" element={<AIManagement />} />
                 <Route path="roles" element={<RolesPermissions />} />
                 <Route path="settings" element={<Settings />} />
                 {PLACEHOLDER_PATHS.map((p) => (

@@ -5,12 +5,16 @@ import os
 import uuid
 import asyncio
 import logging
+import csv
+import io
 import requests
 from typing import Optional, Dict, Any, List
+from fastapi.responses import StreamingResponse
 from pymongo import ReturnDocument
 from datetime import datetime, timezone, timedelta
 from fastapi import UploadFile, File, Depends, HTTPException, Response, Query
 from pydantic import BaseModel
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 from server import api, db, require, get_current_user, log_activity, now_iso, new_id
 
@@ -541,6 +545,147 @@ async def public_bootstrap():
         "subscription_plans": plans,
         "announcements": announcements,
     }
+
+
+# =====================================================================
+# Reports & CSV exports
+# =====================================================================
+def _months_back(n):
+    out = []
+    now = datetime.now(timezone.utc)
+    for i in range(n - 1, -1, -1):
+        y, m = now.year, now.month - i
+        while m <= 0:
+            m += 12; y -= 1
+        out.append(f"{y:04d}-{m:02d}")
+    return out
+
+
+@api.get("/reports/summary")
+async def reports_summary(user: dict = Depends(require("reports"))):
+    labels = _months_back(6)
+    leads_by_month, listings_by_month = [], []
+    for key in labels:
+        lc = await db.leads.count_documents({"created_at": {"$regex": f"^{key}"}})
+        pc = await db.properties.count_documents({"created_at": {"$regex": f"^{key}"}})
+        label = datetime.strptime(key, "%Y-%m").strftime("%b")
+        leads_by_month.append({"month": label, "leads": lc})
+        listings_by_month.append({"month": label, "listings": pc})
+
+    cat_rows = await db.mp_products.aggregate(
+        [{"$group": {"_id": "$category_name", "value": {"$sum": 1}}}, {"$sort": {"value": -1}}]).to_list(20)
+    wallet_agg = await db.wallets.aggregate([{"$group": {"_id": None, "c": {"$sum": "$balance"}}}]).to_list(1)
+    circulation = wallet_agg[0]["c"] if wallet_agg else 0
+    bundles = await db.token_bundles.find({"active": True}, {"_id": 0}).to_list(100)
+    ppt = (sum(b["price"] / max(1, b["tokens"]) for b in bundles) / len(bundles)) if bundles else 0
+
+    totals = {
+        "total_leads": await db.leads.count_documents({}),
+        "total_listings": await db.properties.count_documents({}),
+        "approved_listings": await db.properties.count_documents({"status": "approved"}),
+        "total_agents": await db.agents.count_documents({}),
+        "verified_agents": await db.agents.count_documents({"verified": True}),
+        "products": await db.mp_products.count_documents({}),
+        "token_circulation": circulation,
+        "est_token_revenue": int(circulation * ppt),
+    }
+    return {"leads_by_month": leads_by_month, "listings_by_month": listings_by_month,
+            "products_by_category": [{"name": r["_id"] or "Uncategorized", "value": r["value"]} for r in cat_rows],
+            "totals": totals}
+
+
+REPORT_DATASETS = {
+    "leads": ("leads", [("name", "Name"), ("email", "Email"), ("phone", "Phone"), ("type", "Type"), ("status", "Status"), ("created_at", "Created")]),
+    "properties": ("properties", [("title", "Title"), ("type", "Type"), ("listing", "Listing"), ("city", "City"), ("price", "Price"), ("status", "Status"), ("verified", "Verified"), ("agent_name", "Agent"), ("created_at", "Created")]),
+    "agents": ("agents", [("name", "Name"), ("email", "Email"), ("phone", "Phone"), ("city", "City"), ("agency", "Agency"), ("verified", "Verified"), ("created_at", "Created")]),
+    "products": ("mp_products", [("title", "Title"), ("category_name", "Category"), ("price", "Price"), ("stock", "Stock"), ("featured", "Featured"), ("status", "Status")]),
+    "wallets": ("wallets", [("user_name", "User"), ("balance", "Balance"), ("updated_at", "Updated")]),
+    "users": ("platform_users", [("name", "Name"), ("email", "Email"), ("phone", "Phone"), ("city", "City"), ("status", "Status"), ("created_at", "Created")]),
+}
+
+
+@api.get("/reports/export")
+async def reports_export(dataset: str = Query(...), user: dict = Depends(require("reports"))):
+    if dataset not in REPORT_DATASETS:
+        raise HTTPException(status_code=400, detail="Unknown dataset")
+    coll, cols = REPORT_DATASETS[dataset]
+    rows = await db[coll].find({}, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([c[1] for c in cols])
+    for r in rows:
+        w.writerow([r.get(c[0], "") for c in cols])
+    buf.seek(0)
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+                             headers={"Content-Disposition": f"attachment; filename=amass_{dataset}.csv"})
+
+
+# =====================================================================
+# AI Management (Emergent Universal LLM key)
+# =====================================================================
+AI_PROVIDER = "openai"
+AI_MODEL = "gpt-5.4"
+
+
+class ValuationInput(BaseModel):
+    title: Optional[str] = ""
+    type: Optional[str] = "Apartment"
+    listing: Optional[str] = "Sale"
+    city: Optional[str] = ""
+    bedrooms: int = 0
+    bathrooms: int = 0
+    area_sqm: int = 0
+    notes: Optional[str] = ""
+
+
+class InsightInput(BaseModel):
+    query: str
+
+
+async def _llm(system: str, prompt: str) -> str:
+    if not EMERGENT_KEY:
+        raise HTTPException(status_code=503, detail="LLM key not configured")
+    chat = LlmChat(api_key=EMERGENT_KEY, session_id=new_id(), system_message=system).with_model(AI_PROVIDER, AI_MODEL)
+    return await chat.send_message(UserMessage(text=prompt))
+
+
+async def _store_ai(kind, prompt, output, user):
+    await db.ai_generations.insert_one({"id": new_id(), "kind": kind, "prompt": prompt,
+                                        "output": output, "by": user.get("email", ""), "created_at": now_iso()})
+    await log_activity(f"generated AI {kind}", "ai", user)
+
+
+@api.post("/ai/valuation")
+async def ai_valuation(body: ValuationInput, user: dict = Depends(require("ai_management", "create"))):
+    system = ("You are AMASS AI, a property valuation expert for African real estate markets. "
+              "Give a concise fair-value range in NGN, the key value drivers, and a short confidence note. "
+              "Be realistic; do not fabricate exact comparable sales.")
+    prompt = f"Estimate a fair market value for this property and justify briefly.\nDetails: {body.model_dump()}"
+    out = await _llm(system, prompt)
+    await _store_ai("valuation", prompt, out, user)
+    return {"output": out}
+
+
+@api.post("/ai/description")
+async def ai_description(body: ValuationInput, user: dict = Depends(require("ai_management", "create"))):
+    system = "You are AMASS AI, a real-estate copywriter. Write an appealing, honest 120-160 word listing description. No emojis, no fabricated amenities."
+    prompt = f"Write a listing description for this property: {body.model_dump()}"
+    out = await _llm(system, prompt)
+    await _store_ai("description", prompt, out, user)
+    return {"output": out}
+
+
+@api.post("/ai/market-insight")
+async def ai_market_insight(body: InsightInput, user: dict = Depends(require("ai_management", "create"))):
+    system = "You are AMASS AI, an African property market analyst. Give a concise, structured market insight with clear caveats. Avoid fabricated statistics; note when something is an estimate."
+    out = await _llm(system, body.query)
+    await _store_ai("insight", body.query, out, user)
+    return {"output": out}
+
+
+@api.get("/ai/history")
+async def ai_history(user: dict = Depends(require("ai_management"))):
+    return await db.ai_generations.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
 
 
 # =====================================================================

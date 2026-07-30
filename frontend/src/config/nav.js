@@ -19,7 +19,7 @@ export const NAV_GROUPS = [
       { key: "leads", label: "Lead Management", path: "/admin/leads", icon: Inbox, module: "leads", built: true },
       { key: "cms", label: "Landing Page CMS", path: "/admin/cms", icon: LayoutTemplate, module: "cms", built: true },
       { key: "analytics", label: "Analytics", path: "/admin/analytics", icon: BarChart3, module: "analytics", built: true },
-      { key: "reports", label: "Reports", path: "/admin/reports", icon: FileText, module: "reports" },
+      { key: "reports", label: "Reports", path: "/admin/reports", icon: FileText, module: "reports", built: true },
     ],
   },
   {
@@ -63,7 +63,7 @@ export const NAV_GROUPS = [
     label: "System",
     items: [
       { key: "roles", label: "Roles & Permissions", path: "/admin/roles", icon: ShieldCheck, module: "roles", built: true },
-      { key: "ai_management", label: "AI Management", path: "/admin/ai", icon: Sparkles, module: "ai_management" },
+      { key: "ai_management", label: "AI Management", path: "/admin/ai", icon: Sparkles, module: "ai_management", built: true },
       { key: "settings", label: "Settings", path: "/admin/settings", icon: Settings, module: "settings", built: true },
     ],
   },

@@ -45,6 +45,12 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - UX: locked admin routes now show a proper "Not authorized" state instead of an empty shell.
 - Verified: **93/93 backend tests pass**; Analytics + Notifications frontend flows pass.
 
+## Updated (2026-07-30c) — Unlocked AI Management + Reports
+- **AI Management** (real LLM via Emergent Universal key, `gpt-5.4`): property valuation (NGN range + drivers), listing-description writer, and market-insight Q&A. Generations stored in `ai_generations` with history. Endpoints: `POST /api/ai/valuation|description|market-insight`, `GET /api/ai/history` (RBAC `ai_management`).
+- **Reports**: `GET /api/reports/summary` (6-month leads/listings, products-by-category, KPI totals) + `GET /api/reports/export?dataset=` CSV for leads/properties/agents/products/wallets/users (RBAC `reports`). Frontend Reports page with charts + one-click exports.
+- Both modules now `built:true` in nav & routed. `emergentintegrations` in requirements.
+- Verified live: real AI valuation returned a structured NGN estimate; reports summary + CSV export (200) confirmed.
+
 ## Architecture note (extensibility)
 - New modules live in `/app/backend/modules_ext.py` registering on the shared `api` router — future modules (vehicles, auctions, tokenization, AI valuation, multi-country) follow the same additive pattern. Tech debt: extract a `routers/` package + `deps.py` as this grows.
 
