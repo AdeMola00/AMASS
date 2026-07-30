@@ -254,9 +254,9 @@ function MetaSpec({ icon, value }: { icon: keyof typeof Ionicons.glyphMap; value
 
 const styles = StyleSheet.create({
   container: {
-    position: "absolute",
-    left: 0,
-    right: 0,
+    // Owned by parent (positioned absolutely). No `position: absolute` here
+    // otherwise the wrapper collapses to zero height on web and the FlatList
+    // never lays out.
   },
   listContent: {
     paddingHorizontal: CARD_HGAP,
