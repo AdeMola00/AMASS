@@ -10,6 +10,7 @@ import {
   FlatList,
   Linking,
   Alert,
+  Animated,
 } from "react-native";
 import { MapView, Marker, Circle, Polygon, PROVIDER_DEFAULT, Region } from "@/src/lib/map";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -35,15 +36,34 @@ import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 
 const LAYER_KEY = "amass_map_layer";
 const OVERLAY_KEY = "amass_map_overlay";
+const LAST_REGION_KEY = "amass_map_last_region";
 
 type OverlayType = "none" | "price_per_sqm" | "verified_density" | "views";
 
-const INITIAL_REGION: Region = {
-  latitude: 6.5244,
-  longitude: 3.3792,
-  latitudeDelta: 1.2,
-  longitudeDelta: 1.2,
+// Active market default — Lekki Phase 1 (Nigeria's most active property market).
+// Delta ~0.014 corresponds to zoom ≈ 15 (street level, ~1.5 km wide).
+const DEFAULT_MARKET_REGION: Region = {
+  latitude: 6.4494,
+  longitude: 3.4739,
+  latitudeDelta: 0.014,
+  longitudeDelta: 0.014,
 };
+
+// Wide-angle bootstrap region — used as `initialRegion` so we can smoothly
+// animate DOWN to street-level after mount. This gives a Redfin-style
+// "zoom-in from altitude" opening moment.
+const BOOTSTRAP_REGION: Region = {
+  latitude: 6.4494,
+  longitude: 3.4739,
+  latitudeDelta: 0.06,
+  longitudeDelta: 0.06,
+};
+
+// Nominal 3D tilt applied after the first camera settle (Android + iOS Google Maps).
+const DEFAULT_PITCH_DEG = 40;
+
+// Approx zoom level from latitudeDelta: log2(360 / delta)
+const zoomFromDelta = (delta: number) => Math.max(0, Math.min(21, Math.log2(360 / Math.max(delta, 0.00005))));
 
 const NOW = () => Date.now();
 const RECENT_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -88,7 +108,7 @@ export default function HomeMap() {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [region, setRegion] = useState<Region>(INITIAL_REGION);
+  const [region, setRegion] = useState<Region>(BOOTSTRAP_REGION);
   const [showSearchArea, setShowSearchArea] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<
@@ -97,10 +117,50 @@ export default function HomeMap() {
   const [layer, setLayer] = useState<MapLayer>("standard");
   const [overlay, setOverlay] = useState<OverlayType>("none");
   const [heatCells, setHeatCells] = useState<{ lat: number; lng: number; count: number; weight: number }[]>([]);
-  // Draw-area polygon: array of tap coordinates
   const [drawing, setDrawing] = useState(false);
   const [polygon, setPolygon] = useState<{ latitude: number; longitude: number }[]>([]);
-  const initialRegionRef = useRef<Region>(INITIAL_REGION);
+  const initialRegionRef = useRef<Region>(BOOTSTRAP_REGION);
+  const introDoneRef = useRef(false);
+  const lastRegionSaveRef = useRef(0);
+
+  // Fade-in overlay — starts at 1 (opaque white curtain), fades to 0 after intro.
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Smoothly animate from a higher-altitude view to a target street-level view.
+  const performIntroAnimation = useCallback((target: Region) => {
+    if (introDoneRef.current) return;
+    introDoneRef.current = true;
+    // Ensure we START from a higher altitude near the target.
+    const startRegion: Region = {
+      ...target,
+      latitudeDelta: Math.max(target.latitudeDelta * 4, 0.05),
+      longitudeDelta: Math.max(target.longitudeDelta * 4, 0.05),
+    };
+    initialRegionRef.current = target;
+    setRegion(startRegion);
+    mapRef.current?.animateToRegion(startRegion, 60);
+    // Animate down to street-level after tiny delay
+    setTimeout(() => {
+      mapRef.current?.animateToRegion(target, 550);
+      // Then apply a subtle 3D tilt via camera.
+      setTimeout(() => {
+        if (Platform.OS !== "web") {
+          try {
+            mapRef.current?.animateCamera(
+              { pitch: DEFAULT_PITCH_DEG, heading: 0 } as any,
+              { duration: 500 }
+            );
+          } catch {}
+        }
+      }, 620);
+    }, 120);
+    // Fade the curtain out over the same ~500ms window.
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
 
   // Restore preferred layer + overlay
   useEffect(() => {
@@ -116,10 +176,35 @@ export default function HomeMap() {
     })();
   }, []);
 
-  // Location bootstrap
+  // Smart Location bootstrap: user location > last viewed > active market default
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // 1) Restore last-viewed region (falls back to active market default).
+      let target: Region = DEFAULT_MARKET_REGION;
+      try {
+        const last = await storage.getItem<Region | null>(LAST_REGION_KEY, null);
+        if (
+          last &&
+          typeof last.latitude === "number" &&
+          typeof last.longitude === "number" &&
+          typeof last.latitudeDelta === "number" &&
+          typeof last.longitudeDelta === "number"
+        ) {
+          // Clamp restored delta to street level (never open zoomed all the way out).
+          target = {
+            latitude: last.latitude,
+            longitude: last.longitude,
+            latitudeDelta: Math.min(Math.max(last.latitudeDelta, 0.006), 0.05),
+            longitudeDelta: Math.min(Math.max(last.longitudeDelta, 0.006), 0.05),
+          };
+        }
+      } catch {}
+
+      // 2) Kick the intro animation immediately with our best guess.
+      performIntroAnimation(target);
+
+      // 3) Try location — if granted, re-center on user with a soft animation.
       if (Platform.OS === "web") {
         setLocationPermission("denied");
         return;
@@ -146,15 +231,32 @@ export default function HomeMap() {
         const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
         setUserLocation(coords);
         setLocationPermission("granted");
-        const nextRegion = { ...coords, latitudeDelta: 0.08, longitudeDelta: 0.08 };
-        initialRegionRef.current = nextRegion;
-        mapRef.current?.animateToRegion(nextRegion, 800);
+        const userTarget: Region = {
+          ...coords,
+          latitudeDelta: 0.012,
+          longitudeDelta: 0.012,
+        };
+        initialRegionRef.current = userTarget;
+        // Animate softly to user location (already faded in by now).
+        setTimeout(() => {
+          mapRef.current?.animateToRegion(userTarget, 700);
+          if (Platform.OS !== "web") {
+            setTimeout(() => {
+              try {
+                mapRef.current?.animateCamera(
+                  { pitch: DEFAULT_PITCH_DEG, heading: 0 } as any,
+                  { duration: 400 }
+                );
+              } catch {}
+            }, 720);
+          }
+        }, 900);
       } catch {
         if (!cancelled) setLocationPermission("denied");
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [performIntroAnimation]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -249,16 +351,24 @@ export default function HomeMap() {
   }, [properties, activeId]);
 
   const focusProperty = useCallback((p: Property, zoomIn = false) => {
+    // Marker-tap zoom-in level (one step tighter than current)
+    const nextDelta = zoomIn
+      ? 0.008
+      : Math.min(region.latitudeDelta * 0.55, 0.014);
+    // Center the marker ~28% above the screen middle so the docked card
+    // never covers it. We shift the region center southward (lower latitude)
+    // so the actual marker sits above the visual midpoint.
+    const centerOffset = nextDelta * 0.28;
     mapRef.current?.animateToRegion(
       {
-        latitude: p.latitude,
+        latitude: p.latitude - centerOffset,
         longitude: p.longitude,
-        latitudeDelta: zoomIn ? 0.02 : Math.min(region.latitudeDelta, 0.04),
-        longitudeDelta: zoomIn ? 0.02 : Math.min(region.longitudeDelta, 0.04),
+        latitudeDelta: nextDelta,
+        longitudeDelta: nextDelta,
       },
-      450
+      420
     );
-  }, [region.latitudeDelta, region.longitudeDelta]);
+  }, [region.latitudeDelta]);
 
   const onMarkerPress = (p: Property) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -276,6 +386,12 @@ export default function HomeMap() {
 
   const onRegionChangeComplete = (r: Region) => {
     setRegion(r);
+    // Persist last-viewed region, throttled to once per 800ms.
+    const now = NOW();
+    if (now - lastRegionSaveRef.current > 800) {
+      lastRegionSaveRef.current = now;
+      storage.setItem(LAST_REGION_KEY, r);
+    }
     const ir = initialRegionRef.current;
     const dLat = Math.abs(r.latitude - ir.latitude);
     const dLng = Math.abs(r.longitude - ir.longitude);
@@ -294,7 +410,7 @@ export default function HomeMap() {
   const recenter = async () => {
     Haptics.selectionAsync().catch(() => {});
     if (userLocation) {
-      const nextRegion = { ...userLocation, latitudeDelta: 0.06, longitudeDelta: 0.06 };
+      const nextRegion = { ...userLocation, latitudeDelta: 0.012, longitudeDelta: 0.012 };
       initialRegionRef.current = nextRegion;
       mapRef.current?.animateToRegion(nextRegion, 500);
       setShowSearchArea(false);
@@ -307,14 +423,15 @@ export default function HomeMap() {
         const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
         setUserLocation(coords);
         setLocationPermission("granted");
-        const nextRegion = { ...coords, latitudeDelta: 0.06, longitudeDelta: 0.06 };
+        const nextRegion = { ...coords, latitudeDelta: 0.012, longitudeDelta: 0.012 };
         initialRegionRef.current = nextRegion;
         mapRef.current?.animateToRegion(nextRegion, 500);
         return;
       }
       setLocationPermission(req.canAskAgain ? "denied" : "blocked");
     }
-    mapRef.current?.animateToRegion(INITIAL_REGION, 500);
+    // Fallback to default active market (never open zoomed out).
+    mapRef.current?.animateToRegion(DEFAULT_MARKET_REGION, 500);
   };
 
   const zoomBy = (factor: number) => {
@@ -388,6 +505,10 @@ export default function HomeMap() {
     verified_density: "Verified",
     views: "Views",
   };
+
+  // Progressive disclosure — derived zoom level drives a lightweight UX hint.
+  const zoomLevel = zoomFromDelta(region.latitudeDelta);
+  const nbhdMode = zoomLevel >= 17;
 
   const openFilterSheet = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -478,14 +599,16 @@ export default function HomeMap() {
         provider={PROVIDER_DEFAULT}
         mapType={layerMapType}
         customMapStyle={customStyle as any}
-        initialRegion={INITIAL_REGION}
+        initialRegion={BOOTSTRAP_REGION}
         showsCompass={false}
         showsMyLocationButton={false}
         showsUserLocation={locationPermission === "granted"}
         showsPointsOfInterest={false}
-        showsBuildings={false}
+        showsBuildings={true}
         showsTraffic={false}
         showsIndoors={false}
+        pitchEnabled={true}
+        rotateEnabled={true}
         toolbarEnabled={false}
         onRegionChangeComplete={onRegionChangeComplete}
         onPress={(e: any) => {
@@ -699,6 +822,30 @@ export default function HomeMap() {
         </Pressable>
       )}
 
+      {/* Neighborhood mode chip — appears at street-level zoom */}
+      {nbhdMode && (
+        <View
+          pointerEvents="none"
+          style={[styles.nbhdModeWrap, { top: searchTop + 194 }]}
+          testID="nbhd-mode-chip"
+        >
+          <View style={styles.nbhdMode}>
+            <Ionicons name="sparkles" size={11} color="#F5B301" />
+            <Text style={styles.nbhdModeText}>Neighborhood mode · Zoom {Math.round(zoomLevel)}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Fade-in curtain — a white view that fades out on first render. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: colors.bg, opacity: fadeAnim, zIndex: 5 },
+        ]}
+        testID="map-fade-curtain"
+      />
+
       <FilterSheet ref={filterSheetRef} value={filters} onApply={setFilters} />
       <LayerPickerSheet ref={layerSheetRef} layer={layer} onLayerChange={changeLayer} />
       <NeighborhoodSheet ref={insightsRef} />
@@ -908,6 +1055,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
   },
   overlayLabelText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
+  nbhdModeWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+  nbhdMode: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(10,10,10,0.88)",
+    borderWidth: 1,
+    borderColor: "rgba(245,179,1,0.5)",
+  },
+  nbhdModeText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
   drawDot: {
     width: 12,
     height: 12,
