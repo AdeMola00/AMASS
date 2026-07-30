@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,611 +7,624 @@ import {
   ScrollView,
   ActivityIndicator,
   FlatList,
-  TextInput,
+  RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
-import { api, MarketplaceItem, Vendor, Collection } from "@/src/lib/api";
-import { useCart } from "@/src/contexts/cart";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
-import { ProductCard } from "@/src/components/ProductCard";
-import { CategoryTile, CategoryDef } from "@/src/components/CategoryTile";
-import { CollectionBanner } from "@/src/components/CollectionBanner";
-import { VendorCard } from "@/src/components/VendorCard";
+import { api, MarketplaceItem, MarketCategory } from "@/src/lib/api";
+import { storage } from "@/src/utils/storage";
+import { colors, radius, shadows, spacing } from "@/src/constants/theme";
+import { ClassifiedCard } from "@/src/components/marketplace/ClassifiedCard";
+import { CategoryCircle } from "@/src/components/marketplace/CategoryCircle";
+import {
+  MarketFilterSheet,
+  MarketFilterSheetRef,
+  MarketFilterState,
+} from "@/src/components/marketplace/MarketFilterSheet";
 import { AdModal } from "@/src/components/AdModal";
 import { useAdTrigger } from "@/src/hooks/useAdTrigger";
 
-const CATEGORIES: CategoryDef[] = [
-  { key: "furniture", label: "Furniture", icon: "cube", color: "#0A0A0A", category: "home", subcategory: "Furniture" },
-  { key: "kitchen", label: "Kitchen", icon: "restaurant", color: "#B45309", category: "home", subcategory: "Kitchen" },
-  { key: "lighting", label: "Lighting", icon: "bulb", color: "#D97706", category: "home", subcategory: "Lighting" },
-  { key: "electronics", label: "Electronics", icon: "tv", color: "#0369A1", category: "home", subcategory: "Electronics" },
-  { key: "appliances", label: "Appliances", icon: "flash", color: "#7C2D12", category: "home", subcategory: "Appliances" },
-  { key: "decoration", label: "Décor", icon: "color-palette", color: "#8B5CF6", category: "home", subcategory: "Decoration" },
-  { key: "office", label: "Office", icon: "briefcase", color: "#0A0A0A", category: "home", subcategory: "Office" },
-  { key: "garden", label: "Garden", icon: "leaf", color: "#166534", category: "home", subcategory: "Garden" },
-  { key: "materials", label: "Materials", icon: "construct", color: "#B91C1C", category: "construction", subcategory: "Building Materials" },
-  { key: "equipment", label: "Equipment", icon: "hammer", color: "#374151", category: "construction", subcategory: "Equipment Rental" },
-  { key: "architects", label: "Architects", icon: "school", color: "#0A0A0A", category: "services", subcategory: "Architects" },
-  { key: "professionals", label: "Pros", icon: "people", color: "#065F46", category: "services" },
-];
+type ViewMode = "grid" | "list";
+const VIEW_KEY = "amass_market_view";
+const CITY_KEY = "amass_market_city";
 
-const TRENDING = [
-  "3-bed apartment furniture", "Solar inverter", "Land survey", "Kitchen renovation", "Smart lock", "Chandelier",
+const CITIES = [
+  "All of Nigeria",
+  "Lagos - Lekki",
+  "Lagos - Ikeja",
+  "Lagos - Yaba",
+  "Lagos - Victoria Island",
+  "Lagos - Ajah",
+  "Abuja - Maitama",
+  "Abuja - Wuse 2",
+  "Abuja - Gwarinpa",
+  "Port Harcourt",
+  "Ibadan",
+  "Kano",
 ];
 
 export default function Marketplace() {
   const router = useRouter();
-  const { cart, count, add } = useCart();
+  const filterRef = useRef<MarketFilterSheetRef>(null);
   const { ad, visible: adVisible, dismiss: adDismiss, noteInteraction } = useAdTrigger({
-    triggerAfter: 6,
+    triggerAfter: 8,
     context: "marketplace_home",
-    mountDelayMs: 2500,
+    mountDelayMs: 3000,
   });
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [recent, setRecent] = useState<MarketplaceItem[]>([]);
-  const [showSuggest, setShowSuggest] = useState(false);
+  const [categories, setCategories] = useState<MarketCategory[]>([]);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [filters, setFilters] = useState<MarketFilterState>({});
   const [query, setQuery] = useState("");
+  const [city, setCity] = useState("All of Nigeria");
+  const [showCityPicker, setShowCityPicker] = useState(false);
 
-  const load = useCallback(async () => {
+  // Restore prefs
+  useEffect(() => {
+    (async () => {
+      const v = await storage.getItem<string>(VIEW_KEY, "grid");
+      if (v === "list" || v === "grid") setViewMode(v);
+      const c = await storage.getItem<string>(CITY_KEY, "All of Nigeria");
+      if (c) setCity(c);
+    })();
+  }, []);
+
+  const loadCategories = useCallback(async () => {
     try {
-      const [it, col, ven, rv] = await Promise.all([
-        api.marketplace(),
-        api.marketplaceCollections(),
-        api.marketplaceVendors(),
-        api.marketplaceRecentlyViewed().catch(() => []),
-      ]);
-      setItems(it);
-      setCollections(col);
-      setVendors(ven);
-      setRecent(rv);
+      const cats = await api.marketplaceCategories();
+      setCategories(cats);
     } catch {}
-    setLoading(false);
+  }, []);
+
+  const loadSaved = useCallback(async () => {
+    try {
+      const r = await api.marketplaceSavedIds();
+      setSavedIds(new Set(r.ids));
+    } catch {}
+  }, []);
+
+  const buildParams = useCallback((): Record<string, string | number | boolean | undefined> => {
+    const p: Record<string, string | number | boolean | undefined> = { limit: 100 };
+    if (filters.category) p.category = filters.category;
+    if (filters.subcategory) p.subcategory = filters.subcategory;
+    if (filters.condition) p.condition = filters.condition;
+    if (filters.minPrice) p.min_price = filters.minPrice;
+    if (filters.maxPrice) p.max_price = filters.maxPrice;
+    if (filters.sellerType) p.seller_type = filters.sellerType;
+    if (filters.verifiedOnly) p.verified = true;
+    if (filters.boostedOnly) p.boosted_only = true;
+    if (filters.sort) p.sort = filters.sort;
+    if (query.trim()) p.q = query.trim();
+    if (city && city !== "All of Nigeria") p.city = city;
+    return p;
+  }, [filters, query, city]);
+
+  const loadItems = useCallback(async () => {
+    try {
+      const list = await api.marketplace(buildParams());
+      setItems(list);
+    } catch {
+      setItems([]);
+    }
+  }, [buildParams]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await Promise.all([loadCategories(), loadSaved(), loadItems()]);
+      setLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadItems();
+  }, [loadItems]);
 
-  const popular = useMemo(() => items.filter((i) => i.popular).slice(0, 10), [items]);
-  const home = useMemo(() => items.filter((i) => i.category === "home").slice(0, 10), [items]);
-  const construction = useMemo(() => items.filter((i) => i.category === "construction").slice(0, 10), [items]);
-  const services = useMemo(() => items.filter((i) => i.category === "services").slice(0, 8), [items]);
-  const deals = useMemo(() => items.filter((i) => i.on_sale).slice(0, 8), [items]);
-  const recommended = useMemo(() => {
-    // A shuffled tail — top-rated first
-    return [...items].sort((a, b) => b.rating - a.rating).slice(0, 8);  }, [items]);
-
-  const quickAdd = async (id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    try {
-      await add(id, 1);
-    } catch {}
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadCategories(), loadItems(), loadSaved()]);
+    setRefreshing(false);
   };
 
-  const openCategory = (cat: CategoryDef) => {
+  const toggleView = () => {
     Haptics.selectionAsync().catch(() => {});
-    router.push({
-      pathname: "/marketplace-list",
-      params: {
-        category: cat.category ?? "",
-        subcategory: cat.subcategory ?? "",
-      },
-    } as any);
+    const next: ViewMode = viewMode === "grid" ? "list" : "grid";
+    setViewMode(next);
+    storage.setItem(VIEW_KEY, next);
   };
 
-  const submitSearch = () => {
-    if (!query.trim()) return;
-    router.push({ pathname: "/marketplace-list", params: { q: query.trim() } } as any);
+  const setCityAndSave = (c: string) => {
+    setCity(c);
+    storage.setItem(CITY_KEY, c);
+    setShowCityPicker(false);
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <ActivityIndicator style={{ marginTop: 80 }} color={colors.red} />
-      </SafeAreaView>
-    );
-  }
+  const toggleSave = useCallback(
+    async (item: MarketplaceItem) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      const next = new Set(savedIds);
+      if (next.has(item.id)) next.delete(item.id);
+      else next.add(item.id);
+      setSavedIds(next);
+      try {
+        await api.marketplaceToggleSave(item.id);
+      } catch {}
+    },
+    [savedIds]
+  );
+
+  const openItem = (it: MarketplaceItem) => {
+    noteInteraction();
+    router.push(`/marketplace/${it.id}` as any);
+  };
+
+  const featured = useMemo(
+    () => items.filter((x) => x.is_boosted || x.is_featured).slice(0, 6),
+    [items]
+  );
+
+  const activeFilterCount = Object.values(filters).filter(
+    (v) => v !== undefined && v !== "" && v !== false
+  ).length;
+
+  const renderGridRow = ({ item, index }: { item: MarketplaceItem[]; index: number }) => (
+    <View key={index} style={styles.gridRow}>
+      {item.map((it) => (
+        <ClassifiedCard
+          key={it.id}
+          item={it}
+          variant="grid"
+          onPress={() => openItem(it)}
+          onFavorite={() => toggleSave(it)}
+          favorited={savedIds.has(it.id)}
+        />
+      ))}
+      {item.length === 1 && <View style={{ flex: 1 }} />}
+    </View>
+  );
+
+  const gridRows = useMemo(() => {
+    const rows: MarketplaceItem[][] = [];
+    for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+    return rows;
+  }, [items]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]} testID="marketplace-screen">
-      {/* Sticky header */}
-      <View style={styles.header}>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={styles.h1}>Marketplace</Text>
-          <Text style={styles.subtitle}>For homeowners, tenants, builders.</Text>
-        </View>
+      {/* ─── Top nav ─────────────────────────────────────── */}
+      <View style={styles.topNav}>
         <Pressable
-          onPress={() => router.push("/cart")}
-          style={styles.cartBtn}
-          testID="market-cart-btn"
+          onPress={() => setShowCityPicker((s) => !s)}
+          style={styles.locationBtn}
+          testID="location-selector"
         >
-          <Ionicons name="bag-outline" size={22} color={colors.text} />
-          {count > 0 && (
-            <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>{count}</Text>
-            </View>
-          )}
+          <Ionicons name="location" size={16} color={colors.red} />
+          <Text style={styles.locationText} numberOfLines={1}>{city}</Text>
+          <Ionicons name="chevron-down" size={14} color={colors.textSecondary} />
         </Pressable>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchWrap}>
-        <View style={[styles.searchBar, shadows.soft]}>
-          <Ionicons name="search" size={18} color={colors.textSecondary} />
-          <TextInput
-            placeholder="Search products, brands, vendors"
-            placeholderTextColor={colors.textMuted}
-            value={query}
-            onChangeText={setQuery}
-            onFocus={() => setShowSuggest(true)}
-            onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
-            onSubmitEditing={submitSearch}
-            returnKeyType="search"
-            style={styles.searchInput}
-            testID="market-search-input"
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <IconBtn
+            icon="heart-outline"
+            onPress={() => router.push("/marketplace/saved" as any)}
+            testID="market-saved-btn"
           />
-          <Pressable onPress={() => router.push("/ai-search")} style={styles.aiBtn} testID="market-ai-btn">
-            <Ionicons name="sparkles" size={14} color="#fff" />
-          </Pressable>
+          <IconBtn
+            icon="notifications-outline"
+            onPress={() => router.push("/notifications" as any)}
+            testID="market-notif-btn"
+          />
         </View>
-        {showSuggest && (
-          <View style={[styles.suggestions, shadows.card]} testID="search-suggestions">
-            <Text style={styles.suggestionsLabel}>TRENDING</Text>
-            <View style={styles.suggestionChips}>
-              {TRENDING.map((t) => (
-                <Pressable
-                  key={t}
-                  style={styles.suggestChip}
-                  onPress={() => {
-                    setQuery(t);
-                    setShowSuggest(false);
-                    router.push({ pathname: "/marketplace", params: { q: t } } as any);
-                  }}
-                >
-                  <Ionicons name="trending-up" size={12} color={colors.red} />
-                  <Text style={styles.suggestChipText}>{t}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 160 }}
-      >
-        {/* Quick categories */}
-        <View style={styles.categoriesGrid}>
-          {CATEGORIES.map((c) => (
-            <CategoryTile key={c.key} cat={c} onPress={() => openCategory(c)} />
-          ))}
-        </View>
-
-        {/* Featured Collections */}
-        <SectionHeader title="Featured Collections" caption="Curated for you" />
-        <FlatList
-          data={collections}
-          keyExtractor={(c) => c.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.hRow}
-          renderItem={({ item }) => (
-            <CollectionBanner
-              collection={item}
-              onPress={() =>
-                router.push({
-                  pathname: "/marketplace-list",
-                  params: {
-                    q: item.tag_filter ?? "",
-                    category: item.category_filter ?? "",
-                    title: item.title,
-                  },
-                } as any)
-              }
-            />
-          )}
-        />
-
-        {/* Popular Products */}
-        {popular.length > 0 && (
-          <>
-            <SectionHeader title="Popular right now" caption="What everyone's browsing" />
-            <FlatList
-              data={popular}
-              keyExtractor={(p) => p.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hRow}
-              renderItem={({ item }) => (
-                <ProductCard
-                  item={item}
-                  onPress={() => router.push(`/marketplace/${item.id}` as any)}
-                  onAdd={() => quickAdd(item.id)}
-                />
-              )}
-            />
-          </>
-        )}
-
-        {/* Construction Marketplace */}
-        <SectionCard
-          title="Construction Marketplace"
-          subtitle="Materials, equipment & pros"
-          color="#B91C1C"
-          items={construction}
-          onView={() =>
-            router.push({ pathname: "/marketplace-list", params: { category: "construction" } } as any)
-          }
-          onItemPress={(id) => router.push(`/marketplace/${id}` as any)}
-          onAdd={quickAdd}
-        />
-
-        {/* Home Marketplace */}
-        <SectionCard
-          title="Home Marketplace"
-          subtitle="Furniture, kitchen, lighting, décor"
-          color="#0A0A0A"
-          items={home}
-          onView={() =>
-            router.push({ pathname: "/marketplace-list", params: { category: "home" } } as any)
-          }
-          onItemPress={(id) => router.push(`/marketplace/${id}` as any)}
-          onAdd={quickAdd}
-        />
-
-        {/* Recommended */}
-        {recommended.length > 0 && (
-          <>
-            <SectionHeader title="Recommended for you" caption="Based on what you like" />
-            <FlatList
-              data={recommended}
-              keyExtractor={(p) => p.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hRow}
-              renderItem={({ item }) => (
-                <ProductCard
-                  item={item}
-                  onPress={() => router.push(`/marketplace/${item.id}` as any)}
-                  onAdd={() => quickAdd(item.id)}
-                />
-              )}
-            />
-          </>
-        )}
-
-        {/* Recently viewed */}
-        {recent.length > 0 && (
-          <>
-            <SectionHeader title="Recently viewed" caption="Pick up where you left off" />
-            <FlatList
-              data={recent}
-              keyExtractor={(p) => p.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hRow}
-              renderItem={({ item }) => (
-                <ProductCard
-                  item={item}
-                  size="sm"
-                  onPress={() => router.push(`/marketplace/${item.id}` as any)}
-                  onAdd={() => quickAdd(item.id)}
-                />
-              )}
-            />
-          </>
-        )}
-
-        {/* Top Vendors */}
-        {vendors.length > 0 && (
-          <>
-            <SectionHeader title="Top Vendors" caption="Verified by AMASS" />
-            <FlatList
-              data={vendors}
-              keyExtractor={(v) => v.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hRow}
-              renderItem={({ item }) => (
-                <VendorCard
-                  vendor={item}
-                  onPress={() => router.push(`/vendor/${item.id}` as any)}
-                />
-              )}
-            />
-          </>
-        )}
-
-        {/* Services */}
-        {services.length > 0 && (
-          <>
-            <SectionHeader title="Professionals & Services" caption="Architects, engineers, surveyors" />
-            <FlatList
-              data={services}
-              keyExtractor={(p) => p.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hRow}
-              renderItem={({ item }) => (
-                <ProductCard
-                  item={item}
-                  onPress={() => router.push(`/marketplace/${item.id}` as any)}
-                  onAdd={() => quickAdd(item.id)}
-                />
-              )}
-            />
-          </>
-        )}
-
-        {/* Deals */}
-        {deals.length > 0 && (
-          <>
-            <SectionHeader title="Deals & Promotions" caption="Limited-time savings" accent={colors.red} />
-            <FlatList
-              data={deals}
-              keyExtractor={(p) => p.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hRow}
-              renderItem={({ item }) => (
-                <ProductCard
-                  item={item}
-                  onPress={() => router.push(`/marketplace/${item.id}` as any)}
-                  onAdd={() => quickAdd(item.id)}
-                />
-              )}
-            />
-          </>
-        )}
-      </ScrollView>
-
-      {/* Floating cart peek */}
-      {count > 0 && (
+      {/* Search + Filter */}
+      <View style={styles.searchRow}>
         <Pressable
-          onPress={() => router.push("/cart")}
-          style={[styles.cartPeek, shadows.floating]}
-          testID="cart-peek"
+          style={styles.searchBar}
+          onPress={() => router.push("/marketplace/search" as any)}
+          testID="market-search-bar"
         >
-          <View style={styles.cartPeekIcon}>
-            <Ionicons name="bag" size={16} color="#fff" />
-            <View style={styles.peekBadge}>
-              <Text style={styles.peekBadgeText}>{count}</Text>
-            </View>
-          </View>
-          <Text style={styles.cartPeekText}>View cart</Text>
-          <Text style={styles.cartPeekTotal}>{formatNaira(cart.subtotal)}</Text>
+          <Ionicons name="search" size={18} color={colors.textSecondary} />
+          <Text style={styles.searchPlaceholder}>Search phones, cars, homes…</Text>
         </Pressable>
+        <Pressable
+          onPress={() => filterRef.current?.open()}
+          style={styles.filterBtn}
+          testID="market-filter-btn"
+        >
+          <Ionicons name="options" size={18} color="#fff" />
+          {activeFilterCount > 0 && (
+            <View style={styles.filterDot}>
+              <Text style={styles.filterDotText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </Pressable>
+      </View>
+
+      {/* City picker inline */}
+      {showCityPicker && (
+        <View style={styles.cityPicker}>
+          <ScrollView>
+            {CITIES.map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => setCityAndSave(c)}
+                style={[styles.cityRow, city === c && { backgroundColor: colors.surfaceSecondary }]}
+              >
+                <Ionicons
+                  name={city === c ? "radio-button-on" : "radio-button-off"}
+                  size={16}
+                  color={city === c ? colors.red : colors.textTertiary}
+                />
+                <Text style={styles.cityRowText}>{c}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
       )}
-      <AdModal ad={ad} visible={adVisible} onClose={adDismiss} context="marketplace_home" />
+
+      {loading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.red} />
+        </View>
+      ) : (
+        <FlatList
+          data={viewMode === "grid" ? gridRows : items}
+          keyExtractor={(_, i) => `row-${i}`}
+          contentContainerStyle={{ paddingBottom: 140 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListHeaderComponent={
+            <View>
+              {/* Categories rail */}
+              <View style={styles.catsRail}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.catsRow}
+                >
+                  {categories.map((c) => (
+                    <CategoryCircle
+                      key={c.key}
+                      category={c}
+                      active={filters.category === c.key}
+                      onPress={() =>
+                        setFilters({
+                          ...filters,
+                          category: filters.category === c.key ? undefined : c.key,
+                        })
+                      }
+                    />
+                  ))}
+                  <Pressable
+                    onPress={() => filterRef.current?.open()}
+                    style={styles.moreCircle}
+                    testID="cats-more"
+                  >
+                    <View style={styles.moreInner}>
+                      <Ionicons name="grid" size={20} color={colors.text} />
+                    </View>
+                    <Text style={styles.moreLabel}>More</Text>
+                  </Pressable>
+                </ScrollView>
+              </View>
+
+              {/* Boosted / Featured strip */}
+              {featured.length > 0 && (
+                <View>
+                  <View style={styles.sectionHeader}>
+                    <View style={styles.sectionTitleRow}>
+                      <Ionicons name="flash" size={14} color="#F5B301" />
+                      <Text style={styles.sectionTitle}>Featured</Text>
+                    </View>
+                    <Text style={styles.sectionSub}>{featured.length} listings</Text>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.featuredRow}
+                  >
+                    {featured.map((f) => (
+                      <ClassifiedCard
+                        key={f.id}
+                        item={f}
+                        variant="featured"
+                        onPress={() => openItem(f)}
+                        onFavorite={() => toggleSave(f)}
+                        favorited={savedIds.has(f.id)}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Feed header + view toggle */}
+              <View style={styles.feedHeader}>
+                <View>
+                  <Text style={styles.feedTitle}>{items.length} listings</Text>
+                  <Text style={styles.feedSub}>
+                    {filters.category
+                      ? categories.find((c) => c.key === filters.category)?.label ?? "For you"
+                      : "For you"}
+                    {city !== "All of Nigeria" ? ` · ${city}` : ""}
+                  </Text>
+                </View>
+                <Pressable onPress={toggleView} style={styles.viewToggle} testID="view-toggle">
+                  <Ionicons
+                    name={viewMode === "grid" ? "list" : "grid"}
+                    size={16}
+                    color={colors.text}
+                  />
+                  <Text style={styles.viewToggleText}>
+                    {viewMode === "grid" ? "List" : "Grid"}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="pricetags-outline" size={32} color={colors.textMuted} />
+              </View>
+              <Text style={styles.emptyTitle}>No listings match your filters</Text>
+              <Text style={styles.emptyBody}>Try adjusting filters or exploring another category.</Text>
+            </View>
+          }
+          renderItem={
+            viewMode === "grid"
+              ? (renderGridRow as any)
+              : ({ item }) => (
+                  <ClassifiedCard
+                    item={item as MarketplaceItem}
+                    variant="list"
+                    onPress={() => openItem(item as MarketplaceItem)}
+                    onFavorite={() => toggleSave(item as MarketplaceItem)}
+                    favorited={savedIds.has((item as MarketplaceItem).id)}
+                  />
+                )
+          }
+        />
+      )}
+
+      {/* Sell FAB */}
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          router.push("/marketplace/sell" as any);
+        }}
+        style={styles.sellFab}
+        testID="sell-fab"
+      >
+        <Ionicons name="add" size={22} color="#fff" />
+        <Text style={styles.sellFabText}>Sell</Text>
+      </Pressable>
+
+      <MarketFilterSheet
+        ref={filterRef}
+        value={filters}
+        categories={categories}
+        onApply={setFilters}
+      />
+      {ad && <AdModal ad={ad} visible={adVisible} onClose={adDismiss} />}
     </SafeAreaView>
   );
 }
 
-function SectionHeader({
-  title,
-  caption,
-  accent,
+function IconBtn({
+  icon,
+  onPress,
+  testID,
 }: {
-  title: string;
-  caption?: string;
-  accent?: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  testID?: string;
 }) {
   return (
-    <View style={styles.sectionHeader}>
-      <View style={{ gap: 2 }}>
-        <Text style={[styles.sectionTitle, accent && { color: accent }]}>{title}</Text>
-        {caption && <Text style={styles.sectionCaption}>{caption}</Text>}
-      </View>
-    </View>
-  );
-}
-
-function SectionCard({
-  title,
-  subtitle,
-  color,
-  items,
-  onView,
-  onItemPress,
-  onAdd,
-}: {
-  title: string;
-  subtitle: string;
-  color: string;
-  items: MarketplaceItem[];
-  onView: () => void;
-  onItemPress: (id: string) => void;
-  onAdd: (id: string) => void;
-}) {
-  if (items.length === 0) return null;
-  return (
-    <View style={{ marginTop: spacing.xxl }}>
-      <View style={styles.sectionCardHeader}>
-        <View style={{ flex: 1 }}>
-          <View style={[styles.sectionAccent, { backgroundColor: color }]} />
-          <Text style={styles.sectionCardTitle}>{title}</Text>
-          <Text style={styles.sectionCardSub}>{subtitle}</Text>
-        </View>
-        <Pressable onPress={onView} hitSlop={10}>
-          <Text style={[styles.link, { color }]}>View all →</Text>
-        </Pressable>
-      </View>
-      <FlatList
-        data={items}
-        keyExtractor={(p) => p.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.hRow}
-        renderItem={({ item }) => (
-          <ProductCard
-            item={item}
-            onPress={() => onItemPress(item.id)}
-            onAdd={() => onAdd(item.id)}
-          />
-        )}
-      />
-    </View>
+    <Pressable onPress={onPress} style={styles.iconBtn} hitSlop={8} testID={testID}>
+      <Ionicons name={icon} size={22} color={colors.text} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  h1: { ...typography.display, fontSize: 30 },
-  subtitle: { ...typography.caption, color: colors.textTertiary },
-  cartBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cartBadge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    minWidth: 20,
-    height: 20,
-    paddingHorizontal: 4,
-    borderRadius: 10,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  cartBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  searchWrap: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-    position: "relative",
-    zIndex: 5,
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    height: 52,
-    borderRadius: radius.pill,
-    backgroundColor: "#fff",
+  // Top nav
+  topNav: {
     paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: colors.text, fontWeight: "500" },
-  aiBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.red,
+    paddingTop: 4,
+    paddingBottom: 6,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
   },
-  suggestions: {
-    position: "absolute",
-    top: 62,
-    left: spacing.xl,
-    right: spacing.xl,
-    padding: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    gap: 10,
-  },
-  suggestionsLabel: {
-    fontSize: 10,
-    letterSpacing: 1,
-    fontWeight: "700",
-    color: colors.textTertiary,
-  },
-  suggestionChips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  suggestChip: {
+  locationBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
+    flex: 1,
+    paddingRight: 12,
+  },
+  locationText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: -0.2,
+    flex: 1,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.surfaceSecondary,
   },
-  suggestChipText: { fontSize: 12, fontWeight: "600", color: colors.text },
-  categoriesGrid: {
+  // Search
+  searchRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    paddingHorizontal: spacing.xl,
-    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 10,
+    alignItems: "center",
   },
-  sectionHeader: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.md,
-  },
-  sectionTitle: { ...typography.h2, fontSize: 22 },
-  sectionCaption: { ...typography.caption, color: colors.textTertiary },
-  sectionCardHeader: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
-  },
-  sectionAccent: { width: 28, height: 3, borderRadius: 2, marginBottom: 6 },
-  sectionCardTitle: { ...typography.h2, fontSize: 22 },
-  sectionCardSub: { ...typography.caption, color: colors.textTertiary, marginTop: 2 },
-  link: { fontSize: 13, fontWeight: "700" },
-  hRow: { paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.sm },
-  cartPeek: {
-    position: "absolute",
-    left: spacing.lg,
-    right: spacing.lg,
-    bottom: 96,
+  searchBar: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    height: 56,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 28,
-    backgroundColor: colors.ink,
+    gap: 8,
+    height: 46,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSecondary,
+    paddingHorizontal: 16,
   },
-  cartPeekIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.15)",
+  searchPlaceholder: { fontSize: 14, color: colors.textTertiary, fontWeight: "600", flex: 1 },
+  filterBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
   },
-  peekBadge: {
+  filterDot: {
     position: "absolute",
-    top: -4,
-    right: -4,
+    top: -2,
+    right: -2,
     minWidth: 18,
     height: 18,
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
     borderRadius: 9,
     backgroundColor: colors.red,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#fff",
   },
-  peekBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  cartPeekText: { color: "#fff", flex: 1, fontWeight: "700", fontSize: 14 },
-  cartPeekTotal: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  filterDotText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+
+  // City picker
+  cityPicker: {
+    position: "absolute",
+    top: 100,
+    left: spacing.lg,
+    right: spacing.lg,
+    maxHeight: 340,
+    backgroundColor: "#fff",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    zIndex: 100,
+    ...shadows.floating,
+  },
+  cityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  cityRowText: { fontSize: 14, color: colors.text, fontWeight: "600" },
+
+  // Categories rail
+  catsRail: { paddingVertical: 4 },
+  catsRow: { gap: 12, paddingHorizontal: spacing.lg, paddingVertical: 8 },
+  moreCircle: { width: 76, alignItems: "center", gap: 6 },
+  moreInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  moreLabel: { fontSize: 11, color: colors.textSecondary, fontWeight: "600" },
+
+  // Section
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  sectionTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
+  sectionSub: { fontSize: 11, color: colors.textTertiary, fontWeight: "700" },
+
+  // Featured row
+  featuredRow: { gap: 12, paddingHorizontal: spacing.lg, paddingBottom: 6 },
+
+  // Feed header
+  feedHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    paddingHorizontal: spacing.lg,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  feedTitle: { fontSize: 20, fontWeight: "800", color: colors.text, letterSpacing: -0.4 },
+  feedSub: { fontSize: 12, color: colors.textTertiary, fontWeight: "600", marginTop: 2 },
+  viewToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    height: 34,
+    borderRadius: radius.pill,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  viewToggleText: { fontSize: 12, fontWeight: "800", color: colors.text },
+
+  // Grid
+  gridRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+    paddingHorizontal: spacing.lg,
+  },
+
+  // FAB
+  sellFab: {
+    position: "absolute",
+    right: 20,
+    bottom: 110,
+    height: 52,
+    paddingHorizontal: 20,
+    borderRadius: 26,
+    backgroundColor: colors.red,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    ...shadows.floating,
+  },
+  sellFabText: { color: "#fff", fontSize: 14, fontWeight: "800", letterSpacing: 0.2 },
+
+  loading: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  emptyState: { alignItems: "center", padding: spacing.xxl, gap: 12 },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: { fontSize: 18, fontWeight: "800", color: colors.text, textAlign: "center" },
+  emptyBody: { fontSize: 13, color: colors.textTertiary, textAlign: "center", lineHeight: 18 },
 });

@@ -24,9 +24,11 @@ from pydantic import BaseModel, EmailStr, Field
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
 from marketplace_seed import VENDORS, COLLECTIONS, MARKET_ITEMS
+from marketplace_c2c_seed import C2C_ITEMS as C2C_MARKET_ITEMS
 from tokens import register_token_routes, compute_token_cost, has_unlocked
 from earn_and_tools import register_earn_routes, register_agent_tool_routes
 from ads import register_ads_routes
+from marketplace_v2 import register_marketplace_v2_routes
 
 # ─── Config ───────────────────────────────────────────────
 MONGO_URL = os.environ["MONGO_URL"]
@@ -123,7 +125,7 @@ class Property(BaseModel):
 
 class MarketplaceItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    category: Literal["construction", "home", "services"]
+    category: str  # relaxed — supports c2c cats: vehicles, motorcycles, phones, electronics, furniture, appliances, fashion, tools, equipment, business, services, home, construction, real_estate
     subcategory: str
     name: str
     description: str
@@ -137,16 +139,41 @@ class MarketplaceItem(BaseModel):
     rating: float = 4.5
     reviews: int = 0
     location: Optional[str] = None
+    city: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     verified: bool = False
     delivery: bool = True
     delivery_days: int = 3
     brand: Optional[str] = None
-    condition: Literal["new", "used", "refurbished"] = "new"
+    condition: Literal["new", "used", "refurbished", "for_parts"] = "new"
     stock: int = 25
     specs: dict = Field(default_factory=dict)
     tags: List[str] = []
     popular: bool = False
     on_sale: bool = False
+    # ─── Classifieds (OfferUp / Letgo style) ────────────────
+    posted_at: Optional[str] = None  # ISO string; falls back to created_at
+    views: int = 0
+    saves: int = 0
+    is_boosted: bool = False
+    is_featured: bool = False
+    negotiable: bool = True
+    contact_prefs: List[str] = Field(default_factory=lambda: ["chat", "call", "whatsapp"])  # subset of chat/call/whatsapp
+    # Seller (C2C / B2C dealer / B2C brand)
+    seller_id: Optional[str] = None
+    seller_name: Optional[str] = None
+    seller_avatar: Optional[str] = None
+    seller_phone: Optional[str] = None
+    seller_whatsapp: Optional[str] = None
+    seller_type: Literal["individual", "dealer", "brand"] = "individual"
+    seller_verified: bool = False
+    seller_rating: float = 4.7
+    seller_reviews: int = 0
+    seller_joined_year: int = 2024
+    seller_response_time_hours: int = 2
+    seller_response_rate: int = 92  # percent
+    seller_bio: Optional[str] = None
 
 
 class Vendor(BaseModel):
@@ -955,6 +982,11 @@ async def marketplace(
     min_price: Optional[int] = None,
     max_price: Optional[int] = None,
     verified: Optional[bool] = None,
+    condition: Optional[str] = None,
+    city: Optional[str] = None,
+    seller_type: Optional[str] = None,
+    boosted_only: Optional[bool] = None,
+    sort: Optional[str] = None,  # newest | price_asc | price_desc | views | saves
     limit: int = 200,
 ):
     query: dict = {}
@@ -970,6 +1002,14 @@ async def marketplace(
         query["on_sale"] = on_sale
     if verified is not None:
         query["verified"] = verified
+    if condition:
+        query["condition"] = condition
+    if city:
+        query["city"] = {"$regex": city, "$options": "i"}
+    if seller_type:
+        query["seller_type"] = seller_type
+    if boosted_only:
+        query["is_boosted"] = True
     if min_price is not None or max_price is not None:
         price_q: dict = {}
         if min_price is not None:
@@ -983,8 +1023,22 @@ async def marketplace(
             {"description": {"$regex": q, "$options": "i"}},
             {"subcategory": {"$regex": q, "$options": "i"}},
             {"brand": {"$regex": q, "$options": "i"}},
+            {"city": {"$regex": q, "$options": "i"}},
         ]
-    docs = await db.marketplace.find(query, {"_id": 0}).limit(limit).to_list(limit)
+    cursor = db.marketplace.find(query, {"_id": 0})
+    sort_map = {
+        "newest": [("posted_at", -1)],
+        "price_asc": [("price", 1)],
+        "price_desc": [("price", -1)],
+        "views": [("views", -1)],
+        "saves": [("saves", -1)],
+    }
+    if sort and sort in sort_map:
+        cursor = cursor.sort(sort_map[sort])
+    else:
+        # default: boosted first, then newest
+        cursor = cursor.sort([("is_boosted", -1), ("is_featured", -1), ("posted_at", -1)])
+    docs = await cursor.limit(limit).to_list(limit)
     return docs
 
 
@@ -1526,6 +1580,13 @@ async def seed_data():
     for m in SEED_MARKETPLACE:
         item = MarketplaceItem(**m)
         await db.marketplace.insert_one(item.model_dump())
+    # C2C classifieds seed (OfferUp/Letgo-style)
+    for m in C2C_MARKET_ITEMS:
+        try:
+            item = MarketplaceItem(**m)
+            await db.marketplace.insert_one(item.model_dump())
+        except Exception as e:
+            logger.warning(f"skip c2c seed item {m.get('name','?')}: {e}")
 
     # Seed vendors
     await db.vendors.delete_many({})
@@ -1587,6 +1648,7 @@ def _chat_factory(system: str) -> _ChatWrapper:
 app.include_router(register_earn_routes(db))
 app.include_router(register_agent_tool_routes(db, _chat_factory))
 app.include_router(register_ads_routes(db))
+app.include_router(register_marketplace_v2_routes(db, get_current_user))
 
 app.add_middleware(
     CORSMiddleware,

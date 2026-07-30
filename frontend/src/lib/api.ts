@@ -95,7 +95,7 @@ export type UserProfile = {
 
 export type MarketplaceItem = {
   id: string;
-  category: "construction" | "home" | "services";
+  category: string;
   subcategory: string;
   name: string;
   description: string;
@@ -108,16 +108,75 @@ export type MarketplaceItem = {
   rating: number;
   reviews: number;
   location?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
   verified: boolean;
   delivery: boolean;
   delivery_days: number;
   brand?: string;
-  condition: "new" | "used" | "refurbished";
+  condition: "new" | "used" | "refurbished" | "for_parts";
   stock: number;
   specs: Record<string, string>;
   tags: string[];
   popular: boolean;
   on_sale: boolean;
+  // Classifieds
+  posted_at?: string;
+  views?: number;
+  saves?: number;
+  is_boosted?: boolean;
+  is_featured?: boolean;
+  negotiable?: boolean;
+  contact_prefs?: string[];
+  seller_id?: string;
+  seller_name?: string;
+  seller_avatar?: string;
+  seller_phone?: string;
+  seller_whatsapp?: string;
+  seller_type?: "individual" | "dealer" | "brand";
+  seller_verified?: boolean;
+  seller_rating?: number;
+  seller_reviews?: number;
+  seller_joined_year?: number;
+  seller_response_time_hours?: number;
+  seller_response_rate?: number;
+  seller_bio?: string;
+};
+
+export type MarketCategory = {
+  key: string;
+  label: string;
+  emoji: string;
+  icon: string;
+  color: string;
+  count: number;
+};
+
+export type SellerProfile = {
+  seller_id: string;
+  seller_name?: string;
+  seller_avatar?: string;
+  seller_type: "individual" | "dealer" | "brand";
+  seller_verified: boolean;
+  seller_rating: number;
+  seller_reviews: number;
+  seller_joined_year: number;
+  seller_response_time_hours: number;
+  seller_response_rate: number;
+  seller_bio?: string;
+  seller_phone?: string;
+  seller_whatsapp?: string;
+  city?: string;
+  listings_count: number;
+  items_sold: number;
+};
+
+export type SearchSuggestions = {
+  categories: string[];
+  trending: string[];
+  brands: string[];
+  items: { id: string; name: string; image: string; price: number; city?: string }[];
 };
 
 export type Vendor = {
@@ -275,6 +334,51 @@ export const api = {
   marketplaceRecordView: (id: string) =>
     req<{ ok: boolean }>(`/marketplace/items/${id}/view`, { method: "POST" }),
   marketplaceRecentlyViewed: () => req<MarketplaceItem[]>("/marketplace/recently-viewed"),
+
+  // Marketplace v2 — classifieds
+  marketplaceCategories: () => req<MarketCategory[]>("/marketplace/categories"),
+  marketplaceTrending: () =>
+    req<{ searches: string[]; brands: string[] }>("/marketplace/trending"),
+  marketplaceSuggestions: (q: string) =>
+    req<SearchSuggestions>(`/marketplace/search/suggestions?q=${encodeURIComponent(q)}`),
+  marketplaceToggleSave: (id: string) =>
+    req<{ saved: boolean }>(`/marketplace/items/${id}/save`, { method: "POST" }),
+  marketplaceSavedIds: () => req<{ ids: string[] }>("/marketplace/saved/ids"),
+  marketplaceSaved: () => req<MarketplaceItem[]>("/marketplace/saved"),
+  marketplaceMakeOffer: (id: string, amount: number, message?: string) =>
+    req<{ ok: boolean; offer: any }>(`/marketplace/items/${id}/offer`, {
+      method: "POST",
+      body: JSON.stringify({ amount, message }),
+    }),
+  marketplaceOffersSent: () => req<any[]>("/marketplace/offers/sent"),
+  marketplaceCreateListing: (data: {
+    name: string;
+    description: string;
+    price: number;
+    category: string;
+    subcategory: string;
+    condition: string;
+    brand?: string;
+    image: string;
+    images: string[];
+    city?: string;
+    location?: string;
+    latitude?: number;
+    longitude?: number;
+    negotiable?: boolean;
+    contact_prefs?: string[];
+    seller_phone?: string;
+    seller_whatsapp?: string;
+    specs?: Record<string, string>;
+    tags?: string[];
+  }) =>
+    req<{ ok: boolean; item: MarketplaceItem }>("/marketplace/items", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  marketplaceMyListings: () => req<MarketplaceItem[]>("/marketplace/my-listings"),
+  marketplaceSeller: (id: string) =>
+    req<{ profile: SellerProfile; items: MarketplaceItem[] }>(`/marketplace/sellers/${id}`),
 
   // Cart
   getCart: () => req<Cart>("/cart"),
