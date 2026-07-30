@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 3 validated the new AMASS unified-platform modules (Media Library on Emergent object storage, Marketplace, App Configuration, Token Economy). Extended backend tests with a new file /app/backend/tests/test_ext.py containing 32 tests across 7 test classes; combined with the existing 49-test backend_test.py, pytest ran 81/81 PASSED in ~102s. Verified: media upload -> file served WITHOUT auth (correct content-type) -> soft-delete removes from /api/media and returns 404 on file endpoint; marketplace categories (6 seeded)/products (8 seeded, 3 featured) CRUD + PATCH flags; promotions & pricing-rules CRUD; public marketplace endpoints filter status=active and featured=true; app-config returns 6 sections, PUT persists, GET /api/public/app-config returns {key:data} map without auth; tokens: 3 bundles, 3 plans, 3 rewards seeded, 52 wallets, wallet adjustment clamps to 0; public bundles/plans list only active. RBAC: content_manager & finance BOTH return 403 on /api/marketplace/products, /api/app-config, /api/tokens/bundles and /api/media (parametrized). Frontend Playwright: super_admin can login, all 4 Platform pages load (marketplace-page, app-config-page, tokens-page, media-page); mp-tab-products lists 8 products, adding TEST_UI_Product via dialog appears in list and can be deleted; App Config shows 6 tabs with cfg-save-<key> button; Token Economy Bundles tab shows 3 cards, adding TEST_UI_Bundle appears; wallets tab renders; Media Library uploads a 1x1 PNG and it appears with copy-URL. All test data cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Marketplace / Tokens / Media dialogs", "issues": ["Radix warning: Missing `Description`/`aria-describedby` for DialogContent (accessibility nit, non-blocking) — same pattern as Properties dialog from iteration 2"]},
+      {"screen": "Dashboard", "issues": ["Recharts still emits width(-1)/height(-1) warnings on first paint (cosmetic, self-heals) — carried over from previous iterations"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ext.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_ext.xml",
+    "/app/test_reports/pytest/pytest_all.xml"
+  ],
+  "action_items": [
+    "(Optional a11y) Add DialogDescription (or aria-describedby) to New-Product / New-Bundle / New-Category / New-Reward / New-Promotion / New-Pricing dialogs to silence Radix warnings.",
+    "(Optional hardening) /api/public/marketplace/products currently returns 200 even if the marketplace_config is disabled — consider honoring `marketplace_config.enabled=false` to gate the public endpoint, mirroring the CMS visibility toggle.",
+    "(Carryover) Split server.py + modules_ext.py further as new modules land (both now well over the 700 LOC threshold combined; modules_ext.py = 519 LOC and server.py already exceeds 700). Consider a `routers/` package."
+  ],
+  "critical_code_review_comments": [
+    "modules_ext.py imports from `server` (api, db, require, get_current_user, log_activity, now_iso, new_id) creating a cross-module circular-import risk if server.py grows further — a shared `deps.py` would make this safer.",
+    "media_upload does not validate MIME/size limits — anyone with media.create can upload arbitrary binary of unbounded size to object storage. Add size cap (e.g., 20MB) and allow-list content types.",
+    "media_file endpoint is fully public — currently by design, but there is no signed-URL / expiring token option; any leaked storage_path is permanently public. Fine for MVP; note for prod.",
+    "_put_object retries only on 403; consider retrying on 401/5xx as well and adding backoff so a transient outage doesn't fail user uploads.",
+    "wallet adjustment uses find_one + update_one — not atomic; two concurrent adjustments can race. Use `$inc` with a `max(0, balance+amount)` guard via aggregation pipeline update, or a transaction, for concurrency safety.",
+    "MPProduct.status is a free-string ('active' default) — no enum validation; someone could POST status='xyz' and it would be accepted and then filtered out of the public endpoint invisibly.",
+    "app_config PUT accepts arbitrary JSON in `data` — no per-key schema validation (e.g., map_settings could get `default_lat='hello'`). Consider Pydantic sub-models per key.",
+    "Public token/marketplace endpoints have no rate-limiting — same latent flooding risk as public leads/properties."
+  ],
+  "updated_files": ["/app/backend/tests/test_ext.py", "/app/test_reports/iteration_3.json"],
+  "success_rate": {"backend": "100% (81/81 including 32 new)", "frontend": "100% of critical flows for Marketplace/AppConfig/Tokens/Media"},
+  "test_credentials": "admin@amass.africa / ya0y9os77F@c8TXXh5@A ; content@amass.africa / Amass@2026 ; finance@amass.africa / Amass@2026",
+  "seed_data_creation": "No new seed. EXT_VERSION=1 seed was already loaded (6 categories, 8 products with 3 featured, 2 promotions, 2 pricing-rules, 6 app-config keys, 3 bundles, 3 plans, 3 rewards, 52 wallets). All test-created rows (TEST_ prefix, TEST_UI_Product, TEST_UI_Bundle, uploaded PNG) were cleaned up.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests now split into two files under /app/backend/tests/: backend_test.py (49 core: auth/dashboard/leads/cms/roles/rbac/team/profile/properties/agents/platform_users/publicapp/rbacnew) and test_ext.py (32 new: media/marketplace/appconfig/tokens/extrbac). Run with `pytest backend/tests/ -v`. Data-testids verified live: marketplace-page, mp-tab-categories/products/promotions/pricing, add-product-button, product-title/price/create, product-row-<id>, product-delete-<id>, app-config-page, cfg-tab-<key>, cfg-save-<key>, tokens-page, tok-tab-bundles/plans/rewards/wallets, add-bundle-button, bundle-name/tokens/create, wallet-<id>, wallet-add-<id>, media-page, media-upload-input, media-upload-button, media-<id>, media-copy-<id>, media-delete-<id>. Emergent object storage is REAL and initialized on startup; media file endpoint /api/media/file/{path} serves bytes with no auth and 404s once soft-deleted. RBAC modules: marketplace, app_config, tokens, media — all four correctly forbid content_manager and finance.",
+  "rca of the issue": "N/A — no functional issues found this iteration; only accessibility/hardening notes."
+}

@@ -1092,12 +1092,16 @@ async def seed_demo_data():
 @app.on_event("startup")
 async def on_startup():
     await seed()
+    modules_ext.init_storage_safe()
+    await modules_ext.seed_ext()
 
 
 @api.get("/")
 async def root():
     return {"message": "AMASS Admin Portal API"}
 
+
+import modules_ext  # noqa: E402  (registers extension routes on `api`)
 
 app.include_router(api)
 

@@ -15,6 +15,10 @@ import Properties from "@/pages/Properties";
 import PropertyVerification from "@/pages/PropertyVerification";
 import Agents from "@/pages/Agents";
 import Users from "@/pages/Users";
+import Marketplace from "@/pages/Marketplace";
+import AppConfig from "@/pages/AppConfig";
+import TokenEconomy from "@/pages/TokenEconomy";
+import MediaLibrary from "@/pages/MediaLibrary";
 import Placeholder from "@/pages/Placeholder";
 
 const PLACEHOLDER_PATHS = [
@@ -42,6 +46,10 @@ function App() {
                 <Route path="property-verification" element={<PropertyVerification />} />
                 <Route path="agents" element={<Agents />} />
                 <Route path="users" element={<Users />} />
+                <Route path="marketplace" element={<Marketplace />} />
+                <Route path="app-config" element={<AppConfig />} />
+                <Route path="tokens" element={<TokenEconomy />} />
+                <Route path="media" element={<MediaLibrary />} />
                 <Route path="roles" element={<RolesPermissions />} />
                 <Route path="settings" element={<Settings />} />
                 {PLACEHOLDER_PATHS.map((p) => (

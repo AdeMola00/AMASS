@@ -2,6 +2,7 @@ import {
   LayoutDashboard, Inbox, LayoutTemplate, Building2, UserCog, Users, KeyRound,
   Hammer, Store, MessageSquare, Bell, BarChart3, FileText, ShieldCheck,
   Settings, Sparkles, Wallet, CreditCard, Repeat, BadgeCheck, Briefcase,
+  ShoppingBag, SlidersHorizontal, Coins, Image,
 } from "lucide-react";
 
 // module keys MUST match backend MODULES
@@ -32,6 +33,15 @@ export const NAV_GROUPS = [
       { key: "developers", label: "Developers", path: "/admin/developers", icon: Briefcase, module: "developers" },
       { key: "construction_marketplace", label: "Construction Marketplace", path: "/admin/construction", icon: Hammer, module: "construction_marketplace" },
       { key: "home_marketplace", label: "Home Marketplace", path: "/admin/home-marketplace", icon: Store, module: "home_marketplace" },
+    ],
+  },
+  {
+    label: "Platform",
+    items: [
+      { key: "marketplace", label: "Marketplace", path: "/admin/marketplace", icon: ShoppingBag, module: "marketplace", built: true },
+      { key: "app_config", label: "App Configuration", path: "/admin/app-config", icon: SlidersHorizontal, module: "app_config", built: true },
+      { key: "tokens", label: "Token Economy", path: "/admin/tokens", icon: Coins, module: "tokens", built: true },
+      { key: "media", label: "Media Library", path: "/admin/media", icon: Image, module: "media", built: true },
     ],
   },
   {
