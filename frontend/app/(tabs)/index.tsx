@@ -18,14 +18,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import BottomSheet, { BottomSheetFlatList, BottomSheetView } from "@gorhom/bottom-sheet";
-
 import { api, Property } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { PropertyMarker, ClusterMarker } from "@/src/components/PropertyMarker";
 import { FilterChip } from "@/src/components/FilterChip";
 import { PropertyCard } from "@/src/components/PropertyCard";
-import { MiniPropertyCard } from "@/src/components/MiniPropertyCard";
+import { MapPreviewCarousel } from "@/src/components/MapPreviewCarousel";
 import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
 import { PropertyCardSkeleton } from "@/src/components/Skeleton";
@@ -96,8 +94,6 @@ export default function HomeMap() {
   const searchParams = useLocalSearchParams<{ ai_filters?: string }>();
   const mapRef = useRef<MapView>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const [sheetIndex, setSheetIndex] = useState(-1);
 
   const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [filters, setFilters] = useState<FilterState>({});
@@ -233,8 +229,6 @@ export default function HomeMap() {
   const onMarkerPress = (p: Property) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setActiveId(p.id);
-    // Snap to peek — this also brings the sheet in from hidden (-1) with animation
-    bottomSheetRef.current?.snapToIndex(0);
     focusProperty(p);
   };
 
@@ -467,14 +461,14 @@ export default function HomeMap() {
         </View>
       )}
 
-      {/* Floating "N homes" pill — opens the list when tapped */}
-      {!loading && properties.length > 0 && sheetIndex === -1 && (
+      {/* Floating "N homes" pill — toggles list mode */}
+      {!loading && properties.length > 0 && !activeId && (
         <View style={[styles.homesPillWrap, { bottom: bottomBase + 8 }]} pointerEvents="box-none">
           <Pressable
             style={[styles.homesPill, shadows.floating]}
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
-              bottomSheetRef.current?.snapToIndex(1);
+              setViewMode("list");
             }}
             testID="show-homes-list"
           >
@@ -486,101 +480,20 @@ export default function HomeMap() {
         </View>
       )}
 
-      {/* Bottom Sheet — hidden by default; shown on marker tap or list button */}
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={SNAP_POINTS}
-        onChange={setSheetIndex}
-        bottomInset={bottomBase - 12}
-        handleIndicatorStyle={styles.sheetHandle}
-        backgroundStyle={styles.sheetBg}
-        enableDynamicSizing={false}
-        enablePanDownToClose
-        onClose={() => setActiveId(null)}
-        detached={false}
-        style={styles.sheetShadow}
-      >
-        <BottomSheetView style={styles.sheetHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.sheetTitle}>
-              {activeProperty
-                ? "Selected property"
-                : `${properties.length} ${properties.length === 1 ? "home" : "homes"}`}
-            </Text>
-            <Text style={styles.sheetSub}>
-              {activeProperty
-                ? "Tap card to view full details"
-                : filters.listingType
-                ? `For ${filters.listingType}`
-                : "Swipe down to hide"}
-            </Text>
-          </View>
-          <Pressable
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              // Close entirely when at peek, otherwise cycle up
-              if (sheetIndex === 0) {
-                setActiveId(null);
-                bottomSheetRef.current?.close();
-              } else {
-                bottomSheetRef.current?.snapToIndex(sheetIndex >= 2 ? 0 : sheetIndex + 1);
-              }
-            }}
-            style={styles.expandBtn}
-            testID="sheet-expand-btn"
-          >
-            <Ionicons
-              name={
-                sheetIndex === 0
-                  ? "close"
-                  : sheetIndex >= 2
-                  ? "chevron-down"
-                  : "chevron-up"
-              }
-              size={16}
-              color={colors.text}
-            />
-          </Pressable>
-        </BottomSheetView>
-
-        {loading ? (
-          <BottomSheetView style={{ paddingHorizontal: spacing.lg, paddingTop: 8 }}>
-            <PropertyCardSkeleton />
-          </BottomSheetView>
-        ) : sheetIndex === 0 && activeProperty ? (
-          // Peek state: show the selected full-size PropertyCard
-          <BottomSheetView style={{ paddingHorizontal: spacing.lg, paddingTop: 4 }}>
-            <PropertyCard
-              property={activeProperty}
-              onPress={() => router.push(`/property/${activeProperty.id}`)}
-              onFavorite={() => onFavorite(activeProperty.id)}
-              favorited={favorites.has(activeProperty.id)}
-              variant="floating"
-            />
-          </BottomSheetView>
-        ) : (
-          // Mid / Full state: scrollable list of compact rows
-          <BottomSheetFlatList
-            data={properties}
-            keyExtractor={(p) => p.id}
-            contentContainerStyle={{
-              paddingHorizontal: spacing.lg,
-              paddingTop: 8,
-              paddingBottom: 40,
-              gap: spacing.md,
-            }}
-            renderItem={({ item }) => (
-              <MiniPropertyCard
-                property={item}
-                onPress={() => router.push(`/property/${item.id}`)}
-                onFavorite={() => onFavorite(item.id)}
-                favorited={favorites.has(item.id)}
-              />
-            )}
-          />
-        )}
-      </BottomSheet>
+      {/* Redfin-style horizontal preview carousel — shown only when a marker is selected */}
+      <MapPreviewCarousel
+        properties={properties}
+        activeId={activeId}
+        favorites={favorites}
+        bottomOffset={bottomBase + 4}
+        onIndexChange={(p) => {
+          setActiveId(p.id);
+          focusProperty(p);
+        }}
+        onPressCard={(p) => router.push(`/property/${p.id}`)}
+        onFavorite={onFavorite}
+        onDismiss={() => setActiveId(null)}
+      />
 
       <FilterSheet ref={filterSheetRef} value={filters} onApply={setFilters} />
     </View>
