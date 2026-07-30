@@ -30,7 +30,12 @@ import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
 import { PropertyCardSkeleton } from "@/src/components/Skeleton";
 
-const SNAP_POINTS = [180, "55%", "92%"] as const;
+// Bottom sheet snap heights:
+//   0 → 340: peek shows the full-size PropertyCard for the tapped marker
+//   1 → 55%: mid list view
+//   2 → 92%: full list view
+// Sheet is hidden by default (index = -1) until a marker is tapped.
+const SNAP_POINTS = [340, "55%", "92%"] as const;
 
 const INITIAL_REGION: Region = {
   latitude: 6.5244,
@@ -92,7 +97,7 @@ export default function HomeMap() {
   const mapRef = useRef<MapView>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const [sheetIndex, setSheetIndex] = useState(0);
+  const [sheetIndex, setSheetIndex] = useState(-1);
 
   const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [filters, setFilters] = useState<FilterState>({});
@@ -168,7 +173,7 @@ export default function HomeMap() {
       if (query.trim()) params.q = query.trim();
       const list = await api.listProperties(params);
       setProperties(list);
-      if (list.length) setActiveId((prev) => prev && list.find((x) => x.id === prev) ? prev : list[0].id);
+      // Do NOT auto-select a property — the sheet stays hidden until user taps a marker.
       setShowSearchArea(false);
     } catch {
       setProperties([]);
@@ -214,7 +219,7 @@ export default function HomeMap() {
   const clusters = useMemo(() => cluster(properties, region), [properties, region]);
 
   const activeProperty = useMemo(
-    () => properties.find((p) => p.id === activeId) ?? properties[0],
+    () => (activeId ? properties.find((p) => p.id === activeId) ?? null : null),
     [properties, activeId]
   );
 
@@ -228,7 +233,7 @@ export default function HomeMap() {
   const onMarkerPress = (p: Property) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setActiveId(p.id);
-    // Snap to peek so user always sees the newly-selected card
+    // Snap to peek — this also brings the sheet in from hidden (-1) with animation
     bottomSheetRef.current?.snapToIndex(0);
     focusProperty(p);
   };
@@ -462,42 +467,77 @@ export default function HomeMap() {
         </View>
       )}
 
-      {/* Bottom Sheet — Google Maps / Airbnb style */}
+      {/* Floating "N homes" pill — opens the list when tapped */}
+      {!loading && properties.length > 0 && sheetIndex === -1 && (
+        <View style={[styles.homesPillWrap, { bottom: bottomBase + 8 }]} pointerEvents="box-none">
+          <Pressable
+            style={[styles.homesPill, shadows.floating]}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              bottomSheetRef.current?.snapToIndex(1);
+            }}
+            testID="show-homes-list"
+          >
+            <Ionicons name="list" size={14} color="#fff" />
+            <Text style={styles.homesPillText}>
+              {properties.length} {properties.length === 1 ? "home" : "homes"}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Bottom Sheet — hidden by default; shown on marker tap or list button */}
       <BottomSheet
         ref={bottomSheetRef}
-        index={0}
+        index={-1}
         snapPoints={SNAP_POINTS}
         onChange={setSheetIndex}
         bottomInset={bottomBase - 12}
         handleIndicatorStyle={styles.sheetHandle}
         backgroundStyle={styles.sheetBg}
         enableDynamicSizing={false}
+        enablePanDownToClose
+        onClose={() => setActiveId(null)}
         detached={false}
         style={styles.sheetShadow}
       >
         <BottomSheetView style={styles.sheetHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.sheetTitle}>
-              {loading ? "Searching…" : `${properties.length} ${properties.length === 1 ? "home" : "homes"}`}
+              {activeProperty
+                ? "Selected property"
+                : `${properties.length} ${properties.length === 1 ? "home" : "homes"}`}
             </Text>
             <Text style={styles.sheetSub}>
               {activeProperty
-                ? "Tap card to view details"
+                ? "Tap card to view full details"
                 : filters.listingType
                 ? `For ${filters.listingType}`
-                : "Explore the map"}
+                : "Swipe down to hide"}
             </Text>
           </View>
           <Pressable
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
-              bottomSheetRef.current?.snapToIndex(sheetIndex >= 2 ? 0 : sheetIndex + 1);
+              // Close entirely when at peek, otherwise cycle up
+              if (sheetIndex === 0) {
+                setActiveId(null);
+                bottomSheetRef.current?.close();
+              } else {
+                bottomSheetRef.current?.snapToIndex(sheetIndex >= 2 ? 0 : sheetIndex + 1);
+              }
             }}
             style={styles.expandBtn}
             testID="sheet-expand-btn"
           >
             <Ionicons
-              name={sheetIndex >= 2 ? "chevron-down" : "chevron-up"}
+              name={
+                sheetIndex === 0
+                  ? "close"
+                  : sheetIndex >= 2
+                  ? "chevron-down"
+                  : "chevron-up"
+              }
               size={16}
               color={colors.text}
             />
@@ -509,17 +549,18 @@ export default function HomeMap() {
             <PropertyCardSkeleton />
           </BottomSheetView>
         ) : sheetIndex === 0 && activeProperty ? (
-          // Peek state: show only the selected mini card
-          <BottomSheetView style={{ paddingHorizontal: spacing.lg, paddingTop: 8 }}>
-            <MiniPropertyCard
+          // Peek state: show the selected full-size PropertyCard
+          <BottomSheetView style={{ paddingHorizontal: spacing.lg, paddingTop: 4 }}>
+            <PropertyCard
               property={activeProperty}
               onPress={() => router.push(`/property/${activeProperty.id}`)}
               onFavorite={() => onFavorite(activeProperty.id)}
               favorited={favorites.has(activeProperty.id)}
+              variant="floating"
             />
           </BottomSheetView>
         ) : (
-          // Mid / Full state: scrollable list
+          // Mid / Full state: scrollable list of compact rows
           <BottomSheetFlatList
             data={properties}
             keyExtractor={(p) => p.id}
@@ -826,6 +867,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  homesPillWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  homesPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    height: 44,
+    borderRadius: 999,
+    backgroundColor: "#0A0A0A",
+  },
+  homesPillText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: -0.2,
   },
   emptyBanner: {
     position: "absolute",
