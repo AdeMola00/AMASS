@@ -37,14 +37,36 @@ DEFAULT_TOKEN_COSTS = {
 }
 
 
+def is_free_amass_sale(prop: dict) -> bool:
+    """AMASS refined rule: FREE only if listed BY AMASS AND for sale.
+    Everything else (rent, shortlet, lease, land, commercial, agent/owner/developer
+    listings) requires tokens — regardless of whether it's flagged 'exclusive'.
+    """
+    listed_by_amass = (
+        bool(prop.get("is_amass_exclusive"))
+        or prop.get("listing_source") == "amass"
+        or prop.get("listed_by") == "amass"
+    )
+    listing_type = (prop.get("listing_type") or "").lower()
+    return listed_by_amass and listing_type == "buy"
+
+
 def compute_token_cost(prop: dict) -> int:
-    """Determine token cost for a property based on its type and status."""
-    if prop.get("is_amass_exclusive"):
+    """Determine token cost for a property based on its type and status.
+
+    New AMASS rule: only AMASS-listed SALE properties are free. All rentals,
+    short-lets, leases, land, commercial and non-AMASS listings cost tokens.
+    """
+    if is_free_amass_sale(prop):
         return 0
     if prop.get("token_cost"):
         return int(prop["token_cost"])
     ptype = prop.get("property_type", "")
     status = prop.get("status", "")
+    listing_type = (prop.get("listing_type") or "").lower()
+    # Short-let and lease should sit between rent and premium.
+    if listing_type in ("shortlet", "lease"):
+        return DEFAULT_TOKEN_COSTS["premium"]
     if ptype == "land":
         return DEFAULT_TOKEN_COSTS["land"]
     if ptype == "commercial":

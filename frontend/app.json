@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.propertyosafrica.znbqmw",
+      "usesAppleSignIn": true,
       "config": {
         "googleMapsApiKey": "AIzaSyAknqfu3Tx0v_XwLHMaGRj5fMQ7rJxYYLY"
       },

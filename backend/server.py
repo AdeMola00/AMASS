@@ -25,7 +25,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, Strea
 
 from marketplace_seed import VENDORS, COLLECTIONS, MARKET_ITEMS
 from marketplace_c2c_seed import C2C_ITEMS as C2C_MARKET_ITEMS
-from tokens import register_token_routes, compute_token_cost, has_unlocked
+from tokens import register_token_routes, compute_token_cost, has_unlocked, is_free_amass_sale
 from earn_and_tools import register_earn_routes, register_agent_tool_routes
 from ads import register_ads_routes
 from marketplace_v2 import register_marketplace_v2_routes
@@ -420,8 +420,10 @@ async def list_properties(
     # Always add token economy fields on each item
     for p in docs:
         p["is_amass_exclusive"] = bool(p.get("is_amass_exclusive", False))
+        p["is_free_amass_sale"] = is_free_amass_sale(p)
         p["token_cost"] = compute_token_cost(p)
-        p["unlocked"] = p["id"] in unlocked_ids if user_id else False
+        # Free-AMASS-sale is always "unlocked" for everyone.
+        p["unlocked"] = p["is_free_amass_sale"] or (p["id"] in unlocked_ids if user_id else False)
     return docs
 
 
@@ -442,11 +444,13 @@ async def get_property(
             user_id = None
 
     is_exclusive = bool(doc.get("is_amass_exclusive", False))
+    is_free = is_free_amass_sale(doc)
     token_cost = compute_token_cost(doc)
     doc["is_amass_exclusive"] = is_exclusive
+    doc["is_free_amass_sale"] = is_free
     doc["token_cost"] = token_cost
 
-    unlocked = is_exclusive
+    unlocked = is_free
     if not unlocked and user_id:
         unlocked = await has_unlocked(db, user_id, property_id)
 
@@ -1660,6 +1664,8 @@ app.include_router(register_ads_routes(db))
 app.include_router(register_marketplace_v2_routes(db, get_current_user))
 from intelligence import register_intelligence_routes  # noqa: E402
 app.include_router(register_intelligence_routes(db))
+from apple_auth import register_apple_auth_route  # noqa: E402
+app.include_router(register_apple_auth_route(db, create_token, user_to_out))
 
 app.add_middleware(
     CORSMiddleware,

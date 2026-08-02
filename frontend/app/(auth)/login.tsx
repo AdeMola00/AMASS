@@ -6,6 +6,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/src/contexts/auth";
 import { AmassLogo } from "@/src/components/AmassLogo";
+import { AppleSignInButton } from "@/src/components/AppleSignInButton";
 import { colors, radius, spacing, typography } from "@/src/constants/theme";
 
 export default function Login() {
@@ -87,6 +88,16 @@ export default function Login() {
               <Text style={styles.ctaText}>Sign In</Text>
             )}
           </Pressable>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <AppleSignInButton
+            onError={(msg) => setError(msg)}
+          />
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>New to AMASS? </Text>
@@ -173,4 +184,12 @@ const styles = StyleSheet.create({
   },
   footerText: { color: colors.textTertiary, fontSize: 14 },
   link: { color: colors.emerald, fontSize: 14, fontWeight: "700" },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: spacing.md,
+    gap: 10,
+  },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  dividerText: { color: colors.textTertiary, fontSize: 12, fontWeight: "700" },
 });

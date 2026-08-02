@@ -217,10 +217,10 @@ export default function PropertyDetails() {
                 <Text style={styles.verifiedText}>Verified</Text>
               </View>
             )}
-            {property.is_amass_exclusive && (
+            {(property.is_free_amass_sale || property.is_amass_exclusive) && (
               <View style={styles.freeChip}>
-                <Ionicons name="star" size={11} color="#fff" />
-                <Text style={styles.freeChipText}>FREE · Listed by AMASS</Text>
+                <Ionicons name="ribbon" size={11} color="#fff" />
+                <Text style={styles.freeChipText}>Listed by AMASS · Free Access</Text>
               </View>
             )}
           </View>
@@ -229,7 +229,7 @@ export default function PropertyDetails() {
           <TrustBanner source={property.listing_source} mandate={property.mandate ?? null} />
 
           {/* Locked notice */}
-          {!property.unlocked && !property.is_amass_exclusive && (
+          {!property.unlocked && !property.is_free_amass_sale && !property.is_amass_exclusive && (
             <View style={styles.lockedBanner} testID="locked-banner">
               <View style={styles.lockedIconWrap}>
                 <Ionicons name="lock-closed" size={18} color="#fff" />
@@ -420,7 +420,7 @@ export default function PropertyDetails() {
       </ScrollView>
 
       {/* Sticky CTA */}
-      {property.unlocked || property.is_amass_exclusive ? (
+      {property.unlocked || property.is_free_amass_sale || property.is_amass_exclusive ? (
         <View style={[styles.stickyCta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <Pressable style={styles.ctaGhost} onPress={toggleFav} testID="save-btn">
             <Ionicons

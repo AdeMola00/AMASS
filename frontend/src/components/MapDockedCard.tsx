@@ -37,10 +37,10 @@ const TONE_CHIP: Record<
 
 /**
  * Redfin-style **docked** bottom property card.
- * - Always visible when properties are loaded (~26% screen height)
- * - Horizontal snap-scroll between listings
- * - Selecting a marker on the map programmatically scrolls to that card
- * - Scrolling the card updates the selected marker on the map
+ * - Rendered only when there's an active property selection.
+ * - Horizontal snap-scroll between listings; scrolling updates active marker.
+ * - Swipe DOWN on the card to dismiss (map goes full-screen).
+ * - Tap or long-swipe UP to open the full property detail view.
  */
 export function MapDockedCard({
   properties,
@@ -49,6 +49,7 @@ export function MapDockedCard({
   onIndexChange,
   onPressCard,
   onFavorite,
+  onDismiss,
 }: {
   properties: Property[];
   activeId: string | null;
@@ -56,6 +57,7 @@ export function MapDockedCard({
   onIndexChange: (property: Property) => void;
   onPressCard: (property: Property) => void;
   onFavorite: (id: string) => void;
+  onDismiss?: () => void;
 }) {
   const listRef = useRef<FlatList<Property>>(null);
 
@@ -92,10 +94,21 @@ export function MapDockedCard({
     [properties, activeId, onIndexChange]
   );
 
-  if (!properties.length) return null;
+  if (!properties.length || !activeId) return null;
 
   return (
     <View style={styles.container} pointerEvents="box-none">
+      {/* Grabber / dismiss handle — tap or swipe-down to hide. */}
+      <View style={styles.handleWrap} pointerEvents="box-none">
+        <Pressable
+          onPress={onDismiss}
+          hitSlop={12}
+          style={styles.handleHit}
+          testID="docked-dismiss"
+        >
+          <View style={styles.handleBar} />
+        </Pressable>
+      </View>
       <FlatList
         ref={listRef}
         data={properties}
@@ -207,11 +220,11 @@ function DockedCard({
             <Ionicons name="share-outline" size={16} color="#fff" />
           </Pressable>
           {/* Verified badge */}
-          {(item.verified || item.is_amass_exclusive) && (
+          {(item.verified || item.is_free_amass_sale || item.is_amass_exclusive) && (
             <View style={styles.verifiedBadge}>
               <Ionicons name="shield-checkmark" size={11} color="#fff" />
               <Text style={styles.verifiedText}>
-                {item.is_amass_exclusive ? "AMASS" : "Verified"}
+                {item.is_free_amass_sale || item.is_amass_exclusive ? "AMASS · Free" : "Verified"}
               </Text>
             </View>
           )}
@@ -257,6 +270,22 @@ const styles = StyleSheet.create({
     // Owned by parent (positioned absolutely). No `position: absolute` here
     // otherwise the wrapper collapses to zero height on web and the FlatList
     // never lays out.
+  },
+  handleWrap: {
+    alignItems: "center",
+    paddingBottom: 6,
+    paddingTop: 4,
+  },
+  handleHit: { paddingHorizontal: 20, paddingVertical: 4 },
+  handleBar: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
   },
   listContent: {
     paddingHorizontal: CARD_HGAP,

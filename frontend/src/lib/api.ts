@@ -43,6 +43,7 @@ export type Property = {
   created_at?: string;
   // Token economy
   is_amass_exclusive?: boolean;
+  is_free_amass_sale?: boolean;
   token_cost?: number;
   unlocked?: boolean;
 };
@@ -287,6 +288,11 @@ export const api = {
     }),
   login: (data: { email: string; password: string }) =>
     req<{ access_token: string; user: UserProfile }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  appleSignIn: (data: { identity_token: string; full_name?: string; email?: string }) =>
+    req<{ access_token: string; user: UserProfile }>("/auth/apple", {
       method: "POST",
       body: JSON.stringify(data),
     }),

@@ -7,6 +7,7 @@ type AuthContextValue = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, full_name: string, phone?: string) => Promise<void>;
+  signInWithApple: (payload: { identity_token: string; full_name?: string; email?: string }) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -46,13 +47,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const signInWithApple = useCallback(
+    async (payload: { identity_token: string; full_name?: string; email?: string }) => {
+      const res = await api.appleSignIn(payload);
+      await storage.secureSet(AUTH_STORAGE_KEY, res.access_token);
+      setUser(res.user);
+    },
+    []
+  );
+
   const signOut = useCallback(async () => {
     await storage.secureRemove(AUTH_STORAGE_KEY);
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signInWithApple, signOut }}>
       {children}
     </AuthContext.Provider>
   );

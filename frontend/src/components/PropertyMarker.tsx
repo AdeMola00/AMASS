@@ -238,8 +238,10 @@ const styles = StyleSheet.create({
   },
   clusterWrap: { alignItems: "center", justifyContent: "center" },
   clusterOuter: {
-    position: "absolute",
-    backgroundColor: "rgba(225,27,34,0.14)",
+    // Retained slot kept intentionally minimal for future use.
+    // Removed the previous coloured halo — the map should never
+    // sprout coloured circle overlays.
+    display: "none",
   },
   cluster: {
     alignItems: "center",

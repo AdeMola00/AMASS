@@ -162,16 +162,13 @@ export default function HomeMap() {
     }).start();
   }, [fadeAnim]);
 
-  // Restore preferred layer + overlay
+  // Restore preferred layer only. Overlay defaults to "none" per refined UX
+  // spec (no coloured circle overlays on the map unless the user asks).
   useEffect(() => {
     (async () => {
       const saved = await storage.getItem<string>(LAYER_KEY, "standard");
       if (saved === "standard" || saved === "satellite" || saved === "hybrid" || saved === "terrain") {
         setLayer(saved);
-      }
-      const ov = await storage.getItem<string>(OVERLAY_KEY, "none");
-      if (ov === "none" || ov === "price_per_sqm" || ov === "verified_density" || ov === "views") {
-        setOverlay(ov);
       }
     })();
   }, []);
@@ -340,13 +337,11 @@ export default function HomeMap() {
     return () => clearTimeout(handle);
   }, [overlay, region]);
 
-  // Set first property active by default so docked card has something visible
+  // Reset activeId when properties refresh; do NOT auto-select a marker on load.
+  // The docked card is hidden until the user taps a marker (per refined spec).
   useEffect(() => {
-    if (!activeId && properties.length > 0) {
-      setActiveId(properties[0].id);
-    }
     if (activeId && !properties.find((p) => p.id === activeId)) {
-      setActiveId(properties[0]?.id ?? null);
+      setActiveId(null);
     }
   }, [properties, activeId]);
 
@@ -795,7 +790,7 @@ export default function HomeMap() {
         </View>
       )}
 
-      {/* Docked bottom card — ALWAYS visible when there are listings */}
+      {/* Docked bottom card — appears when a property marker is selected */}
       <View style={{ position: "absolute", left: 0, right: 0, bottom: dockedBottom }} pointerEvents="box-none">
         <MapDockedCard
           properties={properties}
@@ -807,6 +802,10 @@ export default function HomeMap() {
           }}
           onPressCard={(p) => router.push(`/property/${p.id}`)}
           onFavorite={onFavorite}
+          onDismiss={() => {
+            Haptics.selectionAsync().catch(() => {});
+            setActiveId(null);
+          }}
         />
       </View>
 

@@ -98,10 +98,10 @@ export function PropertyCard({
         {/* Top row: source badge + hot flame + favorite */}
         <View style={styles.topRow}>
           <View style={{ flexDirection: "row", gap: 6, alignItems: "center", flexShrink: 1 }}>
-            {property.is_amass_exclusive ? (
+            {property.is_free_amass_sale || property.is_amass_exclusive ? (
               <View style={styles.freeBadge}>
-                <Ionicons name="star" size={10} color="#fff" />
-                <Text style={styles.freeBadgeText}>FREE · Listed by AMASS</Text>
+                <Ionicons name="ribbon" size={10} color="#fff" />
+                <Text style={styles.freeBadgeText}>Listed by AMASS · Free Access</Text>
               </View>
             ) : (
               <View
