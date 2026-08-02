@@ -47,8 +47,8 @@ export const NAV_GROUPS = [
   {
     label: "Finance",
     items: [
-      { key: "transactions", label: "Transactions", path: "/admin/transactions", icon: Wallet, module: "transactions" },
-      { key: "payments", label: "Payments", path: "/admin/payments", icon: CreditCard, module: "payments" },
+      { key: "transactions", label: "Transactions", path: "/admin/transactions", icon: Wallet, module: "transactions", built: true },
+      { key: "payments", label: "Payments", path: "/admin/payments", icon: CreditCard, module: "payments", built: true },
       { key: "subscriptions", label: "Subscriptions", path: "/admin/subscriptions", icon: Repeat, module: "subscriptions" },
     ],
   },

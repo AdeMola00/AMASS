@@ -71,6 +71,10 @@ def _get_object(path: str):
     return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
 
+class VerifyInput(BaseModel):
+    verified: bool
+
+
 # =====================================================================
 # Media library
 # =====================================================================
@@ -876,6 +880,105 @@ async def _seed_pipeline():
 
     await db.app_meta.update_one({"key": "pipeline_version"}, {"$set": {"value": 1}}, upsert=True)
     logger.info("Seeded developers/owners pipeline")
+
+
+# =====================================================================
+# Payments (Paystack) — token bundles & subscription plans
+# =====================================================================
+PAYSTACK_SECRET = os.environ.get("PAYSTACK_SECRET_KEY")
+PAYSTACK_BASE = "https://api.paystack.co"
+
+
+class PaymentInit(BaseModel):
+    email: str
+    purpose: str          # token_bundle | subscription
+    item_id: str
+
+
+def _pk_init(email, kobo, metadata):
+    r = requests.post(f"{PAYSTACK_BASE}/transaction/initialize",
+                      headers={"Authorization": f"Bearer {PAYSTACK_SECRET}", "Content-Type": "application/json"},
+                      json={"email": email, "amount": kobo, "metadata": metadata}, timeout=30)
+    r.raise_for_status()
+    return r.json()["data"]
+
+
+def _pk_verify(reference):
+    r = requests.get(f"{PAYSTACK_BASE}/transaction/verify/{reference}",
+                     headers={"Authorization": f"Bearer {PAYSTACK_SECRET}"}, timeout=30)
+    r.raise_for_status()
+    return r.json()["data"]
+
+
+async def _resolve_item(purpose, item_id):
+    if purpose == "token_bundle":
+        b = await db.token_bundles.find_one({"id": item_id}, {"_id": 0})
+        if b:
+            return b["price"], b["name"], b.get("tokens", 0)
+    elif purpose == "subscription":
+        p = await db.subscription_plans.find_one({"id": item_id}, {"_id": 0})
+        if p:
+            return p["price"], p["name"], 0
+    return None
+
+
+async def _do_initialize(body: PaymentInit):
+    if not PAYSTACK_SECRET:
+        raise HTTPException(status_code=503, detail="Paystack not configured")
+    resolved = await _resolve_item(body.purpose, body.item_id)
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Item not found")
+    price, name, tokens = resolved
+    if price <= 0:
+        raise HTTPException(status_code=400, detail="This item is free — no payment required")
+    meta = {"purpose": body.purpose, "item_id": body.item_id, "item_name": name, "tokens": tokens}
+    data = await asyncio.get_event_loop().run_in_executor(None, _pk_init, body.email, price * 100, meta)
+    txn = {"id": new_id(), "reference": data["reference"], "email": body.email, "purpose": body.purpose,
+           "item_id": body.item_id, "item_name": name, "amount": price, "currency": "NGN",
+           "status": "pending", "gateway": "paystack", "authorization_url": data["authorization_url"],
+           "created_at": now_iso(), "verified_at": None}
+    await db.transactions.insert_one(txn)
+    return {"authorization_url": data["authorization_url"], "reference": data["reference"], "amount": price}
+
+
+async def _do_verify(reference):
+    data = await asyncio.get_event_loop().run_in_executor(None, _pk_verify, reference)
+    status = "success" if data.get("status") == "success" else ("failed" if data.get("status") == "failed" else "pending")
+    await db.transactions.update_one({"reference": reference},
+                                     {"$set": {"status": status, "verified_at": now_iso()}})
+    return {"reference": reference, "status": status}
+
+
+@api.post("/payments/initialize")
+async def payments_initialize(body: PaymentInit, user: dict = Depends(require("payments", "create"))):
+    return await _do_initialize(body)
+
+
+@api.get("/payments/verify/{reference}")
+async def payments_verify(reference: str, user: dict = Depends(require("payments"))):
+    return await _do_verify(reference)
+
+
+@api.get("/transactions")
+async def transactions_list(user: dict = Depends(require("transactions")),
+                            status: Optional[str] = None, purpose: Optional[str] = None):
+    q: Dict[str, Any] = {}
+    if status and status != "all":
+        q["status"] = status
+    if purpose and purpose != "all":
+        q["purpose"] = purpose
+    return await db.transactions.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
+
+
+# Public (AMASS app users initiate purchases)
+@api.post("/public/payments/initialize")
+async def public_payments_initialize(body: PaymentInit):
+    return await _do_initialize(body)
+
+
+@api.get("/public/payments/verify/{reference}")
+async def public_payments_verify(reference: str):
+    return await _do_verify(reference)
 
 
 # =====================================================================

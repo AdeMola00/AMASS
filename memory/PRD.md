@@ -51,6 +51,13 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Both modules now `built:true` in nav & routed. `emergentintegrations` in requirements.
 - Verified live: real AI valuation returned a structured NGN estimate; reports summary + CSV export (200) confirmed.
 
+## Updated (2026-08-02) — Developers, Property Owners, Payments (Paystack)
+- **Developers**: developer accounts + off-plan **project pipelines** (units, price-from, status planning/selling/sold_out/completed). Admin CRUD + verify; public `GET /api/public/developers`, `/api/public/projects`.
+- **Property Owners**: owner profiles with **properties linked to them** (owner_id/owner_name on properties). Owner detail dialog lists linked properties and can link unassigned ones (`PATCH /api/property-owners/assign/{pid}`). Seeded 12 owners, 18 linked.
+- **Payments (Paystack, test)**: `POST /api/payments/initialize` (token bundles & subscription plans → real Paystack checkout URL + reference), `GET /api/payments/verify/{ref}`, `GET /api/transactions`; public equivalents for the app. Verified live: initialize returned a valid checkout.paystack.com URL.
+- Unlocked modules now built: developers, property_owners, transactions, payments. Placeholders remaining: construction, home-marketplace (dedicated), subscriptions (billing engine), messages.
+- Verified via API + screenshots. **Note**: Paystack is in TEST mode (test secret key). Token-bundle success does not auto-credit wallets yet (no verified user↔email mapping) — add on webhook once end-user auth lands.
+
 ## Architecture note (extensibility)
 - New modules live in `/app/backend/modules_ext.py` registering on the shared `api` router — future modules (vehicles, auctions, tokenization, AI valuation, multi-country) follow the same additive pattern. Tech debt: extract a `routers/` package + `deps.py` as this grows.
 
