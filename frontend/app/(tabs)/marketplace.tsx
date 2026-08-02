@@ -18,7 +18,6 @@ import { api, MarketplaceItem, MarketCategory } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
 import { colors, radius, shadows, spacing } from "@/src/constants/theme";
 import { ClassifiedCard } from "@/src/components/marketplace/ClassifiedCard";
-import { CategoryCircle } from "@/src/components/marketplace/CategoryCircle";
 import {
   MarketFilterSheet,
   MarketFilterSheetRef,
@@ -28,8 +27,42 @@ import { AdModal } from "@/src/components/AdModal";
 import { useAdTrigger } from "@/src/hooks/useAdTrigger";
 
 type ViewMode = "grid" | "list";
+type MarketSection = "brands" | "fixa" | "declutter";
+
 const VIEW_KEY = "amass_market_view";
 const CITY_KEY = "amass_market_city";
+const SECTION_KEY = "amass_market_section";
+
+// FIXA services (all mapped to services category on the backend).
+const FIXA_CHIPS = [
+  { key: "Plumbing",       icon: "water" as const },
+  { key: "Electrical",     icon: "flash" as const },
+  { key: "Carpentry",      icon: "hammer" as const },
+  { key: "Painting",       icon: "color-palette" as const },
+  { key: "Tiling",         icon: "grid" as const },
+  { key: "AC Repair",      icon: "snow" as const },
+  { key: "Solar",          icon: "sunny" as const },
+  { key: "CCTV",           icon: "videocam" as const },
+  { key: "Cleaning",       icon: "sparkles" as const },
+  { key: "Movers",         icon: "cube" as const },
+  { key: "Interior",       icon: "bed" as const },
+  { key: "Architects",     icon: "business" as const },
+];
+
+const DECLUTTER_CHIPS = [
+  { key: "furniture",   label: "Furniture",   emoji: "🛋" },
+  { key: "appliances",  label: "Appliances",  emoji: "🏡" },
+  { key: "electronics", label: "Electronics", emoji: "💻" },
+  { key: "fashion",     label: "Fashion",     emoji: "👕" },
+  { key: "tools",       label: "Tools",       emoji: "🛠" },
+];
+
+const BRAND_CHIPS = [
+  { key: "appliances",  label: "Appliances",  emoji: "🏡" },
+  { key: "furniture",   label: "Furniture",   emoji: "🛋" },
+  { key: "electronics", label: "Electronics", emoji: "💻" },
+  { key: "tools",       label: "Hardware",    emoji: "🛠" },
+];
 
 const CITIES = [
   "All of Nigeria",
@@ -62,9 +95,13 @@ export default function Marketplace() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [filters, setFilters] = useState<MarketFilterState>({});
-  const [query, setQuery] = useState("");
+  const [query] = useState("");
   const [city, setCity] = useState("All of Nigeria");
   const [showCityPicker, setShowCityPicker] = useState(false);
+  const [section, setSection] = useState<MarketSection>("brands");
+  const [fixaChip, setFixaChip] = useState<string | null>(null);
+  const [declutterChip, setDeclutterChip] = useState<string | null>(null);
+  const [brandChip, setBrandChip] = useState<string | null>(null);
 
   // Restore prefs
   useEffect(() => {
@@ -73,6 +110,8 @@ export default function Marketplace() {
       if (v === "list" || v === "grid") setViewMode(v);
       const c = await storage.getItem<string>(CITY_KEY, "All of Nigeria");
       if (c) setCity(c);
+      const s = await storage.getItem<string>(SECTION_KEY, "brands");
+      if (s === "brands" || s === "fixa" || s === "declutter") setSection(s);
     })();
   }, []);
 
@@ -92,19 +131,33 @@ export default function Marketplace() {
 
   const buildParams = useCallback((): Record<string, string | number | boolean | undefined> => {
     const p: Record<string, string | number | boolean | undefined> = { limit: 100 };
-    if (filters.category) p.category = filters.category;
+    // ─── Section-driven overlay ───────────────────────────────
+    if (section === "brands") {
+      // Brands: verified dealers/brands only. Reuse `seller_type` param.
+      p.seller_type = "brand";
+      p.verified = true;
+      p.category = brandChip ?? filters.category;
+    } else if (section === "fixa") {
+      // FIXA Services — verified service providers only.
+      p.category = "services";
+      p.verified = true;
+      if (fixaChip) p.q = fixaChip.toLowerCase();
+    } else if (section === "declutter") {
+      // Declutter — pre-owned individual sellers, used household items.
+      p.seller_type = "individual";
+      p.condition = filters.condition ?? "used";
+      p.category = declutterChip ?? filters.category ?? undefined;
+    }
+    // ─── User-selected filters (respected on top of section overlay) ─
     if (filters.subcategory) p.subcategory = filters.subcategory;
-    if (filters.condition) p.condition = filters.condition;
     if (filters.minPrice) p.min_price = filters.minPrice;
     if (filters.maxPrice) p.max_price = filters.maxPrice;
-    if (filters.sellerType) p.seller_type = filters.sellerType;
-    if (filters.verifiedOnly) p.verified = true;
     if (filters.boostedOnly) p.boosted_only = true;
     if (filters.sort) p.sort = filters.sort;
-    if (query.trim()) p.q = query.trim();
+    if (!p.q && query.trim()) p.q = query.trim();
     if (city && city !== "All of Nigeria") p.city = city;
     return p;
-  }, [filters, query, city]);
+  }, [filters, query, city, section, brandChip, fixaChip, declutterChip]);
 
   const loadItems = useCallback(async () => {
     try {
@@ -283,38 +336,145 @@ export default function Marketplace() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListHeaderComponent={
             <View>
-              {/* Categories rail */}
-              <View style={styles.catsRail}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.catsRow}
-                >
-                  {categories.map((c) => (
-                    <CategoryCircle
-                      key={c.key}
-                      category={c}
-                      active={filters.category === c.key}
-                      onPress={() =>
-                        setFilters({
-                          ...filters,
-                          category: filters.category === c.key ? undefined : c.key,
-                        })
-                      }
-                    />
-                  ))}
-                  <Pressable
-                    onPress={() => filterRef.current?.open()}
-                    style={styles.moreCircle}
-                    testID="cats-more"
-                  >
-                    <View style={styles.moreInner}>
-                      <Ionicons name="grid" size={20} color={colors.text} />
-                    </View>
-                    <Text style={styles.moreLabel}>More</Text>
-                  </Pressable>
-                </ScrollView>
+              {/* ─── Section tabs (Brands · FIXA · Declutter) ────── */}
+              <View style={styles.segWrap}>
+                <View style={styles.segTrack}>
+                  {(["brands", "fixa", "declutter"] as MarketSection[]).map((s) => {
+                    const active = section === s;
+                    const label =
+                      s === "brands" ? "Brands" : s === "fixa" ? "FIXA Services" : "Declutter";
+                    return (
+                      <Pressable
+                        key={s}
+                        onPress={() => {
+                          Haptics.selectionAsync().catch(() => {});
+                          setSection(s);
+                          storage.setItem(SECTION_KEY, s);
+                        }}
+                        style={[styles.segItem, active && styles.segItemActive]}
+                        testID={`mkt-tab-${s}`}
+                      >
+                        <Text style={[styles.segText, active && styles.segTextActive]}>{label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
+
+              {/* Section-specific chip rail */}
+              {section === "brands" && (
+                <View style={styles.catsRail}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.catsRow}
+                  >
+                    {BRAND_CHIPS.map((c) => (
+                      <Pressable
+                        key={c.key}
+                        onPress={() => {
+                          Haptics.selectionAsync().catch(() => {});
+                          setBrandChip(brandChip === c.key ? null : c.key);
+                        }}
+                        style={[styles.chipTile, brandChip === c.key && styles.chipTileActive]}
+                        testID={`brand-chip-${c.key}`}
+                      >
+                        <Text style={styles.chipEmoji}>{c.emoji}</Text>
+                        <Text
+                          style={[styles.chipTileText, brandChip === c.key && { color: "#fff" }]}
+                        >
+                          {c.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {section === "fixa" && (
+                <>
+                  <View style={styles.fixaBanner}>
+                    <View style={styles.fixaLogoWrap}>
+                      <Text style={styles.fixaLogoText}>FIXA</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.fixaTitle}>FIXA Verified Services</Text>
+                      <Text style={styles.fixaSub}>
+                        Vetted pros — background-checked, rated, insured.
+                      </Text>
+                    </View>
+                    <Ionicons name="shield-checkmark" size={22} color="#fff" />
+                  </View>
+                  <View style={styles.catsRail}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.catsRow}
+                    >
+                      {FIXA_CHIPS.map((c) => (
+                        <Pressable
+                          key={c.key}
+                          onPress={() => {
+                            Haptics.selectionAsync().catch(() => {});
+                            setFixaChip(fixaChip === c.key ? null : c.key);
+                          }}
+                          style={[styles.chipTile, fixaChip === c.key && styles.chipTileActive]}
+                          testID={`fixa-chip-${c.key}`}
+                        >
+                          <Ionicons
+                            name={c.icon}
+                            size={16}
+                            color={fixaChip === c.key ? "#fff" : colors.text}
+                          />
+                          <Text
+                            style={[
+                              styles.chipTileText,
+                              fixaChip === c.key && { color: "#fff" },
+                            ]}
+                          >
+                            {c.key}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </>
+              )}
+
+              {section === "declutter" && (
+                <View style={styles.catsRail}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.catsRow}
+                  >
+                    {DECLUTTER_CHIPS.map((c) => (
+                      <Pressable
+                        key={c.key}
+                        onPress={() => {
+                          Haptics.selectionAsync().catch(() => {});
+                          setDeclutterChip(declutterChip === c.key ? null : c.key);
+                        }}
+                        style={[
+                          styles.chipTile,
+                          declutterChip === c.key && styles.chipTileActive,
+                        ]}
+                        testID={`declutter-chip-${c.key}`}
+                      >
+                        <Text style={styles.chipEmoji}>{c.emoji}</Text>
+                        <Text
+                          style={[
+                            styles.chipTileText,
+                            declutterChip === c.key && { color: "#fff" },
+                          ]}
+                        >
+                          {c.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
 
               {/* Boosted / Featured strip */}
               {featured.length > 0 && (
@@ -348,11 +508,16 @@ export default function Marketplace() {
               {/* Feed header + view toggle */}
               <View style={styles.feedHeader}>
                 <View>
-                  <Text style={styles.feedTitle}>{items.length} listings</Text>
+                  <Text style={styles.feedTitle}>
+                    {items.length}{" "}
+                    {section === "fixa" ? "pros" : section === "brands" ? "stores" : "items"}
+                  </Text>
                   <Text style={styles.feedSub}>
-                    {filters.category
-                      ? categories.find((c) => c.key === filters.category)?.label ?? "For you"
-                      : "For you"}
+                    {section === "brands"
+                      ? "Verified stores & showrooms"
+                      : section === "fixa"
+                      ? "FIXA verified service providers"
+                      : "Pre-owned finds near you"}
                     {city !== "All of Nigeria" ? ` · ${city}` : ""}
                   </Text>
                 </View>
@@ -374,7 +539,13 @@ export default function Marketplace() {
               <View style={styles.emptyIcon}>
                 <Ionicons name="pricetags-outline" size={32} color={colors.textMuted} />
               </View>
-              <Text style={styles.emptyTitle}>No listings match your filters</Text>
+              <Text style={styles.emptyTitle}>
+                {section === "brands"
+                  ? "No stores match your filters"
+                  : section === "fixa"
+                  ? "No pros found in this trade"
+                  : "No pre-owned items right now"}
+              </Text>
               <Text style={styles.emptyBody}>Try adjusting filters or exploring another category.</Text>
             </View>
           }
@@ -404,7 +575,9 @@ export default function Marketplace() {
         testID="sell-fab"
       >
         <Ionicons name="add" size={22} color="#fff" />
-        <Text style={styles.sellFabText}>Sell</Text>
+        <Text style={styles.sellFabText}>
+          {section === "declutter" ? "Sell" : section === "fixa" ? "Join FIXA" : "Add Store"}
+        </Text>
       </Pressable>
 
       <MarketFilterSheet
@@ -549,6 +722,74 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   moreLabel: { fontSize: 11, color: colors.textSecondary, fontWeight: "600" },
+
+  // Segmented section tabs
+  segWrap: { paddingHorizontal: spacing.lg, paddingTop: 4 },
+  segTrack: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  segItem: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: "center",
+    borderRadius: radius.pill,
+  },
+  segItemActive: {
+    backgroundColor: "#fff",
+    ...shadows.soft,
+  },
+  segText: { fontSize: 12, fontWeight: "700", color: colors.textSecondary, letterSpacing: -0.1 },
+  segTextActive: { color: colors.text, fontWeight: "800" },
+
+  // Section chip tiles
+  chipTile: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipTileActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  chipTileText: { fontSize: 12, fontWeight: "700", color: colors.text },
+  chipEmoji: { fontSize: 16 },
+
+  // FIXA banner
+  fixaBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: spacing.lg,
+    marginTop: 10,
+    padding: 14,
+    borderRadius: radius.lg,
+    backgroundColor: colors.ink,
+    ...shadows.card,
+  },
+  fixaLogoWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#F5B301",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fixaLogoText: {
+    color: "#0A0A0A",
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+  },
+  fixaTitle: { color: "#fff", fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
+  fixaSub: { color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: "600", marginTop: 2 },
 
   // Section
   sectionHeader: {
