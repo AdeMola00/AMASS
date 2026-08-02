@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
@@ -18,6 +19,11 @@ import { api, MarketplaceItem, MarketCategory } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
 import { colors, radius, shadows, spacing } from "@/src/constants/theme";
 import { ClassifiedCard } from "@/src/components/marketplace/ClassifiedCard";
+import { ProviderCard } from "@/src/components/marketplace/ProviderCard";
+import {
+  BookingSheet,
+  BookingSheetRef,
+} from "@/src/components/marketplace/BookingSheet";
 import {
   MarketFilterSheet,
   MarketFilterSheetRef,
@@ -82,6 +88,7 @@ const CITIES = [
 export default function Marketplace() {
   const router = useRouter();
   const filterRef = useRef<MarketFilterSheetRef>(null);
+  const bookingRef = useRef<BookingSheetRef>(null);
   const { ad, visible: adVisible, dismiss: adDismiss, noteInteraction } = useAdTrigger({
     triggerAfter: 8,
     context: "marketplace_home",
@@ -329,7 +336,13 @@ export default function Marketplace() {
         </View>
       ) : (
         <FlatList
-          data={viewMode === "grid" ? gridRows : items}
+          data={
+            section === "fixa"
+              ? items
+              : viewMode === "grid"
+              ? gridRows
+              : items
+          }
           keyExtractor={(_, i) => `row-${i}`}
           contentContainerStyle={{ paddingBottom: 140 }}
           showsVerticalScrollIndicator={false}
@@ -394,16 +407,20 @@ export default function Marketplace() {
               {section === "fixa" && (
                 <>
                   <View style={styles.fixaBanner}>
-                    <View style={styles.fixaLogoWrap}>
-                      <Text style={styles.fixaLogoText}>FIXA</Text>
-                    </View>
+                    <Image
+                      source={{ uri: "https://customer-assets-lxgj4vgw.emergentagent.net/job_property-os-africa/artifacts/dd2uz083_ChatGPT%20Image%20Jun%2025%2C%202026%2C%2010_41_06%20AM.png" }}
+                      style={styles.fixaLogoImg}
+                      contentFit="contain"
+                    />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.fixaTitle}>FIXA Verified Services</Text>
                       <Text style={styles.fixaSub}>
                         Vetted pros — background-checked, rated, insured.
                       </Text>
                     </View>
-                    <Ionicons name="shield-checkmark" size={22} color="#fff" />
+                    <View style={styles.fixaShield}>
+                      <Ionicons name="shield-checkmark" size={20} color="#0A0A0A" />
+                    </View>
                   </View>
                   <View style={styles.catsRail}>
                     <ScrollView
@@ -482,7 +499,9 @@ export default function Marketplace() {
                   <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitleRow}>
                       <Ionicons name="flash" size={14} color="#F5B301" />
-                      <Text style={styles.sectionTitle}>Featured</Text>
+                      <Text style={styles.sectionTitle}>
+                        {section === "fixa" ? "Top Rated Pros" : "Featured"}
+                      </Text>
                     </View>
                     <Text style={styles.sectionSub}>{featured.length} listings</Text>
                   </View>
@@ -491,16 +510,26 @@ export default function Marketplace() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.featuredRow}
                   >
-                    {featured.map((f) => (
-                      <ClassifiedCard
-                        key={f.id}
-                        item={f}
-                        variant="featured"
-                        onPress={() => openItem(f)}
-                        onFavorite={() => toggleSave(f)}
-                        favorited={savedIds.has(f.id)}
-                      />
-                    ))}
+                    {featured.map((f) =>
+                      section === "fixa" ? (
+                        <ProviderCard
+                          key={f.id}
+                          item={f}
+                          variant="featured"
+                          onPress={() => openItem(f)}
+                          onBook={() => bookingRef.current?.open(f)}
+                        />
+                      ) : (
+                        <ClassifiedCard
+                          key={f.id}
+                          item={f}
+                          variant="featured"
+                          onPress={() => openItem(f)}
+                          onFavorite={() => toggleSave(f)}
+                          favorited={savedIds.has(f.id)}
+                        />
+                      )
+                    )}
                   </ScrollView>
                 </View>
               )}
@@ -521,7 +550,12 @@ export default function Marketplace() {
                     {city !== "All of Nigeria" ? ` · ${city}` : ""}
                   </Text>
                 </View>
-                <Pressable onPress={toggleView} style={styles.viewToggle} testID="view-toggle">
+                <Pressable
+                  onPress={toggleView}
+                  style={[styles.viewToggle, section === "fixa" && { opacity: 0 }]}
+                  disabled={section === "fixa"}
+                  testID="view-toggle"
+                >
                   <Ionicons
                     name={viewMode === "grid" ? "list" : "grid"}
                     size={16}
@@ -550,7 +584,17 @@ export default function Marketplace() {
             </View>
           }
           renderItem={
-            viewMode === "grid"
+            section === "fixa"
+              ? (({ item }) => (
+                  <ProviderCard
+                    item={item as MarketplaceItem}
+                    onPress={() => openItem(item as MarketplaceItem)}
+                    onBook={() => bookingRef.current?.open(item as MarketplaceItem)}
+                    onFavorite={() => toggleSave(item as MarketplaceItem)}
+                    favorited={savedIds.has((item as MarketplaceItem).id)}
+                  />
+                )) as any
+              : viewMode === "grid"
               ? (renderGridRow as any)
               : ({ item }) => (
                   <ClassifiedCard
@@ -586,6 +630,7 @@ export default function Marketplace() {
         categories={categories}
         onApply={setFilters}
       />
+      <BookingSheet ref={bookingRef} />
       {ad && <AdModal ad={ad} visible={adVisible} onClose={adDismiss} />}
     </SafeAreaView>
   );
@@ -762,7 +807,7 @@ const styles = StyleSheet.create({
   chipTileText: { fontSize: 12, fontWeight: "700", color: colors.text },
   chipEmoji: { fontSize: 16 },
 
-  // FIXA banner
+  // FIXA banner — ink background with the green helmet logo on left
   fixaBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -771,25 +816,27 @@ const styles = StyleSheet.create({
     marginTop: 10,
     padding: 14,
     borderRadius: radius.lg,
-    backgroundColor: colors.ink,
+    backgroundColor: "#0A0A0A",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.35)",
     ...shadows.card,
   },
-  fixaLogoWrap: {
-    width: 48,
-    height: 48,
+  fixaLogoImg: {
+    width: 60,
+    height: 60,
     borderRadius: 12,
-    backgroundColor: "#F5B301",
+    backgroundColor: "#000",
+  },
+  fixaShield: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#22C55E",
     alignItems: "center",
     justifyContent: "center",
   },
-  fixaLogoText: {
-    color: "#0A0A0A",
-    fontSize: 15,
-    fontWeight: "900",
-    letterSpacing: 0.6,
-  },
-  fixaTitle: { color: "#fff", fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
-  fixaSub: { color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: "600", marginTop: 2 },
+  fixaTitle: { color: "#22C55E", fontSize: 15, fontWeight: "900", letterSpacing: -0.2 },
+  fixaSub: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "600", marginTop: 2 },
 
   // Section
   sectionHeader: {

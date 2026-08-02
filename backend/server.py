@@ -25,6 +25,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, Strea
 
 from marketplace_seed import VENDORS, COLLECTIONS, MARKET_ITEMS
 from marketplace_c2c_seed import C2C_ITEMS as C2C_MARKET_ITEMS
+from fixa_seed import FIXA_PROVIDERS
 from tokens import register_token_routes, compute_token_cost, has_unlocked, is_free_amass_sale
 from earn_and_tools import register_earn_routes, register_agent_tool_routes
 from ads import register_ads_routes
@@ -174,6 +175,13 @@ class MarketplaceItem(BaseModel):
     seller_response_time_hours: int = 2
     seller_response_rate: int = 92  # percent
     seller_bio: Optional[str] = None
+    # ─── FIXA service-provider extras (only used by services listings) ─
+    provider_years_experience: Optional[int] = None
+    provider_jobs_completed: Optional[int] = None
+    provider_specializations: List[str] = Field(default_factory=list)
+    provider_service_areas: List[str] = Field(default_factory=list)
+    is_fixa_verified: bool = False
+    fixa_badges: List[str] = Field(default_factory=list)  # e.g. ["Background Checked", "Insured", "Top Pro"]
 
 
 class Vendor(BaseModel):
@@ -1132,6 +1140,56 @@ async def marketplace_recently_viewed(user: dict = Depends(get_current_user)):
     return docs
 
 
+# ─── FIXA Bookings ────────────────────────────────────────
+class FixaBookingIn(BaseModel):
+    item_id: str
+    customer_name: str
+    customer_phone: str
+    address: str
+    scheduled_date: str  # ISO date, YYYY-MM-DD
+    scheduled_time: str  # e.g. "Morning" / "Afternoon" / "10:00"
+    notes: Optional[str] = None
+
+
+@api.post("/marketplace/fixa/book")
+async def fixa_book(data: FixaBookingIn, user: dict = Depends(get_current_user)):
+    it = await db.marketplace.find_one({"id": data.item_id}, {"_id": 0})
+    if not it:
+        raise HTTPException(404, "Provider not found")
+    if it.get("category") != "services":
+        raise HTTPException(400, "This item is not a FIXA service listing")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "item_id": data.item_id,
+        "provider_id": it.get("seller_id"),
+        "provider_name": it.get("seller_name") or it.get("vendor"),
+        "provider_avatar": it.get("seller_avatar"),
+        "provider_phone": it.get("seller_phone"),
+        "provider_whatsapp": it.get("seller_whatsapp"),
+        "trade": it.get("subcategory"),
+        "customer_name": data.customer_name,
+        "customer_phone": data.customer_phone,
+        "address": data.address,
+        "scheduled_date": data.scheduled_date,
+        "scheduled_time": data.scheduled_time,
+        "notes": data.notes or "",
+        "status": "pending",  # pending | confirmed | completed | cancelled
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.fixa_bookings.insert_one(doc.copy())
+    doc.pop("_id", None)
+    return {"ok": True, "booking": doc}
+
+
+@api.get("/marketplace/fixa/bookings")
+async def fixa_my_bookings(user: dict = Depends(get_current_user)):
+    docs = await db.fixa_bookings.find(
+        {"user_id": user["id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return docs
+
+
 # ─── Cart ─────────────────────────────────────────────────
 class CartItemIn(BaseModel):
     item_id: str
@@ -1600,6 +1658,14 @@ async def seed_data():
             await db.marketplace.insert_one(item.model_dump())
         except Exception as e:
             logger.warning(f"skip c2c seed item {m.get('name','?')}: {e}")
+
+    # FIXA verified service providers
+    for m in FIXA_PROVIDERS:
+        try:
+            item = MarketplaceItem(**m)
+            await db.marketplace.insert_one(item.model_dump())
+        except Exception as e:
+            logger.warning(f"skip fixa seed item {m.get('name','?')}: {e}")
 
     # Seed vendors
     await db.vendors.delete_many({})

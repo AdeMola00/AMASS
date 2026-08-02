@@ -519,22 +519,8 @@ C2C_ITEMS: list[dict] = [
     },
 
     # ═══ SERVICES ═════════════════════════════════════════════
-    {
-        "category": "services", "subcategory": "Home Services",
-        "name": "Deep Home Cleaning — Lagos / Abuja",
-        "description": (
-            "Team of 4, 4-hour deep clean including kitchen deep-scrub "
-            "and sofa steam-clean. Available same-day."
-        ),
-        "price": 45000, "brand": None, "condition": "new", "negotiable": True,
-        "image": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200",
-        "images": ["https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200"],
-        "vendor": "Toluwalase Bello", "verified": True, "rating": 5.0, "reviews": 15,
-        "specs": {"Team": "4 people", "Duration": "4 hours"},
-        "tags": ["new_listing"],
-        **_loc("Lagos - Yaba"), "posted_at": _iso_days_ago(0.8), "views": 30, "saves": 3,
-        **_s("s_tolu"),
-    },
+    # NOTE: FIXA verified service providers are seeded from /app/backend/fixa_seed.py
+    # instead — richer, professional profiles with headshots, badges and booking.
 ]
 
 

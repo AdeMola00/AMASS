@@ -143,6 +143,13 @@ export type MarketplaceItem = {
   seller_response_time_hours?: number;
   seller_response_rate?: number;
   seller_bio?: string;
+  // FIXA service-provider extras (only used by services listings)
+  provider_years_experience?: number;
+  provider_jobs_completed?: number;
+  provider_specializations?: string[];
+  provider_service_areas?: string[];
+  is_fixa_verified?: boolean;
+  fixa_badges?: string[];
 };
 
 export type MarketCategory = {
@@ -414,6 +421,22 @@ export const api = {
   marketplaceMyListings: () => req<MarketplaceItem[]>("/marketplace/my-listings"),
   marketplaceSeller: (id: string) =>
     req<{ profile: SellerProfile; items: MarketplaceItem[] }>(`/marketplace/sellers/${id}`),
+
+  // FIXA Services — booking a verified provider
+  fixaBook: (data: {
+    item_id: string;
+    customer_name: string;
+    customer_phone: string;
+    address: string;
+    scheduled_date: string;
+    scheduled_time: string;
+    notes?: string;
+  }) =>
+    req<{ ok: boolean; booking: any }>("/marketplace/fixa/book", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  fixaMyBookings: () => req<any[]>("/marketplace/fixa/bookings"),
 
   // Cart
   getCart: () => req<Cart>("/cart"),
