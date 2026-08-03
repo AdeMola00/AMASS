@@ -715,6 +715,98 @@ export const api = {
       amount_ngn: number;
     }>(`/payments/status/${reference}`),
 
+  // ─── Property Improvement · Inspection · Finance · Projects ───
+  improveCatalog: () =>
+    req<{
+      milestones: { key: string; label: string; icon: string }[];
+      finance_products: { id: string; name: string; description: string }[];
+      partner_banks: {
+        id: string; name: string; products: string[];
+        rate_apr_range: [number, number]; max_tenor_months: number;
+      }[];
+      trades: string[];
+      brand_categories: string[];
+    }>("/improve/catalog"),
+  improveMine: () =>
+    req<{
+      inspections: any[];
+      finance_applications: any[];
+      projects: any[];
+    }>("/improve/mine"),
+  improveProperty: (propertyId: string) =>
+    req<{
+      property: any;
+      inspections: any[];
+      finance_applications: any[];
+      projects: any[];
+      summary: {
+        current_market_value_ngn?: number;
+        estimated_renovation_cost_ngn?: number;
+        estimated_post_renovation_value_ngn?: number;
+        estimated_rental_income_monthly_ngn?: number;
+        property_health_score?: number;
+        active_project_id?: string;
+        financing_status?: string;
+      };
+    }>(`/improve/property/${propertyId}`),
+  createInspection: (data: {
+    property_id: string;
+    renovation_goals: string;
+    budget_hint_ngn?: number;
+    preferred_date?: string;
+    contact_phone: string;
+    photos?: string[];
+    videos?: string[];
+    notes?: string;
+  }) =>
+    req<any>("/inspections", { method: "POST", body: JSON.stringify(data) }),
+  getInspection: (id: string) => req<any>(`/inspections/${id}`),
+  myInspections: () => req<any[]>("/inspections/mine"),
+  createFinanceApplication: (data: {
+    property_id: string;
+    inspection_id?: string;
+    product_id: string;
+    partner_bank_id?: string;
+    amount_requested_ngn: number;
+    tenor_months: number;
+    purpose: string;
+    documents?: any[];
+    contact_phone?: string;
+  }) =>
+    req<any>("/finance/applications", { method: "POST", body: JSON.stringify(data) }),
+  getFinanceApplication: (id: string) => req<any>(`/finance/applications/${id}`),
+  createProject: (data: {
+    property_id: string;
+    inspection_id?: string;
+    finance_application_id?: string;
+    scope: string;
+    estimated_cost_ngn?: number;
+    estimated_completion?: string;
+    boq_items?: any[];
+    recommended_provider_ids?: string[];
+    recommended_brand_ids?: string[];
+  }) =>
+    req<any>("/projects", { method: "POST", body: JSON.stringify(data) }),
+  getProject: (id: string) => req<any>(`/projects/${id}`),
+  advanceMilestone: (project_id: string, milestone_key: string, note?: string) =>
+    req<{ ok: boolean; milestones_completed: Record<string, string> }>(
+      `/projects/${project_id}/milestone`,
+      { method: "PATCH", body: JSON.stringify({ milestone_key, note }) }
+    ),
+  notifications: () =>
+    req<{ unread: number; items: any[] }>("/notifications"),
+  markNotificationsRead: () =>
+    req<{ ok: boolean }>("/notifications/mark-read", { method: "POST" }),
+  createAgentReferral: (data: {
+    property_id: string;
+    client_user_id?: string;
+    client_name?: string;
+    client_phone?: string;
+    note?: string;
+    product_id?: string;
+  }) =>
+    req<any>("/agents/referrals", { method: "POST", body: JSON.stringify(data) }),
+
   // ─── Earn / Referrals ─────────────────────────────────
   earnTasks: () =>
     req<{

@@ -1831,6 +1831,10 @@ app.include_router(register_saved_search_routes(db, get_current_user))
 from payments import register_payment_routes
 app.include_router(register_payment_routes(db, get_current_user))
 
+# ─── Property Improvement, Inspection, Finance & Renovation Projects
+from property_improvement import register_property_improvement_routes
+app.include_router(register_property_improvement_routes(db, get_current_user))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

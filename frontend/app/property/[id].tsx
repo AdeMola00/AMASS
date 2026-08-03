@@ -396,6 +396,39 @@ export default function PropertyDetails() {
             </View>
           )}
 
+          {/* Improve My Property — new pillar */}
+          <View style={styles.improveCard}>
+            <View style={styles.improveTop}>
+              <View style={styles.improveIcon}>
+                <Ionicons name="construct" size={20} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.improveTitle}>Improve My Property</Text>
+                <Text style={styles.improveBody}>
+                  Book an inspection, apply for renovation financing, and hire verified FIXA pros — all in one place.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.improveActions}>
+              <Pressable
+                style={[styles.improveBtn, styles.improveBtnPrimary]}
+                onPress={() => router.push(`/improve/request/${property.id}` as any)}
+                testID="improve-request-inspection"
+              >
+                <Ionicons name="clipboard" size={14} color="#fff" />
+                <Text style={styles.improveBtnText}>Request Inspection</Text>
+              </Pressable>
+              <Pressable
+                style={styles.improveBtn}
+                onPress={() => router.push(`/improve/finance/apply/${property.id}` as any)}
+                testID="improve-apply-finance"
+              >
+                <Ionicons name="cash" size={14} color={colors.text} />
+                <Text style={[styles.improveBtnText, { color: colors.text }]}>Get Financing</Text>
+              </Pressable>
+            </View>
+          </View>
+
           {similar.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.h3}>Similar homes nearby</Text>
@@ -859,6 +892,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  improveCard: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    padding: 16,
+    borderRadius: radius.lg,
+    backgroundColor: "#0A0A0A",
+    gap: 12,
+  },
+  improveTop: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  improveIcon: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: colors.red,
+    alignItems: "center", justifyContent: "center",
+  },
+  improveTitle: { color: "#fff", fontSize: 16, fontWeight: "900", letterSpacing: -0.3 },
+  improveBody: { color: "rgba(255,255,255,0.75)", fontSize: 12, lineHeight: 17, marginTop: 4 },
+  improveActions: { flexDirection: "row", gap: 8 },
+  improveBtn: {
+    flex: 1, height: 40, borderRadius: 20,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#fff",
+  },
+  improveBtnPrimary: { backgroundColor: colors.red },
+  improveBtnText: { color: "#fff", fontSize: 12, fontWeight: "800", letterSpacing: 0.2 },
   stickyCta: {
     position: "absolute",
     left: 0,
