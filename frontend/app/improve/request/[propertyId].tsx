@@ -8,12 +8,14 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { api } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
@@ -43,6 +45,8 @@ export default function InspectionRequest() {
   const [notes, setNotes] = useState("");
   const [preferredDate, setPreferredDate] = useState<string>("");
   const [photos, setPhotos] = useState<string[]>([]);
+  const [videos, setVideos] = useState<{ uri: string; duration?: number; size?: number }[]>([]);
+  const [pickingVideo, setPickingVideo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -76,6 +80,70 @@ export default function InspectionRequest() {
     Haptics.selectionAsync().catch(() => {});
   };
 
+  const pickVideo = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow media library access to upload videos.");
+      return;
+    }
+    if (videos.length >= 3) {
+      Alert.alert("Max 3 videos", "You've reached the video limit for a single inspection request.");
+      return;
+    }
+    setPickingVideo(true);
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        quality: 0.5,
+        videoMaxDuration: 30, // seconds — keeps payload manageable
+        allowsMultipleSelection: false,
+      });
+      if (res.canceled) return;
+      const asset = res.assets?.[0];
+      if (!asset?.uri) return;
+      const size = asset.fileSize ?? 0;
+      // Warn if larger than ~15MB — base64 payload is ~33% larger
+      if (size > 15 * 1024 * 1024) {
+        Alert.alert(
+          "Video too large",
+          "Please choose a video shorter than 30 seconds or under 15 MB. You can also add a link in the notes.",
+        );
+        return;
+      }
+      // Read as base64 to match AMASS backend pattern
+      let dataUrl = asset.uri;
+      try {
+        if (Platform.OS === "web") {
+          // Convert blob URL → base64 via fetch + FileReader
+          const blob = await fetch(asset.uri).then((r) => r.blob());
+          dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(reader.error);
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } else {
+          const b64 = await FileSystem.readAsStringAsync(asset.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const mime = asset.mimeType || "video/mp4";
+          dataUrl = `data:${mime};base64,${b64}`;
+        }
+      } catch {
+        // Fall back to raw URI if conversion fails — backend accepts strings
+      }
+      setVideos((prev) => [
+        ...prev,
+        { uri: dataUrl, duration: asset.duration ?? undefined, size },
+      ]);
+      Haptics.selectionAsync().catch(() => {});
+    } catch (e: any) {
+      Alert.alert("Failed to add video", e?.message ?? "Please try again.");
+    } finally {
+      setPickingVideo(false);
+    }
+  };
+
   const submit = async () => {
     if (!goals.trim() || !phone.trim()) {
       Alert.alert("Missing details", "Please describe your renovation goals and add a phone number.");
@@ -91,6 +159,7 @@ export default function InspectionRequest() {
         preferred_date: preferredDate || undefined,
         contact_phone: phone.trim(),
         photos,
+        videos: videos.map((v) => v.uri),
         notes: notes.trim() || undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -197,6 +266,51 @@ export default function InspectionRequest() {
             </Pressable>
           )}
         </View>
+
+        <SectionTitle>Videos ({videos.length}/3)</SectionTitle>
+        <View style={styles.videoGrid}>
+          {videos.map((v, i) => (
+            <View key={i} style={styles.videoTile}>
+              <View style={styles.videoPreview}>
+                <Ionicons name="play" size={22} color="#fff" />
+              </View>
+              <View style={styles.videoMetaRow}>
+                <Ionicons name="videocam" size={11} color={colors.textTertiary} />
+                <Text style={styles.videoMetaText}>
+                  {v.duration ? `${Math.round((v.duration || 0) / 1000)}s` : "video"}
+                  {v.size ? ` · ${(v.size / (1024 * 1024)).toFixed(1)} MB` : ""}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setVideos((prev) => prev.filter((_, idx) => idx !== i))}
+                style={styles.photoRemove}
+                testID={`remove-video-${i}`}
+              >
+                <Ionicons name="close" size={12} color="#fff" />
+              </Pressable>
+            </View>
+          ))}
+          {videos.length < 3 && (
+            <Pressable
+              onPress={pickVideo}
+              disabled={pickingVideo}
+              style={[styles.videoAdd, pickingVideo && { opacity: 0.6 }]}
+              testID="add-video"
+            >
+              {pickingVideo ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <>
+                  <Ionicons name="videocam" size={22} color={colors.text} />
+                  <Text style={styles.photoAddText}>Add video</Text>
+                </>
+              )}
+            </Pressable>
+          )}
+        </View>
+        <Text style={styles.videoHint}>
+          Max 30 seconds · 15 MB per clip. Videos help our inspector prep for the visit.
+        </Text>
 
         <SectionTitle>Notes for the inspector (optional)</SectionTitle>
         <TextInput
@@ -312,6 +426,41 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   photoAddText: { fontSize: 10, color: colors.textSecondary, fontWeight: "700" },
+
+  videoGrid: {
+    flexDirection: "row", flexWrap: "wrap", gap: 8,
+    paddingHorizontal: spacing.lg,
+  },
+  videoTile: {
+    width: 108,
+    borderRadius: radius.sm,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    borderWidth: 1, borderColor: colors.border,
+    position: "relative",
+  },
+  videoPreview: {
+    height: 72,
+    backgroundColor: "#0A0A0A",
+    alignItems: "center", justifyContent: "center",
+  },
+  videoMetaRow: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    paddingHorizontal: 6, paddingVertical: 5,
+  },
+  videoMetaText: {
+    fontSize: 10, color: colors.textSecondary, fontWeight: "700",
+  },
+  videoAdd: {
+    width: 108, height: 108, borderRadius: radius.sm,
+    borderWidth: 1.5, borderColor: colors.border, borderStyle: "dashed",
+    alignItems: "center", justifyContent: "center", gap: 4,
+    backgroundColor: "#fff",
+  },
+  videoHint: {
+    marginHorizontal: spacing.lg, marginTop: 8,
+    fontSize: 10, color: colors.textTertiary, fontWeight: "600",
+  },
 
   trustRow: {
     flexDirection: "row", alignItems: "center", gap: 6,
