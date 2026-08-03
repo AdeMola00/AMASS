@@ -663,6 +663,58 @@ export const api = {
       { method: "POST", body: JSON.stringify({ rating, review }) }
     ),
 
+  // ─── Saved Searches / Alerts ─────────────────────────────
+  savedSearches: () =>
+    req<Array<{
+      id: string;
+      name: string;
+      criteria: any;
+      alerts_enabled: boolean;
+      new_matches_since_seen: number;
+      last_run_at: string | null;
+      created_at: string;
+    }>>("/saved-searches"),
+  createSavedSearch: (name: string, criteria: Record<string, any>, alerts_enabled = true) =>
+    req<any>("/saved-searches", {
+      method: "POST",
+      body: JSON.stringify({ name, criteria, alerts_enabled }),
+    }),
+  deleteSavedSearch: (id: string) =>
+    req<{ ok: boolean }>(`/saved-searches/${id}`, { method: "DELETE" }),
+  toggleSavedSearchAlerts: (id: string, enabled: boolean) =>
+    req<{ ok: boolean; alerts_enabled: boolean }>(
+      `/saved-searches/${id}/alerts`,
+      { method: "PATCH", body: JSON.stringify({ enabled }) }
+    ),
+  runSavedSearch: (id: string) =>
+    req<{ count: number; matches: any[] }>(`/saved-searches/${id}/run`, {
+      method: "POST",
+    }),
+
+  // ─── Real payments (Paystack / Flutterwave, with MOCK fallback) ─
+  initPayment: (
+    provider: "paystack" | "flutterwave",
+    currency: Currency,
+    bundle_id: string
+  ) =>
+    req<{ reference: string; checkout_url: string; mock: boolean }>(
+      "/payments/initialize",
+      {
+        method: "POST",
+        body: JSON.stringify({ provider, currency, bundle_id }),
+      }
+    ),
+  paymentStatus: (reference: string) =>
+    req<{
+      reference: string;
+      status: string;
+      bundle_name: string;
+      currency: Currency;
+      credits: number;
+      bonus: number;
+      amount_ngn: number;
+    }>(`/payments/status/${reference}`),
+
   // ─── Earn / Referrals ─────────────────────────────────
   earnTasks: () =>
     req<{

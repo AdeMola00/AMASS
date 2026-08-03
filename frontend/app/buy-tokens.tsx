@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import * as WebBrowser from "expo-web-browser";
 import { api, TokenBundle } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
@@ -30,7 +31,7 @@ const PROVIDERS: {
 
 export default function BuyTokensScreen() {
   const router = useRouter();
-  const { wallet, purchase } = useWallet();
+  const { wallet, refresh } = useWallet();
   const [bundles, setBundles] = useState<TokenBundle[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
@@ -56,13 +57,42 @@ export default function BuyTokensScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setProcessing(true);
     try {
-      const res = await purchase(chosen.id);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        "MASS credited!",
-        `${res.credited} MASS added to your wallet. Your new balance is ${res.balance}.`,
-        [{ text: "Great!", onPress: () => router.replace("/wallet") }]
+      // 1. Initialize server-side payment intent
+      const init = await api.initPayment(provider, "MASS", chosen.id);
+      // 2. Open hosted checkout in in-app browser (real or mock)
+      const result = await WebBrowser.openAuthSessionAsync(
+        init.checkout_url,
+        "amass://payment/callback"
       );
+      // WebBrowser closes when user finishes / cancels / deep-link returns
+      // 3. Poll server-side status (source of truth — never trust redirect)
+      let paid = false;
+      for (let i = 0; i < 5; i++) {
+        try {
+          const s = await api.paymentStatus(init.reference);
+          if (s.status === "paid") {
+            paid = true;
+            break;
+          }
+        } catch {}
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+      if (paid) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        await refresh();
+        Alert.alert(
+          "MASS credited!",
+          `${chosen.tokens + chosen.bonus} MASS added to your wallet.`,
+          [{ text: "Great!", onPress: () => router.replace("/wallet") }]
+        );
+      } else if (result.type === "cancel" || result.type === "dismiss") {
+        // User cancelled — no action needed
+      } else {
+        Alert.alert(
+          "Payment pending",
+          "We're still confirming your payment. Your balance will update automatically once complete."
+        );
+      }
     } catch (e: any) {
       Alert.alert("Purchase failed", e?.message ?? "Please try again.");
     } finally {

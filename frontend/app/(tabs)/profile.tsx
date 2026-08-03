@@ -13,9 +13,11 @@ import { TokenIcon } from "@/src/components/TokenIcon";
 type IconName = keyof typeof Ionicons.glyphMap;
 
 const MENU: { icon: IconName; label: string; route?: string; caption?: string }[] = [
-  { icon: "wallet-outline", label: "AMASS Wallet", route: "/wallet", caption: "Tokens · Transactions · Subscriptions" },
+  { icon: "wallet-outline", label: "Wallet", route: "/wallet", caption: "MASS · FIX · Transactions · Subscriptions" },
   { icon: "gift-outline", label: "Earn Tokens", route: "/earn", caption: "Tasks · Referrals · Daily bonuses" },
   { icon: "lock-open-outline", label: "My Unlocks", route: "/unlocks", caption: "Properties you've unlocked" },
+  { icon: "bookmark-outline", label: "Saved Searches", route: "/saved-searches", caption: "Alerts when new listings match" },
+  { icon: "construct-outline", label: "Provider Dashboard", route: "/provider-dashboard", caption: "FIXA jobs · FIX earnings · Boost" },
   { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", caption: "Verified authority to market properties" },
   { icon: "briefcase-outline", label: "Agent Dashboard", route: "/agent-dashboard", caption: "Listings, leads & analytics" },
   { icon: "add-circle-outline", label: "List a Property", route: "/submit-property", caption: "Publish a new listing" },
@@ -81,10 +83,10 @@ export default function Profile() {
             <TokenIcon size={40} animated />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.walletLabel}>AMASS Tokens</Text>
+            <Text style={styles.walletLabel}>MASS Balance</Text>
             <Text style={styles.walletBalance}>
               {(wallet?.spendable ?? 0).toLocaleString()}
-              <Text style={styles.walletUnit}> tokens</Text>
+              <Text style={styles.walletUnit}> MASS</Text>
             </Text>
           </View>
           <View style={styles.walletCta}>

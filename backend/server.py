@@ -1823,6 +1823,14 @@ app.include_router(register_intelligence_routes(db))
 from apple_auth import register_apple_auth_route  # noqa: E402
 app.include_router(register_apple_auth_route(db, create_token, user_to_out))
 
+# ─── Saved Searches / Alerts ──────────────────────────────────
+from saved_searches import register_saved_search_routes
+app.include_router(register_saved_search_routes(db, get_current_user))
+
+# ─── Real payments (Paystack + Flutterwave) with MOCK_PAYMENT fallback
+from payments import register_payment_routes
+app.include_router(register_payment_routes(db, get_current_user))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

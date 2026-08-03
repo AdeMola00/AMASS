@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import * as WebBrowser from "expo-web-browser";
 import { api, TokenBundle } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
@@ -34,7 +35,7 @@ const PROVIDERS: {
 
 export default function BuyFixScreen() {
   const router = useRouter();
-  const { fix, purchaseFix } = useWallet();
+  const { fix, refresh } = useWallet();
   const [bundles, setBundles] = useState<TokenBundle[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
@@ -59,13 +60,38 @@ export default function BuyFixScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setProcessing(true);
     try {
-      const res = await purchaseFix(chosen.id);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        "FIX credited!",
-        `${res.credited} FIX added to your wallet. Your new balance is ${res.balance}.`,
-        [{ text: "Great!", onPress: () => router.replace("/wallet") }]
+      const init = await api.initPayment(provider, "FIX", chosen.id);
+      const result = await WebBrowser.openAuthSessionAsync(
+        init.checkout_url,
+        "amass://payment/callback"
       );
+      let paid = false;
+      for (let i = 0; i < 5; i++) {
+        try {
+          const s = await api.paymentStatus(init.reference);
+          if (s.status === "paid") {
+            paid = true;
+            break;
+          }
+        } catch {}
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+      if (paid) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        await refresh();
+        Alert.alert(
+          "FIX credited!",
+          `${chosen.tokens + chosen.bonus} FIX added to your wallet.`,
+          [{ text: "Great!", onPress: () => router.replace("/wallet") }]
+        );
+      } else if (result.type === "cancel" || result.type === "dismiss") {
+        // Cancelled
+      } else {
+        Alert.alert(
+          "Payment pending",
+          "We're still confirming your payment. Your balance will update once complete."
+        );
+      }
     } catch (e: any) {
       Alert.alert("Purchase failed", e?.message ?? "Please try again.");
     } finally {

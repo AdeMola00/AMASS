@@ -521,6 +521,44 @@ export default function HomeMap() {
     Alert.alert("Voice search", "Voice-to-text is coming soon. Try typing what you're looking for.");
   };
 
+  const saveCurrentSearch = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Build criteria from active filters + query
+    const criteria: Record<string, any> = {};
+    if (query.trim()) criteria.q = query.trim();
+    if (filters.propertyType) criteria.property_type = filters.propertyType;
+    if (filters.listingType && filters.listingType !== "land" && filters.listingType !== "commercial") {
+      criteria.listing_type = filters.listingType;
+    }
+    if (filters.bedrooms) criteria.min_beds = Number(filters.bedrooms);
+    if (filters.minPrice) criteria.min_price = filters.minPrice;
+    if (filters.maxPrice) criteria.max_price = filters.maxPrice;
+    if (Object.keys(criteria).length === 0) {
+      Alert.alert(
+        "Nothing to save",
+        "Add filters or a search term first — then tap this bookmark to save the search."
+      );
+      return;
+    }
+    // Auto-name
+    const parts: string[] = [];
+    if (criteria.q) parts.push(`"${criteria.q}"`);
+    if (criteria.property_type) parts.push(criteria.property_type);
+    if (criteria.min_beds) parts.push(`${criteria.min_beds}+ bed`);
+    if (criteria.listing_type) parts.push(criteria.listing_type);
+    const name = parts.join(" · ") || "My saved search";
+    try {
+      await api.createSavedSearch(name, criteria, true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert("Search saved", `You'll be notified when new listings match "${name}".`, [
+        { text: "View", onPress: () => router.push("/saved-searches" as any) },
+        { text: "Done", style: "default" },
+      ]);
+    } catch (e: any) {
+      Alert.alert("Save failed", e?.message ?? "Please try again.");
+    }
+  };
+
   const searchTop = insets.top + 6;
   const dockedBottom = 68 + Math.max(insets.bottom, 12) + 12;
 
@@ -542,6 +580,7 @@ export default function HomeMap() {
             onSubmit={load}
             onFilters={openFilterSheet}
             onVoice={voiceHint}
+            onSaveSearch={saveCurrentSearch}
             activeFilters={activeQuickFilterCount}
             filters={filters}
             setFilters={setFilters}
@@ -717,6 +756,7 @@ export default function HomeMap() {
           onSubmit={load}
           onFilters={openFilterSheet}
           onVoice={voiceHint}
+          onSaveSearch={saveCurrentSearch}
           activeFilters={activeQuickFilterCount}
           filters={filters}
           setFilters={setFilters}
@@ -858,6 +898,7 @@ function TopOverlay({
   onSubmit,
   onFilters,
   onVoice,
+  onSaveSearch,
   activeFilters,
   filters,
   setFilters,
@@ -869,6 +910,7 @@ function TopOverlay({
   onSubmit: () => void;
   onFilters: () => void;
   onVoice: () => void;
+  onSaveSearch: () => void;
   activeFilters: number;
   filters: FilterState;
   setFilters: (f: FilterState) => void;
@@ -876,6 +918,13 @@ function TopOverlay({
   setViewMode: (v: ViewMode) => void;
 }) {
   const router = useRouter();
+  const hasActiveSearch =
+    !!query.trim() ||
+    !!filters.propertyType ||
+    !!filters.listingType ||
+    !!filters.bedrooms ||
+    !!filters.minPrice ||
+    !!filters.maxPrice;
   return (
     <View>
       <View style={[styles.searchBar, shadows.card]}>
@@ -909,6 +958,16 @@ function TopOverlay({
         <Pressable onPress={() => router.push("/ai-search")} style={styles.aiBadge} testID="home-ai-btn">
           <Ionicons name="sparkles" size={14} color="#fff" />
         </Pressable>
+        {hasActiveSearch && (
+          <Pressable
+            onPress={onSaveSearch}
+            style={styles.bookmarkBtn}
+            hitSlop={6}
+            testID="save-search-btn"
+          >
+            <Ionicons name="bookmark" size={15} color={colors.text} />
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.chipsRowWrap}>
@@ -1020,6 +1079,13 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.red,
     alignItems: "center", justifyContent: "center",
+  },
+  bookmarkBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: colors.border,
+    marginLeft: 4,
   },
   chipsRowWrap: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: spacing.md },
   chipsRow: { gap: 8, paddingRight: 8 },
