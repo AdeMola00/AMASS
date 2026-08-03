@@ -1,9 +1,17 @@
 """
-AMASS Token Economy — Wallet, Subscriptions, Bundles, Unlocks.
+AMASS Dual-Token Economy — MASS (property utility) + FIX (FIXA service utility/reward).
 
-MOCKED payment gateway: purchases and subscriptions succeed instantly and
-credit tokens to the user's wallet. Real Paystack + Flutterwave wiring will
-plug into the /confirm handlers when API keys are available.
+  • MASS — spent by users to unlock premium property details, view premium
+    listings, buy subscriptions, etc. Purchasable via Paystack/Flutterwave/etc.
+  • FIX  — earned by verified FIXA service providers (job completions, ratings,
+    referrals, milestones) and also purchasable by customers for premium FIXA
+    features (provider profile boost, priority listing, etc.).
+
+Wallets, transactions and subscriptions all carry a `currency` field so a
+single WalletService supports both tokens without duplicated code.
+
+MOCKED payment gateway: purchases succeed instantly. Real Paystack/Flutterwave
+wiring will plug into the /confirm handlers when API keys are available.
 """
 from __future__ import annotations
 
@@ -25,9 +33,14 @@ bearer = HTTPBearer(auto_error=False)
 JWT_SECRET = os.environ.get("JWT_SECRET", "amass-dev-secret-change-in-production")
 JWT_ALG = "HS256"
 
+# ─── Currency ──────────────────────────────────────────────────
+Currency = Literal["MASS", "FIX"]
+MASS: Currency = "MASS"
+FIX: Currency = "FIX"
+
 
 # ─── Static configuration (admin-configurable later) ────────────
-# Property token cost defaults by category & tier
+# Property token cost defaults by category & tier (MASS)
 DEFAULT_TOKEN_COSTS = {
     "basic": 5,
     "premium": 10,
@@ -86,6 +99,37 @@ TOKEN_BUNDLES = [
     {"id": "professional", "name": "Professional", "tokens": 800, "bonus": 150, "price_ngn": 10_000},
 ]
 
+# ─── FIX bundles (customers can also purchase FIX for premium FIXA features) ─
+FIX_BUNDLES = [
+    {"id": "fix_starter", "name": "FIX Starter", "tokens": 50, "bonus": 0, "price_ngn": 500},
+    {"id": "fix_pro", "name": "FIX Pro", "tokens": 200, "bonus": 20, "price_ngn": 2_000},
+    {"id": "fix_team", "name": "FIX Team", "tokens": 500, "bonus": 100, "price_ngn": 5_000},
+    {"id": "fix_enterprise", "name": "FIX Enterprise", "tokens": 1_500, "bonus": 300, "price_ngn": 12_500},
+]
+
+# ─── FIX earning rules ────────────────────────────────────────
+# Server-side events award FIX to verified FIXA service providers.
+FIX_EARN_RULES: dict = {
+    "job_completed":         {"amount": 10,  "description": "Completed a verified job"},
+    "positive_rating":       {"amount": 5,   "description": "Received a 5-star customer rating"},
+    "referral_signup":       {"amount": 20,  "description": "Referral signup bonus"},
+    "active_profile_weekly": {"amount": 3,   "description": "Weekly active profile bonus"},
+    "milestone_50":          {"amount": 50,  "description": "50 jobs milestone"},
+    "milestone_100":         {"amount": 100, "description": "100 jobs milestone"},
+    "milestone_500":         {"amount": 500, "description": "500 jobs milestone"},
+    "promotion":             {"amount": 25,  "description": "AMASS/FIXA promotion reward"},
+    "onboarding_bonus":      {"amount": 15,  "description": "FIXA provider onboarding bonus"},
+}
+
+# ─── FIX spend rules ─────────────────────────────────────────
+# What customers or providers can do with FIX.
+FIX_SPEND_RULES: dict = {
+    "profile_boost_7d":  {"amount": 40,  "description": "Provider profile boost for 7 days"},
+    "priority_listing":  {"amount": 80,  "description": "Priority listing in FIXA search (30 days)"},
+    "featured_pro_30d":  {"amount": 150, "description": "Featured Pro badge for 30 days"},
+    "customer_discount": {"amount": 20,  "description": "10% off next FIXA booking"},
+}
+
 SUBSCRIPTION_PLANS = [
     {
         "id": "starter",
@@ -117,7 +161,8 @@ SUBSCRIPTION_PLANS = [
     },
 ]
 
-WELCOME_TOKENS = 15  # Free tokens on first wallet touch
+WELCOME_TOKENS = 15  # Free MASS tokens on first wallet touch
+WELCOME_FIX = 10     # Free FIX tokens on first FIX-wallet touch
 DEFAULT_UNLOCK_PERMANENCE_DAYS = 0  # 0 = forever
 
 
@@ -125,17 +170,20 @@ DEFAULT_UNLOCK_PERMANENCE_DAYS = 0  # 0 = forever
 TransactionKind = Literal[
     "purchase",           # bought a bundle
     "spend_unlock",       # spent to unlock a property
+    "spend_feature",      # spent on a premium feature (FIX profile boost, etc.)
     "subscription_grant", # monthly grant from subscription
-    "earn_reward",        # earned via task/referral
+    "earn_reward",        # earned via task/referral/job completion
     "bonus",              # bundle bonus / promotion
     "welcome",            # signup gift
     "refund",             # admin refund
     "expire",             # rollover expiry
+    "transfer",           # currency transfer (future)
 ]
 
 
 class Wallet(BaseModel):
     user_id: str
+    currency: Currency = "MASS"
     balance: int = 0            # spendable tokens (excl. bonus)
     bonus_balance: int = 0      # bonus tokens (spent first)
     locked: int = 0             # reserved (e.g., pending unlock)
@@ -149,6 +197,7 @@ class Wallet(BaseModel):
 
 
 class WalletOut(BaseModel):
+    currency: Currency = "MASS"
     balance: int
     bonus_balance: int
     spendable: int
@@ -158,9 +207,15 @@ class WalletOut(BaseModel):
     subscription: Optional[dict] = None
 
 
+class DualWalletOut(BaseModel):
+    mass: WalletOut
+    fix: WalletOut
+
+
 class Transaction(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
+    currency: Currency = "MASS"
     kind: TransactionKind
     amount: int  # positive for credit, negative for debit
     balance_after: int
@@ -191,16 +246,27 @@ class Subscription(BaseModel):
 
 class PurchaseIn(BaseModel):
     bundle_id: str
-    provider: Literal["paystack", "flutterwave", "mock"] = "mock"
+    provider: Literal["paystack", "flutterwave", "bank_transfer", "card", "mock"] = "mock"
 
 
 class SubscribeIn(BaseModel):
     plan_id: str
-    provider: Literal["paystack", "flutterwave", "mock"] = "mock"
+    provider: Literal["paystack", "flutterwave", "bank_transfer", "card", "mock"] = "mock"
 
 
 class UnlockIn(BaseModel):
     property_id: str
+
+
+class FixEarnIn(BaseModel):
+    event: str  # key from FIX_EARN_RULES
+    provider_user_id: Optional[str] = None  # if None → current user
+    meta: dict = Field(default_factory=dict)
+
+
+class FixSpendIn(BaseModel):
+    action: str  # key from FIX_SPEND_RULES
+    meta: dict = Field(default_factory=dict)
 
 
 # ─── Auth guard (dup to avoid circular imports) ─────────────────
@@ -216,26 +282,44 @@ async def _current_user_id(
         raise HTTPException(401, "Invalid token")
 
 
-# ─── Wallet core operations ────────────────────────────────────
+# ─── Wallet core operations (currency-aware) ────────────────
 class WalletService:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
 
-    async def get_or_create(self, user_id: str) -> dict:
-        wallet = await self.db.wallets.find_one({"user_id": user_id}, {"_id": 0})
+    @staticmethod
+    def _welcome_amount(currency: Currency) -> int:
+        return WELCOME_TOKENS if currency == "MASS" else WELCOME_FIX
+
+    async def get_or_create(self, user_id: str, currency: Currency = "MASS") -> dict:
+        # Backward-compat: legacy MASS wallets may have no `currency` field.
+        query: dict = {"user_id": user_id, "currency": currency}
+        if currency == "MASS":
+            query = {"user_id": user_id, "$or": [{"currency": "MASS"}, {"currency": {"$exists": False}}]}
+        wallet = await self.db.wallets.find_one(query, {"_id": 0})
         if wallet:
+            # Auto-migrate legacy doc: stamp currency field for future queries.
+            if not wallet.get("currency"):
+                wallet["currency"] = currency
+                await self.db.wallets.update_one(
+                    {"user_id": user_id, "currency": {"$exists": False}},
+                    {"$set": {"currency": currency}},
+                )
             return wallet
-        doc = Wallet(user_id=user_id).model_dump()
-        # Give welcome tokens (once)
-        doc["bonus_balance"] = WELCOME_TOKENS
-        doc["lifetime_earned"] = WELCOME_TOKENS
+        # Create new wallet with welcome amount
+        welcome = self._welcome_amount(currency)
+        doc = Wallet(user_id=user_id, currency=currency).model_dump()
+        doc["bonus_balance"] = welcome
+        doc["lifetime_earned"] = welcome
         await self.db.wallets.insert_one({**doc})
+        label = "AMASS" if currency == "MASS" else "FIXA"
         await self._log(
             user_id,
             "welcome",
-            WELCOME_TOKENS,
-            WELCOME_TOKENS,
-            "Welcome to AMASS! Enjoy your starter tokens.",
+            welcome,
+            welcome,
+            f"Welcome to {label}! Enjoy your starter {currency} tokens.",
+            currency=currency,
         )
         return {**doc}
 
@@ -246,10 +330,12 @@ class WalletService:
         amount: int,
         balance_after: int,
         description: str,
+        currency: Currency = "MASS",
         meta: Optional[dict] = None,
     ) -> None:
         tx = Transaction(
             user_id=user_id,
+            currency=currency,
             kind=kind,
             amount=amount,
             balance_after=balance_after,
@@ -265,20 +351,24 @@ class WalletService:
         kind: TransactionKind,
         description: str,
         *,
+        currency: Currency = "MASS",
         is_bonus: bool = False,
         meta: Optional[dict] = None,
     ) -> dict:
-        w = await self.get_or_create(user_id)
+        w = await self.get_or_create(user_id, currency)
         field = "bonus_balance" if is_bonus else "balance"
         new_val = w.get(field, 0) + amount
         lifetime = w.get("lifetime_earned", 0) + amount
         await self.db.wallets.update_one(
-            {"user_id": user_id},
+            {"user_id": user_id, "currency": currency},
             {"$set": {field: new_val, "lifetime_earned": lifetime}},
         )
         w[field] = new_val
         w["lifetime_earned"] = lifetime
-        await self._log(user_id, kind, amount, w["balance"] + w["bonus_balance"], description, meta)
+        await self._log(
+            user_id, kind, amount, w["balance"] + w["bonus_balance"], description,
+            currency=currency, meta=meta,
+        )
         return w
 
     async def debit(
@@ -287,13 +377,15 @@ class WalletService:
         amount: int,
         kind: TransactionKind,
         description: str,
+        *,
+        currency: Currency = "MASS",
         meta: Optional[dict] = None,
     ) -> dict:
         """Spend bonus tokens first, then primary balance."""
-        w = await self.get_or_create(user_id)
+        w = await self.get_or_create(user_id, currency)
         spendable = w["balance"] + w["bonus_balance"]
         if spendable < amount:
-            raise HTTPException(402, "Insufficient tokens")
+            raise HTTPException(402, f"Insufficient {currency} tokens")
         remaining = amount
         use_bonus = min(w["bonus_balance"], remaining)
         remaining -= use_bonus
@@ -302,7 +394,7 @@ class WalletService:
         new_balance = w["balance"] - use_balance
         new_lifetime_used = w.get("lifetime_used", 0) + amount
         await self.db.wallets.update_one(
-            {"user_id": user_id},
+            {"user_id": user_id, "currency": currency},
             {
                 "$set": {
                     "balance": new_balance,
@@ -315,7 +407,8 @@ class WalletService:
         w["bonus_balance"] = new_bonus
         w["lifetime_used"] = new_lifetime_used
         await self._log(
-            user_id, kind, -amount, new_balance + new_bonus, description, meta
+            user_id, kind, -amount, new_balance + new_bonus, description,
+            currency=currency, meta=meta,
         )
         return w
 
@@ -334,10 +427,12 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
     async def wallet_me(
         creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     ):
+        """Legacy MASS wallet endpoint (kept for backward compatibility)."""
         user_id = await _current_user_id(creds)
-        w = await svc.get_or_create(user_id)
+        w = await svc.get_or_create(user_id, "MASS")
         sub = await _current_sub(user_id)
         return WalletOut(
+            currency="MASS",
             balance=w["balance"],
             bonus_balance=w["bonus_balance"],
             spendable=w["balance"] + w["bonus_balance"],
@@ -347,23 +442,96 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
             subscription=sub,
         )
 
-    @router.get("/wallet/transactions")
-    async def wallet_transactions(
-        limit: int = 40,
+    def _wallet_out(w: dict, currency: Currency, subscription: Optional[dict] = None) -> WalletOut:
+        return WalletOut(
+            currency=currency,
+            balance=w["balance"],
+            bonus_balance=w["bonus_balance"],
+            spendable=w["balance"] + w["bonus_balance"],
+            locked=w.get("locked", 0),
+            lifetime_earned=w.get("lifetime_earned", 0),
+            lifetime_used=w.get("lifetime_used", 0),
+            subscription=subscription,
+        )
+
+    # ─── MASS aliased endpoint (mirror of /wallet/me, explicit for FE clarity)
+    @router.get("/wallet/mass", response_model=WalletOut)
+    async def wallet_mass(
         creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     ):
         user_id = await _current_user_id(creds)
+        w = await svc.get_or_create(user_id, "MASS")
+        sub = await _current_sub(user_id)
+        return _wallet_out(w, "MASS", sub)
+
+    # ─── FIX wallet endpoint
+    @router.get("/wallet/fix", response_model=WalletOut)
+    async def wallet_fix(
+        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    ):
+        user_id = await _current_user_id(creds)
+        w = await svc.get_or_create(user_id, "FIX")
+        return _wallet_out(w, "FIX")
+
+    # ─── Unified dual-wallet endpoint (single roundtrip for FE Wallet screen)
+    @router.get("/wallet/dual", response_model=DualWalletOut)
+    async def wallet_dual(
+        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    ):
+        user_id = await _current_user_id(creds)
+        mass = await svc.get_or_create(user_id, "MASS")
+        fix = await svc.get_or_create(user_id, "FIX")
+        sub = await _current_sub(user_id)
+        return DualWalletOut(
+            mass=_wallet_out(mass, "MASS", sub),
+            fix=_wallet_out(fix, "FIX"),
+        )
+
+    @router.get("/wallet/transactions")
+    async def wallet_transactions(
+        limit: int = 40,
+        currency: Optional[str] = None,  # "MASS" | "FIX" | None (all)
+        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    ):
+        user_id = await _current_user_id(creds)
+        query: dict = {"user_id": user_id}
+        if currency == "MASS":
+            query["$or"] = [{"currency": "MASS"}, {"currency": {"$exists": False}}]
+        elif currency == "FIX":
+            query["currency"] = "FIX"
         docs = (
-            await db.token_transactions.find({"user_id": user_id}, {"_id": 0})
+            await db.token_transactions.find(query, {"_id": 0})
             .sort("created_at", -1)
             .limit(limit)
             .to_list(limit)
         )
+        # Ensure legacy docs surface a currency label
+        for d in docs:
+            d.setdefault("currency", "MASS")
         return docs
 
     @router.get("/tokens/bundles")
-    async def list_bundles():
-        return TOKEN_BUNDLES
+    async def list_bundles(currency: str = "MASS"):
+        return FIX_BUNDLES if currency.upper() == "FIX" else TOKEN_BUNDLES
+
+    @router.get("/wallet/fix/bundles")
+    async def list_fix_bundles():
+        return FIX_BUNDLES
+
+    @router.get("/wallet/fix/earn-rules")
+    async def list_fix_earn_rules():
+        """Public catalog of how FIX is earned (for provider dashboard)."""
+        return [
+            {"event": k, "amount": v["amount"], "description": v["description"]}
+            for k, v in FIX_EARN_RULES.items()
+        ]
+
+    @router.get("/wallet/fix/spend-rules")
+    async def list_fix_spend_rules():
+        return [
+            {"action": k, "amount": v["amount"], "description": v["description"]}
+            for k, v in FIX_SPEND_RULES.items()
+        ]
 
     @router.post("/tokens/purchase")
     async def purchase_tokens(
@@ -584,6 +752,121 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
             meta={"task_id": "daily_login", "date": today},
         )
         return {"ok": True, "credited": 2}
+
+    # ─── FIX purchase (customer buys FIX for premium FIXA features) ─────
+    @router.post("/wallet/fix/purchase")
+    async def purchase_fix(
+        data: PurchaseIn,
+        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    ):
+        user_id = await _current_user_id(creds)
+        bundle = next((b for b in FIX_BUNDLES if b["id"] == data.bundle_id), None)
+        if not bundle:
+            raise HTTPException(404, "FIX bundle not found")
+        # MOCK payment — instant credit
+        await svc.credit(
+            user_id,
+            bundle["tokens"],
+            "purchase",
+            f"Purchased {bundle['name']} — {bundle['tokens']} FIX",
+            currency="FIX",
+            meta={"bundle_id": bundle["id"], "provider": data.provider, "mock": True},
+        )
+        if bundle["bonus"] > 0:
+            await svc.credit(
+                user_id,
+                bundle["bonus"],
+                "bonus",
+                f"Bonus FIX for {bundle['name']}",
+                currency="FIX",
+                is_bonus=True,
+                meta={"bundle_id": bundle["id"]},
+            )
+        w = await svc.get_or_create(user_id, "FIX")
+        return {
+            "ok": True,
+            "credited": bundle["tokens"] + bundle["bonus"],
+            "balance": w["balance"] + w["bonus_balance"],
+        }
+
+    # ─── FIX earn (server-triggered event: job_completed, positive_rating…) ─
+    @router.post("/wallet/fix/earn")
+    async def earn_fix(
+        data: FixEarnIn,
+        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    ):
+        """Awards FIX to a service provider based on a whitelisted event.
+
+        For MVP the caller is authenticated as either the provider (self-report
+        via a booking flow) or an admin/system. Idempotency keys can be added
+        via meta (e.g., booking_id) to prevent double-credits.
+        """
+        rule = FIX_EARN_RULES.get(data.event)
+        if not rule:
+            raise HTTPException(400, f"Unknown FIX earn event '{data.event}'")
+        target_user = data.provider_user_id or await _current_user_id(creds)
+        # Idempotency: if meta carries an idempotency_key, skip on duplicate.
+        idem = data.meta.get("idempotency_key") if data.meta else None
+        if idem:
+            dup = await db.token_transactions.find_one(
+                {"user_id": target_user, "currency": "FIX", "meta.idempotency_key": idem}
+            )
+            if dup:
+                return {"ok": True, "duplicate": True, "credited": 0}
+        await svc.credit(
+            target_user,
+            rule["amount"],
+            "earn_reward",
+            rule["description"],
+            currency="FIX",
+            meta={"event": data.event, **(data.meta or {})},
+        )
+        w = await svc.get_or_create(target_user, "FIX")
+        return {
+            "ok": True,
+            "credited": rule["amount"],
+            "event": data.event,
+            "balance": w["balance"] + w["bonus_balance"],
+        }
+
+    # ─── FIX spend (premium FIXA feature: profile boost, priority listing…) ─
+    @router.post("/wallet/fix/spend")
+    async def spend_fix(
+        data: FixSpendIn,
+        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    ):
+        rule = FIX_SPEND_RULES.get(data.action)
+        if not rule:
+            raise HTTPException(400, f"Unknown FIX spend action '{data.action}'")
+        user_id = await _current_user_id(creds)
+        try:
+            w = await svc.debit(
+                user_id,
+                rule["amount"],
+                "spend_feature",
+                rule["description"],
+                currency="FIX",
+                meta={"action": data.action, **(data.meta or {})},
+            )
+        except HTTPException as e:
+            if e.status_code == 402:
+                wallet = await svc.get_or_create(user_id, "FIX")
+                raise HTTPException(
+                    402,
+                    {
+                        "error": "insufficient_fix",
+                        "required": rule["amount"],
+                        "balance": wallet["balance"] + wallet["bonus_balance"],
+                        "shortfall": rule["amount"] - (wallet["balance"] + wallet["bonus_balance"]),
+                    },
+                )
+            raise
+        return {
+            "ok": True,
+            "action": data.action,
+            "spent": rule["amount"],
+            "balance": w["balance"] + w["bonus_balance"],
+        }
 
     return router
 

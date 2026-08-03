@@ -13,7 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, Stack } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { api, WalletTransaction } from "@/src/lib/api";
+import { api, Currency, WalletTransaction } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 import { TokenIcon } from "@/src/components/TokenIcon";
@@ -21,6 +21,7 @@ import { TokenIcon } from "@/src/components/TokenIcon";
 const TX_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string; sign: string }> = {
   purchase: { icon: "cart", color: colors.text, sign: "+" },
   spend_unlock: { icon: "lock-open", color: colors.red, sign: "" },
+  spend_feature: { icon: "sparkles", color: colors.red, sign: "" },
   subscription_grant: { icon: "star", color: "#8B5CF6", sign: "+" },
   earn_reward: { icon: "gift", color: "#F5B301", sign: "+" },
   bonus: { icon: "sparkles", color: "#F5B301", sign: "+" },
@@ -29,25 +30,31 @@ const TX_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: str
   expire: { icon: "hourglass", color: colors.textTertiary, sign: "" },
 };
 
+type TxFilter = "all" | "MASS" | "FIX";
+
 export default function WalletScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { wallet, refresh, loading, claimDailyLogin } = useWallet();
+  const { mass, fix, refresh, loading, claimDailyLogin } = useWallet();
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [txLoading, setTxLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [claimStatus, setClaimStatus] = useState<string | null>(null);
+  const [txFilter, setTxFilter] = useState<TxFilter>("all");
 
   const loadTx = useCallback(async () => {
     setTxLoading(true);
     try {
-      const list = await api.walletTransactions();
+      const list = await api.walletTransactions(
+        60,
+        txFilter === "all" ? undefined : (txFilter as Currency)
+      );
       setTransactions(list);
     } catch {}
     finally {
       setTxLoading(false);
     }
-  }, []);
+  }, [txFilter]);
 
   useEffect(() => {
     loadTx();
@@ -59,11 +66,11 @@ export default function WalletScreen() {
     setRefreshing(false);
   }, [refresh, loadTx]);
 
-  const claim = async () => {
+  const claim = async () => { // eslint-disable-line @typescript-eslint/no-unused-vars
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     const res = await claimDailyLogin();
     if (res.credited) {
-      setClaimStatus(`+${res.credited} tokens claimed! Come back tomorrow.`);
+      setClaimStatus(`+${res.credited} MASS claimed! Come back tomorrow.`);
       await loadTx();
     } else if (res.already_claimed) {
       setClaimStatus("You've already claimed today's bonus.");
@@ -71,12 +78,17 @@ export default function WalletScreen() {
     setTimeout(() => setClaimStatus(null), 4000);
   };
 
-  const balance = wallet?.spendable ?? 0;
-  const bonus = wallet?.bonus_balance ?? 0;
-  const primary = wallet?.balance ?? 0;
-  const lifetimeUsed = wallet?.lifetime_used ?? 0;
-  const lifetimeEarned = wallet?.lifetime_earned ?? 0;
-  const subscription = wallet?.subscription;
+  // MASS
+  const massBalance = mass?.spendable ?? 0;
+  const massBonus = mass?.bonus_balance ?? 0;
+  const massPrimary = mass?.balance ?? 0;
+  const massUsed = mass?.lifetime_used ?? 0;
+  const massEarned = mass?.lifetime_earned ?? 0;
+  const subscription = mass?.subscription;
+  // FIX
+  const fixBalance = fix?.spendable ?? 0;
+  const fixEarned = fix?.lifetime_earned ?? 0;
+  const fixUsed = fix?.lifetime_used ?? 0;
 
   return (
     <View style={styles.container}>
@@ -85,7 +97,7 @@ export default function WalletScreen() {
         <Pressable onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={22} color="#fff" />
         </Pressable>
-        <Text style={styles.headerTitle}>AMASS Wallet</Text>
+        <Text style={styles.headerTitle}>Wallet</Text>
         <Pressable onPress={() => router.push("/unlocks")} style={styles.iconBtn}>
           <Ionicons name="time" size={20} color="#fff" />
         </Pressable>
@@ -96,7 +108,7 @@ export default function WalletScreen() {
         contentContainerStyle={{ paddingBottom: 60 + insets.bottom }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
       >
-        {/* Balance Card — African fintech style */}
+        {/* ─── MASS Balance Card ────────────────────────── */}
         <LinearGradient
           colors={["#0A0A0A", "#1F1F1F", "#0A0A0A"]}
           style={styles.balanceCard}
@@ -104,29 +116,85 @@ export default function WalletScreen() {
           <View style={styles.coinAbsolute}>
             <TokenIcon size={120} animated />
           </View>
-          <Text style={styles.balanceLabel}>Available balance</Text>
+          <View style={styles.currencyTag}>
+            <Text style={styles.currencyTagText}>MASS</Text>
+          </View>
+          <Text style={styles.balanceLabel}>Property tokens · MASS</Text>
           <View style={styles.balanceRow}>
-            <Text style={styles.balanceValue}>{balance.toLocaleString()}</Text>
-            <Text style={styles.balanceUnit}>tokens</Text>
+            <Text style={styles.balanceValue}>{massBalance.toLocaleString()}</Text>
+            <Text style={styles.balanceUnit}>MASS</Text>
           </View>
           <View style={styles.subBalances}>
             <View style={styles.subBalanceItem}>
               <Text style={styles.subBalanceLabel}>Primary</Text>
-              <Text style={styles.subBalanceValue}>{primary.toLocaleString()}</Text>
+              <Text style={styles.subBalanceValue}>{massPrimary.toLocaleString()}</Text>
             </View>
             <View style={styles.subBalanceDivider} />
             <View style={styles.subBalanceItem}>
               <Text style={styles.subBalanceLabel}>Bonus</Text>
-              <Text style={styles.subBalanceValue}>{bonus.toLocaleString()}</Text>
+              <Text style={styles.subBalanceValue}>{massBonus.toLocaleString()}</Text>
             </View>
           </View>
         </LinearGradient>
 
-        {/* Quick Actions */}
+        {/* ─── Quick Actions (MASS) ─────────────────────── */}
         <View style={styles.quickActions}>
-          <QuickBtn icon="add" label="Buy Tokens" primary onPress={() => router.push("/buy-tokens")} />
+          <QuickBtn icon="add" label="Buy MASS" primary onPress={() => router.push("/buy-tokens")} />
           <QuickBtn icon="star" label="Subscribe" onPress={() => router.push("/subscribe")} />
           <QuickBtn icon="gift" label="Earn" onPress={() => router.push("/earn")} />
+        </View>
+
+        {/* ─── FIX Balance Card ─────────────────────────── */}
+        <LinearGradient
+          colors={["#052E1F", "#0B3B2A", "#052E1F"]}
+          style={[styles.balanceCard, styles.fixCard]}
+        >
+          <View style={styles.coinAbsolute}>
+            <View style={styles.fixEmblem}>
+              <Ionicons name="construct" size={80} color="#22C55E" />
+            </View>
+          </View>
+          <View style={[styles.currencyTag, styles.currencyTagFix]}>
+            <Ionicons name="shield-checkmark" size={11} color="#052E1F" />
+            <Text style={[styles.currencyTagText, { color: "#052E1F" }]}>FIX</Text>
+          </View>
+          <Text style={styles.balanceLabel}>FIXA service tokens · FIX</Text>
+          <View style={styles.balanceRow}>
+            <Text style={styles.balanceValue}>{fixBalance.toLocaleString()}</Text>
+            <Text style={styles.balanceUnit}>FIX</Text>
+          </View>
+          <View style={styles.subBalances}>
+            <View style={styles.subBalanceItem}>
+              <Text style={styles.subBalanceLabel}>Earned lifetime</Text>
+              <Text style={styles.subBalanceValue}>{fixEarned.toLocaleString()}</Text>
+            </View>
+            <View style={styles.subBalanceDivider} />
+            <View style={styles.subBalanceItem}>
+              <Text style={styles.subBalanceLabel}>Spent lifetime</Text>
+              <Text style={styles.subBalanceValue}>{fixUsed.toLocaleString()}</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* ─── Quick Actions (FIX) ──────────────────────── */}
+        <View style={styles.quickActions}>
+          <QuickBtn
+            icon="add"
+            label="Buy FIX"
+            primary
+            primaryColor="#22C55E"
+            onPress={() => router.push("/buy-fix" as any)}
+          />
+          <QuickBtn
+            icon="trending-up"
+            label="Earn FIX"
+            onPress={() => router.push("/earn-fix" as any)}
+          />
+          <QuickBtn
+            icon="rocket"
+            label="Boost"
+            onPress={() => router.push("/fix-features" as any)}
+          />
         </View>
 
         {claimStatus && (
@@ -161,29 +229,29 @@ export default function WalletScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.upgradeTitle}>Save with a monthly plan</Text>
               <Text style={styles.upgradeBody}>
-                Get 100 – 1,200 tokens delivered every month. Unused tokens roll over.
+                Get 100 – 1,200 MASS delivered every month. Unused MASS rolls over.
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text} />
           </Pressable>
         )}
 
-        {/* Lifetime stats */}
+        {/* Lifetime stats (MASS) */}
         <View style={styles.stats}>
           <View style={styles.statItem}>
             <Ionicons name="trending-up" size={18} color={colors.text} />
-            <Text style={styles.statValue}>{lifetimeEarned.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>Earned</Text>
+            <Text style={styles.statValue}>{massEarned.toLocaleString()}</Text>
+            <Text style={styles.statLabel}>MASS Earned</Text>
           </View>
           <View style={styles.statItem}>
             <Ionicons name="lock-open" size={18} color={colors.red} />
-            <Text style={styles.statValue}>{lifetimeUsed.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>Spent</Text>
+            <Text style={styles.statValue}>{massUsed.toLocaleString()}</Text>
+            <Text style={styles.statLabel}>MASS Spent</Text>
           </View>
           <View style={styles.statItem}>
-            <Ionicons name="albums" size={18} color="#8B5CF6" />
-            <Text style={styles.statValue}>—</Text>
-            <Text style={styles.statLabel}>Unlocks</Text>
+            <Ionicons name="albums" size={18} color="#22C55E" />
+            <Text style={styles.statValue}>{fixEarned.toLocaleString()}</Text>
+            <Text style={styles.statLabel}>FIX Earned</Text>
           </View>
         </View>
 
@@ -192,6 +260,27 @@ export default function WalletScreen() {
           <View style={styles.txHeader}>
             <Text style={styles.h3}>Recent activity</Text>
             {txLoading && <ActivityIndicator size="small" color={colors.text} />}
+          </View>
+          {/* Currency filter */}
+          <View style={styles.filterRow}>
+            {(["all", "MASS", "FIX"] as TxFilter[]).map((f) => {
+              const active = txFilter === f;
+              return (
+                <Pressable
+                  key={f}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setTxFilter(f);
+                  }}
+                  style={[styles.filterChip, active && styles.filterChipActive]}
+                  testID={`wallet-filter-${f}`}
+                >
+                  <Text style={[styles.filterText, active && { color: "#fff" }]}>
+                    {f === "all" ? "All" : f}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
           {transactions.length === 0 && !txLoading ? (
             <View style={styles.emptyState}>
@@ -203,6 +292,7 @@ export default function WalletScreen() {
             transactions.map((tx) => {
               const meta = TX_META[tx.kind] || { icon: "cash", color: colors.text, sign: "" };
               const isPositive = tx.amount > 0;
+              const ccy = tx.currency ?? "MASS";
               return (
                 <View key={tx.id} style={styles.txRow}>
                   <View style={[styles.txIcon, { backgroundColor: meta.color + "18" }]}>
@@ -212,14 +302,21 @@ export default function WalletScreen() {
                     <Text style={styles.txDesc} numberOfLines={1}>
                       {tx.description}
                     </Text>
-                    <Text style={styles.txDate}>
-                      {new Date(tx.created_at).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </Text>
+                    <View style={styles.txSubRow}>
+                      <View style={[styles.txCcy, ccy === "FIX" && styles.txCcyFix]}>
+                        <Text style={[styles.txCcyText, ccy === "FIX" && { color: "#15803D" }]}>
+                          {ccy}
+                        </Text>
+                      </View>
+                      <Text style={styles.txDate}>
+                        {new Date(tx.created_at).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
+                    </View>
                   </View>
                   <Text
                     style={[
@@ -237,7 +334,7 @@ export default function WalletScreen() {
         </View>
       </ScrollView>
 
-      {loading && !wallet && (
+      {loading && !mass && (
         <View style={StyleSheet.absoluteFillObject}>
           <View style={styles.loadingOverlay}>
             <ActivityIndicator color={colors.red} />
@@ -253,16 +350,22 @@ function QuickBtn({
   label,
   onPress,
   primary = false,
+  primaryColor,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
   primary?: boolean;
+  primaryColor?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.quickBtn, primary && styles.quickBtnPrimary]}
+      style={[
+        styles.quickBtn,
+        primary && styles.quickBtnPrimary,
+        primary && primaryColor ? { backgroundColor: primaryColor } : null,
+      ]}
       testID={`wallet-action-${label.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <View style={[styles.quickIcon, primary && { backgroundColor: "rgba(255,255,255,0.15)" }]}>
@@ -295,12 +398,39 @@ const styles = StyleSheet.create({
   // Balance
   balanceCard: {
     marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
     borderRadius: 24,
     padding: 24,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
+  fixCard: {
+    marginTop: spacing.xl,
+    borderColor: "rgba(34,197,94,0.3)",
+  },
+  currencyTag: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  currencyTagFix: {
+    backgroundColor: "#22C55E",
+  },
+  currencyTagText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  fixEmblem: { alignItems: "center", justifyContent: "center" },
   coinAbsolute: {
     position: "absolute",
     right: -30,
@@ -478,8 +608,39 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   txDesc: { fontSize: 13, color: colors.text, fontWeight: "700" },
-  txDate: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
+  txDate: { fontSize: 11, color: colors.textTertiary },
   txAmount: { fontSize: 15, fontWeight: "800", letterSpacing: -0.3 },
+  txSubRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 },
+  txCcy: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    backgroundColor: "rgba(10,10,10,0.06)",
+  },
+  txCcyFix: { backgroundColor: "rgba(34,197,94,0.12)" },
+  txCcyText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.5, color: colors.text },
+
+  // Filter row
+  filterRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    height: 32,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterChipActive: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
+  },
+  filterText: { fontSize: 12, fontWeight: "800", color: colors.text, letterSpacing: 0.2 },
 
   emptyState: {
     alignItems: "center",

@@ -26,7 +26,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, Strea
 from marketplace_seed import VENDORS, COLLECTIONS, MARKET_ITEMS
 from marketplace_c2c_seed import C2C_ITEMS as C2C_MARKET_ITEMS
 from fixa_seed import FIXA_PROVIDERS
-from tokens import register_token_routes, compute_token_cost, has_unlocked, is_free_amass_sale
+from tokens import register_token_routes, compute_token_cost, has_unlocked, is_free_amass_sale, WalletService, FIX_EARN_RULES
 from earn_and_tools import register_earn_routes, register_agent_tool_routes
 from ads import register_ads_routes
 from marketplace_v2 import register_marketplace_v2_routes
@@ -1188,6 +1188,96 @@ async def fixa_my_bookings(user: dict = Depends(get_current_user)):
         {"user_id": user["id"]}, {"_id": 0}
     ).sort("created_at", -1).to_list(50)
     return docs
+
+
+class FixaBookingCompleteIn(BaseModel):
+    rating: Optional[int] = None  # 1-5 stars; 5 unlocks the "positive_rating" bonus
+    review: Optional[str] = None
+
+
+@api.post("/marketplace/fixa/bookings/{booking_id}/complete")
+async def fixa_booking_complete(
+    booking_id: str,
+    data: FixaBookingCompleteIn,
+    user: dict = Depends(get_current_user),
+):
+    """Customer marks a booking complete. Auto-awards FIX to the provider:
+       – job_completed (base) always
+       – positive_rating bonus when rating >= 5
+       – milestone bonuses when the provider crosses 50/100/500 lifetime jobs
+    Idempotent by booking_id.
+    """
+    booking = await db.fixa_bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+    if booking["user_id"] != user["id"]:
+        raise HTTPException(403, "Only the booking owner can complete this booking")
+    if booking.get("status") == "completed":
+        return {"ok": True, "already_completed": True}
+
+    now = datetime.now(timezone.utc).isoformat()
+    update: dict = {"status": "completed", "completed_at": now}
+    if data.rating is not None:
+        update["rating"] = int(max(1, min(5, data.rating)))
+    if data.review:
+        update["review"] = data.review[:500]
+    await db.fixa_bookings.update_one({"id": booking_id}, {"$set": update})
+
+    # ─── Auto-award FIX to the provider ───────────────────────
+    svc = WalletService(db)
+    awards: list[dict] = []
+    provider_id = booking.get("provider_id")
+    # Provider FIX wallet is keyed by seller_id (fixa_*). In this MVP seed
+    # providers are external tradespeople not real users — we track FIX on
+    # them anyway so their virtual wallets accrue balance.
+    if provider_id:
+        # 1. Base job completion
+        base = FIX_EARN_RULES["job_completed"]
+        idem = f"job_completed:{booking_id}"
+        dup = await db.token_transactions.find_one(
+            {"user_id": provider_id, "currency": "FIX", "meta.idempotency_key": idem}
+        )
+        if not dup:
+            await svc.credit(
+                provider_id, base["amount"], "earn_reward", base["description"],
+                currency="FIX",
+                meta={"event": "job_completed", "booking_id": booking_id, "idempotency_key": idem},
+            )
+            awards.append({"event": "job_completed", "amount": base["amount"]})
+        # 2. Positive rating bonus
+        if update.get("rating") == 5:
+            pos = FIX_EARN_RULES["positive_rating"]
+            idem2 = f"positive_rating:{booking_id}"
+            dup2 = await db.token_transactions.find_one(
+                {"user_id": provider_id, "currency": "FIX", "meta.idempotency_key": idem2}
+            )
+            if not dup2:
+                await svc.credit(
+                    provider_id, pos["amount"], "earn_reward", pos["description"],
+                    currency="FIX",
+                    meta={"event": "positive_rating", "booking_id": booking_id, "idempotency_key": idem2},
+                )
+                awards.append({"event": "positive_rating", "amount": pos["amount"]})
+        # 3. Milestone check
+        completed_count = await db.fixa_bookings.count_documents(
+            {"provider_id": provider_id, "status": "completed"}
+        )
+        for milestone in (50, 100, 500):
+            if completed_count == milestone:
+                m_rule = FIX_EARN_RULES[f"milestone_{milestone}"]
+                idem3 = f"milestone_{milestone}:{provider_id}"
+                dup3 = await db.token_transactions.find_one(
+                    {"user_id": provider_id, "currency": "FIX", "meta.idempotency_key": idem3}
+                )
+                if not dup3:
+                    await svc.credit(
+                        provider_id, m_rule["amount"], "earn_reward", m_rule["description"],
+                        currency="FIX",
+                        meta={"event": f"milestone_{milestone}", "idempotency_key": idem3},
+                    )
+                    awards.append({"event": f"milestone_{milestone}", "amount": m_rule["amount"]})
+
+    return {"ok": True, "booking_id": booking_id, "awards": awards}
 
 
 # ─── Cart ─────────────────────────────────────────────────

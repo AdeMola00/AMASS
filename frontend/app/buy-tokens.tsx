@@ -59,8 +59,8 @@ export default function BuyTokensScreen() {
       const res = await purchase(chosen.id);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       Alert.alert(
-        "Tokens credited!",
-        `${res.credited} tokens added to your wallet. Your new balance is ${res.balance}.`,
+        "MASS credited!",
+        `${res.credited} MASS added to your wallet. Your new balance is ${res.balance}.`,
         [{ text: "Great!", onPress: () => router.replace("/wallet") }]
       );
     } catch (e: any) {
@@ -77,7 +77,7 @@ export default function BuyTokensScreen() {
         <Pressable onPress={() => router.back()} style={styles.iconBtn} testID="back-btn">
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Buy Tokens</Text>
+        <Text style={styles.headerTitle}>Buy MASS</Text>
         <TokenBalanceChip balance={wallet?.spendable ?? 0} />
       </SafeAreaView>
 
@@ -88,9 +88,9 @@ export default function BuyTokensScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 200 }}>
           <View style={styles.intro}>
-            <Text style={styles.introTitle}>Top up your AMASS Tokens</Text>
+            <Text style={styles.introTitle}>Top up your MASS tokens</Text>
             <Text style={styles.introBody}>
-              Tokens unlock premium property information — exact addresses, agent contacts,
+              MASS unlocks premium property information — exact addresses, agent contacts,
               documents, virtual tours & more. Buy once, use anytime.
             </Text>
           </View>
@@ -131,7 +131,7 @@ export default function BuyTokensScreen() {
                   <Text style={styles.bundleName}>{b.name}</Text>
                   <View style={styles.bundleTokens}>
                     <Text style={styles.bundleTokensBig}>{totalTokens}</Text>
-                    <Text style={styles.bundleTokensSuffix}>tokens</Text>
+                    <Text style={styles.bundleTokensSuffix}>MASS</Text>
                   </View>
                   {b.bonus > 0 && (
                     <Text style={styles.bundleBonus}>
@@ -142,7 +142,7 @@ export default function BuyTokensScreen() {
                     <Text style={styles.bundlePrice}>{formatNaira(b.price_ngn)}</Text>
                   </View>
                   <Text style={styles.bundleUnit}>
-                    {(b.price_ngn / totalTokens).toFixed(1)} ₦/token
+                    {(b.price_ngn / totalTokens).toFixed(1)} ₦/MASS
                   </Text>
                 </Pressable>
               );
@@ -205,7 +205,7 @@ export default function BuyTokensScreen() {
             ) : (
               <>
                 <Ionicons name="lock-closed" size={16} color="#fff" />
-                <Text style={styles.stickyBtnText}>Pay & Get Tokens</Text>
+                <Text style={styles.stickyBtnText}>Pay & Get MASS</Text>
               </>
             )}
           </Pressable>

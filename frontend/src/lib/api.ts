@@ -48,7 +48,10 @@ export type Property = {
   unlocked?: boolean;
 };
 
+export type Currency = "MASS" | "FIX";
+
 export type WalletDto = {
+  currency?: Currency;  // undefined = legacy MASS wallet
   balance: number;
   bonus_balance: number;
   spendable: number;
@@ -58,12 +61,29 @@ export type WalletDto = {
   subscription?: any | null;
 };
 
+export type DualWalletDto = {
+  mass: WalletDto;
+  fix: WalletDto;
+};
+
 export type TokenBundle = {
   id: string;
   name: string;
   tokens: number;
   bonus: number;
   price_ngn: number;
+};
+
+export type FixEarnRule = {
+  event: string;
+  amount: number;
+  description: string;
+};
+
+export type FixSpendRule = {
+  action: string;
+  amount: number;
+  description: string;
 };
 
 export type SubscriptionPlan = {
@@ -76,6 +96,7 @@ export type SubscriptionPlan = {
 
 export type WalletTransaction = {
   id: string;
+  currency?: Currency;  // undefined = legacy MASS
   kind: string;
   amount: number;
   balance_after: number;
@@ -559,10 +580,14 @@ export const api = {
       body: JSON.stringify({ query, session_id }),
     }),
 
-  // ─── Token economy ────────────────────────────────────
+  // ─── Token economy (MASS = property utility) ─────────
   wallet: () => req<WalletDto>("/wallet/me"),
-  walletTransactions: (limit = 40) =>
-    req<WalletTransaction[]>(`/wallet/transactions?limit=${limit}`),
+  walletDual: () => req<DualWalletDto>("/wallet/dual"),
+  walletMass: () => req<WalletDto>("/wallet/mass"),
+  walletTransactions: (limit = 40, currency?: Currency) =>
+    req<WalletTransaction[]>(
+      `/wallet/transactions?limit=${limit}${currency ? `&currency=${currency}` : ""}`
+    ),
   walletUnlocks: () =>
     req<
       {
@@ -581,15 +606,16 @@ export const api = {
         };
       }[]
     >("/wallet/unlocks"),
-  listBundles: () => req<TokenBundle[]>("/tokens/bundles"),
-  purchaseTokens: (bundle_id: string, provider: "paystack" | "flutterwave" | "mock" = "mock") =>
+  listBundles: (currency: Currency = "MASS") =>
+    req<TokenBundle[]>(`/tokens/bundles?currency=${currency}`),
+  purchaseTokens: (bundle_id: string, provider: "paystack" | "flutterwave" | "bank_transfer" | "card" | "mock" = "mock") =>
     req<{ ok: boolean; credited: number; balance: number }>("/tokens/purchase", {
       method: "POST",
       body: JSON.stringify({ bundle_id, provider }),
     }),
   listPlans: () => req<SubscriptionPlan[]>("/subscriptions/plans"),
   mySubscription: () => req<any>("/subscriptions/me"),
-  subscribe: (plan_id: string, provider: "paystack" | "flutterwave" | "mock" = "mock") =>
+  subscribe: (plan_id: string, provider: "paystack" | "flutterwave" | "bank_transfer" | "card" | "mock" = "mock") =>
     req<{ ok: boolean; subscription: any; credited: number; balance: number }>(
       "/subscriptions/subscribe",
       { method: "POST", body: JSON.stringify({ plan_id, provider }) }
@@ -609,6 +635,32 @@ export const api = {
     req<{ ok: boolean; credited?: number; reason?: string }>(
       "/wallet/earn?task_id=daily_login",
       { method: "POST" }
+    ),
+
+  // ─── FIX token (FIXA service utility & reward) ────────
+  walletFix: () => req<WalletDto>("/wallet/fix"),
+  listFixBundles: () => req<TokenBundle[]>("/wallet/fix/bundles"),
+  fixEarnRules: () => req<FixEarnRule[]>("/wallet/fix/earn-rules"),
+  fixSpendRules: () => req<FixSpendRule[]>("/wallet/fix/spend-rules"),
+  purchaseFix: (bundle_id: string, provider: "paystack" | "flutterwave" | "bank_transfer" | "card" | "mock" = "mock") =>
+    req<{ ok: boolean; credited: number; balance: number }>("/wallet/fix/purchase", {
+      method: "POST",
+      body: JSON.stringify({ bundle_id, provider }),
+    }),
+  spendFix: (action: string, meta?: Record<string, any>) =>
+    req<{ ok: boolean; action: string; spent: number; balance: number }>(
+      "/wallet/fix/spend",
+      { method: "POST", body: JSON.stringify({ action, meta: meta || {} }) }
+    ),
+  earnFix: (event: string, meta?: Record<string, any>) =>
+    req<{ ok: boolean; credited?: number; balance?: number; duplicate?: boolean }>(
+      "/wallet/fix/earn",
+      { method: "POST", body: JSON.stringify({ event, meta: meta || {} }) }
+    ),
+  fixaCompleteBooking: (booking_id: string, rating?: number, review?: string) =>
+    req<{ ok: boolean; already_completed?: boolean; awards?: { event: string; amount: number }[] }>(
+      `/marketplace/fixa/bookings/${booking_id}/complete`,
+      { method: "POST", body: JSON.stringify({ rating, review }) }
     ),
 
   // ─── Earn / Referrals ─────────────────────────────────
