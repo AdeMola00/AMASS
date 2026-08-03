@@ -805,7 +805,37 @@ export const api = {
     note?: string;
     product_id?: string;
   }) =>
-    req<any>("/agents/referrals", { method: "POST", body: JSON.stringify(data) }),
+    req<any>("/agent-workspace/referrals", { method: "POST", body: JSON.stringify(data) }),
+  myAgentReferrals: () => req<any[]>("/agent-workspace/referrals"),
+  qualifyReferral: (referral_id: string, application_id: string, deal_value_ngn: number) =>
+    req<{ ok: boolean; commission_amount_ngn: number; rate: number }>(
+      `/agent-workspace/referrals/${referral_id}/qualify`,
+      { method: "POST", body: JSON.stringify({ application_id, deal_value_ngn }) }
+    ),
+  payoutReferral: (
+    referral_id: string,
+    method: "bank" | "wallet",
+    bank_account?: { bank_name: string; account_number: string; account_name: string }
+  ) =>
+    req<{
+      ok: boolean;
+      already_paid?: boolean;
+      amount_ngn?: number;
+      reference?: string;
+      method?: string;
+      credited_mass?: number;
+    }>(`/agent-workspace/referrals/${referral_id}/payout`, {
+      method: "POST",
+      body: JSON.stringify({ method, bank_account }),
+    }),
+  agentSummary: () =>
+    req<{
+      total_referrals: number;
+      approved_count: number;
+      paid_count: number;
+      pending_payout_ngn: number;
+      paid_ngn: number;
+    }>("/agent-workspace/summary"),
 
   // ─── Earn / Referrals ─────────────────────────────────
   earnTasks: () =>

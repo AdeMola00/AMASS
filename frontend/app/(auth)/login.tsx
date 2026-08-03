@@ -43,7 +43,7 @@ export default function Login() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <AmassLogo size="md" />
+          <AmassLogo size="xl" />
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>
             Sign in to continue exploring properties across Africa.

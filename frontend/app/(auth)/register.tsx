@@ -53,7 +53,7 @@ export default function Register() {
         </Pressable>
 
         <View style={styles.header}>
-          <AmassLogo size="md" />
+          <AmassLogo size="lg" />
           <Text style={styles.title}>Create your account</Text>
           <Text style={styles.subtitle}>
             Join thousands discovering premium properties across Africa.

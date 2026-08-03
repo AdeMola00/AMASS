@@ -75,7 +75,7 @@ export default function Onboarding() {
             <View style={styles.scrim} />
             <SafeAreaView style={styles.content} edges={["top", "bottom"]}>
               <View style={styles.topRow}>
-                <AmassLogo size="sm" color="#fff" />
+                <AmassLogo size="md" showWordmark={false} />
                 <Pressable onPress={() => router.replace("/(auth)/login")} hitSlop={12}>
                   <Text style={styles.skip}>Skip</Text>
                 </Pressable>

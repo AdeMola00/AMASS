@@ -188,6 +188,42 @@ class ProjectMilestoneIn(BaseModel):
     completed_at: Optional[str] = None
 
 
+class AgentReferralIn(BaseModel):
+    property_id: str
+    client_user_id: Optional[str] = None
+    client_name: Optional[str] = None
+    client_phone: Optional[str] = None
+    note: Optional[str] = None
+    product_id: Optional[str] = None  # if recommending financing
+
+
+class LinkReferralIn(BaseModel):
+    application_id: str
+    deal_value_ngn: float
+
+
+class PayoutIn(BaseModel):
+    method: Literal["bank", "wallet"] = "wallet"
+    bank_account: Optional[dict] = None  # {bank_name, account_number, account_name}
+    reference: Optional[str] = None
+
+
+# Commission rate table (percent of loan disbursed or sale value).
+COMMISSION_RATES = {
+    "renovation_loan":     0.025,
+    "property_completion": 0.025,
+    "rebuild_loan":        0.020,
+    "rental_upgrade":      0.030,
+    "mortgage_referral":   0.015,
+    "home_improvement":    0.030,
+    "property_sale":       0.020,
+}
+
+
+def _commission_rate(product_id: Optional[str]) -> float:
+    return COMMISSION_RATES.get(product_id or "property_sale", 0.02)
+
+
 # ─── Registration ───────────────────────────────────────────────
 def register_property_improvement_routes(
     db: AsyncIOMotorDatabase,
@@ -652,15 +688,9 @@ def register_property_improvement_routes(
         return {"ok": True}
 
     # ═══ Agent Workspace hooks ═══════════════════════════════
-    class AgentReferralIn(BaseModel):
-        property_id: str
-        client_user_id: Optional[str] = None
-        client_name: Optional[str] = None
-        client_phone: Optional[str] = None
-        note: Optional[str] = None
-        product_id: Optional[str] = None  # if recommending financing
-
-    @router.post("/agents/referrals")
+    # Prefixed `/agent-workspace/*` to avoid collision with the existing
+    # `/agents/{user_id}` public-profile route defined in server.py.
+    @router.post("/agent-workspace/referrals")
     async def create_agent_referral(
         data: AgentReferralIn, user: dict = Depends(require_auth)
     ):
@@ -671,14 +701,28 @@ def register_property_improvement_routes(
             "id": str(uuid.uuid4()),
             "agent_user_id": user["id"],
             "property_id": data.property_id,
+            "property_snapshot": {
+                "title": prop.get("title"),
+                "location": prop.get("location"),
+                "images": (prop.get("images") or [])[:1],
+                "price": prop.get("price"),
+            },
             "client_user_id": data.client_user_id,
             "client_name": data.client_name,
             "client_phone": data.client_phone,
             "product_id": data.product_id,
             "note": (data.note or "")[:1000],
-            "status": "open",
-            "commission_status": "pending",
+            "status": "open",  # open | qualified | converted | closed_lost
+            "commission_rate": _commission_rate(data.product_id),
+            "commission_status": "pending",  # pending | approved | paid | cancelled
             "commission_amount_ngn": None,
+            "payout_method": None,   # bank | wallet
+            "payout_reference": None,
+            "linked_application_id": None,
+            "history": [
+                {"kind": "created", "at": datetime.now(timezone.utc).isoformat(),
+                 "note": "Referral logged."}
+            ],
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await db.agent_referrals.insert_one(dict(doc))
@@ -691,10 +735,134 @@ def register_property_improvement_routes(
         doc.pop("_id", None)
         return doc
 
-    @router.get("/agents/referrals/mine")
+    @router.get("/agent-workspace/referrals")
     async def my_agent_referrals(user: dict = Depends(require_auth)):
         return await db.agent_referrals.find(
             {"agent_user_id": user["id"]}, {"_id": 0}
         ).sort("created_at", -1).to_list(50)
+
+    @router.post("/agent-workspace/referrals/{referral_id}/qualify")
+    async def qualify_referral(
+        referral_id: str, data: LinkReferralIn, user: dict = Depends(require_auth)
+    ):
+        r = await db.agent_referrals.find_one({"id": referral_id}, {"_id": 0})
+        if not r:
+            raise HTTPException(404, "Referral not found")
+        if r["agent_user_id"] != user["id"] and not user.get("is_admin"):
+            raise HTTPException(403, "Not your referral")
+        rate = r.get("commission_rate") or _commission_rate(r.get("product_id"))
+        amount = round(float(data.deal_value_ngn) * rate)
+        entry = {
+            "kind": "qualified",
+            "at": datetime.now(timezone.utc).isoformat(),
+            "application_id": data.application_id,
+            "deal_value_ngn": data.deal_value_ngn,
+            "commission_amount_ngn": amount,
+        }
+        await db.agent_referrals.update_one(
+            {"id": referral_id},
+            {"$set": {
+                "status": "qualified",
+                "linked_application_id": data.application_id,
+                "commission_amount_ngn": amount,
+                "commission_status": "approved",
+            }, "$push": {"history": entry}},
+        )
+        await _push_notification(
+            r["agent_user_id"], "referral_qualified",
+            "Referral qualified for commission",
+            f"₦{amount:,} approved — payout will follow after the deal closes.",
+            meta={"referral_id": referral_id, "amount_ngn": amount},
+        )
+        return {"ok": True, "commission_amount_ngn": amount, "rate": rate}
+
+    @router.post("/agent-workspace/referrals/{referral_id}/payout")
+    async def payout_referral(
+        referral_id: str, data: PayoutIn, user: dict = Depends(require_auth)
+    ):
+        """Trigger a commission payout. MOCK gateway — in production this would
+        call Paystack Transfer / Flutterwave Transfer or credit the agent's
+        MASS wallet. Idempotent: once paid, further calls return the existing payout.
+        """
+        r = await db.agent_referrals.find_one({"id": referral_id}, {"_id": 0})
+        if not r:
+            raise HTTPException(404, "Referral not found")
+        if r["agent_user_id"] != user["id"] and not user.get("is_admin"):
+            raise HTTPException(403, "Not your referral")
+        if r.get("commission_status") == "paid":
+            return {"ok": True, "already_paid": True,
+                    "amount_ngn": r.get("commission_amount_ngn"),
+                    "reference": r.get("payout_reference")}
+        if r.get("commission_status") != "approved":
+            raise HTTPException(400, "Referral must be approved before payout")
+        amount = r.get("commission_amount_ngn") or 0
+        if amount <= 0:
+            raise HTTPException(400, "No commission amount to pay out")
+        ref = data.reference or f"ref_payout_{uuid.uuid4().hex[:12]}"
+        now = datetime.now(timezone.utc).isoformat()
+        credited_mass = None
+        if data.method == "wallet":
+            from tokens import WalletService  # local import to avoid cycle
+            svc = WalletService(db)
+            credited_mass = max(1, round(amount / 100))  # ₦100 = 1 MASS (MVP)
+            await svc.credit(
+                r["agent_user_id"], credited_mass, "earn_reward",
+                f"Referral commission payout — ₦{amount:,}",
+                currency="MASS",
+                meta={"referral_id": referral_id, "payout_reference": ref, "amount_ngn": amount},
+            )
+        entry = {
+            "kind": "payout",
+            "at": now,
+            "note": f"Paid out ₦{amount:,} via {data.method}",
+            "reference": ref,
+        }
+        await db.agent_referrals.update_one(
+            {"id": referral_id},
+            {"$set": {
+                "commission_status": "paid",
+                "status": "converted",
+                "payout_method": data.method,
+                "payout_reference": ref,
+                "payout_bank_account": data.bank_account,
+                "paid_at": now,
+            }, "$push": {"history": entry}},
+        )
+        await _push_notification(
+            r["agent_user_id"], "commission_paid",
+            "Commission paid",
+            f"₦{amount:,} paid to your {data.method}."
+            + (f" ({credited_mass} MASS credited)" if data.method == "wallet" else ""),
+            meta={"referral_id": referral_id, "amount_ngn": amount, "reference": ref},
+        )
+        return {
+            "ok": True, "amount_ngn": amount, "reference": ref,
+            "method": data.method, "credited_mass": credited_mass,
+        }
+
+    @router.get("/agent-workspace/summary")
+    async def agent_summary(user: dict = Depends(require_auth)):
+        """KPIs for the Agent Workspace dashboard."""
+        docs = await db.agent_referrals.find(
+            {"agent_user_id": user["id"]}, {"_id": 0}
+        ).to_list(500)
+        total = len(docs)
+        approved = sum(1 for d in docs if d.get("commission_status") == "approved")
+        paid = sum(1 for d in docs if d.get("commission_status") == "paid")
+        pending_amount = sum(
+            (d.get("commission_amount_ngn") or 0)
+            for d in docs if d.get("commission_status") == "approved"
+        )
+        paid_amount = sum(
+            (d.get("commission_amount_ngn") or 0)
+            for d in docs if d.get("commission_status") == "paid"
+        )
+        return {
+            "total_referrals": total,
+            "approved_count": approved,
+            "paid_count": paid,
+            "pending_payout_ngn": pending_amount,
+            "paid_ngn": paid_amount,
+        }
 
     return router

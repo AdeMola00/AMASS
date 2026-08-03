@@ -31,6 +31,7 @@ import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/Filte
 import { PropertyCardSkeleton } from "@/src/components/Skeleton";
 import { LayerPickerSheet, LayerPickerRef, MapLayer } from "@/src/components/LayerPickerSheet";
 import { NeighborhoodSheet, NeighborhoodSheetRef } from "@/src/components/NeighborhoodSheet";
+import { AmassLogo } from "@/src/components/AmassLogo";
 import { mapMinimal } from "@/src/constants/mapStyle";
 import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 
@@ -933,7 +934,7 @@ function TopOverlay({
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.98)" }]} />
         )}
-        <Ionicons name="search" size={18} color={colors.textSecondary} />
+        <AmassLogo size={22} showWordmark={false} style={{ marginLeft: -2 }} />
         <TextInput
           placeholder="Search cities, neighborhoods, landmarks…"
           placeholderTextColor={colors.textMuted}
