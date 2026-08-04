@@ -1838,6 +1838,9 @@ app.include_router(register_property_improvement_routes(db, get_current_user))
 from admin import register_admin_routes  # noqa: E402
 app.include_router(register_admin_routes(db, get_current_user))
 
+from cms import register_cms_routes  # noqa: E402
+app.include_router(register_cms_routes(db, get_current_user, hash_password, create_token, user_to_out))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

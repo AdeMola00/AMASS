@@ -64,6 +64,11 @@ export function Login() {
         <Button type="submit" disabled={busy} className="w-full amass-btn-primary h-11 rounded-xl" data-testid="login-submit">
           {busy ? "Signing in…" : "Sign in"}
         </Button>
+        <div className="text-center text-sm">
+          <Link to="/forgot-password" className="text-neutral-600 hover:text-[color:var(--amass-red)]" data-testid="login-forgot-link">
+            Forgot your password?
+          </Link>
+        </div>
       </form>
 
       <div className="mt-6 text-center text-sm text-neutral-500">

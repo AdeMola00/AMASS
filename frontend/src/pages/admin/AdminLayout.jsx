@@ -2,14 +2,17 @@ import React from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { AmassLogo } from "@/components/AmassLogo";
-import { LayoutDashboard, Building2, Users, UserCheck, ShoppingBag, FileText, ArrowLeft, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, Users, UserCheck, ShoppingBag, FileText, ArrowLeft, LogOut, Paintbrush, Settings, Megaphone } from "lucide-react";
 
 const links = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/admin/properties", label: "Properties", icon: Building2 },
+  { to: "/admin/marketplace", label: "Marketplace", icon: ShoppingBag },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/agents", label: "Agents", icon: UserCheck },
-  { to: "/admin/marketplace", label: "Marketplace", icon: ShoppingBag },
+  { to: "/admin/cms", label: "Landing CMS", icon: Paintbrush },
+  { to: "/admin/notifications", label: "Broadcasts", icon: Megaphone },
+  { to: "/admin/settings", label: "Settings", icon: Settings },
   { to: "/admin/audit-log", label: "Audit log", icon: FileText },
 ];
 

@@ -1,5 +1,4 @@
 // AMASS unified API client — talks to the single production backend.
-// All Landing, Public browse, User dashboard AND Admin Portal use this.
 const BASE = process.env.REACT_APP_BACKEND_URL;
 const AUTH_KEY = "amass_auth_token";
 
@@ -43,11 +42,16 @@ function qs(params) {
 
 export const api = {
   // Auth
-  register: (data) =>
-    req("/auth/register", { method: "POST", body: JSON.stringify(data) }),
-  login: (data) =>
-    req("/auth/login", { method: "POST", body: JSON.stringify(data) }),
+  register: (data) => req("/auth/register", { method: "POST", body: JSON.stringify(data) }),
+  login: (data) => req("/auth/login", { method: "POST", body: JSON.stringify(data) }),
   me: () => req("/auth/me"),
+  forgotPassword: (email) => req("/auth/forgot", { method: "POST", body: JSON.stringify({ email }) }),
+  resetPassword: (token, password) =>
+    req("/auth/reset", { method: "POST", body: JSON.stringify({ token, password }) }),
+
+  // Public CMS
+  cmsLanding: () => req("/cms/landing"),
+  cms: (key) => req(`/cms/${key}`),
 
   // Properties (public)
   listProperties: (params) => req(`/properties${qs(params)}`),
@@ -56,10 +60,7 @@ export const api = {
 
   // Favorites
   toggleFavorite: (property_id) =>
-    req("/favorites/toggle", {
-      method: "POST",
-      body: JSON.stringify({ property_id }),
-    }),
+    req("/favorites/toggle", { method: "POST", body: JSON.stringify({ property_id }) }),
   listFavorites: () => req("/favorites"),
   favoriteIds: () => req("/favorites/ids"),
 
@@ -79,46 +80,44 @@ export const api = {
   // Agent
   agentDashboard: () => req("/agent/dashboard"),
   agentListings: () => req("/agent/listings"),
-  agentApply: (data) =>
-    req("/agents/apply", { method: "POST", body: JSON.stringify(data) }),
-  createProperty: (data) =>
-    req("/properties", { method: "POST", body: JSON.stringify(data) }),
 
   // AI
   aiSearch: (query) =>
-    req("/ai/search/sync", {
-      method: "POST",
-      body: JSON.stringify({ query }),
-    }),
+    req("/ai/search/sync", { method: "POST", body: JSON.stringify({ query }) }),
 
   // Admin
   admin: {
     dashboard: () => req("/admin/dashboard"),
     properties: (params) => req(`/admin/properties${qs(params)}`),
     approveProperty: (id, data) =>
-      req(`/admin/properties/${id}/approve`, {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+      req(`/admin/properties/${id}/approve`, { method: "POST", body: JSON.stringify(data) }),
     deleteProperty: (id) => req(`/admin/properties/${id}`, { method: "DELETE" }),
     users: (params) => req(`/admin/users${qs(params)}`),
     updateUserRole: (id, data) =>
-      req(`/admin/users/${id}/role`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
+      req(`/admin/users/${id}/role`, { method: "PATCH", body: JSON.stringify(data) }),
+    updateUserRoles: (id, roles) =>
+      req(`/admin/users/${id}/roles`, { method: "PATCH", body: JSON.stringify({ roles }) }),
     agents: (params) => req(`/admin/agents${qs(params)}`),
     agentDecision: (userId, decision, verification_level) =>
-      req(
-        `/admin/agents/${userId}/decision${qs({ decision, verification_level })}`,
-        { method: "POST" }
-      ),
+      req(`/admin/agents/${userId}/decision${qs({ decision, verification_level })}`, { method: "POST" }),
     marketplace: (params) => req(`/admin/marketplace${qs(params)}`),
     deleteMarketplaceItem: (id) =>
       req(`/admin/marketplace/${id}`, { method: "DELETE" }),
     orders: () => req("/admin/orders"),
     auditLog: (limit = 50) => req(`/admin/audit-log?limit=${limit}`),
     payments: () => req("/admin/payments"),
+    // CMS
+    cmsLanding: () => req("/admin/cms/landing"),
+    updateCmsLanding: (patch) =>
+      req("/admin/cms/landing", { method: "PATCH", body: JSON.stringify(patch) }),
+    resetCmsLanding: () => req("/admin/cms/landing/reset", { method: "POST" }),
+    // Settings
+    settings: () => req("/admin/settings"),
+    updateSettings: (key, value) =>
+      req("/admin/settings", { method: "PUT", body: JSON.stringify({ key, value }) }),
+    // Broadcast
+    broadcast: (data) =>
+      req("/admin/notifications/broadcast", { method: "POST", body: JSON.stringify(data) }),
   },
 };
 

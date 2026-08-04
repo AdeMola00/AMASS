@@ -13,6 +13,8 @@ import { Discover } from "@/pages/Discover";
 import { About } from "@/pages/About";
 import { Login } from "@/pages/Login";
 import { Register } from "@/pages/Register";
+import { ForgotPassword } from "@/pages/ForgotPassword";
+import { ResetPassword } from "@/pages/ResetPassword";
 import { Dashboard } from "@/pages/Dashboard";
 
 import { AdminLayout } from "@/pages/admin/AdminLayout";
@@ -22,6 +24,9 @@ import { AdminUsers } from "@/pages/admin/AdminUsers";
 import { AdminAgents } from "@/pages/admin/AdminAgents";
 import { AdminMarketplace } from "@/pages/admin/AdminMarketplace";
 import { AdminAuditLog } from "@/pages/admin/AdminAuditLog";
+import { AdminCMS } from "@/pages/admin/AdminCMS";
+import { AdminSettings } from "@/pages/admin/AdminSettings";
+import { AdminNotifications } from "@/pages/admin/AdminNotifications";
 
 function PublicShell({ children }) {
   return (
@@ -70,6 +75,8 @@ export default function App() {
           <Route path="/about" element={<PublicShell><About /></PublicShell>} />
           <Route path="/login" element={<PublicShell><Login /></PublicShell>} />
           <Route path="/register" element={<PublicShell><Register /></PublicShell>} />
+          <Route path="/forgot-password" element={<PublicShell><ForgotPassword /></PublicShell>} />
+          <Route path="/reset-password" element={<PublicShell><ResetPassword /></PublicShell>} />
           <Route
             path="/dashboard"
             element={
@@ -93,6 +100,9 @@ export default function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="agents" element={<AdminAgents />} />
             <Route path="marketplace" element={<AdminMarketplace />} />
+            <Route path="cms" element={<AdminCMS />} />
+            <Route path="settings" element={<AdminSettings />} />
+            <Route path="notifications" element={<AdminNotifications />} />
             <Route path="audit-log" element={<AdminAuditLog />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
