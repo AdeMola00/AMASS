@@ -745,11 +745,13 @@ def register_property_improvement_routes(
     async def qualify_referral(
         referral_id: str, data: LinkReferralIn, user: dict = Depends(require_auth)
     ):
+        # SECURITY: Only admins may qualify a referral — otherwise agents can
+        # rubber-stamp their own commissions and self-payout MASS tokens.
+        if not user.get("is_admin"):
+            raise HTTPException(403, "Only AMASS admins can qualify referrals")
         r = await db.agent_referrals.find_one({"id": referral_id}, {"_id": 0})
         if not r:
             raise HTTPException(404, "Referral not found")
-        if r["agent_user_id"] != user["id"] and not user.get("is_admin"):
-            raise HTTPException(403, "Not your referral")
         rate = r.get("commission_rate") or _commission_rate(r.get("product_id"))
         amount = round(float(data.deal_value_ngn) * rate)
         entry = {
@@ -783,12 +785,13 @@ def register_property_improvement_routes(
         """Trigger a commission payout. MOCK gateway — in production this would
         call Paystack Transfer / Flutterwave Transfer or credit the agent's
         MASS wallet. Idempotent: once paid, further calls return the existing payout.
+        SECURITY: admin-only to prevent self-payout abuse.
         """
+        if not user.get("is_admin"):
+            raise HTTPException(403, "Only AMASS admins can trigger payouts")
         r = await db.agent_referrals.find_one({"id": referral_id}, {"_id": 0})
         if not r:
             raise HTTPException(404, "Referral not found")
-        if r["agent_user_id"] != user["id"] and not user.get("is_admin"):
-            raise HTTPException(403, "Not your referral")
         if r.get("commission_status") == "paid":
             return {"ok": True, "already_paid": True,
                     "amount_ngn": r.get("commission_amount_ngn"),

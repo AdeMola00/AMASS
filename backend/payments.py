@@ -48,12 +48,19 @@ def _flutterwave_hash() -> str:
 
 def _api_base() -> str:
     """The public HTTPS base at which THIS FastAPI is reachable (for webhook URLs
-    and the HTTPS→deep-link relay). Falls back to Expo dev URL for local runs."""
-    return (
-        os.getenv("PUBLIC_API_BASE")
-        or os.getenv("EXPO_BACKEND_URL")
-        or "http://localhost:8001"
-    ).rstrip("/")
+    and the HTTPS→deep-link relay). Requires PUBLIC_API_BASE (or EXPO_BACKEND_URL
+    as a fallback) to be set in env — no insecure http://localhost default."""
+    base = (os.getenv("PUBLIC_API_BASE") or os.getenv("EXPO_BACKEND_URL") or "").strip()
+    if not base:
+        # Only accept an http fallback when explicitly mocking payments locally.
+        if os.getenv("MOCK_PAYMENT", "false").lower() == "true":
+            base = "http://localhost:8001"
+        else:
+            raise RuntimeError(
+                "PUBLIC_API_BASE or EXPO_BACKEND_URL must be set for live "
+                "payments (webhook + callback rely on it)."
+            )
+    return base.rstrip("/")
 
 
 def _lookup_bundle(currency: Currency, bundle_id: str) -> Optional[dict]:

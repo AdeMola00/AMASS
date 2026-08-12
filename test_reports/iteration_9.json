@@ -1,0 +1,56 @@
+{
+  "summary": "Backend-only security-hardening regression pass. Executed 28 pytest cases via /app/backend/tests/test_security_hardening.py against https://property-os-africa.preview.emergentagent.com/api. RESULT: 28/28 PASSED. All four P0 security fixes are correctly enforced end-to-end: (1) POST /api/seed returns 401 anon, 403 non-admin, 200 for demo user (in ADMIN_EMAILS) and returns a counts dict; (2) POST /api/tokens/purchase and POST /api/wallet/fix/purchase both return 410 Gone with a `redirect` field in the detail body AND — verified via wallet before/after diff — apply ZERO credit to the caller wallet; (3) wallet atomic ops: FIX /wallet/fix/earn credits +10 the first time with idempotency_key, second identical call returns {duplicate:true, credited:0} with balance and lifetime_earned each incremented by exactly 10; /earn/claim task_id=daily_login credits +2 MASS once/day and returns already_claimed_today on retry, lifetime_earned goes up by exactly 2; (4) /agent-workspace/referrals/{id}/qualify and /payout both return 403 'Only AMASS admins can qualify referrals' / 'Only AMASS admins can trigger payouts' for a fresh non-admin user and 200 for demo — commission credited & payout marked paid. Regression sweep also green: register / login / auth/me, /properties (9 back), /marketplace, /wallet/me, /wallet/dual, /wallet/transactions?currency=MASS, /earn/tasks, /earn/referral/me, /agent/promotions/config, /improve/catalog, /saved-searches, apple auth route registered (probed via POST /api/auth/apple with malformed token returning 400 'Malformed Apple identity token' — not 404), and payments initialize returns a mock checkout URL + reference. Two documentation-vs-implementation mismatches surfaced (both non-blocking, minor): (a) the 410 redirect field points to /api/payments/init but the real route is /api/payments/initialize (init returns 404); (b) /api/wallet/mass/transactions in the review request also returns 404 — only the currency-filtered /api/wallet/transactions?currency=MASS exists. A third minor: the mock checkout_url is built from http://localhost:8001 because PUBLIC_API_BASE / EXPO_BACKEND_URL is not set in backend/.env, so mobile clients won't be able to open the mock checkout page from the preview host. None of these regressed a working feature — they were pre-existing gaps.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/tokens/purchase and POST /api/wallet/fix/purchase",
+        "issue": "410 Gone response body contains {\"redirect\": \"/api/payments/init\"} but the actual initialize route is /api/payments/initialize. Any client that follows the redirect verbatim will hit 404. Reference: /app/backend/tokens.py:569 and :772 — change 'redirect' value to '/api/payments/initialize' (or add an /init alias to payments router)."
+      },
+      {
+        "endpoint": "GET /api/wallet/mass/transactions",
+        "issue": "Route does not exist (returns 404). Review request references this path but only /api/wallet/transactions?currency=MASS is implemented (tokens.py:508). Either add a /wallet/mass/transactions alias or update the client contract to use the currency-filtered route."
+      },
+      {
+        "endpoint": "POST /api/payments/initialize (MOCK_PAYMENT=true)",
+        "issue": "checkout_url is returned as 'http://localhost:8001/api/payments/mock/<ref>' because PUBLIC_API_BASE and EXPO_BACKEND_URL are not set in /app/backend/.env. The mock checkout URL will not open on a real mobile device against the preview host. Add PUBLIC_API_BASE=https://property-os-africa.preview.emergentagent.com (or EXPO_BACKEND_URL) to backend/.env. Reference: /app/backend/payments.py:49-60."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_security_hardening.py",
+    "/app/test_reports/pytest/pytest_iteration9.xml"
+  ],
+  "action_items": [
+    "Fix redirect URL string in /app/backend/tokens.py — /api/payments/init → /api/payments/initialize (both purchase_tokens at line 569 and purchase_fix at line 772). Optional: register an alias route @router.post('/init') in /app/backend/payments.py that delegates to initialize() so old clients keep working.",
+    "Decide the contract for /api/wallet/mass/transactions: either add a route in tokens.py that forwards to the currency-filtered handler, or update any client / OpenAPI reference to use /api/wallet/transactions?currency=MASS.",
+    "Add PUBLIC_API_BASE (or ensure EXPO_BACKEND_URL) is set in /app/backend/.env so the MOCK checkout URL is reachable from mobile. Currently defaults to http://localhost:8001.",
+    "No regression detected on the P0 fixes — safe to proceed toward deployment for the security items in scope."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1979 lines — well above the 700-line guidance. Consider splitting the seed logic (lines ~1754-1900), marketplace routes (~1018-1220), and startup indexes/seed hooks into dedicated modules to reduce merge friction.",
+    "ADMIN_EMAILS fallback string 'demo@amass.africa,admin@amass.africa' is hardcoded in server.py:50-52. Fine for MVP but for production the fallback should be empty and ADMIN_EMAILS mandatory in .env — otherwise deploying without the env var silently grants admin to the demo account.",
+    "tokens.py purchase_tokens / purchase_fix declare `data: PurchaseIn` and `creds` params but ignore them entirely (immediate raise). Drop the params or at least don't accept a body — otherwise 422 could surface for clients sending old payloads before the intended 410.",
+    "property_improvement.py:751/791 admin check uses `user.get('is_admin')` — good, but relies on get_current_user's ADMIN_EMAILS normalisation. If require_auth in property_improvement.py doesn't call the same normaliser, an admin allow-listed via env would be treated as non-admin. Verified indirectly (test_qualify_by_admin_200 passes) but worth an explicit unit test.",
+    "payments.py:196 mock checkout URL depends on _api_base() which silently falls back to http://localhost:8001 (line 57-58). The comment claims 'no insecure http://localhost default' but the fallback contradicts the comment — either raise on missing env or delete the fallback.",
+    "Auth-gated wallet routes are internally consistent: /wallet/fix/earn uses meta.idempotency_key on token_transactions to detect duplicates — verified working. Consider adding a partial unique index on {user_id, currency, 'meta.idempotency_key'} to make this race-safe under load (currently a read-then-write which is only best-effort)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_security_hardening.py (new file — 28 pytest cases covering the 4 P0 fixes + regression sweep)"
+  ],
+  "success_rate": {
+    "backend": "100% (28/28)",
+    "frontend": "N/A (skipped per review request)"
+  },
+  "seed_data_creation": "Two fresh non-admin users registered during the run with TEST_ prefix (TEST_sec_<hex>@amass.africa and TEST_reg_<hex>@amass.africa). One agent_referrals doc created by the non-admin user, qualified + paid out by demo admin — leaves one MASS credit transaction on demo's ledger (referral commission payout). No production data mutated.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Security-hardening tests live at /app/backend/tests/test_security_hardening.py and are safe to re-run — all fixtures are idempotent (fresh TEST_ users each run, unique idempotency keys per run, daily_login test tolerates prior-day claim state). Run with: EXPO_BACKEND_URL=https://property-os-africa.preview.emergentagent.com pytest backend/tests/test_security_hardening.py -v. JUnit report at /app/test_reports/pytest/pytest_iteration9.xml. Three minor doc/route gaps flagged (redirect string, wallet/mass/transactions alias, mock checkout URL base) — none block deployment of the security fixes themselves. If the main agent fixes the redirect string in tokens.py, no retest needed — the test suite already asserts the redirect field starts with /api/payments/ (prefix check, tolerant of both /init and /initialize).",
+  "rca_of_issue": "N/A — all P0 fixes verified working. The three minor issues flagged are pre-existing gaps, not regressions: (1) redirect string typo dates to when purchase endpoints were converted from 200-mock to 410-gone; (2) /wallet/mass/transactions was never implemented — only the currency-filtered version exists; (3) _api_base localhost fallback is a dev-mode convenience that never got hardened for the preview environment."
+}

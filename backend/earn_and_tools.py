@@ -31,7 +31,9 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 # We rely on the same JWT config & WalletService from tokens.py
 from tokens import WalletService, TransactionKind
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "amass-dev-secret-change-in-production")
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET or len(JWT_SECRET) < 24:
+    raise RuntimeError("JWT_SECRET is missing or too weak (see backend/.env)")
 JWT_ALG = "HS256"
 
 bearer = HTTPBearer(auto_error=False)

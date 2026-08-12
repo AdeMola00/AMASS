@@ -30,7 +30,9 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 router = APIRouter(prefix="/api", tags=["tokens"])
 bearer = HTTPBearer(auto_error=False)
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "amass-dev-secret-change-in-production")
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET or len(JWT_SECRET) < 24:
+    raise RuntimeError("JWT_SECRET is missing or too weak (see backend/.env)")
 JWT_ALG = "HS256"
 
 # ─── Currency ──────────────────────────────────────────────────
@@ -355,16 +357,19 @@ class WalletService:
         is_bonus: bool = False,
         meta: Optional[dict] = None,
     ) -> dict:
-        w = await self.get_or_create(user_id, currency)
+        # Ensure wallet exists (creates on first touch with welcome bonus).
+        await self.get_or_create(user_id, currency)
         field = "bonus_balance" if is_bonus else "balance"
-        new_val = w.get(field, 0) + amount
-        lifetime = w.get("lifetime_earned", 0) + amount
-        await self.db.wallets.update_one(
+        # Atomic increment — safe under concurrent credits/debits.
+        w = await self.db.wallets.find_one_and_update(
             {"user_id": user_id, "currency": currency},
-            {"$set": {field: new_val, "lifetime_earned": lifetime}},
+            {"$inc": {field: amount, "lifetime_earned": amount}},
+            projection={"_id": 0},
+            return_document=True,  # ReturnDocument.AFTER
         )
-        w[field] = new_val
-        w["lifetime_earned"] = lifetime
+        if not w:
+            # Should never happen because get_or_create ran first.
+            raise HTTPException(500, "Wallet not found for credit")
         await self._log(
             user_id, kind, amount, w["balance"] + w["bonus_balance"], description,
             currency=currency, meta=meta,
@@ -381,36 +386,49 @@ class WalletService:
         currency: Currency = "MASS",
         meta: Optional[dict] = None,
     ) -> dict:
-        """Spend bonus tokens first, then primary balance."""
+        """Spend bonus tokens first, then primary balance — atomically."""
         w = await self.get_or_create(user_id, currency)
         spendable = w["balance"] + w["bonus_balance"]
         if spendable < amount:
             raise HTTPException(402, f"Insufficient {currency} tokens")
-        remaining = amount
-        use_bonus = min(w["bonus_balance"], remaining)
-        remaining -= use_bonus
-        use_balance = remaining
-        new_bonus = w["bonus_balance"] - use_bonus
-        new_balance = w["balance"] - use_balance
-        new_lifetime_used = w.get("lifetime_used", 0) + amount
-        await self.db.wallets.update_one(
-            {"user_id": user_id, "currency": currency},
-            {
-                "$set": {
-                    "balance": new_balance,
-                    "bonus_balance": new_bonus,
-                    "lifetime_used": new_lifetime_used,
-                }
-            },
-        )
-        w["balance"] = new_balance
-        w["bonus_balance"] = new_bonus
-        w["lifetime_used"] = new_lifetime_used
-        await self._log(
-            user_id, kind, -amount, new_balance + new_bonus, description,
-            currency=currency, meta=meta,
-        )
-        return w
+        # Compute allocations optimistically, then apply with a conditional
+        # atomic update that fails if the state drifted underneath us.
+        use_bonus = min(w["bonus_balance"], amount)
+        use_balance = amount - use_bonus
+        # Use $inc with a filter guarding the exact state we just read.
+        # Retry once if optimistic lock fails.
+        for _attempt in range(3):
+            updated = await self.db.wallets.find_one_and_update(
+                {
+                    "user_id": user_id,
+                    "currency": currency,
+                    "balance": {"$gte": use_balance},
+                    "bonus_balance": {"$gte": use_bonus},
+                },
+                {
+                    "$inc": {
+                        "balance": -use_balance,
+                        "bonus_balance": -use_bonus,
+                        "lifetime_used": amount,
+                    }
+                },
+                projection={"_id": 0},
+                return_document=True,
+            )
+            if updated:
+                await self._log(
+                    user_id, kind, -amount,
+                    updated["balance"] + updated["bonus_balance"],
+                    description, currency=currency, meta=meta,
+                )
+                return updated
+            # Re-read wallet & recompute allocations
+            w = await self.get_or_create(user_id, currency)
+            if w["balance"] + w["bonus_balance"] < amount:
+                raise HTTPException(402, f"Insufficient {currency} tokens")
+            use_bonus = min(w["bonus_balance"], amount)
+            use_balance = amount - use_bonus
+        raise HTTPException(409, "Wallet contention — please retry")
 
 
 # ─── Router factory ────────────────────────────────────────────
@@ -538,37 +556,19 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
         data: PurchaseIn,
         creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     ):
-        user_id = await _current_user_id(creds)
-        bundle = next((b for b in TOKEN_BUNDLES if b["id"] == data.bundle_id), None)
-        if not bundle:
-            raise HTTPException(404, "Bundle not found")
-        # MOCK: assume payment succeeded. Real Paystack/Flutterwave flow:
-        # 1) POST /transaction/initialize to gateway → returns auth URL
-        # 2) User completes payment
-        # 3) Webhook triggers this same credit call
-        # For now, credit immediately.
-        await svc.credit(
-            user_id,
-            bundle["tokens"],
-            "purchase",
-            f"Purchased {bundle['name']} — {bundle['tokens']} tokens",
-            meta={"bundle_id": bundle["id"], "provider": data.provider, "mock": True},
+        """DEPRECATED: This mock endpoint has been removed. All real MASS
+        purchases must go through /api/payments/init and be credited via the
+        provider webhook (/api/payments/webhook/paystack|flutterwave).
+        Kept as 410 GONE to surface any legacy client integrations.
+        """
+        raise HTTPException(
+            410,
+            {
+                "error": "endpoint_removed",
+                "message": "Use POST /api/payments/initialize to purchase MASS tokens.",
+                "redirect": "/api/payments/initialize",
+            },
         )
-        if bundle["bonus"] > 0:
-            await svc.credit(
-                user_id,
-                bundle["bonus"],
-                "bonus",
-                f"Bonus tokens for {bundle['name']}",
-                is_bonus=True,
-                meta={"bundle_id": bundle["id"]},
-            )
-        w = await svc.get_or_create(user_id)
-        return {
-            "ok": True,
-            "credited": bundle["tokens"] + bundle["bonus"],
-            "balance": w["balance"] + w["bonus_balance"],
-        }
 
     @router.get("/subscriptions/plans")
     async def list_plans():
@@ -759,35 +759,19 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
         data: PurchaseIn,
         creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     ):
-        user_id = await _current_user_id(creds)
-        bundle = next((b for b in FIX_BUNDLES if b["id"] == data.bundle_id), None)
-        if not bundle:
-            raise HTTPException(404, "FIX bundle not found")
-        # MOCK payment — instant credit
-        await svc.credit(
-            user_id,
-            bundle["tokens"],
-            "purchase",
-            f"Purchased {bundle['name']} — {bundle['tokens']} FIX",
-            currency="FIX",
-            meta={"bundle_id": bundle["id"], "provider": data.provider, "mock": True},
+        """DEPRECATED: This mock endpoint has been removed. FIX purchases now
+        go through /api/payments/init (currency='FIX') and are credited via
+        the provider webhook, ensuring no wallet credit occurs without a
+        real (or explicitly mocked via MOCK_PAYMENT env) transaction.
+        """
+        raise HTTPException(
+            410,
+            {
+                "error": "endpoint_removed",
+                "message": "Use POST /api/payments/initialize with currency='FIX' to purchase FIX tokens.",
+                "redirect": "/api/payments/initialize",
+            },
         )
-        if bundle["bonus"] > 0:
-            await svc.credit(
-                user_id,
-                bundle["bonus"],
-                "bonus",
-                f"Bonus FIX for {bundle['name']}",
-                currency="FIX",
-                is_bonus=True,
-                meta={"bundle_id": bundle["id"]},
-            )
-        w = await svc.get_or_create(user_id, "FIX")
-        return {
-            "ok": True,
-            "credited": bundle["tokens"] + bundle["bonus"],
-            "balance": w["balance"] + w["bonus_balance"],
-        }
 
     # ─── FIX earn (server-triggered event: job_completed, positive_rating…) ─
     @router.post("/wallet/fix/earn")

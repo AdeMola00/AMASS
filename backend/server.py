@@ -34,10 +34,24 @@ from marketplace_v2 import register_marketplace_v2_routes
 # ─── Config ───────────────────────────────────────────────
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
-JWT_SECRET = os.environ.get("JWT_SECRET", "amass-dev-secret-change-in-production")
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET or len(JWT_SECRET) < 24:
+    raise RuntimeError(
+        "JWT_SECRET is missing or too weak. Set a strong JWT_SECRET "
+        "(>=24 chars) in backend/.env before starting the API."
+    )
 JWT_ALG = "HS256"
 JWT_EXPIRES_DAYS = 30
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+
+# Admin allow-list — comma-separated emails allowed to run privileged ops
+# (seeding, referral qualify/payout, etc.). Fallback keeps the demo account
+# admin so the pre-configured demo flow keeps working.
+ADMIN_EMAILS = {
+    e.strip().lower()
+    for e in os.environ.get("ADMIN_EMAILS", "demo@amass.africa,admin@amass.africa").split(",")
+    if e.strip()
+}
 
 # ─── DB ───────────────────────────────────────────────────
 client = AsyncIOMotorClient(MONGO_URL)
@@ -273,6 +287,15 @@ async def get_current_user(
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(401, "User not found")
+    # Normalize admin flag from allow-list or explicit doc field.
+    email = (user.get("email") or "").lower()
+    user["is_admin"] = bool(user.get("is_admin")) or email in ADMIN_EMAILS
+    return user
+
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if not user.get("is_admin"):
+        raise HTTPException(403, "Admin only")
     return user
 
 
@@ -1729,7 +1752,11 @@ SEED_NEIGHBORHOODS = [
 
 
 @api.post("/seed")
-async def seed_data():
+async def seed_data(_admin: dict = Depends(require_admin)):
+    return await _do_seed()
+
+
+async def _do_seed():
     # Seed properties
     await db.properties.delete_many({})
     for p in SEED_PROPERTIES:
@@ -1846,11 +1873,33 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def on_startup():
+    # ─── DB Indexes (idempotent) ─────────────────────────────
+    try:
+        await db.properties.create_index("id", unique=True)
+        await db.properties.create_index("agent_id")
+        await db.properties.create_index("listing_type")
+        await db.properties.create_index([("latitude", 1), ("longitude", 1)])
+        await db.properties.create_index("verified")
+        await db.wallets.create_index([("user_id", 1), ("currency", 1)], unique=True)
+        await db.token_transactions.create_index([("user_id", 1), ("created_at", -1)])
+        await db.token_transactions.create_index("meta.idempotency_key", sparse=True)
+        await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
+        await db.notifications.create_index("id", unique=True)
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("referral_code", sparse=True)
+        await db.favorites.create_index([("user_id", 1), ("property_id", 1)], unique=True)
+        await db.favorites.create_index("property_id")
+        await db.marketplace.create_index("id", unique=True)
+        await db.agent_referrals.create_index("agent_user_id")
+        await db.agent_referrals.create_index("id", unique=True)
+    except Exception as e:
+        logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
+
     # Auto-seed if empty
     count = await db.properties.count_documents({})
     if count == 0:
         logger.info("Seeding initial data …")
-        await seed_data()
+        await _do_seed()
     # Mark AMASS Exclusive listings (Category 1 — free forever)
     # Marketing inventory: keep a curated handful as AMASS Exclusive.
     # First, unmark all so we can converge to a deterministic state each boot.
