@@ -278,6 +278,26 @@ def register_payment_routes(
     async def payment_redirect(ref: str, status: str = "success"):
         return RedirectResponse(f"amass://payment/callback?ref={ref}&status={status}")
 
+    async def _fulfill_agent_subscription(reference: str, provider: str) -> dict:
+        """Activate an agent subscription when the payment provider webhook
+        confirms `agentsub_*` references. Idempotent — safe on webhook retry.
+        The heavy lifting lives in agent_platform._finalize_subscription; we
+        just look up the pending record and hand it over."""
+        pending = await db.pending_agent_subscriptions.find_one(
+            {"reference": reference}, {"_id": 0}
+        )
+        if not pending:
+            return {"ok": False, "reason": "unknown_reference"}
+        # Late import to avoid circular; the hook is stashed on module load.
+        import agent_platform as _ap
+        finalize = getattr(_ap, "_FINALIZE_SUBSCRIPTION", None)
+        if finalize is None:
+            return {"ok": False, "reason": "finalize_hook_missing"}
+        try:
+            return await finalize(pending)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     # ─── PAYSTACK webhook ───────────────────────────────────
     @router.post("/paystack/webhook")
     async def paystack_webhook(
@@ -289,13 +309,22 @@ def register_payment_routes(
             expected = hmac.new(secret, raw, hashlib.sha512).hexdigest()
             if not x_paystack_signature or not hmac.compare_digest(expected, x_paystack_signature):
                 raise HTTPException(401, "Invalid signature")
-        payload = await request.json()
+        try:
+            payload = await request.json()
+        except Exception:
+            # Empty / malformed body — ack so the provider doesn't retry endlessly.
+            return {"ok": True, "ignored": "empty_body"}
+        if not isinstance(payload, dict):
+            return {"ok": True, "ignored": "invalid_shape"}
         if payload.get("event") == "charge.success":
             ref = payload.get("data", {}).get("reference")
             if ref:
                 verified = payload.get("data", {})
-                # Best practice: also API-verify (skipped here to keep the mock path safe)
-                await _fulfill(ref, "paystack", verified)
+                # Route agent-subscription references to the finalize hook.
+                if ref.startswith("agentsub_"):
+                    await _fulfill_agent_subscription(ref, "paystack")
+                else:
+                    await _fulfill(ref, "paystack", verified)
         return {"ok": True}
 
     # ─── FLUTTERWAVE webhook ────────────────────────────────
@@ -306,11 +335,19 @@ def register_payment_routes(
         expected = _flutterwave_hash()
         if expected and (not verif_hash or not hmac.compare_digest(verif_hash, expected)):
             raise HTTPException(401, "Invalid signature")
-        payload = await request.json()
+        try:
+            payload = await request.json()
+        except Exception:
+            return {"ok": True, "ignored": "empty_body"}
+        if not isinstance(payload, dict):
+            return {"ok": True, "ignored": "invalid_shape"}
         data = payload.get("data", payload)
         ref = data.get("tx_ref") or payload.get("tx_ref")
         if ref and data.get("status") in ("successful", "success"):
-            await _fulfill(ref, "flutterwave", data)
+            if ref.startswith("agentsub_"):
+                await _fulfill_agent_subscription(ref, "flutterwave")
+            else:
+                await _fulfill(ref, "flutterwave", data)
         return {"ok": True}
 
     return router

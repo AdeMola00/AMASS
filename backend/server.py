@@ -1887,6 +1887,18 @@ _agent_platform_router, _agent_platform_admin_router = register_agent_platform_r
 app.include_router(_agent_platform_router)
 app.include_router(_agent_platform_admin_router)
 
+# ─── Agent Platform v2 (Phase 2: public profiles, badges, apple deletion)
+from agent_platform_v2 import register_agent_platform_v2_routes
+import agent_platform as _ap  # for _FINALIZE_SUBSCRIPTION lookup
+_v2_router, _v2_admin_router = register_agent_platform_v2_routes(
+    db,
+    get_current_user,
+    require_admin,
+    finalize_subscription_hook=lambda pending: _ap._FINALIZE_SUBSCRIPTION(pending),  # type: ignore
+)
+app.include_router(_v2_router)
+app.include_router(_v2_admin_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1927,6 +1939,8 @@ async def on_startup():
         await db.pending_agent_subscriptions.create_index("reference", unique=True)
         await db.agent_applications.create_index("user_id", unique=True)
         await db.agent_applications.create_index("status")
+        await db.agent_applications.create_index("slug", unique=True, sparse=True)
+        await db.account_deletions.create_index("user_id_hash", unique=True)
     except Exception as e:
         logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
 
@@ -1935,6 +1949,18 @@ async def on_startup():
         await _ensure_plans_seeded(db)
     except Exception:
         logger.exception("failed to seed agent plans")
+
+    # ─── Backfill slugs on existing agent_applications (Phase 2) ────
+    try:
+        from agent_platform_v2 import _ensure_slug as _ensure_agent_slug
+        cursor = db.agent_applications.find({"slug": {"$exists": False}}, {"_id": 0})
+        async for a in cursor:
+            try:
+                await _ensure_agent_slug(db, a)
+            except Exception:
+                pass
+    except Exception:
+        logger.exception("agent slug backfill failed")
 
     # Auto-seed if empty
     count = await db.properties.count_documents({})

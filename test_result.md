@@ -241,50 +241,56 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Phase 1 of the AMASS Agent Ecosystem is now shipped. New backend module
-      `/app/backend/agent_platform.py` adds:
-        • Plans catalog (Starter Free / Pro ₦15k / Agency ₦50k) with founding pricing
-          (Pro ₦10k / Agency ₦35k, first 500 agents)
-        • Founding Agent counter
-        • Agent subscription lifecycle (subscribe / activate-mock / cancel)
-        • Server-side listing quota enforcement in POST /api/properties (HTTP 402
-          with structured payload when at limit)
-        • Auto Starter Kit eligibility marking after 5 verified listings
-        • Onboarding progress tracker (5 steps)
-        • Admin: list/verify/suspend agents, edit plans, manage kit statuses, KPIs
+      Phase 2 of the AMASS Agent Ecosystem shipped. New backend module
+      `/app/backend/agent_platform_v2.py` adds:
+        • Public agent profile — GET /api/agent-platform/public/{slug}
+          (slug OR user_id both accepted). Returns agent card with badge,
+          is_founding_agent flag, listing stats, response rate, share_url.
+        • Public listings — GET /api/agent-platform/public/{slug}/listings
+        • Verification badge system (4 tiers, auto-computed on read):
+          registered → verified → trusted → top_agent
+        • Badge progress — GET /api/agent-platform/badge/progress
+          (auth-required, shows agent's path to the next tier).
+        • Admin can pin/unpin a badge tier —
+          POST /api/admin/agents/{user_id}/badge  {tier: "trusted"|null|...}
+        • Apple / privacy account deletion —
+          POST /api/agent-platform/account/delete (auth). Hard-deletes user
+          plus 17 collections of PII, anonymises owned properties, writes
+          an `account_deletions` audit row keyed by uuid5(user_id).
+        • Paystack + Flutterwave webhooks now route `agentsub_*` refs to
+          `_FINALIZE_SUBSCRIPTION` (real subscription webhook wiring — MOCK
+          fallback still active while awaiting rotated Paystack live key).
+        • Startup slug backfill for pre-existing agent_applications.
 
       Please validate:
-      1) GET /api/agent-platform/plans (public) — returns 3 plans with founding
-         effective_price_ngn when founding is open.
-      2) GET /api/agent-platform/founding — returns {target:500, claimed:N, ...}.
-      3) GET /api/agent-platform/subscription/me — auto-default Starter when no
-         paid sub, returns paid subscription otherwise.
-      4) POST /api/agent-platform/subscription/subscribe with plan_id=starter →
-         instant activation. With plan_id=pro → returns pending_reference.
-      5) POST /api/agent-platform/subscription/activate?pending_reference=... —
-         only works when MOCK_PAYMENT=true (dev bypass); should flip user to Pro.
-      6) After activation, GET /api/agent-platform/quota should reflect new limit
-         (30 for Pro, 150 for Agency).
-      7) POST /api/agent-platform/subscription/cancel → drops user back to Starter.
-      8) Listing quota enforcement — as demo user (9 active listings, on Starter
-         limit 5), POST /api/properties should return HTTP 402 with structured
-         plan_limit_reached error. After subscribing to Pro (30 limit), the same
-         POST should succeed (returns Property).
-      9) Onboarding — GET /api/agent-platform/onboarding returns 5 steps with
-         `completed`/`percent`/`can_go_live`.
-      10) Admin endpoints (as demo@amass.africa which is in ADMIN_EMAILS):
-          - GET /api/admin/agents (filter by status/plan/q)
-          - POST /api/admin/agents/{user_id}/verify with {approve:true,verification_level:2}
-          - POST /api/admin/agents/{user_id}/suspend with {suspend:true, reason:"test"}
-             then {suspend:false}
-          - PATCH /api/admin/plans/pro with {monthly_price_ngn: 20000}, then revert
-          - POST /api/admin/starter-kits/{user_id}/status with {status:"processing",
-            notes:"packed"} → then dispatched → delivered
-          - GET /api/admin/agents/kpis
-      11) 403 for non-admin trying to hit /api/admin/agents.
-      12) Regression: existing endpoints (auth, properties GET/list, wallet, marketplace,
-          earn/tasks) still work.
+      1) GET /api/agent-platform/public/{slug} — 200 with full public shape.
+         Use slug `ada-demo-a8d30c` for demo user, or fall back to the demo
+         user_id in place of slug (both work).
+      2) GET /api/agent-platform/public/{slug}/listings — returns array of
+         Property docs (excludes archived).
+      3) Public profile for suspended agent → HTTP 410.
+      4) GET /api/agent-platform/badge/rules — public 4-tier catalog.
+      5) GET /api/agent-platform/badge/progress (as demo) — 200 with
+         `current_badge:"verified"`, `next_badge:"trusted"`, checks[] listing
+         verification_level, verified_listings, rating, response_rate.
+      6) POST /api/admin/agents/{user_id}/badge  {tier: "top_agent"} → 200,
+         then GET /public/{slug} shows Top Agent badge. Reset with {tier: null}
+         → back to auto-computed "verified".
+      7) Account deletion: register a throwaway user, credit a daily login
+         reward (creates wallets + token_transactions rows), then POST
+         /account/delete. Expect:
+           - Response 200 with scrubbed_collections including "wallets(...)"
+           - Subsequent /auth/login with the same email → 401
+           - Old JWT → 401 (User not found)
+           - The primary user row and all listed collections purged
+           - A single row in `account_deletions` collection
+      8) Slug backfill idempotency: restart the server and confirm the demo
+         agent_applications row still has exactly one slug (no dupes).
+      9) Paystack webhook routing: NOT easily testable without a real
+         signature — smoke-check that /api/payments/paystack/webhook still
+         returns 200 for irrelevant events and 401 for bad signature.
+      10) Regression sweep — All Phase 1 endpoints still work
+          (plans, founding, subscription/subscribe+activate+cancel, quota,
+          onboarding, starter-kit/me, admin/*).
 
-      Demo credentials: demo@amass.africa / amass2026 (admin).
-      Fresh non-admin test user: create a new user via /api/auth/register
-      (e.g. testagent@example.com / test1234) to verify 402 quota + 403 admin-gate.
+      Demo credentials: demo@amass.africa / amass2026 (admin via ADMIN_EMAILS).

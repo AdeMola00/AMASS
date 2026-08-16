@@ -1,0 +1,62 @@
+{
+  "summary": "Backend Phase 2 (AMASS Agent Ecosystem) verified. 21/24 tests passed (87.5%). Two real bugs found: (1) POST /api/admin/agents/{user_id}/badge rejects JSON body with 422 (`loc: [\"query\",\"data\"]`) — endpoint is treating the Pydantic `AdminPinBadgeIn` as query params instead of a request body, likely because the model is declared inside the router-factory closure without an explicit `Body(...)` annotation. (2) POST /api/payments/paystack/webhook crashes with 500 (`json.decoder.JSONDecodeError: Expecting value`) when hit with an empty body — signature check is skipped in MOCK mode (secret is empty) and `await request.json()` blows up. All other Phase 2 features work: public profile by slug + user_id fallback, unknown slug 404, suspended agent 410 with reinstate, public listings (no archived, sorted), badge rules catalog (4 tiers), badge progress (current=verified, next=trusted, 4 checks), non-admin 403, account deletion (data scrubbed incl. wallets + token_transactions, JWT invalidated, login rejected), slug backfill idempotent across `supervisorctl restart backend`, and full Phase 1 regression sweep still green.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/admin/agents/{user_id}/badge",
+        "issue": "Returns 422 for a valid JSON body `{\"tier\":\"top_agent\"}`. Pydantic error `loc: [\"query\",\"data\"]` shows FastAPI is treating the `AdminPinBadgeIn` model as a query parameter. Root cause: the class is declared inside the `register_agent_platform_v2_routes` factory (line 446 of agent_platform_v2.py) which appears to break FastAPI body inference in the installed FastAPI/Pydantic-v2 combo. Fix options: (a) move `AdminPinBadgeIn` to module scope, (b) annotate the param as `data: AdminPinBadgeIn = Body(...)`, or (c) use `Annotated[AdminPinBadgeIn, Body()]`. Reference: /app/backend/agent_platform_v2.py:446-459.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "POST /api/payments/paystack/webhook",
+        "issue": "Crashes with HTTP 500 on empty body / missing signature. `await request.json()` throws JSONDecodeError because the empty-body path isn't guarded. In MOCK_PAYMENT=true mode PAYSTACK_SECRET_KEY is unset so signature verification is skipped and every malformed payload reaches the parser. Should return 200 (or 401 if signature enforcement is on). Reference: /app/backend/payments.py:306-322. Same class of bug likely exists on /api/payments/flutterwave/webhook (payments.py:325-340). Fix: wrap in try/except and return early, e.g. `try: payload = await request.json() except Exception: return {\"ok\": True}`.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_agent_platform_phase2.py",
+    "/app/test_reports/pytest/pytest_iteration11.xml"
+  ],
+  "action_items": [
+    "Fix admin badge pin endpoint: either move `AdminPinBadgeIn` outside the closure OR annotate parameter as `data: AdminPinBadgeIn = Body(...)` in /app/backend/agent_platform_v2.py:450-451 so JSON body is accepted (currently 422 on every request).",
+    "Harden Paystack + Flutterwave webhooks to not crash on empty / non-JSON bodies. Wrap `await request.json()` in try/except at /app/backend/payments.py:312 and payments.py:332 — return 200 (or 400) instead of 500.",
+    "After fixing the two issues above, re-run `pytest /app/backend/tests/test_agent_platform_phase2.py -n 0` — expected 24/24 green."
+  ],
+  "critical_code_review_comments": [
+    "agent_platform_v2.py — `AdminPinBadgeIn` Pydantic class is declared inside `register_agent_platform_v2_routes` (line 446). This works with older FastAPI but with the current Pydantic v2 stack causes the model to be inferred as query params. Recommend moving all request/response Pydantic models to module scope for consistency and stability across FastAPI upgrades.",
+    "payments.py — both webhook handlers assume the body is always valid JSON. Since signature verification is skipped when the secret is absent (MOCK mode), any probe / health-check hitting the webhook URL will 500. Add a defensive JSON parse.",
+    "agent_platform_v2.py `_ensure_slug` — retries collision detection up to 5 times then silently accepts a possibly-still-colliding slug. Low risk in practice but worth logging on the 5th attempt.",
+    "agent_platform_v2.py `/account/delete` — swallows per-collection exceptions with a bare `except Exception: pass` (lines 398-399, 417-418, 425-426). If Mongo throws for a real reason (e.g. permissions) the deletion silently under-scrubs and returns ok:true. Consider logging."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_agent_platform_phase2.py (new)"
+  ],
+  "success_rate": {
+    "backend": "87.5%",
+    "frontend": "not tested (backend-only request)"
+  },
+  "seed_data_creation": "No seed data added. Created + deleted 1 throwaway user for account-deletion test (deltest+<ts>@example.com). Test used the pre-seeded demo user (demo@amass.africa / slug ada-demo-a8d30c).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: `EXPO_BACKEND_URL=https://property-os-africa.preview.emergentagent.com pytest /app/backend/tests/test_agent_platform_phase2.py -v --tb=short -n 0` (use `-n 0` because the suite contains a supervisor restart that must run serially). Fixture STATE is shared at module scope. After E1 fixes the two open bugs, expect 24/24 green.",
+  "rca_of_issue": {
+    "admin_badge_endpoint_422": {
+      "reproduction": "curl -X POST '$BASE/api/admin/agents/<demo_uid>/badge' -H 'Authorization: Bearer <demo_jwt>' -H 'Content-Type: application/json' -d '{\"tier\":\"top_agent\"}' → 422 with `loc:[\"query\",\"data\"]`.",
+      "root_cause": "FastAPI + Pydantic v2 fails to auto-detect the closure-scoped `AdminPinBadgeIn` model as a body param. The `data` field is instead treated as a required query parameter of type `AdminPinBadgeIn`, which is unsatisfiable.",
+      "mitigation": "Annotate: `data: AdminPinBadgeIn = Body(...)` OR promote the class to module scope. Adding `from fastapi import Body` at top of the module."
+    },
+    "paystack_webhook_500": {
+      "reproduction": "curl -X POST '$BASE/api/payments/paystack/webhook' -H 'Content-Type: application/json' --data '' → 500 (JSONDecodeError).",
+      "root_cause": "payments.py:312 calls `await request.json()` unconditionally. When MOCK_PAYMENT=true and PAYSTACK_SECRET_KEY is empty, the signature check on lines 308-311 is skipped (empty secret is falsy), so the parser sees an empty body.",
+      "mitigation": "Wrap in try/except and short-circuit with 200. Same fix applies at flutterwave_webhook (payments.py:332)."
+    }
+  }
+}

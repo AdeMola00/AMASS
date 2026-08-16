@@ -207,6 +207,15 @@ export default function BecomeAgent() {
             <Ionicons name="pricetags" size={16} color={colors.bg} />
             <Text style={styles.plansBtnText}>See plans & upgrade</Text>
           </Pressable>
+
+          <Pressable
+            style={styles.publicBtn}
+            onPress={() => router.push(`/agent/${existing.user_id}` as any)}
+            testID="view-public-profile-btn"
+          >
+            <Ionicons name="globe-outline" size={16} color={colors.ink} />
+            <Text style={styles.publicBtnText}>View my public profile</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -633,4 +642,16 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   plansBtnText: { fontSize: 14, fontWeight: "800", color: colors.bg },
+  publicBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    height: 44,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+    marginTop: spacing.sm,
+  },
+  publicBtnText: { fontSize: 13, fontWeight: "800", color: colors.ink },
 });

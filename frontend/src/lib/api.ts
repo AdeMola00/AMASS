@@ -1062,6 +1062,48 @@ export const api = {
       delivery_address?: string;
       notes?: string;
     }>("/agent-platform/starter-kit/me"),
+
+  // ─── Agent Platform v2 (Phase 2: public profile, badges, deletion) ───
+  publicAgentBySlug: (slug: string) =>
+    req<{
+      user_id: string;
+      slug: string;
+      full_name: string;
+      agency_name?: string | null;
+      avatar_url?: string | null;
+      state?: string | null;
+      lga?: string | null;
+      years_experience: number;
+      areas_of_operation: string[];
+      specialisations: string[];
+      badge: { id: string; label: string; colour: string; icon: string; description: string };
+      verification_level: number;
+      is_founding_agent: boolean;
+      rating: number;
+      reviews_count: number;
+      active_listings: number;
+      verified_listings: number;
+      total_sold: number;
+      total_rented: number;
+      response_rate: number;
+      joined_at?: string | null;
+      share_url: string;
+    }>(`/agent-platform/public/${encodeURIComponent(slug)}`),
+  publicAgentListings: (slug: string) =>
+    req<Property[]>(`/agent-platform/public/${encodeURIComponent(slug)}/listings`),
+  badgeProgress: () =>
+    req<{
+      current_badge: { id: string; label: string; colour: string; icon: string; description: string };
+      next_badge: { id: string; label: string; colour: string; icon: string; description: string } | null;
+      checks: { label: string; current: number; target: number; met: boolean }[];
+      progress_percent: number;
+    }>("/agent-platform/badge/progress"),
+  badgeRules: () => req<any>("/agent-platform/badge/rules"),
+  deleteMyAccount: () =>
+    req<{ ok: boolean; deleted_at: string; scrubbed_collections: string[] }>(
+      "/agent-platform/account/delete",
+      { method: "POST" }
+    ),
 };
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;

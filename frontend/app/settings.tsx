@@ -1,17 +1,76 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Switch } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { api } from "@/src/lib/api";
+import { useAuth } from "@/src/contexts/auth";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 export default function Settings() {
   const router = useRouter();
+  const { signOut } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const onDeleteAccount = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    Alert.alert(
+      "Delete your AMASS account?",
+      "This is permanent. We'll erase your profile, subscription, wallet, saved searches, favourites and notifications. Any properties you listed will be anonymised so past viewers still see a history.\n\nThis cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete forever",
+          style: "destructive",
+          onPress: () => {
+            // Second-stage confirmation to match Apple's guidance.
+            Alert.alert(
+              "Are you absolutely sure?",
+              "Type DELETE below is not required — but this action erases your account immediately.",
+              [
+                { text: "Keep my account", style: "cancel" },
+                {
+                  text: "Yes, delete",
+                  style: "destructive",
+                  onPress: async () => {
+                    setDeleting(true);
+                    try {
+                      const res = await api.deleteMyAccount();
+                      if (res.ok) {
+                        Haptics.notificationAsync(
+                          Haptics.NotificationFeedbackType.Success
+                        ).catch(() => {});
+                        await signOut();
+                        Alert.alert(
+                          "Account deleted",
+                          "Your AMASS account and personal data have been erased."
+                        );
+                        router.replace("/(auth)/login" as any);
+                      }
+                    } catch (e: any) {
+                      Alert.alert(
+                        "Deletion failed",
+                        e?.message ??
+                          "We couldn't delete your account. Please contact support at hello@amass.africa"
+                      );
+                    } finally {
+                      setDeleting(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]} testID="settings-screen">
@@ -41,8 +100,13 @@ export default function Settings() {
         </Section>
 
         <Section title="Account">
-          <Row icon="star-outline" label="Subscription" value="Premium" onPress={() => {}} />
-          <Row icon="trash-outline" label="Delete account" onPress={() => {}} destructive />
+          <Row icon="star-outline" label="Subscription" value="Premium" onPress={() => router.push("/agent-plans")} />
+          <Row
+            icon="trash-outline"
+            label={deleting ? "Deleting…" : "Delete account"}
+            onPress={deleting ? undefined : onDeleteAccount}
+            destructive
+          />
         </Section>
 
         <Text style={styles.version}>AMASS v1.0.0 · Africa&apos;s Property OS</Text>
@@ -76,7 +140,12 @@ function Row({
   destructive?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.row} testID={`settings-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={styles.row}
+      testID={`settings-${label.toLowerCase().replace(/\s+/g, "-")}`}
+    >
       <View style={[styles.rowIcon, destructive && { backgroundColor: colors.redLight }]}>
         <Ionicons name={icon} size={18} color={destructive ? colors.red : colors.text} />
       </View>

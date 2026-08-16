@@ -364,7 +364,14 @@ export default function PropertyDetails() {
           {property.agent_name && (
             <View style={styles.section}>
               <Text style={styles.h3}>Listing agent</Text>
-              <View style={[styles.agentCard, shadows.soft]}>
+              <Pressable
+                onPress={() =>
+                  property.agent_id &&
+                  router.push(`/agent/${property.agent_id}` as any)
+                }
+                style={[styles.agentCard, shadows.soft]}
+                testID="agent-profile-link"
+              >
                 <View style={styles.agentAvatar}>
                   {property.agent_avatar ? (
                     <Image
@@ -386,13 +393,11 @@ export default function PropertyDetails() {
                   <Text style={styles.agentName}>{property.agent_name}</Text>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
                     <Ionicons name="shield-checkmark" size={12} color={colors.red} />
-                    <Text style={styles.agentRole}>Verified AMASS Agent</Text>
+                    <Text style={styles.agentRole}>Verified AMASS Agent · View profile</Text>
                   </View>
                 </View>
-                <Pressable style={styles.callBtn}>
-                  <Ionicons name="call" size={18} color="#fff" />
-                </Pressable>
-              </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              </Pressable>
             </View>
           )}
 

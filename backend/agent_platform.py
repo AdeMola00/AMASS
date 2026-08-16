@@ -620,6 +620,9 @@ def register_agent_platform_routes(
 
     # Exposed under module for external callers (webhook wiring later).
     router._finalize_subscription = _finalize_subscription  # type: ignore
+    # Also stash at module level so payments.py can look it up without
+    # circular imports.
+    globals()["_FINALIZE_SUBSCRIPTION"] = _finalize_subscription
 
     @router.post("/subscription/cancel")
     async def cancel_subscription(user: dict = Depends(require_auth)):
