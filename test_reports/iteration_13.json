@@ -1,0 +1,49 @@
+{
+  "summary": "Backend Phase 4 (Reviews / Agent Score / Analytics / Lead CRM) fully verified against the preview URL. 33/33 test cases pass in a serial run (see /app/backend/tests/test_phase4_reviews_score_crm.py). All 7 requested feature areas plus the regression sweep are green. One flaky ConnectTimeout was observed on TestRegression.test_public_agent during a subsequent full-suite run — the endpoint returned 200 on immediate retry (transient preview-URL latency, NOT a code issue). No backend defects were found in reviews_score_crm.py.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/agent-platform/public/{slug}",
+        "issue": "Intermittent 30s ConnectTimeout observed once during the full-suite run at the ingress layer. Endpoint returned 200 on immediate retry. Not reproducible; likely a transient preview-URL cold-start."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase4_reviews_score_crm.py",
+    "/app/test_reports/pytest/pytest_iteration13.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "reviews_score_crm.py:201 — admin users (demo included) bypass the 'meaningful interaction' guardrail. The demo user seeded lead_unlocks anyway during testing so behaviour was covered, but flag this for future non-admin production QA.",
+    "reviews_score_crm.py:334 — _recompute_agent_rating is called both when the new status is 'approved' AND when the previous status was 'approved' (to handle un-approve). Good; verified the reject → public list = [] flow works.",
+    "reviews_score_crm.py:681 — 'responded_at' is stamped once when status leaves 'new'. Verified in test_patch_second_status_preserves_responded_at that a second status change does NOT overwrite it.",
+    "reviews_score_crm.py:635 — 'open' status filter uses $nin ['won','lost'] on crm_status; leads with the default (missing) crm_status are still returned. This matches the spec ('excludes won/lost'). No bug, but note the query does not match leads that literally have no crm_status field yet — MongoDB $nin returns them (verified in test)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase4_reviews_score_crm.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (33/33)",
+    "frontend": "not tested (backend-only per request)"
+  },
+  "seed_data_creation": "Inserted transient rows into db.lead_unlocks for (a) satisfying the review guardrail for the fresh reviewer, (b) seeding one owned lead for the demo agent, (c) creating a 'lost' lead to validate the 'open' filter. Also created transient users: reviewer1_<ts>, reporter1_<ts>, reporter2_<ts>, outsider_<ts>, nonagent_<ts>, starter_<ts>. All prefixed with role names; safe to leave.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Test file /app/backend/tests/test_phase4_reviews_score_crm.py uses module-level pytest attributes to pass IDs between test cases in the same class order — run with -o addopts='' to disable pytest-xdist parallelism (root pytest.ini defaults to -n auto --dist loadscope which will split classes across workers and break the shared review_id). Command that works: `cd /app/backend && python -m pytest tests/test_phase4_reviews_score_crm.py -o addopts='' --junitxml=...`. Requires MONGO_URL + EXPO_BACKEND_URL env.",
+  "features_verified": {
+    "reviews_guardrail": "PASS — 403 before interaction, 200 after lead_unlocks seed, self-review 400, upsert dedup verified",
+    "reviews_moderation": "PASS — pending hidden, approve→public, reject→hidden, rating & reviews_count recomputed on agent_applications and surfaced via /api/agent-platform/public/{slug}",
+    "reviews_reporting_autoflag": "PASS — 2 reports from distinct users auto-flag review; flagged review hidden from public list",
+    "agent_score": "PASS — 6 factors with exact weights {profile_completeness:15, listing_quality:25, response_rate:20, customer_rating:20, activity:10, deals_closed:10}, sum(weighted)≈score within ±1, tier mapping correct, public /api/agent/{slug}/score works without auth, 404 for fresh non-agent user",
+    "analytics": "PASS — default period_days=30, all required keys present, lead_pipeline dict has all 6 statuses, response_rate in [0,1], period_days=7 query param honoured",
+    "lead_crm": "PASS — list/seed/filter, PATCH contacted stamps responded_at, second status change preserves responded_at, invalid status 400 with valid list, empty body 400 'Nothing to update', notes appended and last_contact_at synced, non-owner 403, status=contacted and status=open filters correct",
+    "regression": "PASS — /api/agent-platform/plans, /subscription/me, /public/{slug}, /badge/progress, /share/property/{id}, /properties (list), POST /properties for fresh Starter user all 200"
+  }
+}

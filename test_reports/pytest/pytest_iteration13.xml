@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="33" time="66.389" timestamp="2026-08-16T11:03:36.609954+00:00" hostname="agent-env-c87d7f0a-1774-477f-b447-fe4d76044621"><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewsGuardrail" name="test_guardrail_blocks_first_attempt" time="0.867" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewsGuardrail" name="test_self_review_blocked" time="0.091" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewsGuardrail" name="test_after_lead_unlock_seed_review_accepted" time="0.105" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewsGuardrail" name="test_reposting_upserts_single_row" time="0.104" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewModeration" name="test_pending_not_public" time="0.105" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewModeration" name="test_approve_moderation" time="0.101" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewModeration" name="test_public_list_shows_approved" time="0.093" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewModeration" name="test_rating_recomputed_on_public_profile" time="0.100" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewModeration" name="test_reject_removes_from_public_list" time="0.195" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewReports" name="test_reapprove_then_two_reports_auto_flag" time="0.935" /><testcase classname="tests.test_phase4_reviews_score_crm.TestReviewReports" name="test_flagged_review_hidden_from_public" time="0.101" /><testcase classname="tests.test_phase4_reviews_score_crm.TestAgentScore" name="test_my_score_shape" time="0.112" /><testcase classname="tests.test_phase4_reviews_score_crm.TestAgentScore" name="test_tier_mapping" time="0.095" /><testcase classname="tests.test_phase4_reviews_score_crm.TestAgentScore" name="test_public_score_by_slug" time="0.095" /><testcase classname="tests.test_phase4_reviews_score_crm.TestAgentScore" name="test_non_agent_score_404" time="0.419" /><testcase classname="tests.test_phase4_reviews_score_crm.TestAnalytics" name="test_default_30d" time="0.103" /><testcase classname="tests.test_phase4_reviews_score_crm.TestAnalytics" name="test_period_days_query" time="0.100" /><testcase classname="tests.test_phase4_reviews_score_crm.TestLeadCRM" name="test_list_and_seed" time="0.097" /><testcase classname="tests.test_phase4_reviews_score_crm.TestLeadCRM" name="test_patch_contacted_sets_responded_at" time="0.099" /><testcase classname="tests.test_phase4_reviews_score_crm.TestLeadCRM" name="test_patch_second_status_preserves_responded_at" time="0.089" /><testcase classname="tests.test_phase4_reviews_score_crm.TestLeadCRM" name="test_patch_invalid_status_400" time="0.095" /><testcase classname="tests.test_phase4_reviews_score_crm.TestLeadCRM" name="test_add_note" time="0.186" /><testcase classname="tests.test_phase4_reviews_score_crm.TestLeadCRM" name="test_non_owner_patch_403" time="0.427" /><testcase classname="tests.test_phase4_reviews_score_crm.TestLeadCRM" name="test_empty_body_400" time="0.098" /><testcase classname="tests.test_phase4_reviews_score_crm.TestLeadCRM" name="test_filter_by_status" time="0.094" /><testcase classname="tests.test_phase4_reviews_score_crm.TestLeadCRM" name="test_filter_open_excludes_won_lost" time="0.102" /><testcase classname="tests.test_phase4_reviews_score_crm.TestRegression" name="test_plans" time="0.122" /><testcase classname="tests.test_phase4_reviews_score_crm.TestRegression" name="test_subscription_me" time="0.097" /><testcase classname="tests.test_phase4_reviews_score_crm.TestRegression" name="test_public_agent" time="60.033"><failure message="requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='property-os-africa.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/agent-platform/public/ada-demo-a8d30c (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='property-os-africa.preview.emergentagent.com', port=443) at 0xfb71b25ca450&gt;, 'Connection to property-os-africa.preview.emergentagent.com timed out. (connect timeout=30)'))">/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:204: in _new_conn
+    sock = connection.create_connection(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:85: in create_connection
+    raise err
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:73: in create_connection
+    sock.connect(sa)
+E   TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:788: in urlopen
+    response = self._make_request(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:488: in _make_request
+    raise new_e
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:464: in _make_request
+    self._validate_conn(conn)
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:1106: in _validate_conn
+    conn.connect()
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:759: in connect
+    self.sock = sock = self._new_conn()
+                       ^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:213: in _new_conn
+    raise ConnectTimeoutError(
+E   urllib3.exceptions.ConnectTimeoutError: (&lt;HTTPSConnection(host='property-os-africa.preview.emergentagent.com', port=443) at 0xfb71b25ca450&gt;, 'Connection to property-os-africa.preview.emergentagent.com timed out. (connect timeout=30)')
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:696: in send
+    resp = conn.urlopen(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:842: in urlopen
+    retries = retries.increment(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/retry.py:543: in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='property-os-africa.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/agent-platform/public/ada-demo-a8d30c (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='property-os-africa.preview.emergentagent.com', port=443) at 0xfb71b25ca450&gt;, 'Connection to property-os-africa.preview.emergentagent.com timed out. (connect timeout=30)'))
+
+During handling of the above exception, another exception occurred:
+tests/test_phase4_reviews_score_crm.py:452: in test_public_agent
+    r = requests.get(f"{BASE_URL}/api/agent-platform/public/{DEMO_SLUG}", timeout=30)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:87: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:71: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:651: in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:784: in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:717: in send
+    raise ConnectTimeout(e, request=request)
+E   requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='property-os-africa.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/agent-platform/public/ada-demo-a8d30c (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='property-os-africa.preview.emergentagent.com', port=443) at 0xfb71b25ca450&gt;, 'Connection to property-os-africa.preview.emergentagent.com timed out. (connect timeout=30)'))</failure></testcase><testcase classname="tests.test_phase4_reviews_score_crm.TestRegression" name="test_badge_progress" time="0.197" /><testcase classname="tests.test_phase4_reviews_score_crm.TestRegression" name="test_share_property" time="0.206" /><testcase classname="tests.test_phase4_reviews_score_crm.TestRegression" name="test_properties_list" time="0.109" /><testcase classname="tests.test_phase4_reviews_score_crm.TestRegression" name="test_starter_quota_first_upload" time="0.421" /></testsuite></testsuites>

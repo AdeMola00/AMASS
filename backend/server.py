@@ -1907,6 +1907,12 @@ app.include_router(_v2_admin_router)
 from share_routes import register_share_routes
 app.include_router(register_share_routes(db, get_current_user))
 
+# ─── Reviews · Agent Score · Analytics · Lead CRM (Phase 4)
+from reviews_score_crm import register_phase4_routes
+_p4_router, _p4_admin_router = register_phase4_routes(db, get_current_user, require_admin)
+app.include_router(_p4_router)
+app.include_router(_p4_admin_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1951,6 +1957,13 @@ async def on_startup():
         await db.account_deletions.create_index("user_id_hash", unique=True)
         await db.share_events.create_index([("target_id", 1), ("created_at", -1)])
         await db.share_events.create_index([("user_id", 1), ("created_at", -1)])
+        # Phase 4 — reviews / CRM
+        await db.agent_reviews.create_index([("agent_id", 1), ("status", 1), ("created_at", -1)])
+        await db.agent_reviews.create_index([("reviewer_id", 1), ("agent_id", 1)], unique=True)
+        await db.agent_reviews.create_index("id", unique=True)
+        await db.agent_review_reports.create_index("review_id")
+        await db.lead_unlocks.create_index([("agent_id", 1), ("crm_status", 1)])
+        await db.lead_unlocks.create_index([("agent_id", 1), ("next_follow_up_at", 1)], sparse=True)
     except Exception as e:
         logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
 

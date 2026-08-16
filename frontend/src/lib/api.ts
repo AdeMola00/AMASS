@@ -1164,6 +1164,82 @@ export const api = {
     req<{ total_shares: number; by_channel: Record<string, number> }>(
       `/share/property/${encodeURIComponent(property_id)}/stats`
     ),
+
+  // ─── Phase 4: Reviews · Score · Analytics · CRM ───
+  createAgentReview: (agent_user_id: string, rating: number, review_text?: string, transaction_context?: string) =>
+    req<any>(`/reviews/agent/${encodeURIComponent(agent_user_id)}`, {
+      method: "POST",
+      body: JSON.stringify({ rating, review_text, transaction_context }),
+    }),
+  listAgentReviews: (slug: string, limit = 20) =>
+    req<
+      {
+        id: string;
+        agent_id: string;
+        reviewer_id: string;
+        reviewer_name?: string;
+        reviewer_avatar?: string;
+        rating: number;
+        review_text?: string;
+        transaction_context: string;
+        status: string;
+        created_at: string;
+      }[]
+    >(`/reviews/agent/${encodeURIComponent(slug)}?limit=${limit}`),
+  myReviews: () => req<any[]>("/reviews/mine"),
+  reportReview: (review_id: string, reason: string) =>
+    req<{ ok: boolean; reports: number }>(`/reviews/${encodeURIComponent(review_id)}/report`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  agentScore: () =>
+    req<{
+      score: number;
+      tier: string;
+      factors: {
+        id: string;
+        label: string;
+        value: number;
+        weight: number;
+        weighted: number;
+        hint: string;
+      }[];
+      updated_at: string;
+    }>("/agent/score"),
+  agentAnalytics: (period_days = 30) =>
+    req<{
+      period_days: number;
+      property_views: number;
+      profile_views: number;
+      leads: number;
+      inspection_requests: number;
+      shares_total: number;
+      shares_by_channel: Record<string, number>;
+      response_rate: number;
+      top_property?: { id: string; title?: string; views: number; image?: string } | null;
+      lead_pipeline: Record<string, number>;
+      updated_at: string;
+    }>(`/agent/analytics?period_days=${period_days}`),
+  crmListLeads: (status?: string) =>
+    req<any[]>(`/crm/leads${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  crmUpdateLead: (
+    lead_id: string,
+    updates: {
+      status?: string;
+      next_follow_up_at?: string;
+      last_contact_at?: string;
+      assigned_to?: string;
+    }
+  ) =>
+    req<{ ok: boolean; updated: string[] }>(`/crm/leads/${encodeURIComponent(lead_id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }),
+  crmAddNote: (lead_id: string, text: string) =>
+    req<{ ok: boolean; note: any }>(`/crm/leads/${encodeURIComponent(lead_id)}/note`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
 };
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;

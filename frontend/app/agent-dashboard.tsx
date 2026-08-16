@@ -21,6 +21,7 @@ import { useAuth } from "@/src/contexts/auth";
 import { useWallet } from "@/src/contexts/wallet";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { TokenIcon } from "@/src/components/TokenIcon";
+import { AgentScoreCard } from "@/src/components/AgentScoreCard";
 
 type Tab = "overview" | "listings" | "leads";
 
@@ -158,6 +159,8 @@ export default function AgentDashboard() {
         >
           <Overview dashboard={dashboard} onNew={() => router.push("/submit-property")} />
 
+          <AgentScoreCard />
+
           {quota && (
             <Pressable
               onPress={() => router.push("/agent-plans")}
@@ -262,6 +265,24 @@ export default function AgentDashboard() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.red} />}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => <LeadRow lead={item} />}
+          ListHeaderComponent={
+            <Pressable
+              onPress={() => router.push("/crm")}
+              style={styles.crmCta}
+              testID="open-crm-cta"
+            >
+              <View style={styles.crmIcon}>
+                <Ionicons name="briefcase" size={16} color={colors.bg} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.crmTitle}>Open the full Leads CRM</Text>
+                <Text style={styles.crmSub}>
+                  Track status, notes and follow-ups for every conversation.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            </Pressable>
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="people-outline" size={48} color={colors.textMuted} />
@@ -657,6 +678,28 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   quotaBarFill: { height: 6, borderRadius: 3 },
+  crmCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+    ...shadows.soft,
+  },
+  crmIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.ink,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crmTitle: { ...typography.bodyBold, color: colors.ink },
+  crmSub: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
   header: {
     flexDirection: "row",
     alignItems: "center",

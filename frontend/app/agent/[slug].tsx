@@ -30,6 +30,7 @@ export default function AgentPublicProfile() {
 
   const [agent, setAgent] = useState<PublicAgent | null>(null);
   const [listings, setListings] = useState<Property[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,12 +39,14 @@ export default function AgentPublicProfile() {
     if (!slug) return;
     try {
       setError(null);
-      const [a, l] = await Promise.all([
+      const [a, l, r] = await Promise.all([
         api.publicAgentBySlug(slug as string),
         api.publicAgentListings(slug as string).catch(() => []),
+        api.listAgentReviews(slug as string, 10).catch(() => []),
       ]);
       setAgent(a);
       setListings(l);
+      setReviews(r);
     } catch (e: any) {
       setError(e?.message ?? "Could not load agent profile");
     } finally {
@@ -314,10 +317,54 @@ export default function AgentPublicProfile() {
           )}
         </Section>
 
+        <ReviewsSection reviews={reviews} />
+
         <Text style={styles.legal}>
           AMASS Verified · amass.africa/agent/{agent.slug}
         </Text>
       </ScrollView>
+    </View>
+  );
+}
+
+function ReviewsSection({ reviews }: { reviews: any[] }) {
+  if (reviews.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Customer reviews ({reviews.length})</Text>
+      </View>
+      {reviews.slice(0, 5).map((r) => (
+        <View key={r.id} style={styles.reviewCard}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={styles.reviewAvatar}>
+              {r.reviewer_avatar ? (
+                <Image
+                  source={{ uri: r.reviewer_avatar }}
+                  style={{ width: 32, height: 32, borderRadius: 16 }}
+                />
+              ) : (
+                <Text style={styles.reviewInitials}>
+                  {(r.reviewer_name || "?").slice(0, 2).toUpperCase()}
+                </Text>
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reviewName}>{r.reviewer_name || "AMASS customer"}</Text>
+              <Text style={styles.reviewMeta}>
+                {"★".repeat(r.rating)}
+                <Text style={{ color: colors.textMuted }}>{"★".repeat(5 - r.rating)}</Text>
+                {"  ·  "}
+                {new Date(r.created_at).toLocaleDateString("en-GB", {
+                  month: "short",
+                  year: "numeric",
+                })}
+              </Text>
+            </View>
+          </View>
+          {r.review_text && <Text style={styles.reviewText}>{r.review_text}</Text>}
+        </View>
+      ))}
     </View>
   );
 }
@@ -517,4 +564,24 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: spacing.md,
   },
+  reviewCard: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+    gap: 8,
+  },
+  reviewAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.ink,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reviewInitials: { color: colors.bg, fontSize: 11, fontWeight: "800" },
+  reviewName: { color: colors.ink, fontSize: 13, fontWeight: "700" },
+  reviewMeta: { color: colors.red, fontSize: 12, marginTop: 2 },
+  reviewText: { color: colors.text, fontSize: 13, lineHeight: 19 },
 });

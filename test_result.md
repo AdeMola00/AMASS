@@ -241,72 +241,97 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Phase 3 of the AMASS Agent Ecosystem shipped. New backend module
-      `/app/backend/share_routes.py` adds property/agent sharing primitives:
+      Phase 4 of the AMASS Agent Ecosystem shipped. New backend module
+      `/app/backend/reviews_score_crm.py` adds:
 
-      NEW ENDPOINTS
-        • GET  /api/share/property/{property_id} — returns share_url, qr_url,
-          whatsapp_url (wa.me deep link with pre-formatted message),
-          whatsapp_message (pre-composed text), and flyer_payload
-          (property + agent + branding — everything needed to render a
-          client-side flyer without additional round-trips).
-        • GET  /api/share/agent/{slug}            — same for agent profiles.
-        • POST /api/share/property/{id}/event      {channel, context}  (auth)
-          increments share_events + denormalised share_count/share_by_channel
-          on the property doc.
-        • POST /api/share/agent/{slug}/event       {channel, context}  (auth)
-          same for agent_applications.
-        • GET  /api/share/property/{id}/stats     (auth, agent OR admin only)
-          returns {total_shares, by_channel:{...}}
+      REVIEWS
+        • POST /api/reviews/agent/{agent_user_id}
+            {rating:1-5, review_text?, transaction_context?}
+            Anti-spam: self-review blocked, must have prior interaction
+            (unlocked/inspected/shared one of agent's listings) unless caller
+            is admin. Upsert per (reviewer, agent) pair — status: pending.
+        • GET  /api/reviews/agent/{slug}    — approved reviews only (public)
+        • GET  /api/reviews/mine            — reviewer's own history
+        • POST /api/reviews/{id}/report {reason} — 2+ reports auto-flags
+        • Admin: GET /api/admin/reviews?status=pending|approved|rejected|flagged
+        • Admin: POST /api/admin/reviews/{id}/moderate {action:approve|reject|flag, admin_note?}
+            On approve: recomputes agent's rolling rating + reviews_count.
+
+      AGENT SCORE
+        • GET /api/agent/score  (auth) — 0-100 with 6 transparent factors:
+            profile_completeness (15), listing_quality (25), response_rate (20),
+            customer_rating (20), activity (10), deals_closed (10).
+            Each factor returns value/weight/weighted/hint so agent can improve.
+        • GET /api/agent/{slug}/score  (public)
+
+      ANALYTICS
+        • GET /api/agent/analytics?period_days=30 (auth)
+          Returns property_views, profile_views, leads, inspection_requests,
+          shares_total, shares_by_channel, response_rate, top_property,
+          lead_pipeline (counts per status).
+
+      LEAD CRM (extends lead_unlocks in place — no new collection)
+        • GET   /api/crm/leads?status=open|new|contacted|inspection_scheduled|negotiating|won|lost
+        • PATCH /api/crm/leads/{lead_id} {status?, next_follow_up_at?, last_contact_at?, assigned_to?}
+        • POST  /api/crm/leads/{lead_id}/note {text}
 
       FRONTEND
-        • New route /app/frontend/app/share/[id].tsx renders a premium AMASS
-          property flyer captured via react-native-view-shot, with:
-            - Hero cover, verified badge, listing type, price
-            - Bed/bath/sqm spec chips
-            - Listed-by agent + verification badge label
-            - Embedded QR code (react-native-qrcode-svg)
-            - Actions: Send on WhatsApp (25D366 brand), Save flyer,
-              Share flyer (native share sheet), Copy link, More options
-        • property/[id].tsx — Share button now routes to /share/{id}
-        • agent/[slug].tsx — WhatsApp CTA tracks agent shares
-        • app.json — Added NSPhotoLibraryAddUsageDescription (iOS),
-          WRITE_EXTERNAL_STORAGE (Android), expo-media-library plugin
-        • package.json — Added react-native-qrcode-svg, react-native-view-shot,
-          expo-media-library, expo-sharing, expo-file-system, expo-clipboard
+        • New: /app/frontend/app/agent-score.tsx — full breakdown screen
+        • New: /app/frontend/app/crm.tsx — lead pipeline with status filters + detail sheet + notes
+        • New: /app/frontend/src/components/AgentScoreCard.tsx — compact card added to agent-dashboard
+        • Extended: agent/[slug].tsx — Customer reviews section
+        • Extended: agent-dashboard.tsx — "Open the full Leads CRM" CTA at top of leads tab
+        • Extended: src/lib/api.ts — 9 new typed methods
 
-      PLEASE VALIDATE
-      1) GET /api/share/property/{valid_id} → 200 with share_url starting
-         "https://amass.africa/property/", whatsapp_url starting
-         "https://wa.me/?text=", flyer_payload.property containing id/title/
-         price/city/state/bedrooms/verified, flyer_payload.agent (if property
-         has an agent_id) containing full_name/badge/verification_level, and
-         flyer_payload.brand set to AMASS.
-      2) GET /api/share/property/{unknown_id} → 404
-      3) GET /api/share/agent/{slug} → 200 with share_url ending in the slug,
-         flyer_payload.kind=="agent" and flyer_payload.agent populated.
-      4) GET /api/share/agent/{unknown} → 404
-      5) POST /api/share/property/{id}/event {"channel":"whatsapp"} (auth) → 200,
-         subsequent GET /property/{id} response should have share_count == 1
-         and share_by_channel.whatsapp == 1. Repeat with "qr", "copy_link",
-         "flyer" — each increments its own bucket. Unauthenticated → 401.
-      6) POST /api/share/agent/{slug}/event {"channel":"whatsapp"} (auth) → 200.
-      7) GET /api/share/property/{id}/stats:
-         - As the property's own agent (demo user) → 200 with
-           total_shares and by_channel matching the events from #5.
-         - As a different (fresh) user → 403 "You can only view your own..."
-         - As demo (admin) for someone else's listing → 200.
-      8) Idempotency of the event: 3 events of the same channel should
-         reflect share_count == 3.
-      9) URL encoding: whatsapp_message contains newlines + Naira sign;
-         whatsapp_url must be percent-encoded and decodable back to the
-         same message.
-      10) Regression: earlier Phase 1/Phase 2 endpoints still work.
-          Specifically re-hit /api/agent-platform/plans,
-          /api/agent-platform/subscription/me, /api/agent-platform/public/{slug},
-          /api/agent-platform/badge/progress, and a POST /api/properties
-          (which should still hit the quota check).
+      Please validate:
 
-      Demo credentials: demo@amass.africa / amass2026 (in ADMIN_EMAILS).
-      Demo agent slug: ada-demo-a8d30c.
-      MOCK_PAYMENT=true is set.
+      REVIEWS
+      1) Fresh non-admin user (no prior interaction with demo agent) posts
+         POST /api/reviews/agent/<demo_user_id> {rating:5} → 403 (guardrail).
+      2) Have the user unlock one of demo's properties via
+         POST /api/lead-unlock/{property_id} (or use lead_unlocks insert),
+         then repeat the review → 201/200 with status "pending".
+      3) Self-review (demo reviewing demo) → 400.
+      4) Same reviewer sends 2nd review → upserts (single row, not duplicate).
+      5) GET /api/reviews/agent/{slug} → returns [] until admin approves.
+      6) POST /api/admin/reviews/{id}/moderate {action:"approve"} → 200,
+         then GET /api/reviews/agent/{slug} → returns the review.
+         Also demo user's agent_applications.rating and reviews_count must
+         update (query DB or /api/agent-platform/public/{slug}).
+      7) Report review: 2 different users POST /api/reviews/{id}/report
+         → status becomes "flagged".
+      8) Admin moderate {action:"reject"} → review no longer public.
+
+      SCORE
+      9) GET /api/agent/score (as demo) → 200 with score 0-100 and 6 factors.
+         Verify sum of `weighted` ≈ score (± 1 rounding).
+         `tier` label matches score bracket.
+      10) GET /api/agent/{slug}/score (public, no auth) → same shape.
+      11) Non-agent user calling /api/agent/score → 404.
+
+      ANALYTICS
+      12) GET /api/agent/analytics as demo → 200 with shares_total ≥ 27
+          (from Phase 3 test events), shares_by_channel populated,
+          lead_pipeline dict with all 6 statuses (0 or positive integers).
+
+      CRM
+      13) GET /api/crm/leads (demo) → 200 array (may be empty if no unlocks;
+          seed via db.lead_unlocks.insert if needed).
+      14) PATCH /api/crm/leads/{id} {status:"contacted"} — verify:
+          - responded_at is auto-set on first status change (was absent before)
+          - subsequent GET /crm/leads returns status:"contacted"
+          - analytics.response_rate ticks up (if you PATCH ALL leads to
+            responded)
+      15) POST /api/crm/leads/{id}/note {text:"Called back"} → 200,
+          crm_notes has 1 entry, last_contact_at updated.
+      16) PATCH with invalid status → 400.
+      17) Non-owner user PATCH → 403.
+
+      REGRESSION
+      18) Sweep: /api/agent-platform/plans, /public/{slug},
+          /badge/progress, /subscription/me, /share/property/{id},
+          /properties (GET), /properties (POST fresh user).
+
+      Demo credentials: demo@amass.africa / amass2026 (admin via ADMIN_EMAILS)
+      Demo agent slug: ada-demo-a8d30c
+      MOCK_PAYMENT=true
