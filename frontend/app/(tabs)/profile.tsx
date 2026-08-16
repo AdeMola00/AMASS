@@ -20,6 +20,7 @@ const MENU: { icon: IconName; label: string; route?: string; caption?: string }[
   { icon: "construct-outline", label: "Improve My Property", route: "/improve", caption: "Inspections · Financing · Renovation" },
   { icon: "hammer-outline", label: "Provider Dashboard", route: "/provider-dashboard", caption: "FIXA jobs · FIX earnings · Boost" },
   { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", caption: "Verified authority to market properties" },
+  { icon: "pricetags-outline", label: "Agent Plans", route: "/agent-plans", caption: "Starter · Pro · Agency · Founding pricing" },
   { icon: "briefcase-outline", label: "Agent Workspace", route: "/agent-workspace", caption: "Referrals · Commissions · Payouts" },
   { icon: "add-circle-outline", label: "List a Property", route: "/submit-property", caption: "Publish a new listing" },
   { icon: "heart-outline", label: "Saved Properties", caption: "Your favorites" },

@@ -973,6 +973,95 @@ export const api = {
   myAds: () => req<any[]>("/ads/mine"),
   createAd: (payload: any) =>
     req<any>("/ads", { method: "POST", body: JSON.stringify(payload) }),
+
+  // ─── Agent Platform (Phase 1: plans, quotas, onboarding, founding) ───
+  listAgentPlans: () =>
+    req<
+      {
+        id: string;
+        name: string;
+        tier: string;
+        monthly_price_ngn: number;
+        founding_price_ngn: number;
+        effective_price_ngn: number;
+        is_founding_price: boolean;
+        listing_limit: number;
+        premium_credits_per_month: number;
+        team_seats: number;
+        extra_seat_price_ngn: number;
+        starter_kit_eligible: boolean;
+        features: string[];
+        cta: string;
+        highlight: boolean;
+      }[]
+    >("/agent-platform/plans"),
+  foundingCounter: () =>
+    req<{ target: number; claimed: number; remaining: number; is_open: boolean }>(
+      "/agent-platform/founding"
+    ),
+  mySubscription: () =>
+    req<{
+      plan_id: string;
+      plan_name: string;
+      status: string;
+      listing_limit: number;
+      monthly_price_ngn: number;
+      is_founding_price: boolean;
+      next_billing_at?: string | null;
+      auto_default?: boolean;
+    }>("/agent-platform/subscription/me"),
+  subscribeToPlan: (plan_id: string, provider: "paystack" | "flutterwave" = "paystack") =>
+    req<{
+      ok: boolean;
+      activated: boolean;
+      requires_payment?: boolean;
+      pending_reference?: string;
+      plan_id: string;
+      amount_ngn?: number;
+      is_founding_price?: boolean;
+      provider?: string;
+    }>("/agent-platform/subscription/subscribe", {
+      method: "POST",
+      body: JSON.stringify({ plan_id, provider }),
+    }),
+  activateSubscriptionMock: (pending_reference: string) =>
+    req<{ ok: boolean; already?: boolean; subscription: any }>(
+      `/agent-platform/subscription/activate?pending_reference=${encodeURIComponent(pending_reference)}`,
+      { method: "POST" }
+    ),
+  cancelSubscription: () =>
+    req<{ ok: boolean }>("/agent-platform/subscription/cancel", { method: "POST" }),
+  myQuota: () =>
+    req<{
+      plan_id: string;
+      plan_name: string;
+      listing_limit: number;
+      active_listings: number;
+      remaining: number;
+      at_limit: boolean;
+    }>("/agent-platform/quota"),
+  onboardingProgress: () =>
+    req<{
+      steps: { id: string; label: string; completed: boolean; optional: boolean }[];
+      completed_count: number;
+      total_steps: number;
+      percent: number;
+      can_go_live: boolean;
+      starter_kit_status: string;
+    }>("/agent-platform/onboarding"),
+  myStarterKit: () =>
+    req<{
+      user_id: string;
+      status: string;
+      kit_type: string;
+      eligible_at?: string;
+      processing_at?: string;
+      dispatched_at?: string;
+      delivered_at?: string;
+      tracking_reference?: string;
+      delivery_address?: string;
+      notes?: string;
+    }>("/agent-platform/starter-kit/me"),
 };
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;

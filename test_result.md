@@ -241,22 +241,50 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Ran the deployment_agent health check per user request and immediately
-      followed up with P0 security fixes. Six security-critical changes have
-      landed; backend restarted and boots cleanly. Please validate:
+      Phase 1 of the AMASS Agent Ecosystem is now shipped. New backend module
+      `/app/backend/agent_platform.py` adds:
+        • Plans catalog (Starter Free / Pro ₦15k / Agency ₦50k) with founding pricing
+          (Pro ₦10k / Agency ₦35k, first 500 agents)
+        • Founding Agent counter
+        • Agent subscription lifecycle (subscribe / activate-mock / cancel)
+        • Server-side listing quota enforcement in POST /api/properties (HTTP 402
+          with structured payload when at limit)
+        • Auto Starter Kit eligibility marking after 5 verified listings
+        • Onboarding progress tracker (5 steps)
+        • Admin: list/verify/suspend agents, edit plans, manage kit statuses, KPIs
 
-      1. POST /api/seed — 401 without token; 200 with demo user Bearer token.
-      2. POST /api/tokens/purchase — always 410 (mock removed).
-      3. POST /api/wallet/fix/purchase — always 410.
-      4. Wallet credit/debit — verify no negative balances under parallel calls
-         if you can simulate. Existing GET /api/wallet/dual should still show
-         demo balances correctly.
-      5. POST /api/agent-workspace/referrals/{id}/qualify — 403 for non-admin,
-         200 for demo (in ADMIN_EMAILS).
-      6. GET / everything else — regression check that normal flows still work
-         (login, /me, /properties, /marketplace, /wallet/dual, /wallet/me,
-         earn/tasks, agent/promotions/config, etc.)
+      Please validate:
+      1) GET /api/agent-platform/plans (public) — returns 3 plans with founding
+         effective_price_ngn when founding is open.
+      2) GET /api/agent-platform/founding — returns {target:500, claimed:N, ...}.
+      3) GET /api/agent-platform/subscription/me — auto-default Starter when no
+         paid sub, returns paid subscription otherwise.
+      4) POST /api/agent-platform/subscription/subscribe with plan_id=starter →
+         instant activation. With plan_id=pro → returns pending_reference.
+      5) POST /api/agent-platform/subscription/activate?pending_reference=... —
+         only works when MOCK_PAYMENT=true (dev bypass); should flip user to Pro.
+      6) After activation, GET /api/agent-platform/quota should reflect new limit
+         (30 for Pro, 150 for Agency).
+      7) POST /api/agent-platform/subscription/cancel → drops user back to Starter.
+      8) Listing quota enforcement — as demo user (9 active listings, on Starter
+         limit 5), POST /api/properties should return HTTP 402 with structured
+         plan_limit_reached error. After subscribing to Pro (30 limit), the same
+         POST should succeed (returns Property).
+      9) Onboarding — GET /api/agent-platform/onboarding returns 5 steps with
+         `completed`/`percent`/`can_go_live`.
+      10) Admin endpoints (as demo@amass.africa which is in ADMIN_EMAILS):
+          - GET /api/admin/agents (filter by status/plan/q)
+          - POST /api/admin/agents/{user_id}/verify with {approve:true,verification_level:2}
+          - POST /api/admin/agents/{user_id}/suspend with {suspend:true, reason:"test"}
+             then {suspend:false}
+          - PATCH /api/admin/plans/pro with {monthly_price_ngn: 20000}, then revert
+          - POST /api/admin/starter-kits/{user_id}/status with {status:"processing",
+            notes:"packed"} → then dispatched → delivered
+          - GET /api/admin/agents/kpis
+      11) 403 for non-admin trying to hit /api/admin/agents.
+      12) Regression: existing endpoints (auth, properties GET/list, wallet, marketplace,
+          earn/tasks) still work.
 
-      Demo credentials: demo@amass.africa / amass2026 (this account IS admin
-      via ADMIN_EMAILS env). MOCK_PAYMENT is still true so /api/payments/init
-      still works for local flows.
+      Demo credentials: demo@amass.africa / amass2026 (admin).
+      Fresh non-admin test user: create a new user via /api/auth/register
+      (e.g. testagent@example.com / test1234) to verify 402 quota + 403 admin-gate.

@@ -71,19 +71,29 @@ export default function AgentDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [boostProperty, setBoostProperty] = useState<Property | null>(null);
+  const [quota, setQuota] = useState<{
+    plan_id: string;
+    plan_name: string;
+    listing_limit: number;
+    active_listings: number;
+    remaining: number;
+    at_limit: boolean;
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [d, l, a, ld] = await Promise.all([
+      const [d, l, a, ld, q] = await Promise.all([
         api.agentDashboard(),
         api.agentListings(),
         api.agentListingsAnalytics(),
         api.agentLeads(),
+        api.myQuota().catch(() => null),
       ]);
       setDashboard(d);
       setListings(l);
       setAnalytics(a);
       setLeads(ld);
+      setQuota(q);
     } catch {
       /* ignore */
     }
@@ -147,6 +157,49 @@ export default function AgentDashboard() {
           showsVerticalScrollIndicator={false}
         >
           <Overview dashboard={dashboard} onNew={() => router.push("/submit-property")} />
+
+          {quota && (
+            <Pressable
+              onPress={() => router.push("/agent-plans")}
+              style={[
+                styles.quotaCard,
+                quota.at_limit && styles.quotaCardWarn,
+              ]}
+              testID="agent-quota-card"
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View style={styles.quotaBadge}>
+                  <Ionicons name="business" size={14} color={colors.bg} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.quotaTitle}>
+                    {quota.plan_name} plan · {quota.active_listings}/{quota.listing_limit} listings
+                  </Text>
+                  <Text style={styles.quotaSub}>
+                    {quota.at_limit
+                      ? "You've reached your plan limit — tap to upgrade."
+                      : `${quota.remaining} listing slots available.`}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+              </View>
+              <View style={styles.quotaBarTrack}>
+                <View
+                  style={[
+                    styles.quotaBarFill,
+                    {
+                      width: `${Math.min(
+                        100,
+                        (quota.active_listings / Math.max(1, quota.listing_limit)) * 100
+                      )}%`,
+                      backgroundColor: quota.at_limit ? colors.red : colors.ink,
+                    },
+                  ]}
+                />
+              </View>
+            </Pressable>
+          )}
+
           {dashboard?.recent && dashboard.recent.length > 0 && (
             <>
               <View style={styles.sectionHeader}>
@@ -577,6 +630,33 @@ function LeadRow({ lead }: { lead: Lead }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  quotaCard: {
+    backgroundColor: colors.bg,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 12,
+    ...shadows.soft,
+  },
+  quotaCardWarn: { borderColor: colors.red, backgroundColor: colors.redSurface },
+  quotaBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.ink,
+  },
+  quotaTitle: { ...typography.bodyBold, color: colors.ink },
+  quotaSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  quotaBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.surfaceSecondary,
+    overflow: "hidden",
+  },
+  quotaBarFill: { height: 6, borderRadius: 3 },
   header: {
     flexDirection: "row",
     alignItems: "center",

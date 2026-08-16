@@ -619,6 +619,10 @@ class PropertyCreateIn(BaseModel):
 
 @api.post("/properties", response_model=Property)
 async def create_property(data: PropertyCreateIn, user: dict = Depends(get_current_user)):
+    # SECURITY: enforce per-plan listing quota server-side (frontend limits
+    # are advisory only). Raises HTTP 402 with an "upgrade" hint payload.
+    await check_listing_quota(db, user["id"])
+
     # Determine listing_source
     if data.is_owner:
         listing_source: str = "owner_listed"
@@ -670,6 +674,14 @@ async def create_property(data: PropertyCreateIn, user: dict = Depends(get_curre
             )
     except Exception:
         logger.exception("failed to award upload_property")
+
+    # After crediting: check whether this listing brings the agent to
+    # 5+ verified quality listings → mark Starter Kit eligible.
+    try:
+        await maybe_mark_starter_kit_eligible(db, user["id"])
+    except Exception:
+        logger.exception("starter kit eligibility check failed")
+
     return prop
 
 
@@ -1862,6 +1874,19 @@ app.include_router(register_payment_routes(db, get_current_user))
 from property_improvement import register_property_improvement_routes
 app.include_router(register_property_improvement_routes(db, get_current_user))
 
+# ─── Agent Platform (Phase 1: onboarding, plans, quotas, founding, admin)
+from agent_platform import (
+    register_agent_platform_routes,
+    check_listing_quota,
+    maybe_mark_starter_kit_eligible,
+    _ensure_plans_seeded,
+)
+_agent_platform_router, _agent_platform_admin_router = register_agent_platform_routes(
+    db, get_current_user, require_admin
+)
+app.include_router(_agent_platform_router)
+app.include_router(_agent_platform_admin_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1892,8 +1917,24 @@ async def on_startup():
         await db.marketplace.create_index("id", unique=True)
         await db.agent_referrals.create_index("agent_user_id")
         await db.agent_referrals.create_index("id", unique=True)
+        # Agent Platform (Phase 1)
+        await db.agent_plans.create_index("id", unique=True)
+        await db.agent_subscriptions.create_index([("user_id", 1), ("status", 1)])
+        await db.agent_subscriptions.create_index("id", unique=True)
+        await db.agent_subscriptions.create_index("payment_reference", sparse=True)
+        await db.agent_starter_kits.create_index("user_id", unique=True)
+        await db.founding_program.create_index("id", unique=True)
+        await db.pending_agent_subscriptions.create_index("reference", unique=True)
+        await db.agent_applications.create_index("user_id", unique=True)
+        await db.agent_applications.create_index("status")
     except Exception as e:
         logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
+
+    # ─── Seed Agent Platform plans + founding program ─────────
+    try:
+        await _ensure_plans_seeded(db)
+    except Exception:
+        logger.exception("failed to seed agent plans")
 
     # Auto-seed if empty
     count = await db.properties.count_documents({})

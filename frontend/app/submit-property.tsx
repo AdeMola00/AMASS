@@ -146,6 +146,34 @@ export default function SubmitProperty() {
       router.replace(`/property/${created.id}`);
     } catch (e: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      // Detect plan-limit-reached (HTTP 402) and surface an upgrade CTA.
+      const msg = String(e?.message || "");
+      if (msg.includes("plan_limit_reached") || msg.includes("limit")) {
+        // Parse structured detail if present in the error message.
+        let planName = "your current plan";
+        let limit: number | null = null;
+        try {
+          const j = JSON.parse(msg.split("::").pop() || "{}");
+          if (j?.plan_name) planName = j.plan_name;
+          if (j?.limit) limit = j.limit;
+        } catch {}
+        Alert.alert(
+          "Listing limit reached",
+          limit
+            ? `You've reached your ${limit}-property limit on ${planName}. Upgrade to add more listings.`
+            : "You've reached your listing limit. Upgrade to add more.",
+          [
+            { text: "Not now", style: "cancel" },
+            {
+              text: "Upgrade plan",
+              onPress: () => router.push("/agent-plans"),
+              style: "default",
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Could not save property", msg || "Please try again");
+      }
       // eslint-disable-next-line no-console
       console.warn("submit failed", e?.message);
     } finally {

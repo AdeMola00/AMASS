@@ -198,6 +198,15 @@ export default function BecomeAgent() {
             <Ionicons name="create-outline" size={16} color={colors.text} />
             <Text style={styles.editBtnText}>Edit application</Text>
           </Pressable>
+
+          <Pressable
+            style={styles.plansBtn}
+            onPress={() => router.push("/agent-plans")}
+            testID="see-plans-btn"
+          >
+            <Ionicons name="pricetags" size={16} color={colors.bg} />
+            <Text style={styles.plansBtnText}>See plans & upgrade</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -613,4 +622,15 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   editBtnText: { fontSize: 13, fontWeight: "800", color: colors.text },
+  plansBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    height: 46,
+    borderRadius: radius.pill,
+    backgroundColor: colors.ink,
+    marginTop: spacing.md,
+  },
+  plansBtnText: { fontSize: 14, fontWeight: "800", color: colors.bg },
 });
