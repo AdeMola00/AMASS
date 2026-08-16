@@ -135,6 +135,10 @@ class Property(BaseModel):
     # Token economy — Category 1 = AMASS Exclusive (free), Category 2 = token-gated
     is_amass_exclusive: bool = False
     token_cost: Optional[int] = None  # override; else computed from category
+    # Sharing analytics (Phase 3)
+    share_count: Optional[int] = 0
+    share_by_channel: Optional[dict] = None
+    views_count: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -1899,6 +1903,10 @@ _v2_router, _v2_admin_router = register_agent_platform_v2_routes(
 app.include_router(_v2_router)
 app.include_router(_v2_admin_router)
 
+# ─── Marketing & Sharing (Phase 3: share links, WhatsApp, QR events)
+from share_routes import register_share_routes
+app.include_router(register_share_routes(db, get_current_user))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1941,6 +1949,8 @@ async def on_startup():
         await db.agent_applications.create_index("status")
         await db.agent_applications.create_index("slug", unique=True, sparse=True)
         await db.account_deletions.create_index("user_id_hash", unique=True)
+        await db.share_events.create_index([("target_id", 1), ("created_at", -1)])
+        await db.share_events.create_index([("user_id", 1), ("created_at", -1)])
     except Exception as e:
         logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
 

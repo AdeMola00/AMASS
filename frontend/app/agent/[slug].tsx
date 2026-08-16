@@ -73,6 +73,7 @@ export default function AgentPublicProfile() {
         } — ${agent.badge.label} on AMASS. See listings: ${agent.share_url}`,
         url: agent.share_url,
       });
+      api.recordAgentShare(agent.slug, "native_share", "profile-header").catch(() => {});
     } catch {}
   };
 
@@ -87,6 +88,7 @@ export default function AgentPublicProfile() {
     Linking.openURL(`https://wa.me/?text=${text}`).catch(() =>
       Alert.alert("WhatsApp not available")
     );
+    api.recordAgentShare(agent.slug, "whatsapp", "profile-cta").catch(() => {});
   };
 
   if (loading) {

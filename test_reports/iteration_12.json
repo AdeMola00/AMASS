@@ -1,0 +1,54 @@
+{
+  "summary": "Backend-only verification of AMASS Phase 3 (Marketing & Sharing / share_routes.py). 20/20 pytest cases pass (0 failed, 0 skipped) covering property + agent share bundles, WhatsApp URL construction, share event recording (auth-gated, all 5 required channels), stats permission model (owner + admin override + 403 for non-owner), URL-encoding round-trip, bulk-event idempotency, and the requested regression sweep (plans, subscription/me, public agent, badge progress). One documented minor gap: GET /api/properties/{id} does not surface the denormalised share_count / share_by_channel counters — clients must call /api/share/property/{id}/stats. No blocking bugs.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/properties/{id}",
+        "issue": "share_count and share_by_channel are $inc'd into the Mongo document by POST /api/share/property/{id}/event, but the Property Pydantic response_model filters them out so the standard property fetch never exposes the counters. Review spec (#3) explicitly asks for verification via GET /api/properties/{id}. Either (a) add both fields to Property/PropertyOut (Optional[int] and Optional[dict]) or (b) update the spec to source counters exclusively from /api/share/property/{id}/stats. The stats endpoint is currently the only working read path."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_share_routes.py",
+    "/app/test_reports/pytest/pytest_iteration12_share.xml"
+  ],
+  "action_items": [
+    "Optional: extend the Property response model (server.py) to include share_count: Optional[int]=0 and share_by_channel: Optional[dict]=None so the counters are visible from GET /api/properties/{id} as the review spec expects. Not blocking — the /stats endpoint already returns them correctly."
+  ],
+  "critical_code_review_comments": [
+    "share_routes.py: registrations of the ShareEventIn.channel Literal align with the review spec (whatsapp/qr/copy_link/native_share/flyer/email/sms) — good.",
+    "record_property_share / record_agent_share both denormalise counters via $inc and also insert a raw share_events audit row — correct dual-write; no ObjectId leak, all endpoints project {_id: 0}.",
+    "property_share_stats correctly enforces owner-or-admin permission (403 for non-owner, 200 for admin override) — verified in tests.",
+    "WhatsApp deep link uses urllib.parse.quote which preserves \\n as %0A — decoded text is byte-identical to whatsapp_message (verified in test_whatsapp_url_encoded_matches_message).",
+    "flyer_payload.property.images is correctly sliced to 1 cover image and amenities to max 6 — matches spec.",
+    "Minor: no rate-limiting on POST /event — a hostile client can spam counter increments unbounded. Consider a per-user+target+channel throttle (e.g. 1/min) or dedup via unique index on (user_id, target_id, channel, minute-bucket). Not part of this iteration's scope but flagged."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_share_routes.py (new pytest suite; no production code touched)"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20 passed)",
+    "frontend": "not tested (per review request)"
+  },
+  "seed_data_creation": "Created 1 TEST_ foreign property owned by an ephemeral registered user (TEST_share_<uuid>@example.com) so the admin-override stats test could execute. Cleanup not performed — the test property carries the TEST_ prefix and is on the fresh user's account (agent_id != demo). Recommend a scheduled cleanup or leave for future iterations to overwrite.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The share_routes.py module is fully functional end-to-end. Pytest suite at /app/backend/tests/test_share_routes.py is idempotent (uses relative deltas via /stats baseline, not hard-coded absolutes) and safe to re-run. Auth uses access_token (not token) in the login/register response. Note: pytest.ini enforces `-n 2 --dist loadscope`; override with `-o \"addopts=-n 0\"` when running just this file to avoid worker contention on the shared demo property. All 10 seed properties are owned by demo — foreign_property fixture auto-creates one via a fresh user (Starter plan allows first 5 free).",
+  "phase3_feature_pass_matrix": {
+    "1_property_share_bundle": "PASS (share_url + qr_url + wa.me URL + WhatsApp message with ₦/title/listing/location/URL + flyer_payload.property with 1-image/6-amenity caps + brand block + agent block when agent_id set + 404 on unknown id)",
+    "2_agent_share_bundle": "PASS (slug lookup + user_id fallback + flyer_payload.kind==agent + agent name + WhatsApp msg references name/badge + 404 on unknown slug)",
+    "3_record_property_share_event": "PASS via stats endpoint (401 unauth, 200 authed, all 5 channels increment their own bucket + total; final whatsapp bucket = 2, total delta = 6). NOTE: could not verify via GET /api/properties/{id} because the response model omits share_count/share_by_channel — see minor issue #1.",
+    "4_record_agent_share": "PASS (401 unauth, 200 authed, 404 unknown slug)",
+    "5_share_stats_permission": "PASS (owner 200, non-owner 403, admin override 200)",
+    "6_url_encoding": "PASS (parse_qs of whatsapp_url['text'] === whatsapp_message verbatim, including ₦ and \\n)",
+    "7_bulk_events_idempotency": "PASS (3 rapid copy_link POSTs increment total by exactly 3, copy_link bucket by exactly 3, no drift)",
+    "8_regression_sweep": "PASS (agent-platform/plans, subscription/me, public/{slug}, badge/progress)"
+  }
+}

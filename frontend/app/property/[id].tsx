@@ -90,18 +90,14 @@ export default function PropertyDetails() {
     } catch {}
   }, [property]);
 
-  const onShare = useCallback(async () => {
+  const onShare = useCallback(() => {
     if (!property) return;
     Haptics.selectionAsync().catch(() => {});
-    const url = `${SHARE_BASE}/property/${property.id}`;
-    try {
-      await Share.share({
-        message: `${property.title} — ${formatNaira(property.price)} · ${property.location}\n${url}`,
-        url,
-        title: property.title,
-      });
-    } catch {}
-  }, [property]);
+    // Opens the AMASS branded share screen (QR code, marketing flyer,
+    // WhatsApp deep-link, copy-link, native fallback). All share events
+    // are tracked for the agent's per-listing analytics.
+    router.push(`/share/${property.id}` as any);
+  }, [property, router]);
 
   if (loading) {
     return (

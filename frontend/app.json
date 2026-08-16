@@ -18,6 +18,7 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Discover properties near you on the map",
         "NSPhotoLibraryUsageDescription": "Choose photos for your property listings",
+        "NSPhotoLibraryAddUsageDescription": "Save AMASS flyers and QR codes to your camera roll",
         "NSCameraUsageDescription": "Take photos of properties to list on AMASS"
       }
     },
@@ -37,7 +38,8 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
@@ -52,6 +54,14 @@
         {
           "photosPermission": "Choose photos of your property to list on AMASS",
           "cameraPermission": "Take photos of your property to list on AMASS"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "AMASS saves your property flyers and QR codes to Photos.",
+          "savePhotosPermission": "AMASS saves your property flyers and QR codes to Photos.",
+          "isAccessMediaLocationEnabled": false
         }
       ],
       [

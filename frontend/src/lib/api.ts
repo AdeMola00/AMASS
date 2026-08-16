@@ -1104,6 +1104,66 @@ export const api = {
       "/agent-platform/account/delete",
       { method: "POST" }
     ),
+
+  // ─── Marketing & Sharing (Phase 3: WhatsApp deep links, QR, flyer) ───
+  propertyShareBundle: (property_id: string) =>
+    req<{
+      share_url: string;
+      qr_url: string;
+      whatsapp_url: string;
+      whatsapp_message: string;
+      flyer_payload: {
+        property: {
+          id: string;
+          title?: string;
+          price?: number;
+          currency?: string;
+          listing_type?: string;
+          property_type?: string;
+          bedrooms?: number;
+          bathrooms?: number;
+          size_sqm?: number;
+          city?: string;
+          state?: string;
+          location?: string;
+          images?: string[];
+          verified?: boolean;
+          amenities?: string[];
+        };
+        agent?: any;
+        brand: { name: string; tagline: string; domain: string; accent: string; ink: string };
+      };
+    }>(`/share/property/${encodeURIComponent(property_id)}`),
+  agentShareBundle: (slug: string) =>
+    req<{
+      share_url: string;
+      qr_url: string;
+      whatsapp_url: string;
+      whatsapp_message: string;
+      flyer_payload: any;
+    }>(`/share/agent/${encodeURIComponent(slug)}`),
+  recordPropertyShare: (
+    property_id: string,
+    channel: "whatsapp" | "qr" | "copy_link" | "native_share" | "flyer" | "email" | "sms",
+    context?: string
+  ) =>
+    req<{ ok: boolean }>(`/share/property/${encodeURIComponent(property_id)}/event`, {
+      method: "POST",
+      body: JSON.stringify({ channel, context }),
+    }),
+  recordAgentShare: (
+    slug: string,
+    channel: "whatsapp" | "qr" | "copy_link" | "native_share" | "flyer" | "email" | "sms",
+    context?: string
+  ) =>
+    req<{ ok: boolean }>(`/share/agent/${encodeURIComponent(slug)}/event`, {
+      method: "POST",
+      body: JSON.stringify({ channel, context }),
+    }),
+  propertyShareStats: (property_id: string) =>
+    req<{ total_shares: number; by_channel: Record<string, number> }>(
+      `/share/property/${encodeURIComponent(property_id)}/stats`
+    ),
 };
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;
