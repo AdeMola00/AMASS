@@ -126,7 +126,7 @@ export default function AgentDashboard() {
           <Text style={styles.headerSub}>Welcome back, {user?.full_name?.split(" ")[0] || "Agent"}</Text>
         </View>
         <Pressable
-          onPress={() => router.push("/submit-property")}
+          onPress={() => router.push("/agent/onboarding" as any)}
           style={styles.newBtn}
           testID="dashboard-new-listing"
         >
@@ -157,7 +157,7 @@ export default function AgentDashboard() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.red} />}
           showsVerticalScrollIndicator={false}
         >
-          <Overview dashboard={dashboard} onNew={() => router.push("/submit-property")} />
+          <Overview dashboard={dashboard} onNew={() => router.push("/agent/onboarding" as any)} />
 
           <AgentScoreCard />
 
@@ -250,7 +250,7 @@ export default function AgentDashboard() {
               <Ionicons name="business-outline" size={48} color={colors.textMuted} />
               <Text style={styles.emptyTitle}>No listings yet</Text>
               <Text style={styles.emptySub}>Publish your first property to start receiving leads.</Text>
-              <Pressable style={styles.emptyBtn} onPress={() => router.push("/submit-property")} testID="empty-new-listing">
+              <Pressable style={styles.emptyBtn} onPress={() => router.push("/agent/onboarding" as any)} testID="empty-new-listing">
                 <Ionicons name="add" size={18} color="#fff" />
                 <Text style={styles.emptyBtnText}>New Listing</Text>
               </Pressable>

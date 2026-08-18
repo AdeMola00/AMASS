@@ -25,8 +25,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 
 DEFAULTS = {
-    "high_confidence_threshold": 80,
-    "possible_threshold": 60,
+    "high_confidence_threshold": 70,
+    "possible_threshold": 45,
     "search_radius_meters": 25,
     "gps_multiplier": 2,  # radius = max(search_radius, gps_accuracy * multiplier)
     "max_candidates": 20,
@@ -391,10 +391,10 @@ def register_duplicate_routes(db, require_auth, require_admin):
         if not updates:
             raise HTTPException(400, "Nothing to update")
         # Guardrails per user's instruction: never allow disabling protection.
-        if updates.get("possible_threshold", 60) < 40:
-            raise HTTPException(400, "possible_threshold must be >= 40")
-        if updates.get("high_confidence_threshold", 80) < 60:
-            raise HTTPException(400, "high_confidence_threshold must be >= 60")
+        if updates.get("possible_threshold", 45) < 30:
+            raise HTTPException(400, "possible_threshold must be >= 30")
+        if updates.get("high_confidence_threshold", 70) < 50:
+            raise HTTPException(400, "high_confidence_threshold must be >= 50")
         await db.system_config.update_one(
             {"id": "duplicate_config"},
             {"$set": {**updates, "updated_at": datetime.now(timezone.utc)}},

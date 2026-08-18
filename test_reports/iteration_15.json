@@ -1,0 +1,50 @@
+{
+  "summary": "Phase 6C backend: 18/18 tests PASS in /app/backend/tests/test_property_identity_phase6c.py. Verified the PATCH refactor (single dict body): (a) PATCH details-only sets status=DETAILS_PENDING and preserves listing=null; (b) PATCH listing-only preserves details=null; (c) PATCH media_ids-only accepts a base64 list and IS CAPPED AT 20 (25 sent → 20 stored, in order; subsequent under-cap send overwrites, not appends); (d) PATCH all three keys in one call works; (e) unknown oid → 404; (f) other agent cannot PATCH someone else's draft (→404 not 403 — owner check hides existence); (g) unauth → 401/403. Full happy path (start → location → PATCH details+listing+media_ids → duplicate-check → submit) creates properties_geo + property_listings + audit rows and returns amass_property_id of shape AMASS-XXX-YYYYYYYY (verified via public /api/properties-v2/{amass_id} which also carries media_ids). Idempotent submit with same client_submission_id returns idempotent:true with identical amass_property_id/property_id/listing_id. Duplicate gate: created a first property at a shared Lagos-ish point, second onboarding at SAME lat/lng/address returned candidates populated with first_amass in the list; submit without decision → 409 duplicate_decision_required; POST /decision same_property + same_as_amass_id → submit returns attached_to_existing:true, same amass_property_id + property_id, new listing_id; public /listings shows both listings on the canonical property. GET /api/agent/properties/mine returns the wizard-created listing joined with property. Regression sweep on list_drafts, ad-hoc /duplicate-check, unknown /properties-v2 → 404, unauth guards, and /decision validation (invalid decision → 400, same_property w/o id → 400) — all pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/agent/properties/{oid}/duplicate-check",
+        "issue": "With default thresholds (possible=60), a wizard-only same-location + same-address + same-property_type + same bedrooms/bathrooms flow scores at most proximity(30)+address(10)+type(5)+attrs(5) = 50, which is BELOW the possible_threshold of 60. The duplicate gate therefore only fires in practice when footprint(25)/parcel(20) polygons are supplied — but the draft-based /duplicate-check does not accept or forward those fields (see duplicate_detection.py:295). Net effect: the 5-stage wizard alone will almost never trigger a 'possible_duplicate' warning at defaults. Test lowers possible_threshold to 40 via admin config to exercise the flow (restored on teardown). Consider either (a) lowering default possible_threshold or (b) letting the draft-check accept optional footprint/parcel polygons from later wizard steps."
+      },
+      {
+        "endpoint": "PATCH /api/agent/properties/{oid}",
+        "issue": "media_ids semantic is OVERWRITE, not append (whole list replaces prior list). This is fine for a wizard, but should be documented — a client that PATCHes 3 photos after previously PATCHing 20 will end up with 3, not 23. Confirmed by test test_patch_media_ids_only_and_cap."
+      },
+      {
+        "endpoint": "PATCH /api/agent/properties/{oid}",
+        "issue": "Payload is a raw dict body — no Pydantic model — so unknown keys are silently ignored and empty body silently returns {ok:true} without touching the draft. Low-risk but consider a Pydantic model with model_config strict fields for clearer client errors."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_property_identity_phase6c.py",
+    "/app/test_reports/pytest/pytest_iteration15_phase6c.xml"
+  ],
+  "action_items": [
+    "Consider defaulting possible_threshold lower OR letting draft /duplicate-check accept building_footprint/parcel_polygon so the duplicate gate is reachable via the wizard at default thresholds (see minor issue above).",
+    "Optional: document media_ids overwrite semantics in API docs / frontend comments so a partial re-upload doesn't accidentally shrink the gallery.",
+    "Optional: replace the raw dict body on PATCH /{oid} with a Pydantic model (SavePatchIn { details?: PropertyDetailsIn, listing?: ListingDetailsIn, media_ids?: List[str] }) to catch typos client-side (400 vs silent no-op)."
+  ],
+  "critical_code_review_comments": [
+    "property_identity.py:239 PATCH /{oid} — empty payload / unknown keys silently returns ok:true. No client-visible error if the field name is mistyped.",
+    "property_identity.py:257-259 media_ids cap uses [:20] on the incoming list only; there is no per-item size cap (each base64 photo could be several MB → Mongo BSON 16 MB doc size risk if photos are large). Consider a per-item size guard or storing photos out-of-band (S3/Cloudinary) with URLs instead of base64.",
+    "duplicate_detection.py:283 duplicate_check_for_draft — cannot request 'possible_duplicate' from wizard fields alone (max 50/100); default possible_threshold=60 makes the gate unreachable without polygons.",
+    "duplicate_detection.py:394-397 admin PATCH guardrails compare against payload defaults (60/80) when the field is absent; harmless because unset fields are removed by `k: v for … if v is not None`, but the guardrail line reads confusingly. Consider basing the comparison on the merged effective config."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_property_identity_phase6c.py (new)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Created ~10 fresh properties_geo rows (Lagos + Victoria-Island-ish) and ~15 property_onboarding drafts on demo user's account, plus one fresh throwaway user (pi6c_other_*@test.amass) for the cross-agent test. All CSIDs prefixed with 'csid-6c-' — safe to leave in dev DB or purge with db.property_onboarding.deleteMany({client_submission_id: /^csid-6c-/}).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Test file /app/backend/tests/test_property_identity_phase6c.py is reusable — runs in ~5s via xdist. It temporarily lowers admin duplicate config (possible_threshold=40, high_confidence=60) inside TestDuplicateGate and restores on teardown. NOTE: running test_property_identity_phase6a.py + test_property_identity_phase6c.py together in the same xdist run breaks TestCounter::test_three_lagos_increment because the Lagos counter is shared across parallel workers and adjacent submits are no longer +1 apart. This is a pre-existing xdist-isolation issue in the 6A test — that specific test passes when run alone. Not a code regression.",
+  "rca_of_issue": "N/A — no bug found; report highlights one product-design gap (wizard cannot reach possible_threshold=60 without polygons)."
+}

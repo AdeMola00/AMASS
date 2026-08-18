@@ -1240,6 +1240,126 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ text }),
     }),
+
+  // ─── Phase 6A/6B: Property Onboarding Wizard + Duplicate Detection ───
+  onboardingStart: (client_submission_id: string) =>
+    req<{ onboarding_id: string; status: string; resumed: boolean }>(
+      "/agent/properties/onboarding",
+      { method: "POST", body: JSON.stringify({ client_submission_id }) }
+    ),
+  onboardingGet: (oid: string) =>
+    req<any>(`/agent/properties/onboarding/${encodeURIComponent(oid)}`),
+  onboardingList: () => req<any[]>("/agent/properties/onboarding"),
+  onboardingSaveLocation: (
+    oid: string,
+    location: {
+      latitude: number;
+      longitude: number;
+      accuracy_meters: number;
+      location_source: "GPS" | "NETWORK" | "MAP_SELECTED" | "ADDRESS_SEARCH" | "MANUAL";
+      altitude?: number | null;
+    },
+    address?: {
+      state: string;
+      lga?: string;
+      district?: string;
+      area?: string;
+      estate?: string;
+      street?: string;
+      house_number?: string;
+      landmark?: string;
+      raw_address?: string;
+    }
+  ) =>
+    req<{ ok: boolean; status: string; gps_verification: string; gps_message: string }>(
+      `/agent/properties/${encodeURIComponent(oid)}/location`,
+      { method: "POST", body: JSON.stringify({ location, address }) }
+    ),
+  onboardingSaveDetails: (
+    oid: string,
+    body: {
+      details?: {
+        property_type: string;
+        property_subtype?: string;
+        bedrooms?: number;
+        bathrooms?: number;
+        floors?: number;
+        land_size_sqm?: number;
+        building_size_sqm?: number;
+        amenities?: string[];
+        year_built?: number;
+      };
+      listing?: {
+        listing_type: "buy" | "rent" | "lease" | "shortlet";
+        price: number;
+        currency?: string;
+        description?: string;
+        title_document?: string;
+        representation_type?: "owner" | "agent" | "agency" | "developer" | "landlord";
+        owner_name?: string;
+        owner_phone?: string;
+      };
+      media_ids?: string[];
+    }
+  ) =>
+    req<{ ok: boolean }>(`/agent/properties/${encodeURIComponent(oid)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  onboardingDuplicateCheck: (oid: string) =>
+    req<{
+      search_radius_meters: number;
+      highest_score: number;
+      action: "allow" | "possible_duplicate" | "high_confidence_duplicate";
+      high_confidence_threshold: number;
+      possible_threshold: number;
+      candidates: {
+        amass_property_id: string;
+        property_uuid: string;
+        distance_meters: number;
+        score: number;
+        reasons: string[];
+        breakdown: Record<string, number>;
+        preview: {
+          state?: string;
+          lga?: string;
+          area?: string;
+          estate?: string;
+          street?: string;
+          property_type?: string;
+          bedrooms?: number;
+        };
+      }[];
+    }>(`/agent/properties/${encodeURIComponent(oid)}/duplicate-check`, {
+      method: "POST",
+    }),
+  onboardingRecordDecision: (
+    oid: string,
+    payload: {
+      client_submission_id: string;
+      duplicate_decision: "same_property" | "not_same_property";
+      same_as_amass_id?: string;
+      not_same_reason?: string;
+    }
+  ) =>
+    req<{ ok: boolean; decision: string }>(
+      `/agent/properties/${encodeURIComponent(oid)}/decision`,
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
+  onboardingSubmit: (oid: string, client_submission_id: string) =>
+    req<{
+      ok: boolean;
+      idempotent?: boolean;
+      attached_to_existing?: boolean;
+      amass_property_id: string;
+      property_id: string;
+      listing_id: string;
+      status: string;
+    }>(`/agent/properties/${encodeURIComponent(oid)}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ client_submission_id }),
+    }),
+  agentMyPropertiesV2: () => req<any[]>("/agent/properties/mine"),
 };
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;

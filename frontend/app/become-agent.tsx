@@ -201,11 +201,20 @@ export default function BecomeAgent() {
 
           <Pressable
             style={styles.plansBtn}
+            onPress={() => router.push("/agent/onboarding" as any)}
+            testID="start-onboarding-btn"
+          >
+            <Ionicons name="add-circle" size={16} color={colors.bg} />
+            <Text style={styles.plansBtnText}>List a property (new wizard)</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.editBtn}
             onPress={() => router.push("/agent-plans")}
             testID="see-plans-btn"
           >
-            <Ionicons name="pricetags" size={16} color={colors.bg} />
-            <Text style={styles.plansBtnText}>See plans & upgrade</Text>
+            <Ionicons name="pricetags" size={16} color={colors.text} />
+            <Text style={styles.editBtnText}>See plans & upgrade</Text>
           </Pressable>
 
           <Pressable

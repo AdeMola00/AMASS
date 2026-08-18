@@ -239,19 +239,24 @@ def register_property_identity_routes(db, require_auth, require_admin):
     @router.patch("/{oid}")
     async def save_details(
         oid: str,
-        details: Optional[PropertyDetailsIn] = Body(None),
-        listing: Optional[ListingDetailsIn] = Body(None),
+        payload: dict = Body(...),
         user: dict = Depends(require_auth),
     ):
         draft = await db.property_onboarding.find_one({"id": oid, "agent_id": user["id"]})
         if not draft:
             raise HTTPException(404, "Onboarding draft not found")
         updates: dict = {"updated_at": datetime.now(timezone.utc)}
-        if details:
-            updates["details"] = details.model_dump()
+        details_raw = payload.get("details")
+        listing_raw = payload.get("listing")
+        media_ids = payload.get("media_ids")
+        if details_raw is not None:
+            updates["details"] = PropertyDetailsIn(**details_raw).model_dump()
             updates["status"] = "DETAILS_PENDING"
-        if listing:
-            updates["listing"] = listing.model_dump()
+        if listing_raw is not None:
+            updates["listing"] = ListingDetailsIn(**listing_raw).model_dump()
+        if isinstance(media_ids, list):
+            # Cap total photos at 20 to protect Mongo doc size / bandwidth.
+            updates["media_ids"] = media_ids[:20]
         await db.property_onboarding.update_one({"id": oid}, {"$set": updates})
         return {"ok": True}
 
