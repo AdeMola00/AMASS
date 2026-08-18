@@ -104,6 +104,22 @@ export default function Profile() {
         </View>
 
         <View style={styles.menu}>
+          {user?.is_admin && (
+            <Pressable
+              style={[styles.menuRow, { backgroundColor: "#FEF3F2" }]}
+              onPress={() => router.push("/admin" as any)}
+              testID="menu-admin-cockpit"
+            >
+              <View style={[styles.menuIcon, { backgroundColor: colors.red }]}>
+                <Ionicons name="shield-checkmark" size={20} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuLabel, { color: colors.red }]}>Admin Cockpit</Text>
+                <Text style={styles.menuCaption}>Duplicate queue · Merge · Audit log · Representations</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.red} />
+            </Pressable>
+          )}
           {MENU.map((m) => (
             <Pressable
               key={m.label}

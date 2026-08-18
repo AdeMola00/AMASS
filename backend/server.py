@@ -77,6 +77,7 @@ class UserOut(BaseModel):
     city: Optional[str] = None
     bio: Optional[str] = None
     is_agent: bool = False
+    is_admin: bool = False
     referral_code: Optional[str] = None
     created_at: datetime
 
@@ -304,6 +305,8 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
 
 
 def user_to_out(u: dict) -> UserOut:
+    email = (u.get("email") or "").lower()
+    is_admin = bool(u.get("is_admin")) or email in ADMIN_EMAILS
     return UserOut(
         id=u["id"],
         email=u["email"],
@@ -311,6 +314,7 @@ def user_to_out(u: dict) -> UserOut:
         phone=u.get("phone"),
         avatar_url=u.get("avatar_url"),
         is_agent=u.get("is_agent", False),
+        is_admin=is_admin,
         created_at=u["created_at"],
     )
 
@@ -1927,6 +1931,25 @@ _dup_router, _dup_admin = register_duplicate_routes(db, get_current_user, requir
 app.include_router(_dup_router)
 app.include_router(_dup_admin)
 
+# ─── Property Representations & Claims (Phase 6C)
+from property_representations import register_representation_routes
+_rep_agent, _rep_public, _rep_admin = register_representation_routes(
+    db, get_current_user, require_admin
+)
+app.include_router(_rep_agent)
+app.include_router(_rep_public)
+app.include_router(_rep_admin)
+
+# ─── Property Passport — public SEO-friendly page (Phase 6C)
+from property_passport import register_passport_routes
+_pp_public, _pp_admin = register_passport_routes(db, get_current_user, require_admin)
+app.include_router(_pp_public)
+app.include_router(_pp_admin)
+
+# ─── Admin Cockpit — duplicate queue, merge, audit, verify (Phase 6D)
+from admin_cockpit import register_admin_cockpit_routes
+app.include_router(register_admin_cockpit_routes(db, require_admin))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1996,6 +2019,22 @@ async def on_startup():
         await db.property_id_counters.create_index("state_code", unique=True)
         await db.property_audit_logs.create_index([("property_id", 1), ("created_at", -1)])
         await db.property_audit_logs.create_index("id", unique=True)
+        # Phase 6C — Representations & Claims
+        await db.property_representations.create_index("id", unique=True)
+        await db.property_representations.create_index(
+            [("property_id", 1), ("status", 1)]
+        )
+        await db.property_representations.create_index(
+            [("user_id", 1), ("status", 1)]
+        )
+        await db.property_representations.create_index("listing_id", sparse=True)
+        await db.property_representations.create_index(
+            [("listing_id", 1), ("user_id", 1)], unique=True, sparse=True
+        )
+        await db.property_claims.create_index("id", unique=True)
+        await db.property_claims.create_index(
+            [("representation_id", 1), ("submitted_at", -1)]
+        )
     except Exception as e:
         logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
 

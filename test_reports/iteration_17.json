@@ -1,0 +1,54 @@
+{
+  "summary": "Phase 6D admin_cockpit backend tested end-to-end. Wrote 36 pytest cases in /app/backend/tests/test_phase6d_admin_cockpit.py covering AuthZ (401/403), is_admin flag on /auth/me, dashboard counters, duplicate queue population from wizard bypass, decide clear/flag_for_merge, compare, full merge lifecycle (listings/reps move, alias, audit on both properties), verify/unverify, audit-logs filters (action/actor_type/property_id in AMASS or UUID form/since-until), cursor pagination and distinct actions list. 34/36 pass when run serially (-n 0). 2 failures — both trace to the SAME real bug: after merge the loser's AMASS ID does NOT resolve to the winner canonical (spec explicitly requires this). Phase 6A/6B/6C regression: 108/110 pass; the 2 regression failures are pre-existing shared-state fragility in TestRegression.test_brand_new_lat_lng_full_flow and TestCounter.test_three_lagos_increment (dozens of Lagos props now exist in the shared preview DB — both tests assume a pristine sequence/spot; not caused by Phase 6D logic).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/properties-v2/{loser_amass_id}",
+        "issue": "After merge, the loser's own AMASS ID still resolves to its own doc (physical_status=MERGED) instead of the winner canonical. Spec requires alias resolution. RCA: property_identity.py line 488-500 does find_one({'amass_property_id': amass_id}) first — the loser doc still exists after merge so the alias-fallback branch never runs.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "GET /api/passport/{loser_amass_id}",
+        "issue": "Same root cause — passport route in property_passport.py line 179 uses $or on {amass_property_id, aliases}. When both loser doc AND winner (with loser in aliases[]) match, Mongo returns the loser doc (with MERGED status, empty listings — listings moved to winner). Should prefer winner: either filter physical_status != MERGED, or after find(): if p['physical_status']=='MERGED' and merged_into_amass_id set → re-fetch winner.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase6d_admin_cockpit.py",
+    "/app/test_reports/pytest/pytest_iteration17_phase6d.xml"
+  ],
+  "action_items": [
+    "Fix merge alias resolution: in property_identity.py get_property_by_amass_id — after direct find, if p.physical_status=='MERGED' and p.merged_into_amass_id set, fetch and return the winner doc with resolved_via_alias=true (or exclude MERGED from the initial query and let alias branch handle it).",
+    "Fix same bug in property_passport.build_passport: add {'physical_status': {'$ne': 'MERGED'}} to the $or query, OR post-check and re-run with merged_into_amass_id.",
+    "Once merge alias resolution is fixed, Phase 6D suite will report 36/36. Re-run: pytest backend/tests/test_phase6d_admin_cockpit.py -n 0",
+    "Consider making test_phase6b TestRegression.test_brand_new_lat_lng_full_flow pick a far-away lat/lng not currently populated by other tests (Ikorodu / Ajah cluster) so shared preview state does not flip 'allow'→'possible_duplicate'.",
+    "Add xdist loadscope isolation for TestCounter.test_three_lagos_increment in phase6a (or serialize with pytest-order) — it assumes exclusive Lagos counter access."
+  ],
+  "critical_code_review_comments": [
+    "admin_cockpit.py properly gates every route behind Depends(require_admin) and writes audit rows on every state-changing action — good.",
+    "Merge logic in admin_cockpit.py handles unique-index dedupe for representations (listing_id+user_id on winner) correctly, deleting loser dupes.",
+    "The audit-logs endpoint accepts both AMASS-XXX ids (with alias-aware $or lookup) and raw UUIDs — clean.",
+    "Cursor pagination in audit-logs is based on the cursor row's created_at with $lt, plus limit+1 look-ahead for next_cursor — correct and consistent.",
+    "property_identity.py duplicate-bypass flag propagation (needs_admin_review + duplicate_score_at_creation + review_reason) only sets when decision.decision == 'not_same_property' AND highest >= high_confidence_threshold — matches spec.",
+    "MergeIn/VerifyIn/ReviewDecisionIn Pydantic Literal enums correctly return 422 on invalid actions.",
+    "BUG (already flagged): merge does not update the resolver for GET /api/properties-v2/{loser_amass_id} or /api/passport/{loser_amass_id} — the loser doc remains directly resolvable.",
+    "Minor: admin_cockpit._audit stores 'actor_type' based on is_admin flag on the actor dict — matches server.py convention. OK."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase6d_admin_cockpit.py (new — 36 cases)"
+  ],
+  "success_rate": {"backend": "94% (34/36 phase6d; 108/110 regression 6A/6B/6C)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Tests create fresh properties per module fixture at unique random lat/lng offsets (Ikeja GRA, Yaba, Victoria Island, Ikoyi). All merged / verified during the suite. No cleanup — properties persist in the preview DB, which is why the 2 regression tests already assume shared-state fragility.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase 6D suite lives at /app/backend/tests/test_phase6d_admin_cockpit.py — run with `-n 0` for deterministic ordering (module-level fixtures mutate duplicate config globally so cross-worker races are possible under default loadscope xdist). Re-run after main agent patches property_identity.py + property_passport.py merge alias resolution. Expect 36/36 pass.",
+  "rca_of_issue": "GET /api/properties-v2/{amass_id} in property_identity.py first does find_one({'amass_property_id': amass_id}) — after merge, the loser's own doc still exists (marked physical_status=MERGED, with merged_into_property_uuid/merged_into_amass_id set) so this direct match SUCCEEDS and the alias-fallback (find({'aliases': amass_id})) is never reached. Reproduction: 1) create two properties A and B far apart, 2) POST /api/admin/cockpit/merge {winner=A, loser=B}, 3) GET /api/properties-v2/{B} — returns B's own doc with physical_status=MERGED instead of A with resolved_via_alias=true. Same defect in property_passport.build_passport at line 179 — the $or match returns the loser first. Mitigation: exclude MERGED from initial query OR follow p.merged_into_amass_id when p.physical_status=='MERGED'."
+}

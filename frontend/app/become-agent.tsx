@@ -209,6 +209,15 @@ export default function BecomeAgent() {
           </Pressable>
 
           <Pressable
+            style={styles.publicBtn}
+            onPress={() => router.push("/agent/representations" as any)}
+            testID="my-reps-btn"
+          >
+            <Ionicons name="ribbon-outline" size={16} color={colors.ink} />
+            <Text style={styles.publicBtnText}>My representations</Text>
+          </Pressable>
+
+          <Pressable
             style={styles.editBtn}
             onPress={() => router.push("/agent-plans")}
             testID="see-plans-btn"

@@ -1,0 +1,63 @@
+{
+  "summary": "Phase 6C backend (Passport + Representations & Claims) tested end-to-end: 29/29 tests PASS in /app/backend/tests/test_phase6c_passport_reps.py. Verified: (1) Wizard submit auto-creates a PENDING property_representations doc for BOTH the new-property branch and the duplicate 'attach-to-existing' branch (visible via GET /api/agent/representations/mine, with autocreated_by_wizard=true). (2) Agent endpoints — POST /{rep_id}/claim accepts documents+mandate_type and flips DOCS_REQUESTED->PENDING; blocks with 400 on REJECTED/REVOKED; GET /mine returns joined property+listing preview, supports ?status= filter; GET /{rep_id} returns rep + its claims list; PATCH /{rep_id} works on non-closed reps (400 on closed). Cross-agent GET /{rep_id} returns 404 (no existence disclosure). Unauth on /mine and /claim => 401/403. (3) Admin decide — approve/reject/request_docs/suspend/revoke all transition status correctly, write audit rows (REPRESENTATION_APPROVED etc.), and re-deciding the same status returns {already:true}. Approve flips properties_geo.has_verified_representation=true and the property's public passport reflects it. GET /api/admin/representations/queue?status=PENDING returns rows with property_preview + agent_preview joined; non-admin gets 403; invalid status gets 400. (4) Public passport — GET /api/passport/{amass_id} (NO auth) is fully sanitised: owner_name/owner_phone/agent_id are NOT in listings; exact GPS is rounded to ~100m grid (coordinates_precision='~100m') when show_exact_gps=false (default); street/house_number/raw_address are absent by default; timeline events carry NO reason/actor_id/old_value/new_value and only PUBLIC_EVENT_TYPES appear (no DUPLICATE_DETECTED, ONBOARDING_STARTED, etc.); representatives block is empty until at least one rep is APPROVED, and even then the rep block carries no owner_phone/documents and the agent block carries no email/phone. (5) Visibility patch — PATCH /api/admin/passport/{amass_id}/visibility {show_street:true, show_house_number:true} makes the subsequent public GET include those fields (raw_address stays hidden); empty body -> 400; unknown amass_id -> 404; non-admin -> 403. (6) Admin bypass — GET /api/admin/passport/{amass_id}/full returns exact GPS + street + house_number + raw_address regardless of visibility; non-admin -> 403. (7) URL stability — after attaching a 2nd listing (same_property decision), passport URL still resolves under the same AMASS ID and shows both listings via /api/properties-v2/{amass}/listings. Regression: /api/properties (v1) unchanged; /api/properties-v2/{amass}/listings unchanged. No leaks observed in any sanitised payload examined.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/agent/representations/{rep_id}/claim",
+        "issue": "Claim submission does NOT re-open a rep that is in APPROVED / SUSPENDED / DOCS_REQUESTED with distinct semantics — only DOCS_REQUESTED is transitioned back to PENDING. Submitting a claim on an already APPROVED rep silently mutates the rep's documents/mandate_type WITHOUT any status transition or audit event describing 're-submission on approved mandate'. Consider either blocking claim on APPROVED (409) or writing a distinct audit event."
+      },
+      {
+        "endpoint": "POST /api/agent/representations/{rep_id}/claim",
+        "issue": "Claim payload allows owner_name / owner_phone but the model does NOT enforce phone format (any string accepted). Since these end up on the internal rep doc (and could accidentally be echoed in a future admin/preview endpoint), consider a light regex or E.164 normaliser. Not exposed publicly today (verified via passport)."
+      },
+      {
+        "endpoint": "GET /api/passport/{amass_id}",
+        "issue": "coordinates_precision='~100m' is a string label; consumers cannot programmatically distinguish 'rounded' vs 'exact'. Consider adding a boolean is_exact:false alongside the label, or emitting the precision in metres (100)."
+      },
+      {
+        "endpoint": "PATCH /api/admin/passport/{amass_id}/visibility",
+        "issue": "Audit row for PASSPORT_VISIBILITY_UPDATED is written with property_id:null (see property_passport.py:322). The audit is keyed by amass_id via new_value but the property_id is not looked up, so filtering the audit collection by property_id will miss visibility changes."
+      },
+      {
+        "endpoint": "GET /api/admin/representations/queue",
+        "issue": "The queue endpoint uses require_admin, which correctly returns 403 for non-admin; however there is no pagination cursor (only limit up to 200). For scale, consider adding since/before or offset."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase6c_passport_reps.py",
+    "/app/test_reports/pytest/pytest_iteration16_phase6c.xml"
+  ],
+  "action_items": [
+    "Optional: block or specially audit claim submissions on already-APPROVED reps to avoid silent mandate-doc rewrites.",
+    "Optional: add is_exact:bool + precision_metres:int to passport.property.coordinates payload for programmatic consumers.",
+    "Optional: populate property_id on the PASSPORT_VISIBILITY_UPDATED audit row (property_passport.py:322) so audit queries by property_id include visibility changes.",
+    "Pre-existing (not Phase 6C): test_phase6b_duplicate.py's TestAdminThresholds class does NOT restore duplicate_config on teardown, so running phase 6b + 6c tests in sequence leaves the DB in a state where 2 phase-6b regression tests fail on the next run. This is a test-suite hygiene bug, NOT a code regression. Recommend adding an autouse restore fixture to that class."
+  ],
+  "critical_code_review_comments": [
+    "property_representations.py:167-175 — claim endpoint denormalises data.documents onto the representation even when rep is APPROVED, without transitioning status or writing a distinct audit. If a bad actor gained control of the agent account they could quietly rewrite the mandate docs on an active mandate.",
+    "property_passport.py:322 — audit row for PASSPORT_VISIBILITY_UPDATED has property_id:None. amass_id is discoverable in new_value but not indexed as property_id, weakening auditability.",
+    "property_passport.py:114-125 — _sanitise_listing correctly strips owner_name / owner_phone / agent_id / seller_id. Confirmed via test.",
+    "property_passport.py:244-250 — timeline strips reason/actor_id/old_value/new_value at construction time. Good, but consider also filtering by has_verified_representation gates when show_history is false (redundant since show_history flag already controls emission, verified).",
+    "property_representations.py:141-143 — REJECTED/REVOKED cannot submit claim (400). Verified. SUSPENDED still allows claim submission — this may be by design (agent uploading remediation docs) but is worth documenting."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase6c_passport_reps.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (29/29 Phase 6C tests pass)",
+    "frontend": "not tested (backend-only request)"
+  },
+  "seed_data_creation": "Created ~15 fresh properties_geo rows + ~15 property_listings + ~15 PENDING/APPROVED/REJECTED/REVOKED/SUSPENDED property_representations rows on demo user's account, plus one throwaway user (pi6c_other_*@test.amass) for cross-agent tests. All csids prefixed with 'csid-6c-pp-'. Test set duplicate_config.high_confidence_threshold was RESTORED to 80 at end of run (verified: GET /api/admin/duplicate/config → high=80, possible=60).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Test file /app/backend/tests/test_phase6c_passport_reps.py runs in ~20s. IMPORTANT: this test does NOT touch duplicate_config. However, test_property_identity_phase6c.py's TestDuplicateGate DOES lower duplicate_config, and test_phase6b_duplicate.py's TestAdminThresholds ALSO PATCHes it and does not always restore. If both are run in the same session and Phase 6B tests fail with 'action=high_confidence_duplicate expected allow', run this to restore: POST /api/auth/login demo → PATCH /api/admin/duplicate/config {possible_threshold:60, high_confidence_threshold:80}. All Phase 6C endpoints are stable; no observed data leaks in public passport across 4 different property sanitisation checks.",
+  "rca_of_issue": "N/A — no bugs found in Phase 6C code. Two pre-existing failures in test_phase6b_duplicate.py are caused by test-suite state leakage (its own admin-threshold test class does not restore duplicate_config), not by Phase 6C changes. The specific failing tests (test_patch_high_below_60_rejected, test_brand_new_lat_lng_full_flow) rely on default thresholds and fail when a prior test class left high_confidence_threshold=50."
+}

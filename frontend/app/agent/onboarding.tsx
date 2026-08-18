@@ -296,11 +296,16 @@ export default function AgentOnboardingWizard() {
       await clearActiveDraft();
       Alert.alert(
         res.attached_to_existing ? "Attached to existing property" : "Listing submitted",
-        `AMASS ID: ${res.amass_property_id}\n\nYour listing is pending review and will go live within 48 hours.`,
+        `AMASS ID: ${res.amass_property_id}\n\nA PENDING representation was created for you. Upload your mandate documents next.`,
         [
           {
-            text: "OK",
-            onPress: () => router.replace("/agent-dashboard"),
+            text: "View Passport",
+            onPress: () => router.replace(`/property-passport/${res.amass_property_id}` as any),
+          },
+          {
+            text: "My Representations",
+            onPress: () => router.replace("/agent/representations" as any),
+            style: "default",
           },
         ]
       );
@@ -551,12 +556,41 @@ function StageLocation({
   patchDraft: (patch: Partial<OnboardingDraft>) => Promise<void>;
 }) {
   const [locating, setLocating] = useState(false);
+  const [preview, setPreview] = useState<Awaited<ReturnType<typeof api.duplicateCheckAdhoc>> | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const lastCheckedRef = useRef<string>("");
   const coords = {
     latitude: draft.location?.latitude ?? DEFAULT_COORDS.latitude,
     longitude: draft.location?.longitude ?? DEFAULT_COORDS.longitude,
   };
   const accuracy = draft.location?.accuracy_meters ?? 0;
   const source = draft.location?.location_source;
+
+  // Debounced inline duplicate preview — fires when the pin locks. Uses a
+  // signature key so the same coords don't fire multiple network calls.
+  useEffect(() => {
+    if (!draft.location) return;
+    const key = `${draft.location.latitude.toFixed(5)}|${draft.location.longitude.toFixed(5)}|${draft.address?.state ?? ""}`;
+    if (lastCheckedRef.current === key) return;
+    lastCheckedRef.current = key;
+    const t = setTimeout(async () => {
+      try {
+        setPreviewing(true);
+        const r = await api.duplicateCheckAdhoc({
+          latitude: draft.location!.latitude,
+          longitude: draft.location!.longitude,
+          accuracy_meters: draft.location!.accuracy_meters,
+          address: draft.address,
+        });
+        setPreview(r);
+      } catch {
+        setPreview(null);
+      } finally {
+        setPreviewing(false);
+      }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [draft.location, draft.address]);
 
   const useMyGps = async () => {
     try {
@@ -690,6 +724,55 @@ function StageLocation({
         <View style={[styles.gpsChip, { borderColor: gpsQualityColor }]}>
           <View style={[styles.gpsChipDot, { backgroundColor: gpsQualityColor }]} />
           <Text style={styles.gpsChipText}>{gpsMessage}</Text>
+        </View>
+      )}
+
+      {/* Inline duplicate preview — appears as soon as GPS/pin is locked */}
+      {draft.location && (previewing || preview) && (
+        <View
+          style={[
+            styles.dupPreview,
+            preview?.action === "high_confidence_duplicate" && { backgroundColor: colors.redSurface, borderColor: colors.red },
+            preview?.action === "possible_duplicate" && { backgroundColor: colors.goldLight, borderColor: colors.gold },
+            preview?.action === "allow" && { backgroundColor: colors.surface, borderColor: colors.emerald },
+          ]}
+        >
+          {previewing ? (
+            <View style={styles.dupPreviewRow}>
+              <ActivityIndicator size="small" color={colors.textTertiary} />
+              <Text style={styles.dupPreviewText}>Checking for existing properties…</Text>
+            </View>
+          ) : preview?.action === "allow" ? (
+            <View style={styles.dupPreviewRow}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.emerald} />
+              <Text style={styles.dupPreviewText}>No duplicates found at this location.</Text>
+            </View>
+          ) : (
+            <View style={{ gap: 6 }}>
+              <View style={styles.dupPreviewRow}>
+                <Ionicons
+                  name="warning"
+                  size={16}
+                  color={preview?.action === "high_confidence_duplicate" ? colors.red : colors.gold}
+                />
+                <Text style={styles.dupPreviewTitle}>
+                  {preview?.action === "high_confidence_duplicate"
+                    ? `Likely duplicate (${preview?.highest_score}/100)`
+                    : `Possible duplicate (${preview?.highest_score}/100)`}
+                </Text>
+              </View>
+              <Text style={styles.dupPreviewText}>
+                {preview?.candidates.length ?? 0} existing propert
+                {(preview?.candidates.length ?? 0) > 1 ? "ies" : "y"} within{" "}
+                {preview?.search_radius_meters}m. You&apos;ll be asked to confirm before submission.
+              </Text>
+              {preview?.candidates?.[0] && (
+                <Text style={styles.dupPreviewNearest}>
+                  Nearest: {preview.candidates[0].amass_property_id} · {preview.candidates[0].distance_meters}m away
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       )}
 
@@ -1290,6 +1373,36 @@ const styles = StyleSheet.create({
   },
   gpsChipDot: { width: 8, height: 8, borderRadius: 4 },
   gpsChipText: { flex: 1, fontSize: 12, fontWeight: "700", color: colors.text },
+
+  dupPreview: {
+    padding: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: 4,
+  },
+  dupPreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  dupPreviewTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  dupPreviewText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.text,
+    fontWeight: "600",
+    lineHeight: 17,
+  },
+  dupPreviewNearest: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    fontWeight: "600",
+    marginLeft: 24,
+  },
 
   pickerRow: { flexDirection: "row", gap: 10 },
   pickerBtn: {

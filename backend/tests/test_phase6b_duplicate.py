@@ -446,14 +446,14 @@ class TestAdminThresholds:
         assert "high_confidence_threshold" in d
         assert "possible_threshold" in d
 
-    def test_patch_possible_below_40_rejected(self, s, demo_headers):
+    def test_patch_possible_below_30_rejected(self, s, demo_headers):
         r = s.patch(f"{BASE_URL}/api/admin/duplicate/config",
                     headers=demo_headers, json={"possible_threshold": 20})
         assert r.status_code == 400
 
-    def test_patch_high_below_60_rejected(self, s, demo_headers):
+    def test_patch_high_below_50_rejected(self, s, demo_headers):
         r = s.patch(f"{BASE_URL}/api/admin/duplicate/config",
-                    headers=demo_headers, json={"high_confidence_threshold": 50})
+                    headers=demo_headers, json={"high_confidence_threshold": 40})
         assert r.status_code == 400
 
     def test_valid_update_and_reset(self, s, demo_headers):
@@ -462,9 +462,10 @@ class TestAdminThresholds:
         assert r.status_code == 200
         r = s.get(f"{BASE_URL}/api/admin/duplicate/config", headers=demo_headers)
         assert r.json()["possible_threshold"] == 55
-        # Reset
+        # Reset to Phase 6C defaults so subsequent test runs stay clean.
         r = s.patch(f"{BASE_URL}/api/admin/duplicate/config",
-                    headers=demo_headers, json={"possible_threshold": 60})
+                    headers=demo_headers,
+                    json={"possible_threshold": 45, "high_confidence_threshold": 70})
         assert r.status_code == 200
 
     def test_non_admin_patch_forbidden(self, s, non_admin_headers):

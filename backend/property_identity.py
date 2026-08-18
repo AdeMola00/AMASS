@@ -108,6 +108,15 @@ class ListingDetailsIn(BaseModel):
     owner_phone: Optional[str] = None
 
 
+class SavePatchIn(BaseModel):
+    """Typed body for PATCH /api/agent/properties/{oid}. Any mistyped key
+    is rejected by Pydantic (extra=forbid), which prevents silent no-ops."""
+    model_config = {"extra": "forbid"}
+    details: Optional[PropertyDetailsIn] = None
+    listing: Optional[ListingDetailsIn] = None
+    media_ids: Optional[List[str]] = None
+
+
 class OnboardingStartIn(BaseModel):
     client_submission_id: str = Field(..., min_length=8, max_length=64)
 
@@ -239,24 +248,23 @@ def register_property_identity_routes(db, require_auth, require_admin):
     @router.patch("/{oid}")
     async def save_details(
         oid: str,
-        payload: dict = Body(...),
+        payload: SavePatchIn = Body(...),
         user: dict = Depends(require_auth),
     ):
         draft = await db.property_onboarding.find_one({"id": oid, "agent_id": user["id"]})
         if not draft:
             raise HTTPException(404, "Onboarding draft not found")
         updates: dict = {"updated_at": datetime.now(timezone.utc)}
-        details_raw = payload.get("details")
-        listing_raw = payload.get("listing")
-        media_ids = payload.get("media_ids")
-        if details_raw is not None:
-            updates["details"] = PropertyDetailsIn(**details_raw).model_dump()
+        if payload.details is not None:
+            updates["details"] = payload.details.model_dump()
             updates["status"] = "DETAILS_PENDING"
-        if listing_raw is not None:
-            updates["listing"] = ListingDetailsIn(**listing_raw).model_dump()
-        if isinstance(media_ids, list):
+        if payload.listing is not None:
+            updates["listing"] = payload.listing.model_dump()
+        if payload.media_ids is not None:
             # Cap total photos at 20 to protect Mongo doc size / bandwidth.
-            updates["media_ids"] = media_ids[:20]
+            updates["media_ids"] = payload.media_ids[:20]
+        if len(updates) == 1:  # only updated_at — nothing meaningful
+            raise HTTPException(400, "Nothing to update — provide details, listing, or media_ids")
         await db.property_onboarding.update_one({"id": oid}, {"$set": updates})
         return {"ok": True}
 
@@ -348,6 +356,24 @@ def register_property_identity_routes(db, require_auth, require_admin):
                 "created_at": now, "updated_at": now,
             }
             await db.property_listings.insert_one(listing_doc)
+            # Auto-create PENDING representation for this listing.
+            try:
+                from property_representations import create_pending_representation_from_listing
+                await create_pending_representation_from_listing(
+                    db,
+                    property_uuid=canonical["property_uuid"],
+                    amass_property_id=canonical["amass_property_id"],
+                    listing_id=listing_doc["id"],
+                    agent_id=user["id"],
+                    representation_type=(
+                        "owner" if (draft["listing"].get("representation_type") == "owner")
+                        else draft["listing"].get("representation_type") or "agent_mandate"
+                    ),
+                    owner_name=draft["listing"].get("owner_name"),
+                    owner_phone=draft["listing"].get("owner_phone"),
+                )
+            except Exception:
+                pass
             await db.property_onboarding.update_one(
                 {"id": oid},
                 {"$set": {
@@ -404,6 +430,11 @@ def register_property_identity_routes(db, require_auth, require_admin):
             "updated_at": now,
             "aliases": [],
         }
+        # Flag for admin review when the agent overrode a high-confidence duplicate.
+        if highest >= cfg["high_confidence_threshold"] and decision.get("decision") == "not_same_property":
+            property_doc["needs_admin_review"] = True
+            property_doc["review_reason"] = f"Agent bypassed a high-confidence duplicate (score {highest})"
+            property_doc["duplicate_score_at_creation"] = highest
         await db.properties_geo.insert_one(property_doc)
 
         listing_doc = {
@@ -424,6 +455,24 @@ def register_property_identity_routes(db, require_auth, require_admin):
             "updated_at": now,
         }
         await db.property_listings.insert_one(listing_doc)
+        # Auto-create PENDING representation for this new listing.
+        try:
+            from property_representations import create_pending_representation_from_listing
+            await create_pending_representation_from_listing(
+                db,
+                property_uuid=prop_uuid,
+                amass_property_id=amass_id,
+                listing_id=listing_doc["id"],
+                agent_id=user["id"],
+                representation_type=(
+                    "owner" if (draft["listing"].get("representation_type") == "owner")
+                    else draft["listing"].get("representation_type") or "agent_mandate"
+                ),
+                owner_name=draft["listing"].get("owner_name"),
+                owner_phone=draft["listing"].get("owner_phone"),
+            )
+        except Exception:
+            pass
         await db.property_onboarding.update_one(
             {"id": oid},
             {"$set": {
@@ -443,27 +492,40 @@ def register_property_identity_routes(db, require_auth, require_admin):
         }
 
     # ═══ PROPERTY CANONICAL LOOKUPS (public) ═══════════════════════
+    async def _resolve_canonical(amass_id: str):
+        """Follow merges + aliases so any historical AMASS ID resolves to the
+        current canonical property doc. Returns (canonical_doc, resolved_via)."""
+        p = await db.properties_geo.find_one({"amass_property_id": amass_id}, {"_id": 0})
+        # If the direct hit is a merged loser, follow the pointer to the winner.
+        if p and p.get("physical_status") == "MERGED" and p.get("merged_into_amass_id"):
+            target = p["merged_into_amass_id"]
+            winner = await db.properties_geo.find_one(
+                {"amass_property_id": target}, {"_id": 0}
+            )
+            if winner:
+                return winner, "merged"
+        if p:
+            return p, "direct"
+        # Alias lookup — merged properties expose their old id via winner.aliases[]
+        p = await db.properties_geo.find_one({"aliases": amass_id}, {"_id": 0})
+        if p:
+            return p, "alias"
+        return None, None
+
     @public.get("/{amass_id}")
     async def get_property_by_amass_id(amass_id: str):
-        p = await db.properties_geo.find_one({"amass_property_id": amass_id}, {"_id": 0})
+        p, via = await _resolve_canonical(amass_id)
         if not p:
-            # Alias lookup — merged properties resolve via aliases
-            p = await db.properties_geo.find_one(
-                {"aliases": amass_id}, {"_id": 0}
-            )
-            if p:
-                return {**p, "resolved_via_alias": True, "requested_id": amass_id}
             raise HTTPException(404, "Property not found")
         # Strip sensitive fields for public view
         p.pop("created_by", None)
+        if via in ("alias", "merged"):
+            return {**p, "resolved_via_alias": True, "requested_id": amass_id}
         return p
 
     @public.get("/{amass_id}/listings")
     async def property_listings(amass_id: str):
-        p = await db.properties_geo.find_one(
-            {"$or": [{"amass_property_id": amass_id}, {"aliases": amass_id}]},
-            {"_id": 0, "property_uuid": 1},
-        )
+        p, _ = await _resolve_canonical(amass_id)
         if not p:
             raise HTTPException(404, "Property not found")
         return await db.property_listings.find(

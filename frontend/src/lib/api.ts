@@ -112,6 +112,7 @@ export type UserProfile = {
   phone?: string;
   avatar_url?: string;
   is_agent: boolean;
+  is_admin?: boolean;
   created_at: string;
 };
 
@@ -1333,6 +1334,33 @@ export const api = {
     }>(`/agent/properties/${encodeURIComponent(oid)}/duplicate-check`, {
       method: "POST",
     }),
+  duplicateCheckAdhoc: (payload: {
+    latitude: number;
+    longitude: number;
+    accuracy_meters?: number;
+    property_type?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+    building_size_sqm?: number;
+    address?: Record<string, any>;
+  }) =>
+    req<{
+      search_radius_meters: number;
+      highest_score: number;
+      action: "allow" | "possible_duplicate" | "high_confidence_duplicate";
+      high_confidence_threshold: number;
+      possible_threshold: number;
+      candidates: {
+        amass_property_id: string;
+        distance_meters: number;
+        score: number;
+        reasons: string[];
+        preview: Record<string, any>;
+      }[];
+    }>("/agent/properties/duplicate-check", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   onboardingRecordDecision: (
     oid: string,
     payload: {
@@ -1360,6 +1388,246 @@ export const api = {
       body: JSON.stringify({ client_submission_id }),
     }),
   agentMyPropertiesV2: () => req<any[]>("/agent/properties/mine"),
+
+  // ─── Phase 6C: Public Property Passport ───
+  getPassport: (amass_id: string) =>
+    req<{
+      property: {
+        amass_property_id: string;
+        property_type?: string;
+        property_subtype?: string;
+        state?: string;
+        lga?: string;
+        area?: string;
+        estate?: string;
+        street?: string;
+        house_number?: string;
+        identity_status?: string;
+        physical_status?: string;
+        has_verified_representation?: boolean;
+        created_at?: string;
+        coordinates?: { latitude: number; longitude: number } | null;
+        coordinates_precision?: "exact" | "~100m";
+        details?: {
+          bedrooms?: number;
+          bathrooms?: number;
+          floors?: number;
+          year_built?: number;
+        };
+        size?: { building_size_sqm?: number; land_size_sqm?: number };
+        amenities?: string[];
+        photos?: string[];
+      };
+      listings: {
+        id: string;
+        listing_type?: string;
+        listing_status?: string;
+        price?: number;
+        currency?: string;
+        description?: string;
+        representation_type?: string;
+        created_at?: string;
+      }[];
+      representatives: {
+        id: string;
+        representation_type: string;
+        mandate_type?: string;
+        mandate_expiry?: string;
+        decided_at?: string;
+        agent: {
+          user_id: string;
+          slug?: string;
+          full_name?: string;
+          agency_name?: string;
+          avatar_url?: string;
+          verification_level?: number;
+          rating?: number;
+          reviews_count?: number;
+        };
+      }[];
+      timeline: { action: string; label: string; at: string }[];
+      share: {
+        passport_url: string;
+        qr_url?: string | null;
+        allow_enquiries: boolean;
+      };
+      visibility: Record<string, boolean>;
+      generated_at: string;
+    }>(`/passport/${encodeURIComponent(amass_id)}`),
+
+  // ─── Phase 6C: Representations & Claims (agent-facing) ───
+  myRepresentations: (status?: string) =>
+    req<any[]>(
+      `/agent/representations/mine${status ? `?status=${encodeURIComponent(status)}` : ""}`
+    ),
+  getRepresentation: (rep_id: string) =>
+    req<any>(`/agent/representations/${encodeURIComponent(rep_id)}`),
+  submitClaim: (
+    rep_id: string,
+    payload: {
+      representation_type?:
+        | "owner"
+        | "agent_mandate"
+        | "landlord"
+        | "developer"
+        | "property_manager"
+        | "agency";
+      mandate_type?: "exclusive" | "sole" | "open" | "verbal" | "written";
+      mandate_expiry?: string;
+      documents?: string[];
+      owner_name?: string;
+      owner_phone?: string;
+      notes?: string;
+    }
+  ) =>
+    req<{ ok: boolean; claim_id: string; status: string }>(
+      `/agent/representations/${encodeURIComponent(rep_id)}/claim`,
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
+  patchRepresentation: (
+    rep_id: string,
+    payload: {
+      documents?: string[];
+      mandate_type?: string;
+      mandate_expiry?: string;
+      notes?: string;
+    }
+  ) =>
+    req<{ ok: boolean }>(`/agent/representations/${encodeURIComponent(rep_id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  publicPropertyReps: (amass_id: string) =>
+    req<any[]>(`/properties-v2/${encodeURIComponent(amass_id)}/representations`),
+
+  // ─── Phase 6D: Admin Cockpit ───
+  adminDashboard: () =>
+    req<{
+      pending_duplicate_review: number;
+      pending_representations: number;
+      docs_requested: number;
+      total_properties: number;
+      total_listings: number;
+      merged_properties: number;
+      generated_at: string;
+    }>("/admin/cockpit/dashboard"),
+  adminDuplicateQueue: (limit = 50) =>
+    req<{
+      items: {
+        property: {
+          amass_property_id: string;
+          property_uuid: string;
+          state?: string;
+          lga?: string;
+          area?: string;
+          estate?: string;
+          street?: string;
+          property_type?: string;
+          created_at?: string;
+          created_by?: string;
+          review_reason?: string;
+          duplicate_score_at_creation?: number;
+          cover?: string | null;
+        };
+        candidates: {
+          amass_property_id: string;
+          property_uuid: string;
+          state?: string;
+          area?: string;
+          street?: string;
+          estate?: string;
+          property_type?: string;
+          created_at?: string;
+          cover?: string | null;
+        }[];
+      }[];
+      total_flagged: number;
+    }>(`/admin/cockpit/duplicate-queue?limit=${limit}`),
+  adminResolveDupReview: (
+    amass_id: string,
+    payload: { action: "clear" | "flag_for_merge"; reason?: string; merge_with_amass_id?: string }
+  ) =>
+    req<{ ok: boolean; status: string }>(
+      `/admin/cockpit/duplicate-queue/${encodeURIComponent(amass_id)}/decide`,
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
+  adminCompareProperties: (a: string, b: string) =>
+    req<{ a: any; b: any }>(
+      `/admin/cockpit/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
+    ),
+  adminMergeProperties: (payload: { winner_amass_id: string; loser_amass_id: string; reason?: string }) =>
+    req<{
+      ok: boolean;
+      winner_amass_id: string;
+      loser_amass_id: string;
+      listings_moved: number;
+      reps_moved: number;
+    }>("/admin/cockpit/merge", { method: "POST", body: JSON.stringify(payload) }),
+  adminVerifyProperty: (
+    amass_id: string,
+    payload: { action: "verify" | "unverify"; reason?: string }
+  ) =>
+    req<{ ok: boolean; status: string }>(
+      `/admin/cockpit/property/${encodeURIComponent(amass_id)}/verify`,
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
+  adminAuditLogs: (params: {
+    property_id?: string;
+    action?: string;
+    actor_type?: "agent" | "admin";
+    since?: string;
+    until?: string;
+    limit?: number;
+    cursor?: string;
+  }) => {
+    const qs = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== "" && v !== null)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join("&");
+    return req<{
+      items: {
+        id: string;
+        property_id?: string;
+        actor_id?: string;
+        actor_type?: string;
+        action: string;
+        new_value?: any;
+        old_value?: any;
+        reason?: string;
+        created_at: string;
+      }[];
+      next_cursor: string | null;
+      count: number;
+    }>(`/admin/cockpit/audit-logs${qs ? `?${qs}` : ""}`);
+  },
+  adminAuditActions: () => req<string[]>("/admin/cockpit/audit-logs/actions"),
+  adminRepQueue: (status = "PENDING", limit = 50) =>
+    req<any[]>(
+      `/admin/representations/queue?status=${encodeURIComponent(status)}&limit=${limit}`
+    ),
+  adminRepDecide: (
+    rep_id: string,
+    payload: {
+      action: "approve" | "reject" | "request_docs" | "suspend" | "revoke";
+      reason?: string;
+      valid_until?: string;
+    }
+  ) =>
+    req<{ ok: boolean; status?: string; already?: boolean }>(
+      `/admin/representations/${encodeURIComponent(rep_id)}/decide`,
+      { method: "POST", body: JSON.stringify(payload) }
+    ),
+  adminGetPassportFull: (amass_id: string) =>
+    req<any>(`/admin/passport/${encodeURIComponent(amass_id)}/full`),
+  adminGetVisibility: (amass_id: string) =>
+    req<Record<string, boolean>>(
+      `/admin/passport/${encodeURIComponent(amass_id)}/visibility`
+    ),
+  adminPatchVisibility: (amass_id: string, updates: Record<string, boolean>) =>
+    req<{ ok: boolean; updated: string[] }>(
+      `/admin/passport/${encodeURIComponent(amass_id)}/visibility`,
+      { method: "PATCH", body: JSON.stringify(updates) }
+    ),
 };
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;
