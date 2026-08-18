@@ -1913,6 +1913,14 @@ _p4_router, _p4_admin_router = register_phase4_routes(db, get_current_user, requ
 app.include_router(_p4_router)
 app.include_router(_p4_admin_router)
 
+# ─── Property Identity Core (Phase 6A)
+from property_identity import register_property_identity_routes
+_pi_router, _pi_public = register_property_identity_routes(
+    db, get_current_user, require_admin
+)
+app.include_router(_pi_router)
+app.include_router(_pi_public)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1964,6 +1972,24 @@ async def on_startup():
         await db.agent_review_reports.create_index("review_id")
         await db.lead_unlocks.create_index([("agent_id", 1), ("crm_status", 1)])
         await db.lead_unlocks.create_index([("agent_id", 1), ("next_follow_up_at", 1)], sparse=True)
+        # Phase 6A — Property Identity Core (MongoDB 2dsphere)
+        await db.properties_geo.create_index([("entrance_point", "2dsphere")])
+        await db.properties_geo.create_index("amass_property_id", unique=True)
+        await db.properties_geo.create_index("property_uuid", unique=True)
+        await db.properties_geo.create_index("aliases")
+        await db.properties_geo.create_index([("state", 1), ("lga", 1), ("area", 1)])
+        await db.properties_geo.create_index("normalized_address")
+        await db.property_listings.create_index("property_id")
+        await db.property_listings.create_index([("agent_id", 1), ("listing_status", 1)])
+        await db.property_listings.create_index("id", unique=True)
+        await db.property_onboarding.create_index(
+            [("client_submission_id", 1), ("agent_id", 1)], unique=True
+        )
+        await db.property_onboarding.create_index("id", unique=True)
+        await db.property_onboarding.create_index([("agent_id", 1), ("status", 1)])
+        await db.property_id_counters.create_index("state_code", unique=True)
+        await db.property_audit_logs.create_index([("property_id", 1), ("created_at", -1)])
+        await db.property_audit_logs.create_index("id", unique=True)
     except Exception as e:
         logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
 
