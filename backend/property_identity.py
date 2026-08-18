@@ -298,6 +298,72 @@ def register_property_identity_routes(db, require_auth, require_admin):
             raise HTTPException(400, "Property details required before submit")
         if not draft.get("listing"):
             raise HTTPException(400, "Listing details required before submit")
+        # ── Duplicate gate (Phase 6B) ─────────────────────────
+        # If a high-confidence match was flagged and the agent hasn't
+        # explicitly reviewed it, block. If they said "same_property",
+        # attach the new listing to the existing canonical property
+        # instead of creating a new one.
+        dup = draft.get("duplicate_check") or {}
+        decision = draft.get("duplicate_decision") or {}
+        try:
+            from duplicate_detection import _load_config as _dup_cfg_loader
+            cfg = await _dup_cfg_loader(db)()
+        except Exception:
+            cfg = {"high_confidence_threshold": 80, "possible_threshold": 60}
+        highest = int(dup.get("highest_score") or 0)
+        if highest >= cfg["possible_threshold"] and not decision:
+            raise HTTPException(
+                409,
+                {"error": "duplicate_decision_required",
+                 "message": "A possible existing property was found — please review before submitting.",
+                 "highest_score": highest,
+                 "candidates": dup.get("candidates", [])[:3]},
+            )
+        if decision.get("decision") == "same_property":
+            canonical = await db.properties_geo.find_one(
+                {"amass_property_id": decision["same_as_amass_id"]}, {"_id": 0}
+            )
+            if not canonical:
+                raise HTTPException(404, "The property you selected as 'same' no longer exists")
+            now = datetime.now(timezone.utc)
+            listing_doc = {
+                "id": str(uuid.uuid4()),
+                "property_id": canonical["property_uuid"],
+                "amass_property_id": canonical["amass_property_id"],
+                "agent_id": user["id"], "agency_id": None,
+                "listing_type": draft["listing"]["listing_type"],
+                "listing_status": "PENDING_REVIEW",
+                "price": draft["listing"]["price"],
+                "currency": draft["listing"].get("currency", "NGN"),
+                "description": draft["listing"].get("description"),
+                "representation_type": draft["listing"].get("representation_type", "agent"),
+                "owner_name": draft["listing"].get("owner_name"),
+                "owner_phone": draft["listing"].get("owner_phone"),
+                "attached_via_duplicate_decision": True,
+                "created_at": now, "updated_at": now,
+            }
+            await db.property_listings.insert_one(listing_doc)
+            await db.property_onboarding.update_one(
+                {"id": oid},
+                {"$set": {
+                    "status": "SUBMITTED",
+                    "amass_property_id": canonical["amass_property_id"],
+                    "property_id": canonical["property_uuid"],
+                    "listing_id": listing_doc["id"],
+                    "submitted_at": now, "updated_at": now,
+                }},
+            )
+            await _audit(db, canonical["property_uuid"], user, "LISTING_ATTACHED_TO_EXISTING",
+                         new={"listing_id": listing_doc["id"],
+                              "amass_property_id": canonical["amass_property_id"]},
+                         onboarding_id=oid)
+            return {
+                "ok": True, "attached_to_existing": True,
+                "amass_property_id": canonical["amass_property_id"],
+                "property_id": canonical["property_uuid"],
+                "listing_id": listing_doc["id"], "status": "SUBMITTED",
+            }
+        # ── Otherwise create a new canonical property ───────────
         addr = draft.get("address") or {}
         state = (addr.get("state") or "").strip() or "Lagos"
         sc = _state_code(state)

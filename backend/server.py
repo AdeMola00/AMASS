@@ -1921,6 +1921,12 @@ _pi_router, _pi_public = register_property_identity_routes(
 app.include_router(_pi_router)
 app.include_router(_pi_public)
 
+# ─── Duplicate Detection Engine (Phase 6B)
+from duplicate_detection import register_duplicate_routes
+_dup_router, _dup_admin = register_duplicate_routes(db, get_current_user, require_admin)
+app.include_router(_dup_router)
+app.include_router(_dup_admin)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
