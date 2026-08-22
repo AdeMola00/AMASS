@@ -1964,6 +1964,10 @@ app.include_router(_as_admin)
 from discovery_google import register_discovery_google_routes
 app.include_router(register_discovery_google_routes(db, require_admin))
 
+# ─── D-3: Candidate reducer + bulk discovery jobs pipeline ─
+from discovery_pipeline import register_discovery_pipeline_routes, fail_crashed_jobs
+app.include_router(register_discovery_pipeline_routes(db, require_admin))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -2076,6 +2080,9 @@ async def on_startup():
         from app_settings import ensure_default_settings as _ensure_as
         await _ensure_pt(db)
         await _ensure_as(db)
+        # D-3: mark any RUNNING/QUEUED jobs as FAILED (crash recovery)
+        from discovery_pipeline import fail_crashed_jobs as _fail_crashed
+        await _fail_crashed(db)
     except Exception as e:
         logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
 
