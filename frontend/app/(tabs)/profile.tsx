@@ -23,6 +23,7 @@ const MENU: { icon: IconName; label: string; route?: string; caption?: string }[
   { icon: "pricetags-outline", label: "Agent Plans", route: "/agent-plans", caption: "Starter · Pro · Agency · Founding pricing" },
   { icon: "briefcase-outline", label: "Agent Workspace", route: "/agent-workspace", caption: "Referrals · Commissions · Payouts" },
   { icon: "add-circle-outline", label: "List a Property", route: "/submit-property", caption: "Publish a new listing" },
+  { icon: "megaphone-outline", label: "My Ad Campaigns", route: "/ads", caption: "Analytics · AI coach · Pause/refund" },
   { icon: "heart-outline", label: "Saved Properties", caption: "Your favorites" },
   { icon: "document-text-outline", label: "My Documents", caption: "Contracts & titles" },
   { icon: "shield-checkmark-outline", label: "Identity Verification", caption: "Enhance trust" },

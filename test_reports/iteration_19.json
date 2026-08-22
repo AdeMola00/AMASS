@@ -1,0 +1,37 @@
+{
+  "summary": "AMASS Ads Phase C+D+E backend tested end-to-end: 26/26 pytest cases passed (100%). Regression (tiers + legacy create) intact. Phase C targeting persistence, device/radius/schedule filters and interest-tag inference all working. Phase D budget/bidding — cpm/cpc debits, auto-pause on daily & total budget, manual pause/resume/cancel refund with owner-only enforcement all pass. Phase E analytics returns full funnel/CTR/CPA/time-series and enforces owner-only access. AI /suggestions live: Emergent LLM Key returned used_ai=true and debited 5 tokens (Claude Sonnet 4.5). Heuristic fallback contract is intact (>=1 suggestion always). All auth guards return 401 for anonymous.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ads_phase_cde.py",
+    "/app/test_reports/pytest/pytest_iteration19_ads_cde.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ads.py:582 analytics uses seller_id-scoped find_one, returning 404 (not 403) for non-owner requests. Task spec says '403/404 for others' — acceptable per spec but consider explicit 403 for better DX.",
+    "ads.py:266 _cost_of_event returns ceil(bid/1000) with `max(1, ...)` — bid_tokens=1 correctly costs 1 token per impression (minimum floor). Confirmed via test with bid=2000 → 2 tokens.",
+    "ads.py:456 candidates list capped at 50 via to_list(50) — if seller creates many active ads for the same targeting, only top 50 by insertion order enter the auction. Fine for MVP.",
+    "ads.py:302 _reset_daily_spend_if_stale runs only inside /ads/next candidate loop — a paused ad awaiting daily reset won't self-heal until it is next surfaced as a candidate. Consider a scheduled sweep.",
+    "ads.py:686 AI-suggestion debit happens AFTER LLM success; if debit fails for any reason, the user has still received the AI suggestions. Consider debiting first (with rollback) for stricter accounting."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_ads_phase_cde.py"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "not_tested"
+  },
+  "seed_data_creation": "Test creates ephemeral property + favorite in Mongo for interest-tags test and cleans up after. All test ads are cancelled/expired at test teardown so wallet balance is fully restored (net token spend across the run is minimal — only cpm/cpc debits from tracking tests are non-refundable, well under 50 tokens).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Test file at /app/backend/tests/test_ads_phase_cde.py covers Phase C/D/E ads end-to-end. Uses demo@amass.africa/amass2026 which starts with ample MASS balance. AI /suggestions endpoint currently uses live Claude Sonnet 4.5 via EMERGENT_LLM_KEY (verified used_ai=true). Tests are parallel-safe (xdist) and clean up their own ads via /cancel.",
+  "rca_of_issue": "N/A — no bugs found."
+}

@@ -975,6 +975,65 @@ export const api = {
   createAd: (payload: any) =>
     req<any>("/ads", { method: "POST", body: JSON.stringify(payload) }),
 
+  // Phase C/D/E — Ads advanced
+  pauseAd: (ad_id: string) =>
+    req<{ ok: boolean; status: string }>(
+      `/ads/${encodeURIComponent(ad_id)}/pause`,
+      { method: "POST" }
+    ),
+  resumeAd: (ad_id: string) =>
+    req<{ ok: boolean; status: string }>(
+      `/ads/${encodeURIComponent(ad_id)}/resume`,
+      { method: "POST" }
+    ),
+  cancelAd: (ad_id: string) =>
+    req<{ ok: boolean; refund_tokens: number }>(
+      `/ads/${encodeURIComponent(ad_id)}/cancel`,
+      { method: "POST" }
+    ),
+  adAnalytics: (ad_id: string, period_days = 7) =>
+    req<{
+      ad_id: string;
+      title: string;
+      status: string;
+      tier: string;
+      period_days: number;
+      funnel: {
+        impressions: number;
+        clicks: number;
+        saves: number;
+        chats: number;
+        calls: number;
+      };
+      ctr_percent: number;
+      spent_tokens: number;
+      cost_per_action: {
+        cpm_tokens: number;
+        cpc_tokens: number;
+        cost_per_chat_tokens: number;
+      };
+      budget: {
+        daily_budget_tokens?: number | null;
+        daily_spent_tokens: number;
+        total_budget_tokens?: number | null;
+        total_spent_tokens: number;
+      };
+      impressions_over_time: { day: string; hour: number; count: number }[];
+      clicks_over_time: { day: string; hour: number; count: number }[];
+    }>(`/ads/${encodeURIComponent(ad_id)}/analytics?period_days=${period_days}`),
+  adSuggestions: (ad_id: string) =>
+    req<{
+      ad_id: string;
+      used_ai: boolean;
+      cost_charged_tokens: number;
+      suggestions: {
+        kind: string;
+        priority: "high" | "medium" | "low";
+        text: string;
+      }[];
+    }>(`/ads/${encodeURIComponent(ad_id)}/suggestions`),
+  myInterestTags: () => req<{ tags: string[] }>("/ads/interest-tags/mine"),
+
   // ─── Agent Platform (Phase 1: plans, quotas, onboarding, founding) ───
   listAgentPlans: () =>
     req<
