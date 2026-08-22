@@ -128,6 +128,14 @@ export default function AdminCockpitHub() {
                 testID="tile-merge"
               />
               <Tile
+                title="Property Discovery"
+                caption="Google Places search · Cost meter · Candidate → Lead pipeline"
+                icon="compass-outline"
+                accent={colors.emerald}
+                onPress={() => router.push("/admin/discovery" as any)}
+                testID="tile-discovery"
+              />
+              <Tile
                 title="Platform settings"
                 caption="Feature flags · Property types · Config"
                 icon="settings-outline"

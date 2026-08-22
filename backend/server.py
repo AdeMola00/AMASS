@@ -1960,6 +1960,10 @@ app.include_router(_pt_admin)
 app.include_router(_as_public)
 app.include_router(_as_admin)
 
+# ─── D-2: Google Places server-side discovery (mockable-first) ─
+from discovery_google import register_discovery_google_routes
+app.include_router(register_discovery_google_routes(db, require_admin))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

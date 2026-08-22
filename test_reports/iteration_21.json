@@ -1,0 +1,47 @@
+{
+  "summary": "AMASS Phase D-2 (Google Places server-side integration, mock client) backend verified: 20/20 pytest cases pass covering /status shape, admin/auth gating (401 unauth + 403 non-admin), PROPERTY_DISCOVERY_ENABLED feature-flag gate, text-search + nearby-search mock behavior (query match, radius filter, included_types filter to real_estate_agency = MOCK_AGENCY_1), place details cache (first=cached:false, second=cached:true+cost_usd:0, force_refresh=true bypass), cache DELETE invalidation, /estimate response shape, and /usage aggregation that correctly excludes is_mock=true rows. Regression clean: D-1 property-types, public feature-flags, admin settings, Passport (AMASS-LAG-00000233), and Ads /next all 200. FIXED one production bug (tz-naive vs tz-aware datetime subtraction in cache path — MongoDB round-trips datetimes tz-naive, was crashing 2nd GET with HTTP 500). FLAGGED one spec/impl discrepancy on /estimate that main agent should review.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/admin/discovery/estimate",
+        "issue": "Spec/implementation mismatch on requires_confirmation. Review request expects {request_type:'text_search', result_count:30, include_details:true} to return requires_confirmation=true (cost > 2 USD threshold), but current implementation returns estimated_cost_usd = 0.032 (1 text_search call) + 30 × 0.017 (place_details) = 0.542 USD, which is < 2.0 threshold → requires_confirmation=false. Either (a) _preflight_cost should scale text_search count with result_count / max_page_size (so 30 results ≈ 2 text_search pages @ 0.032 each = still only 0.064 + 0.51 = 0.574 — still under 2), or more likely (b) default admin_confirm_threshold_usd should be lower (e.g. 0.25) or default pricing constants should be higher, or (c) the spec example numbers should be revised (e.g. result_count=200). Business decision needed."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_d2_discovery_google.py",
+    "/app/test_reports/pytest/pytest_iteration21_phase_d2.xml"
+  ],
+  "action_items": [
+    "REVIEW the /estimate spec vs implementation mismatch (see backend_issues.minor above). Recommend adjusting DEFAULT_GOOGLE_LIMITS.admin_confirm_threshold_usd (e.g. from 2.0 → 0.25) or updating pricing/count math to make the review example produce requires_confirmation=true.",
+    "OPTIONAL: consider adding a compound Mongo index on google_places_usage (day, is_mock) and (month, is_mock) — the _sum_usage aggregation runs on every request that reaches _preflight_cost and every /status call.",
+    "OPTIONAL: audit that RealGooglePlacesClient's throttle _lock is instance-scoped — because _pick_client() creates a NEW RealGooglePlacesClient per request (line 338), the token-bucket / throttle state is not shared across requests. If this endpoint ever handles real Google traffic under load, the RPS control will not actually rate-limit. Recommend caching a single module-level client instance keyed by api_key."
+  ],
+  "critical_code_review_comments": [
+    "BUG FIXED in /app/backend/discovery_google.py line 496: `age = (now - cached['cached_at']).total_seconds()` was crashing with TypeError 'can't subtract offset-naive and offset-aware datetimes' on the 2nd cache-hit GET because Motor returns MongoDB datetimes as tz-naive UTC while `now = datetime.now(timezone.utc)` is tz-aware. Normalised cached_at.tzinfo → UTC before subtraction.",
+    "_pick_client() re-instantiates RealGooglePlacesClient on every request (line 338). The internal throttle lock + _last_call state is therefore per-request, defeating the token-bucket rate limiter for real traffic. Consider a module-level singleton once GOOGLE_MAPS_SERVER_KEY becomes available.",
+    "Cost caps ONLY enforced for real (non-mock) calls — spec requirement met (line 446, 470, 504).",
+    "field masks correctly minimise Google API cost (FIELD_MASK_SEARCH + FIELD_MASK_DETAILS).",
+    "google_places_usage rows are correctly tagged is_mock=true for mock client → /usage aggregation excludes them (line 409). Verified empirically: 20 mock calls in-suite ⇒ /usage.rows == [] (or unchanged from prior real calls).",
+    "Place-details cache write uses upsert (line 511) and preserves the immutable set of fields per Google terms — good.",
+    "Feature-flag gate is enforced BEFORE _pick_client + _preflight_cost, correctly ordering 403 disabled → 402 cap → 409 confirmation → 200.",
+    "MongoDB _id excluded via projection {'_id': 0} in cache read (line 492) — no ObjectId leak."
+  ],
+  "updated_files": [
+    "/app/backend/discovery_google.py (fixed tz-naive datetime bug in place-details cache path)",
+    "/app/backend/tests/test_phase_d2_discovery_google.py (new pytest suite, 20 cases)"
+  ],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "N/A (backend only per request)"},
+  "seed_data_creation": "None persisted. Test-created cache entries for MOCK_LEKKI_1 + MOCK_LEKKI_2 are either deleted in-suite or naturally expire at 30d TTL. All 20 mock calls land in google_places_usage with is_mock=true so /usage aggregation ignores them.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "D-2 mock path is stable (20/20 pass). Run this suite with `pytest backend/tests/test_phase_d2_discovery_google.py -n 0 -o addopts=''` — the module-level fixture toggles PROPERTY_DISCOVERY_ENABLED true→false→true so parallel workers on other suites could see brief 403s if they hit /api/admin/discovery/* concurrently. When GOOGLE_MAPS_SERVER_KEY becomes available, the RealGooglePlacesClient path needs its own test file — the token-bucket throttle should be moved to a module-level singleton first (see action_items). For the /estimate spec/impl mismatch — do NOT change the test; wait for main-agent decision on which side to move.",
+  "rca_of_issue": "TypeError bug RCA — 2nd GET /api/admin/discovery/place/{place_id} was returning HTTP 500. Reproduction: 1) DELETE /api/admin/discovery/cache/MOCK_LEKKI_1  2) GET .../place/MOCK_LEKKI_1 → 200 cached:false (writes cache with tz-aware datetime via `$set: cached_at: now`, but MongoDB stores as naive UTC BSON date)  3) GET .../place/MOCK_LEKKI_1 → 500 TypeError 'can't subtract offset-naive and offset-aware datetimes' at line 496. Root cause: datetime returned by Motor from Mongo is offset-naive (default BSON semantics), while `now = datetime.now(timezone.utc)` is offset-aware. Fix: normalise cached_at.tzinfo to UTC before the subtraction. Verified fix — same reproduction now returns 200 cached:true, cost_usd:0."
+}

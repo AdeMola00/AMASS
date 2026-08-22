@@ -63,11 +63,12 @@ DEFAULT_GOOGLE_PRICING = {
 DEFAULT_GOOGLE_LIMITS = {
     "daily_cap_usd": 5.0,
     "monthly_cap_usd": 50.0,
-    "admin_confirm_threshold_usd": 2.0,
+    "admin_confirm_threshold_usd": 0.50,  # confirm bulk jobs > $0.50 (~30 details)
     "max_concurrent_jobs": 2,
     "requests_per_second": 5,
     "request_timeout_seconds": 10,
     "max_retries": 3,
+    "place_cache_ttl_days": 30,
 }
 
 DEFAULT_VALUATION_CONFIG = {
