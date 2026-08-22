@@ -335,3 +335,30 @@ agent_communication:
       Demo credentials: demo@amass.africa / amass2026 (admin via ADMIN_EMAILS)
       Demo agent slug: ada-demo-a8d30c
       MOCK_PAYMENT=true
+
+    - Phase D-4: Duplicate review UI + admin override log (Jun 2026)
+      Backend:
+      1) GET /api/admin/discovery/candidates/{id}/review — returns candidate,
+         highest_score, recommended_action, hydrated matches (with distances,
+         listings_count, reps_count, aliases), override_history
+      2) POST /api/admin/discovery/candidates/{id}/resolve — actions:
+         MERGE (attaches candidate to existing amass_property_id; audit log
+         CANDIDATE_MERGED; adds google:place_id to property aliases)
+         MARK_RELATED (links candidate.related_amass_property_id; audit log
+         CANDIDATE_MARKED_RELATED; candidate stays UNVERIFIED, still
+         promotable as its own lead)
+         KEEP_SEPARATE (clears duplicate_matches, unlocks promote-as-new)
+      3) GET /api/admin/discovery/overrides — filterable by candidate_id,
+         amass_property_id, action
+      Idempotency: 400 if candidate already promoted_to_amass_property_id set
+      Auth: all endpoints require admin
+      Test file: /app/backend/tests/test_phase_d4_duplicate_review.py (13/13 pass)
+
+      Frontend:
+      Route: /admin/duplicate-review/[candidate_id]
+      Also linked from /admin/discovery (new "Pending duplicate review" section)
+      Renders: recommendation banner, candidate card, mini-map with candidate
+      pin (gold) + up to 5 AMASS pins (red numbered), per-match cards with
+      distance/score/reasons/listings/reps and Merge/Related/View buttons,
+      global "Keep Separate" button, override history timeline, decision
+      modal with optional reason.

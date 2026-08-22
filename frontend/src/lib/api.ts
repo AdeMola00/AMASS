@@ -1738,6 +1738,123 @@ export const api = {
     ),
   adminGetPassportFull: (amass_id: string) =>
     req<any>(`/admin/passport/${encodeURIComponent(amass_id)}/full`),
+
+  // ─── Phase D-4: Discovery duplicate review ───
+  adminCandidateReview: (cand_id: string) =>
+    req<{
+      candidate: {
+        id: string;
+        google_place_id?: string;
+        candidate_type?: string;
+        status?: string;
+        name?: string;
+        address?: string;
+        latitude?: number;
+        longitude?: number;
+        google_types?: string[];
+        primary_type?: string;
+        duplicate_score?: number;
+        promoted_to_amass_property_id?: string | null;
+        related_amass_property_id?: string | null;
+        admin_override_keep_separate?: boolean;
+        created_at?: string;
+        reviewed_at?: string;
+        review_notes?: string | null;
+      };
+      highest_score: number;
+      recommended_action: "allow" | "possible_duplicate" | "high_confidence_duplicate";
+      matches: {
+        amass_property_id: string;
+        property_uuid: string;
+        property_type?: string;
+        property_identity_status?: string;
+        location_verification_status?: string;
+        state?: string;
+        lga?: string;
+        area?: string;
+        estate?: string;
+        street?: string;
+        raw_address?: string;
+        latitude?: number;
+        longitude?: number;
+        listings_count?: number;
+        representations_count?: number;
+        aliases?: string[];
+        created_at?: string;
+        distance_meters: number;
+        score: number;
+        reasons: string[];
+      }[];
+      override_history: {
+        id: string;
+        action: string;
+        amass_property_id?: string | null;
+        reason?: string | null;
+        actor_email?: string;
+        created_at: string;
+      }[];
+    }>(`/admin/discovery/candidates/${encodeURIComponent(cand_id)}/review`),
+  adminCandidateResolve: (
+    cand_id: string,
+    payload: {
+      action: "MERGE" | "KEEP_SEPARATE" | "MARK_RELATED";
+      amass_property_id?: string;
+      reason?: string;
+    }
+  ) =>
+    req<{
+      ok: boolean;
+      action: string;
+      candidate_id: string;
+      amass_property_id?: string;
+      property_uuid?: string;
+      override_id: string;
+      next_status?: string;
+    }>(`/admin/discovery/candidates/${encodeURIComponent(cand_id)}/resolve`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  adminListCandidates: (params: {
+    status?: string;
+    candidate_type?: string;
+    limit?: number;
+  } = {}) => {
+    const qs = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== "" && v !== null)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join("&");
+    return req<{
+      items: {
+        id: string;
+        google_place_id?: string;
+        candidate_type?: string;
+        status?: string;
+        name?: string;
+        address?: string;
+        latitude?: number;
+        longitude?: number;
+        duplicate_score?: number;
+        duplicate_matches?: { amass_property_id: string; score: number }[];
+        created_at?: string;
+      }[];
+      count: number;
+    }>(`/admin/discovery/candidates${qs ? `?${qs}` : ""}`);
+  },
+  adminDiscoveryOverrides: (params: {
+    candidate_id?: string;
+    amass_property_id?: string;
+    action?: string;
+    limit?: number;
+  } = {}) => {
+    const qs = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== "" && v !== null)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join("&");
+    return req<{
+      items: any[];
+      count: number;
+    }>(`/admin/discovery/overrides${qs ? `?${qs}` : ""}`);
+  },
   adminGetVisibility: (amass_id: string) =>
     req<Record<string, boolean>>(
       `/admin/passport/${encodeURIComponent(amass_id)}/visibility`

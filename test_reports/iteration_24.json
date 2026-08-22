@@ -1,0 +1,43 @@
+{
+  "summary": "Retest of the Phase D-4 discovery red-screen fix in /app/frontend/app/admin/discovery.tsx. Verified the fix END-TO-END on the deployed preview (390x844 mobile viewport) with demo@amass.africa / amass2026. Result: 100% PASS on all 4 acceptance criteria from the review request. (1) /admin/discovery mounts cleanly with NO red-screen error — no 'Cannot read properties of undefined (reading daily_cap_usd)' anywhere in DOM or console; only benign RN-web deprecation warnings (shadow*, pointerEvents, useNativeDriver). (2) Status card renders correctly: MOCK MODE chip visible, Today meter shows '$0.00 / $0.00', This Month meter shows '$0.00 / $0.00' (limits are 0 because backend is in mock mode with zero-cap defaults — expected), Key: — placeholder, and the 'New search' form (Text Search toggle + Query input pre-filled with 'lekki estate' + Discover button) renders below. (3) 'Pending duplicate review' section renders with count badge '2', containing the seeded candidate D4 UI Seed Bravo (id=7a762997-ddd4-47e4-996e-43c21e650c81, PENDING_DEDUPLICATION, SCORE 55, 0 matches) as well as Palm Grove Apartments (D-4 screenshot). Row testID `pending-7a762997-ddd4-47e4-996e-43c21e650c81` is present and tappable. (4) Tapping the Bravo row navigates the router to /admin/duplicate-review/7a762997-ddd4-47e4-996e-43c21e650c81, the admin-dup-review container mounts, the recommendation banner ('No duplicates detected · Top score: 0'), the candidate card (gold CANDIDATE chip + PENDING_DEDUPLICATION chip + name + address + PROPERTY meta chip + coords 6.43950, 3.47420 + premise/point_of_interest tags), the mini-map placeholder ('Interactive map available on mobile' — expected on web since react-native-maps has no web renderer, same behavior as iteration_23), and the primary 'Keep Separate — allow as new lead' button (testID btn-keep-separate) all render correctly. The fix (using AUTH_STORAGE_KEY from @/src/lib/api in _authHeaders + ?? 0 nullish fallbacks on Meter spent/cap props) fully resolves the D-4 entry-flow blocker documented in iteration_23. No new issues found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/admin/discovery",
+        "issues": [
+          "Both meters read '$0.00 / $0.00' because the backend returns limits.daily_cap_usd = 0 and limits.monthly_cap_usd = 0 in mock mode. Not a regression and not part of this review request, but consider surfacing 'Unlimited (mock mode)' text or hiding the meters when caps are 0 to avoid confusion once the admin panel goes live. Purely cosmetic."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_23.json (previous — bug identified)",
+    "/app/test_reports/pytest/pytest_iteration23_phase_d4.xml (backend 13/13 already green — not re-run per instructions)"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix in /app/frontend/app/admin/discovery.tsx is minimal and correct: `_authHeaders` now dynamically imports AUTH_STORAGE_KEY from @/src/lib/api and uses storage.secureGet<string>(AUTH_STORAGE_KEY, ''), matching the app-wide auth token storage convention.",
+    "Meter renders now use `status.daily_spent_usd ?? 0`, `status.limits?.daily_cap_usd ?? 0`, `status.monthly_spent_usd ?? 0`, `status.limits?.monthly_cap_usd ?? 0` — defensively guards against partial status objects during the first render tick.",
+    "The Pending duplicate review section renders above the status card and is fetched from /api/admin/discovery/candidates (via authenticated call), correctly displaying PENDING_DEDUPLICATION rows and routing to /admin/duplicate-review/[id] on tap.",
+    "No deprecated Expo packages, no MongoDB ObjectId leaks in the payload (verified in iteration_23 tests), no React Native red-screen or missing Text wrapping issues observed on this screen."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_24.json (this file)"
+  ],
+  "success_rate": {
+    "backend": "N/A (not re-run per instructions — was 13/13 in iteration_23)",
+    "frontend": "100% (4/4 acceptance criteria verified)"
+  },
+  "seed_data_creation": "Reused the seeded candidate 7a762997-ddd4-47e4-996e-43c21e650c81 (D4 UI Seed Bravo) from iteration_23 — confirmed still present in db.property_candidates with status=PENDING_DEDUPLICATION. No new seeding required.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase D-4 UI is fully unblocked. The /admin/discovery screen now safely renders under mock-mode limits, and the Pending duplicate review → duplicate-review/[id] navigation flow works end-to-end for demo admin. Two candidates remain PENDING for further manual QA (D4 UI Seed Bravo + Palm Grove Apartments D-4 screenshot). No follow-up test needed for this iteration.",
+  "rca_of_issue": "Original bug (iteration_23) was caused by two independent issues in /app/frontend/app/admin/discovery.tsx: (a) inline `_authHeaders` read the wrong storage key `amass_auth_v1`, causing /api/admin/discovery/status to be called unauthenticated → 401 → throw; (b) Meter render read `status.limits.daily_cap_usd` without a nullish guard on the sub-object. E1's fix addresses both: dynamic import of AUTH_STORAGE_KEY constant from api.ts ensures the correct key `amass_auth_token` is used, and `?? 0` fallbacks on all four Meter props prevent partial-status render crashes. Verified by successful mount + all elements visible + no console errors related to the original crash."
+}

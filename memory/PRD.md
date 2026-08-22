@@ -58,3 +58,18 @@ Splash → Onboarding (3-slide) → Login / Register → Tabs:
 
 ## Test Credentials
 See `/app/memory/test_credentials.md`
+
+## Phase D-4 — Duplicate Review UI + Admin Override Log (Jun 2026)
+- Backend `/app/backend/discovery_pipeline.py`:
+  - `GET /api/admin/discovery/candidates/{id}/review` — returns candidate + hydrated matches + override history
+  - `POST /api/admin/discovery/candidates/{id}/resolve` — actions: MERGE | KEEP_SEPARATE | MARK_RELATED
+  - `GET /api/admin/discovery/overrides` — filterable override list
+  - MERGE writes `CANDIDATE_MERGED` to property_audit_logs + appends `google:<place_id>` alias
+  - MARK_RELATED writes `CANDIDATE_MARKED_RELATED` + property.related_candidate_ids
+  - KEEP_SEPARATE clears duplicate_matches, sets admin_override_keep_separate=true → allows fresh promote
+  - New collection `discovery_admin_overrides` with 3 indexes
+- Frontend:
+  - New screen `/app/frontend/app/admin/duplicate-review/[candidate_id].tsx` — side-by-side comparison with mini-map, match cards, decision modal with reason, override history timeline
+  - `/admin/discovery.tsx` — added "Pending duplicate review" section listing PENDING_DEDUPLICATION + DUPLICATE candidates
+  - Fixed pre-existing bug: `_authHeaders()` now reads `AUTH_STORAGE_KEY` via `storage.secureGet`
+- Tests: `/app/backend/tests/test_phase_d4_duplicate_review.py` — 13/13 pass

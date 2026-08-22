@@ -80,6 +80,12 @@ class PromoteIn(BaseModel):
     force_new: bool = False  # skip duplicate-attach even if match
 
 
+class ResolveDupIn(BaseModel):
+    action: str = Field(..., pattern="^(MERGE|KEEP_SEPARATE|MARK_RELATED)$")
+    amass_property_id: Optional[str] = None  # required for MERGE + MARK_RELATED
+    reason: Optional[str] = None
+
+
 def register_discovery_pipeline_routes(db, require_admin):
     from app_settings import get_feature_flag
     from discovery_google import _pick_client
@@ -189,6 +195,261 @@ def register_discovery_pipeline_routes(db, require_admin):
         c = await db.property_candidates.find_one({"id": cand_id}, {"_id": 0})
         if not c: raise HTTPException(404, "Candidate not found")
         return c
+
+    # ─── Phase D-4: Duplicate review — full side-by-side payload ───
+    @router.get("/candidates/{cand_id}/review")
+    async def review_candidate(cand_id: str, _admin=Depends(require_admin)):
+        """Returns candidate + fully hydrated matched AMASS properties for
+        side-by-side comparison (map, distance, addresses, counts).
+
+        Always re-scores against properties_geo so the admin sees a live
+        picture — the stored duplicate_matches may be stale."""
+        cand = await db.property_candidates.find_one({"id": cand_id}, {"_id": 0})
+        if not cand:
+            raise HTTPException(404, "Candidate not found")
+
+        # Re-score live so we see the freshest neighbours.
+        dup = await _score_candidate(cand)
+        # Hydrate each match with the full properties_geo doc + listings count
+        matches_hydrated = []
+        for m in dup["matches"]:
+            p = await db.properties_geo.find_one(
+                {"amass_property_id": m["amass_property_id"]}, {"_id": 0}
+            )
+            if not p:
+                continue
+            listings_count = await db.property_listings.count_documents(
+                {"property_id": p["property_uuid"]}
+            )
+            reps_count = await db.property_representations.count_documents(
+                {"property_id": p["property_uuid"], "status": "APPROVED"}
+            )
+            coords = (p.get("entrance_point") or {}).get("coordinates") or [None, None]
+            matches_hydrated.append({
+                "amass_property_id": p["amass_property_id"],
+                "property_uuid": p["property_uuid"],
+                "property_type": p.get("property_type"),
+                "property_identity_status": p.get("property_identity_status"),
+                "location_verification_status": p.get("location_verification_status"),
+                "state": p.get("state"),
+                "lga": p.get("lga"),
+                "area": p.get("area"),
+                "estate": p.get("estate"),
+                "street": p.get("street"),
+                "raw_address": p.get("raw_address"),
+                "latitude": coords[1] if coords[1] is not None else None,
+                "longitude": coords[0] if coords[0] is not None else None,
+                "listings_count": listings_count,
+                "representations_count": reps_count,
+                "aliases": p.get("aliases") or [],
+                "created_at": p.get("created_at"),
+                "distance_meters": m["distance_meters"],
+                "score": m["score"],
+                "reasons": m.get("reasons") or [],
+            })
+
+        # Any prior admin decisions on this candidate?
+        history = await db.discovery_admin_overrides.find(
+            {"candidate_id": cand_id}, {"_id": 0}
+        ).sort("created_at", -1).to_list(20)
+
+        return {
+            "candidate": cand,
+            "highest_score": dup["score"],
+            "recommended_action": dup["action"],
+            "matches": matches_hydrated,
+            "override_history": history,
+        }
+
+    @router.post("/candidates/{cand_id}/resolve")
+    async def resolve_candidate(
+        cand_id: str,
+        data: ResolveDupIn = Body(...),
+        admin: dict = Depends(require_admin),
+    ):
+        """Admin decides:
+          • MERGE  → attach candidate to existing AMASS property (no new lead)
+          • KEEP_SEPARATE → clear duplicate lock, allow promotion as a new lead
+          • MARK_RELATED → keep candidate independent, but link to nearby property
+        Writes to discovery_admin_overrides + property_audit_logs when a
+        property is affected.
+        """
+        cand = await db.property_candidates.find_one({"id": cand_id}, {"_id": 0})
+        if not cand:
+            raise HTTPException(404, "Candidate not found")
+        if cand.get("promoted_to_amass_property_id"):
+            raise HTTPException(400, "Candidate already resolved")
+
+        now = datetime.now(timezone.utc)
+        action = data.action.upper()
+        override_id = str(uuid.uuid4())
+        override_doc: Dict[str, Any] = {
+            "id": override_id,
+            "candidate_id": cand_id,
+            "google_place_id": cand.get("google_place_id"),
+            "action": action,
+            "amass_property_id": data.amass_property_id,
+            "reason": data.reason,
+            "actor_id": admin["id"],
+            "actor_email": admin.get("email"),
+            "highest_score_at_decision": cand.get("duplicate_score"),
+            "created_at": now,
+        }
+
+        # ── MERGE: attach candidate to existing property ───────────────
+        if action == "MERGE":
+            if not data.amass_property_id:
+                raise HTTPException(400, "amass_property_id required for MERGE")
+            target = await db.properties_geo.find_one(
+                {"amass_property_id": data.amass_property_id}, {"_id": 0}
+            )
+            if not target:
+                raise HTTPException(404, f"Target property {data.amass_property_id} not found")
+            await db.property_candidates.update_one(
+                {"id": cand_id},
+                {"$set": {
+                    "status": "DUPLICATE",
+                    "promoted_to_amass_property_id": target["amass_property_id"],
+                    "merged_into_property_uuid": target["property_uuid"],
+                    "reviewed_by": admin["id"],
+                    "reviewed_at": now,
+                    "review_notes": data.reason or "merged into existing property",
+                    "updated_at": now,
+                }},
+            )
+            # Add candidate details to the property (aliases + discovery_candidate_ids)
+            update_ops: Dict[str, Any] = {
+                "$addToSet": {
+                    "discovery_candidate_ids": cand_id,
+                },
+                "$set": {"updated_at": now},
+            }
+            # Add candidate's Google place_id + raw address as aliases for later lookup
+            aliases_to_add = set()
+            if cand.get("google_place_id"):
+                aliases_to_add.add(f"google:{cand['google_place_id']}")
+            if cand.get("address"):
+                aliases_to_add.add(cand["address"])
+            if aliases_to_add:
+                update_ops["$addToSet"]["aliases"] = {"$each": sorted(aliases_to_add)}
+            await db.properties_geo.update_one(
+                {"amass_property_id": target["amass_property_id"]}, update_ops
+            )
+            await db.property_audit_logs.insert_one({
+                "id": str(uuid.uuid4()),
+                "property_id": target["property_uuid"],
+                "actor_id": admin["id"],
+                "actor_type": "admin",
+                "action": "CANDIDATE_MERGED",
+                "new_value": {
+                    "candidate_id": cand_id,
+                    "google_place_id": cand.get("google_place_id"),
+                    "candidate_name": cand.get("name"),
+                    "amass_property_id": target["amass_property_id"],
+                },
+                "reason": data.reason,
+                "created_at": now,
+            })
+            await db.discovery_admin_overrides.insert_one(override_doc)
+            return {
+                "ok": True,
+                "action": "MERGE",
+                "candidate_id": cand_id,
+                "amass_property_id": target["amass_property_id"],
+                "property_uuid": target["property_uuid"],
+                "override_id": override_id,
+            }
+
+        # ── KEEP_SEPARATE: allow this candidate to be promoted as a new lead ──
+        if action == "KEEP_SEPARATE":
+            await db.property_candidates.update_one(
+                {"id": cand_id},
+                {"$set": {
+                    "status": "UNVERIFIED",
+                    "duplicate_matches": [],  # clear lock — admin explicitly cleared
+                    "duplicate_score": 0,
+                    "admin_override_keep_separate": True,
+                    "reviewed_by": admin["id"],
+                    "reviewed_at": now,
+                    "review_notes": data.reason or "kept separate by admin",
+                    "updated_at": now,
+                }},
+            )
+            override_doc["previous_status"] = cand.get("status")
+            await db.discovery_admin_overrides.insert_one(override_doc)
+            return {
+                "ok": True,
+                "action": "KEEP_SEPARATE",
+                "candidate_id": cand_id,
+                "next_status": "UNVERIFIED",
+                "override_id": override_id,
+            }
+
+        # ── MARK_RELATED: informational link (candidate stays independent) ──
+        if action == "MARK_RELATED":
+            if not data.amass_property_id:
+                raise HTTPException(400, "amass_property_id required for MARK_RELATED")
+            target = await db.properties_geo.find_one(
+                {"amass_property_id": data.amass_property_id}, {"_id": 0}
+            )
+            if not target:
+                raise HTTPException(404, f"Target property {data.amass_property_id} not found")
+            await db.property_candidates.update_one(
+                {"id": cand_id},
+                {"$set": {
+                    "status": "UNVERIFIED",
+                    "related_amass_property_id": target["amass_property_id"],
+                    "reviewed_by": admin["id"],
+                    "reviewed_at": now,
+                    "review_notes": data.reason or f"related to {target['amass_property_id']}",
+                    "updated_at": now,
+                }},
+            )
+            await db.properties_geo.update_one(
+                {"amass_property_id": target["amass_property_id"]},
+                {"$addToSet": {"related_candidate_ids": cand_id},
+                 "$set": {"updated_at": now}},
+            )
+            await db.property_audit_logs.insert_one({
+                "id": str(uuid.uuid4()),
+                "property_id": target["property_uuid"],
+                "actor_id": admin["id"],
+                "actor_type": "admin",
+                "action": "CANDIDATE_MARKED_RELATED",
+                "new_value": {
+                    "candidate_id": cand_id,
+                    "candidate_name": cand.get("name"),
+                    "amass_property_id": target["amass_property_id"],
+                },
+                "reason": data.reason,
+                "created_at": now,
+            })
+            await db.discovery_admin_overrides.insert_one(override_doc)
+            return {
+                "ok": True,
+                "action": "MARK_RELATED",
+                "candidate_id": cand_id,
+                "amass_property_id": target["amass_property_id"],
+                "override_id": override_id,
+            }
+
+        raise HTTPException(400, "Unknown action")
+
+    @router.get("/overrides")
+    async def list_overrides(
+        candidate_id: Optional[str] = Query(None),
+        amass_property_id: Optional[str] = Query(None),
+        action: Optional[str] = Query(None),
+        limit: int = Query(50, ge=1, le=200),
+        _admin=Depends(require_admin),
+    ):
+        q: dict = {}
+        if candidate_id: q["candidate_id"] = candidate_id
+        if amass_property_id: q["amass_property_id"] = amass_property_id
+        if action: q["action"] = action.upper()
+        rows = await db.discovery_admin_overrides.find(q, {"_id": 0}) \
+            .sort("created_at", -1).limit(limit).to_list(limit)
+        return {"items": rows, "count": len(rows)}
 
     # ─── Promote candidate to AMASS lead (properties_geo) ───
     @router.post("/candidates/{cand_id}/promote")

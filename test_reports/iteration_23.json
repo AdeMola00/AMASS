@@ -1,0 +1,66 @@
+{
+  "summary": "Phase D-4 (Duplicate Review UI + Admin Override Log) verified end-to-end. Backend: 13/13 pytest cases in test_phase_d4_duplicate_review.py PASS against the deployed preview URL (auth guards, review payload shape, 404 on unknown candidate, KEEP_SEPARATE clears lock + writes override, MERGE attaches + writes CANDIDATE_MERGED audit log, MARK_RELATED keeps candidate independent + writes CANDIDATE_MARKED_RELATED audit, MERGE 400 without amass_id / 404 on unknown target, resolve-twice rejected 400 after promoted, KEEP_SEPARATE then promote creates a fresh AMASS ID, overrides filter, invalid action → 422). Regression: full Phase D-3 pipeline (29/30, 1 legit skip) + full Phase 6D admin cockpit (35/35) still green — 65 passed, 1 skipped in one sweep. Phase 6D audit-log integration confirmed: `/api/admin/cockpit/audit-logs?action=CANDIDATE_MERGED&property_id=<amass>` returns the merge event with candidate_id in new_value. Frontend (mobile 390x844 viewport): seeded 2 synthetic candidates directly into property_candidates (D4 UI Seed Alpha/Bravo, PENDING_DEDUPLICATION, Lagos VI coords). Logged in as demo@amass.africa via UI. `/admin/duplicate-review/[candidate_id]` renders correctly — recommendation banner ('No duplicates detected · Top score: 0'), candidate card with gold CANDIDATE chip + PENDING_DEDUPLICATION status chip + address + META chips (PROPERTY, coords), map component with fallback placeholder on web (expected — react-native-maps has no web renderer), 'No matches in radius' empty-state card, and 'Keep Separate — allow as new lead' primary button. Tapping Keep Separate opens the decision Modal with reason TextInput + Keep separate confirm. Submitting a KEEP_SEPARATE decision with reason 'Playwright: distinct property test' persisted correctly: `/api/admin/discovery/overrides?candidate_id=<id>` returns count=1, action=KEEP_SEPARATE with the reason preserved, candidate.status=UNVERIFIED, admin_override_keep_separate=true. Revisiting the review screen shows the Override history section with the KEEP_SEPARATE entry and quoted reason. Non-admin gate at /admin/duplicate-review/[id] correctly renders 'Admins only' lock (backend also enforces 401/403 — covered by pytest).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "/app/frontend/app/admin/discovery.tsx",
+        "issue": "Uncaught TypeError: Cannot read properties of undefined (reading 'daily_cap_usd') at Meter render (line 186). Reproduced during Phase D-4 UI test: logging in as demo admin and navigating to /admin/discovery crashes the entire screen (red screen error). Because /admin/discovery is the ONLY entry point users are instructed to use to reach the new 'Pending duplicate review' section + tap through to /admin/duplicate-review/[id], this bug fully blocks the D-4 entry-flow acceptance criterion (feature #5 in the review request). The D-4 review screen itself works perfectly when opened via direct URL. Root cause is Phase D-2 code path: `const r = await (api as any).adminDiscoveryStatus?.() ?? _discoveryStatus();` — api.adminDiscoveryStatus doesn't exist, so fallback runs; inline `_authHeaders()` reads `storage.getItem('amass_auth_v1', '')` but the actual auth key is `amass_auth_token` (api.ts line 4), so /api/admin/discovery/status is called without Authorization → 401 → throws. Also Meter unconditionally reads status.limits.daily_cap_usd without a nullish guard on the sub-object. Fix suggestions: (a) update _authHeaders in discovery.tsx to use AUTH_STORAGE_KEY exported from api.ts (or refactor to api.authenticatedFetch), and (b) guard Meter usage with `status?.limits &&` or default limits={{...}}. Priority: HIGH — blocks D-4 UX entry.",
+        "testID": "admin-discovery",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Discovery → Pending duplicate review → duplicate-review/[id]",
+        "issue": "Because /admin/discovery crashes at mount, the 'Pending duplicate review' section (added in this phase) is never rendered in the deployed web preview and the `pending-<candidate_id>` row cannot be tapped. The list is fetched correctly (adminListCandidates returns the seeded candidates via API), but the render is preempted by the Meter crash. Once discovery.tsx is fixed, this flow will work — the D-4 code changes on discovery.tsx (Pending section, styles.pendingRow / pendingIcon / router.push('/admin/duplicate-review/'+c.id)) are all correct.",
+        "affected_testIDs": ["admin-discovery", "pending-<candidate_id>"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "duplicate-review/[candidate_id]",
+        "issues": [
+          "Map on web falls back to a static placeholder image ('Interactive map available on mobile') — the `dup-review-map` / `marker-candidate` testIDs do not render on web. This is expected behaviour for react-native-maps on web and not a D-4 regression; native builds will show the real map + gold candidate pin + red numbered match pins. Verified the code path is correct."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_d4_duplicate_review.py",
+    "/app/test_reports/pytest/pytest_iteration23_phase_d4.xml"
+  ],
+  "action_items": [
+    "HIGH — Fix /admin/discovery.tsx crash: (a) replace inline `_authHeaders` to use AUTH_STORAGE_KEY exported from api.ts (or better, delegate to api.authenticatedFetch); (b) add a nullish guard on Meter cap prop, e.g. `cap={status.limits?.daily_cap_usd ?? 0}`. This unblocks the D-4 'Pending duplicate review' entry section. The D-4 review screen itself is production-ready.",
+    "LOW — Consider adding a top-level entry point to /admin/duplicate-review/[id] from another admin surface (e.g. cockpit dashboard) so the flow doesn't depend solely on the crashing /admin/discovery route.",
+    "LOW — On decision success the review screen calls Alert.alert with a 'Back to Discovery' button that routes to /admin/discovery — after the fix above, verify the navigate-back happens cleanly."
+  ],
+  "critical_code_review_comments": [
+    "GET /api/admin/discovery/candidates/{id}/review returns fully hydrated matches with property_type, estate/street/area/lga/state, distance_meters, score, reasons, listings_count, representations_count — payload shape matches spec.",
+    "POST /api/admin/discovery/candidates/{id}/resolve is idempotency-safe: cannot resolve after promoted_to_amass_property_id is set (400).",
+    "MERGE appends `google:<place_id>` to properties_geo.aliases and writes property_audit_logs.CANDIDATE_MERGED with new_value.candidate_id — verified in pytest via /api/admin/cockpit/audit-logs?property_id=<amass>&action=CANDIDATE_MERGED.",
+    "KEEP_SEPARATE clears duplicate_matches, sets admin_override_keep_separate=true, status=UNVERIFIED; subsequent /promote creates a fresh AMASS-<STATE>-XXXXXXXX ID — verified.",
+    "discovery_admin_overrides collection is written for all three actions; the /overrides endpoint filters by candidate_id, amass_property_id, action, actor_id.",
+    "Frontend review screen uses testIDs on every interactive element (btn-back, admin-dup-review, dup-review-map, marker-candidate, btn-merge-<id>, btn-related-<id>, btn-view-<id>, btn-keep-separate, input-reason, btn-confirm-decision). All are correctly wired.",
+    "Admin gate on the review screen (`user?.is_admin` check) matches backend enforcement — non-admins see 'Admins only' lock.",
+    "Modal uses KeyboardAvoidingView, TextInput multiline for reason, and shows different subtitle text per action (MERGE / MARK_RELATED / KEEP_SEPARATE). Good.",
+    "No deprecated Expo packages introduced in this phase (no expo-av, expo-barcode-scanner, expo-background-fetch usage).",
+    "No MongoDB ObjectId leak observed — review payload strips _id via projection (`{'_id': 0}` in discovery_pipeline)."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_23.json (this file)"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 D-4 tests pass; regression 65/66 with 1 legit D-3 skip)",
+    "frontend": "80% (D-4 review screen + decision flow + override history 100% verified; discovery entry section blocked by pre-existing crash in discovery.tsx unrelated to D-4 code)"
+  },
+  "seed_data_creation": "Seeded 2 synthetic candidates directly into db.property_candidates via /tmp/seed_d4_candidates.py (persisted to /app not required — data lives in Mongo). IDs: 719da5e5-c724-4b83-94fd-d4c22fe144f9 (D4 UI Seed Alpha, 6.4410,3.4758, now KEEP_SEPARATE resolved with 1 override) and 7a762997-ddd4-47e4-996e-43c21e650c81 (D4 UI Seed Bravo, 6.4395,3.4742, still PENDING_DEDUPLICATION — available for further manual testing). The pytest suite additionally creates and resolves several transient candidates each run.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes /admin/discovery.tsx (auth-header key + Meter nullish guard), re-run /app/backend/tests/test_phase_d4_duplicate_review.py (13/13) and re-open /admin/discovery — the 'Pending duplicate review' section should render Bravo (Alpha is already resolved). Tapping `pending-<id>` should push to /admin/duplicate-review/[id]. The D-4 review screen already works via direct URL and via that navigation once discovery renders. Do NOT reintroduce localStorage-based token injection — the app uses AsyncStorage (IndexedDB) on web under key `amass_auth_token`; use the login screen UI (testIDs login-email/login-password/login-submit-button) with demo@amass.africa / amass2026 to authenticate.",
+  "rca_of_issue": "Discovery-screen crash RCA: `/app/frontend/app/admin/discovery.tsx` line 65 uses `await (api as any).adminDiscoveryStatus?.() ?? _discoveryStatus()`. Since `api.adminDiscoveryStatus` is not defined in api.ts (verified via grep), the optional-call yields undefined and the `??` operator falls through to `_discoveryStatus()`. That inline helper (lines 294-306) reads the auth token from `storage.getItem('amass_auth_v1', '')`, but the app's actual auth storage key is `amass_auth_token` (api.ts line 4, re-exported as AUTH_STORAGE_KEY on line 1869). So the token is always empty → the /api/admin/discovery/status call is unauthenticated → 401 → _discoveryStatus throws. However, the Meter render at line 186 still crashes on some paths because `status` becomes truthy but partial (likely a stale render tick), and `status.limits.daily_cap_usd` blows up. Two-part fix: (a) delegate to api.authenticatedFetch (or use AUTH_STORAGE_KEY constant) so the status call actually authenticates; (b) add defensive access `cap={status?.limits?.daily_cap_usd ?? 0}` in the Meter usage, or short-circuit the whole card with `{status?.limits && ...}` instead of just `{status && ...}`. Impact on D-4: purely UX — backend and the /duplicate-review/[id] screen work perfectly. Reproduction: log in as demo admin via /login → navigate to /admin/discovery → red-screen with 'Cannot read properties of undefined (reading daily_cap_usd)' at app/admin/discovery.tsx:186:86, component stack rooted at AdminDiscoveryScreen."
+}

@@ -58,6 +58,7 @@ export default function AdminDiscoveryScreen() {
   const [results, setResults] = useState<Place[]>([]);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingReview, setPendingReview] = useState<Awaited<ReturnType<typeof api.adminListCandidates>>["items"]>([]);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -70,10 +71,28 @@ export default function AdminDiscoveryScreen() {
     }
   }, []);
 
+  const loadPendingReview = useCallback(async () => {
+    try {
+      // Union of possibly-duplicate + high-confidence duplicate candidates
+      const [a, b] = await Promise.all([
+        api.adminListCandidates({ status: "PENDING_DEDUPLICATION", limit: 25 }),
+        api.adminListCandidates({ status: "DUPLICATE", limit: 25 }),
+      ]);
+      // Only surface candidates that are NOT already resolved (no promoted id)
+      const merged = [...a.items, ...b.items].filter(
+        (c: any) => !c.promoted_to_amass_property_id
+      );
+      setPendingReview(merged);
+    } catch (e) {
+      // silent — the discovery screen still works if this fails
+    }
+  }, []);
+
   useEffect(() => {
     if (!user?.is_admin) return;
     loadStatus();
-  }, [user, loadStatus]);
+    loadPendingReview();
+  }, [user, loadStatus, loadPendingReview]);
 
   const runSearch = async () => {
     setBusy(true);
@@ -107,8 +126,49 @@ export default function AdminDiscoveryScreen() {
       <Header title="Property Discovery" onBack={() => router.back()} />
       <ScrollView
         contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg, paddingBottom: 60 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadStatus(); }} tintColor={colors.red} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadStatus(); loadPendingReview(); }} tintColor={colors.red} />}
       >
+        {/* Pending duplicate review — Phase D-4 */}
+        {pendingReview.length > 0 && (
+          <View style={[styles.section, { borderColor: colors.gold, borderWidth: 1.5 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={styles.sectionTitle}>Pending duplicate review</Text>
+              <View style={[styles.modeChip, { backgroundColor: colors.gold }]}>
+                <Text style={styles.modeChipText}>{pendingReview.length}</Text>
+              </View>
+            </View>
+            <Text style={styles.mockHint}>Candidates awaiting admin decision (merge / mark related / keep separate).</Text>
+            {pendingReview.slice(0, 10).map((c: any) => (
+              <Pressable
+                key={c.id}
+                style={styles.pendingRow}
+                onPress={() => router.push(`/admin/duplicate-review/${c.id}` as any)}
+                testID={`pending-${c.id}`}
+              >
+                <View style={styles.pendingIcon}>
+                  <Ionicons name="flask" size={14} color={colors.gold} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.resultName} numberOfLines={1}>{c.name ?? "(no name)"}</Text>
+                  <Text style={styles.resultAddr} numberOfLines={1}>{c.address ?? "—"}</Text>
+                  <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
+                    <View style={[styles.typePill, { backgroundColor: c.status === "DUPLICATE" ? "#FDECEC" : "#FFF6DA" }]}>
+                      <Text style={[styles.typePillText, { color: c.status === "DUPLICATE" ? colors.red : "#A6791C" }]}>{c.status}</Text>
+                    </View>
+                    <View style={styles.typePill}>
+                      <Text style={styles.typePillText}>SCORE {c.duplicate_score ?? 0}</Text>
+                    </View>
+                    <View style={styles.typePill}>
+                      <Text style={styles.typePillText}>{(c.duplicate_matches ?? []).length} match{(c.duplicate_matches ?? []).length === 1 ? "" : "es"}</Text>
+                    </View>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+              </Pressable>
+            ))}
+          </View>
+        )}
+
         {/* Mode + cost meter */}
         {status && (
           <View style={[styles.statusCard, shadows.soft, status.client_mode === "mock" && { borderColor: colors.gold, borderWidth: 1.5 }]}>
@@ -123,8 +183,8 @@ export default function AdminDiscoveryScreen() {
               <Text style={styles.mockHint}>Add GOOGLE_MAPS_SERVER_KEY in deployment secrets and toggle GOOGLE_PLACES_ENABLED to enable live search.</Text>
             )}
             <View style={styles.meterRow}>
-              <Meter label="Today" spent={status.daily_spent_usd} cap={status.limits.daily_cap_usd} />
-              <Meter label="This Month" spent={status.monthly_spent_usd} cap={status.limits.monthly_cap_usd} />
+              <Meter label="Today" spent={status.daily_spent_usd ?? 0} cap={status.limits?.daily_cap_usd ?? 0} />
+              <Meter label="This Month" spent={status.monthly_spent_usd ?? 0} cap={status.limits?.monthly_cap_usd ?? 0} />
             </View>
           </View>
         )}
@@ -233,8 +293,8 @@ function Meter({ label, spent, cap }: { label: string; spent: number; cap: numbe
 // ── inline API helpers (avoiding api.ts churn for D-2) ──
 async function _authHeaders(): Promise<Record<string, string>> {
   const { storage } = await import("@/src/utils/storage");
-  const t = await storage.getItem<string>("amass_auth_v1", "");
-  const token = t ? JSON.parse(t)?.token : "";
+  const { AUTH_STORAGE_KEY } = await import("@/src/lib/api");
+  const token = await storage.secureGet<string>(AUTH_STORAGE_KEY, "");
   return token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
 }
 async function _discoveryStatus(): Promise<Status> {
@@ -290,6 +350,18 @@ const styles = StyleSheet.create({
   typePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: colors.surfaceSecondary },
   typePillText: { fontSize: 9, color: colors.textSecondary, fontWeight: "700" },
   placeIdMono: { fontSize: 9, color: colors.textTertiary, fontFamily: "monospace" as any },
+  pendingRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
+    alignItems: "center",
+  },
+  pendingIcon: {
+    width: 30, height: 30, borderRadius: 15, backgroundColor: "#FFF6DA",
+    alignItems: "center", justifyContent: "center",
+  },
   blocked: { padding: spacing.xl, alignItems: "center", gap: 10, marginTop: 40 },
   blockedText: { fontSize: 14, color: colors.text, fontWeight: "700" },
 });
