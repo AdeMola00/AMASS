@@ -127,6 +127,14 @@ export default function AdminCockpitHub() {
                 onPress={() => router.push("/admin/duplicate-queue" as any)}
                 testID="tile-merge"
               />
+              <Tile
+                title="Platform settings"
+                caption="Feature flags · Property types · Config"
+                icon="settings-outline"
+                accent={colors.textSecondary}
+                onPress={() => router.push("/admin/settings" as any)}
+                testID="tile-settings"
+              />
             </View>
 
             <Text style={styles.hint}>

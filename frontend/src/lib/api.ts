@@ -1034,6 +1034,66 @@ export const api = {
     }>(`/ads/${encodeURIComponent(ad_id)}/suggestions`),
   myInterestTags: () => req<{ tags: string[] }>("/ads/interest-tags/mine"),
 
+  // ─── D-1: Property Types + App Settings ───
+  propertyTypes: () =>
+    req<
+      {
+        id: string;
+        slug: string;
+        label: string;
+        icon: string;
+        color: string;
+        order: number;
+        subtypes: string[];
+        active: boolean;
+        is_system?: boolean;
+      }[]
+    >("/property-types"),
+  featureFlags: () => req<Record<string, boolean>>("/settings/feature-flags"),
+  adminListSettings: () => req<Record<string, any>>("/admin/settings"),
+  adminGetSetting: (key: string) => req<{ key: string; value: any }>(`/admin/settings/${encodeURIComponent(key)}`),
+  adminPatchSetting: (key: string, value: any) =>
+    req<{ ok: boolean; key: string; value: any }>(
+      `/admin/settings/${encodeURIComponent(key)}`,
+      { method: "PATCH", body: JSON.stringify({ value }) }
+    ),
+  adminResetSetting: (key: string) =>
+    req<{ ok: boolean; key: string; reset: boolean }>(
+      `/admin/settings/${encodeURIComponent(key)}/reset`,
+      { method: "POST" }
+    ),
+  adminListPropertyTypes: () =>
+    req<any[]>("/admin/property-types"),
+  adminCreatePropertyType: (payload: {
+    slug: string;
+    label: string;
+    icon: string;
+    color: string;
+    order?: number;
+    subtypes?: string[];
+    active?: boolean;
+  }) => req<any>("/admin/property-types", { method: "POST", body: JSON.stringify(payload) }),
+  adminPatchPropertyType: (
+    slug: string,
+    updates: {
+      label?: string;
+      icon?: string;
+      color?: string;
+      order?: number;
+      subtypes?: string[];
+      active?: boolean;
+    }
+  ) =>
+    req<{ ok: boolean; updated: string[] }>(
+      `/admin/property-types/${encodeURIComponent(slug)}`,
+      { method: "PATCH", body: JSON.stringify(updates) }
+    ),
+  adminDeletePropertyType: (slug: string) =>
+    req<{ ok: boolean; action: string }>(
+      `/admin/property-types/${encodeURIComponent(slug)}`,
+      { method: "DELETE" }
+    ),
+
   // ─── Agent Platform (Phase 1: plans, quotas, onboarding, founding) ───
   listAgentPlans: () =>
     req<

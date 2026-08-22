@@ -1,0 +1,38 @@
+{
+  "summary": "AMASS Phase D-1 backend verified: 39/39 pytest cases pass covering property-types registry (public list, admin CRUD, hex validation, system soft-delete, non-system hard-delete, 403/401/409 handling) and app_settings (public feature-flags GET, admin GET/PATCH/RESET for all 8 known keys, unknown-key 400/404, feature-flag boolean+known-key validation, verification_weights 0-100 int enforcement). Phase 6 regressions clean (/api/passport/AMASS-LAG-00000233 and /api/admin/cockpit/dashboard both 200). Idempotency confirmed: after `supervisorctl restart backend`, counts of property_types (9) and app_settings (8) are unchanged and backend.err.log shows no traceback or duplicate-key errors. NOTE: the pytest-xdist default `-n 2 --dist loadscope` in /app/backend/pytest.ini causes 502s when the restart test in TestIdempotentSeeding races with sibling tests on a second worker; run this file with `-n 0` (only this file) or ensure the restart class runs serially. All D-1 functionality itself is correct — no bugs found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_d1_property_types_settings.py",
+    "/app/test_reports/pytest/pytest_iteration20_phase_d1.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: In future D-x phases, mark TestIdempotentSeeding (or any restart-inducing test) with `@pytest.mark.xdist_group('serial_backend_restart')` and add `--dist=loadgroup` support to pytest.ini, OR isolate restart tests into their own module and run them serially. Not blocking D-1 delivery.",
+    "OPTIONAL: consider adding admin RESET RBAC test (currently /api/admin/settings/{key}/reset admin-only path is protected by same Depends but not explicitly asserted with 403 in this suite). Not urgent — same middleware as PATCH which is covered."
+  ],
+  "critical_code_review_comments": [
+    "property_types.py delete endpoint returns pt.pop('_id', None) after Motor projection excludes _id — no leak observed; safe.",
+    "app_settings.py PATCH uses `upsert=True` — safe because SETTING_DEFAULTS whitelist is checked first, so no ghost keys can be created.",
+    "verification_weights validation only enforces per-value 0-100 int; the module comment says 'sum <= 200' is intentionally NOT enforced (headroom for tuning) — matches spec.",
+    "ensure_default_property_types + ensure_default_settings both use find_one presence check → idempotent; confirmed empirically via restart test.",
+    "Both routers correctly declared under /api/ prefix, meeting Kubernetes ingress routing requirement.",
+    "Colour regex ^#[0-9A-Fa-f]{6}$ applied on both PropertyTypeIn (create) and PropertyTypePatchIn (patch) — full-coverage."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_d1_property_types_settings.py (new)"
+  ],
+  "success_rate": {"backend": "100% (39/39)", "frontend": "N/A (backend only)"},
+  "seed_data_creation": "None persisted — the CRUD test creates a temporary `coliving_<uuid>` type and hard-deletes it in the same class. `other` is temporarily soft-deleted then re-activated by a follow-up PATCH — leaves state identical to seed. Mutated google_limits/verification_weights/feature_flags are all reset via /reset before class teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "D-1 is a stable foundation. When D-2 tests (Google discovery) are written, they can rely on: (1) `app_settings.google_limits.daily_cap_usd == 5.0` default, (2) 9 property types with `is_system=True` all present, (3) `feature_flags.GOOGLE_PLACES_ENABLED == False` by default (D-2 tests will need to flip this via PATCH). To run this file standalone: `pytest backend/tests/test_phase_d1_property_types_settings.py -n 0`. Running with default `-n 2` produces spurious 502s only in the restart-idempotency class due to backend downtime.",
+  "rca_of_issue": "N/A — no bugs. One test-infra observation: default `-n 2 --dist loadscope` in pytest.ini means the restart in TestIdempotentSeeding kills the backend for tests running concurrently on the sibling worker. Fixed locally by running the D-1 suite with `-n 0`."
+}

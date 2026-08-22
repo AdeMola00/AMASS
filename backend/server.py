@@ -1950,6 +1950,16 @@ app.include_router(_pp_admin)
 from admin_cockpit import register_admin_cockpit_routes
 app.include_router(register_admin_cockpit_routes(db, require_admin))
 
+# ─── D-1: Property Type registry + App Settings (feature flags, weights, pricing) ─
+from property_types import register_property_type_routes, ensure_default_property_types
+from app_settings import register_app_settings_routes, ensure_default_settings
+_pt_public, _pt_admin = register_property_type_routes(db, require_admin)
+_as_public, _as_admin = register_app_settings_routes(db, require_admin)
+app.include_router(_pt_public)
+app.include_router(_pt_admin)
+app.include_router(_as_public)
+app.include_router(_as_admin)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -2035,6 +2045,33 @@ async def on_startup():
         await db.property_claims.create_index(
             [("representation_id", 1), ("submitted_at", -1)]
         )
+        # ─── Phase D-1: Property types + app settings + D-3/D-5/D-8 collections ─
+        await db.property_types.create_index("slug", unique=True)
+        await db.property_types.create_index([("order", 1), ("active", 1)])
+        await db.app_settings.create_index("key", unique=True)
+        # Discovery pipeline (populated in D-2/D-3)
+        await db.property_candidates.create_index("id", unique=True)
+        await db.property_candidates.create_index("google_place_id", sparse=True)
+        await db.property_candidates.create_index([("status", 1), ("created_at", -1)])
+        await db.property_candidates.create_index([("location", "2dsphere")])
+        await db.discovery_jobs.create_index("id", unique=True)
+        await db.discovery_jobs.create_index([("status", 1), ("created_at", -1)])
+        await db.google_places_cache.create_index("place_id", unique=True)
+        await db.google_places_cache.create_index([("cached_at", 1)])
+        await db.google_places_usage.create_index([("day", 1)])
+        # Verification tasks + territories + valuations (populated D-5..D-8)
+        await db.agent_verification_tasks.create_index("id", unique=True)
+        await db.agent_verification_tasks.create_index([("agent_id", 1), ("status", 1)])
+        await db.agent_verification_tasks.create_index([("location", "2dsphere")])
+        await db.agent_territories.create_index([("agent_id", 1)])
+        await db.agent_territories.create_index([("polygon", "2dsphere")])
+        await db.property_valuations.create_index([("amass_property_id", 1), ("valued_at", -1)])
+        await db.property_valuations.create_index("id", unique=True)
+        # Seed defaults (idempotent)
+        from property_types import ensure_default_property_types as _ensure_pt
+        from app_settings import ensure_default_settings as _ensure_as
+        await _ensure_pt(db)
+        await _ensure_as(db)
     except Exception as e:
         logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
 
