@@ -1961,6 +1961,64 @@ export const api = {
       `/admin/verification-tasks/create-for-property/${encodeURIComponent(amass_id)}`,
       { method: "POST", body: JSON.stringify({ priority }) }
     ),
+
+  // ─── Phase D-6: Verification score ───
+  getPropertyScore: (amass_id: string) =>
+    req<{
+      amass_property_id: string;
+      score: number;
+      tier: "SUPER" | "VERIFIED" | "UNSTABLE" | "UNVERIFIED";
+      breakdown: Record<string, number>;
+      computed_at?: string;
+      verified_at?: string | null;
+      location_verification_status?: string;
+    }>(`/properties-v2/${encodeURIComponent(amass_id)}/score`),
+  adminListFraudFlags: (params: { status?: string; flag_type?: string; limit?: number } = {}) => {
+    const qs = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== "" && v !== null)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join("&");
+    return req<{
+      items: any[];
+      count: number;
+      counts_by_type: Record<string, number>;
+    }>(`/admin/fraud/flags${qs ? `?${qs}` : ""}`);
+  },
+  adminDismissFraudFlag: (flag_id: string, reason?: string) =>
+    req<{ ok: boolean }>(`/admin/fraud/flags/${encodeURIComponent(flag_id)}/dismiss`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason ?? "false positive" }),
+    }),
+  adminRecomputeScore: (amass_id: string) =>
+    req<any>(`/admin/properties/${encodeURIComponent(amass_id)}/recompute-score`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
+  // ─── Phase D-8: AI Valuation ───
+  getPropertyValuation: (amass_id: string, forceRefresh = false) =>
+    req<{
+      amass_property_id: string;
+      value: number;
+      range_low: number;
+      range_high: number;
+      currency: string;
+      confidence: number;
+      method: string;
+      comparables_count: number;
+      dispersion_pct: number;
+      narrative?: string | null;
+      valued_at: string;
+    }>(
+      `/properties-v2/${encodeURIComponent(amass_id)}/valuation${
+        forceRefresh ? "?force_refresh=true" : ""
+      }`
+    ),
+  adminRefreshValuation: (amass_id: string) =>
+    req<any>(`/admin/valuations/${encodeURIComponent(amass_id)}/refresh`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
   adminGetVisibility: (amass_id: string) =>
     req<Record<string, boolean>>(
       `/admin/passport/${encodeURIComponent(amass_id)}/visibility`

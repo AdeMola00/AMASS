@@ -403,6 +403,25 @@ def register_agent_tasks_routes(db, get_current_user, require_admin):
         await _audit(db, t["property_uuid"], user, "PROPERTY_VERIFIED_BY_AGENT" if data.verdict == "PROPERTY_EXISTS" else f"AGENT_VERIFICATION_{data.verdict}",
                      new={"task_id": task_id, "verdict": data.verdict, "drift_m": drift_m,
                           "photo_path": photo_path})
+
+        # D-6: recompute score + fraud flags (best-effort)
+        try:
+            from verification_scoring import compute_verification_score, evaluate_property_fraud
+            fresh_prop = await db.properties_geo.find_one({"property_uuid": t["property_uuid"]}, {"_id": 0})
+            if fresh_prop:
+                await compute_verification_score(db, fresh_prop)
+                await evaluate_property_fraud(db, t["property_uuid"])
+        except Exception:
+            pass
+
+        # D-8: trigger valuation refresh (best-effort, only on verified)
+        if data.verdict == "PROPERTY_EXISTS":
+            try:
+                from property_valuations import estimate_property_valuation
+                await estimate_property_valuation(db, t["property_uuid"], triggered_by="verification")
+            except Exception:
+                pass
+
         return {
             "ok": True,
             "task_status": new_task_status,

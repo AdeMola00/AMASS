@@ -1978,6 +1978,14 @@ app.include_router(_admin_tasks_router)
 from object_storage import get_object as _os_get_object, init_storage as _os_init
 from fastapi import Response as _FileResp
 
+# ─── D-6: Verification scoring + fraud signals ───
+from verification_scoring import register_verification_scoring_routes
+app.include_router(register_verification_scoring_routes(db, get_current_user, require_admin))
+
+# ─── D-8: AI valuation (HybridComparableEstimator) ───
+from property_valuations import register_valuation_routes
+app.include_router(register_valuation_routes(db, get_current_user, require_admin))
+
 @app.get("/api/files/{file_path:path}")
 async def _download_file(file_path: str, user: dict = Depends(get_current_user)):
     """Auth-checked passthrough to Emergent Object Storage.
@@ -2122,6 +2130,11 @@ async def on_startup():
         await db.agent_territories.create_index([("state", 1), ("is_active", 1)])
         await db.property_valuations.create_index([("amass_property_id", 1), ("valued_at", -1)])
         await db.property_valuations.create_index("id", unique=True)
+        await db.property_valuations.create_index([("property_uuid", 1), ("status", 1), ("valued_at", -1)])
+        # D-6 fraud flags
+        await db.fraud_flags.create_index("id", unique=True)
+        await db.fraud_flags.create_index([("property_uuid", 1), ("flag_type", 1), ("status", 1)])
+        await db.fraud_flags.create_index([("status", 1), ("created_at", -1)])
         # Seed defaults (idempotent)
         from property_types import ensure_default_property_types as _ensure_pt
         from app_settings import ensure_default_settings as _ensure_as

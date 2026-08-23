@@ -32,6 +32,7 @@ import * as Haptics from "expo-haptics";
 import { api } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
+import { PropertyScoreCard } from "@/src/components/PropertyScoreCard";
 
 type PassportData = Awaited<ReturnType<typeof api.getPassport>>;
 
@@ -185,6 +186,9 @@ export default function PropertyPassportScreen() {
             {p.details?.year_built != null && <Fact icon="calendar-outline" label={`Built ${p.details.year_built}`} />}
           </View>
         </View>
+
+        {/* D-6/D-7/D-8: Verification score + AI value strip */}
+        <PropertyScoreCard amassId={p.amass_property_id} />
 
         {/* Segmented tabs */}
         <View style={styles.tabs}>

@@ -1,0 +1,32 @@
+{
+  "summary": "Phase D-6 (verification scoring + fraud flags), D-7 (passport score card UI), and D-8 (AI valuation) verified end-to-end on deployed environment. Backend: 14/14 D-6/D-8 tests pass; D-4 + D-5 regression 27/27 still pass. All 4 spot-check curls (score, valuation, admin fraud flags, admin recompute-score) return expected shapes. Frontend passport for AMASS-LAG-00000233 renders the new PropertyScoreCard between the title block and the About/Listings/History tabs, showing: tier chip (UNVERIFIED gray), radial SVG score gauge (5/100), AI Value Estimate strip with graceful fallback ('Not enough comparables yet…'), and chevron expansion revealing all six breakdown factors (recency, gps_tier, drift, photo, agent_trust, duplicate_cleanliness). No red-screen or crash observed. Component degrades gracefully when valuation returns no comparables and/or Claude narrative is absent. No blocking issues found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "PropertyScoreCard", "issue": "No testID attributes on the tier pill, gauge, value strip, chevron pressable, or breakdown rows. This works today but blocks robust automated UI testing — had to click by pixel coordinates to expand the card. Reference: /app/frontend/src/components/PropertyScoreCard.tsx"}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/pytest_iteration26_phase_d6_d8.xml",
+    "/app/backend/tests/test_phase_d6_d8_scoring_valuation.py"
+  ],
+  "action_items": [
+    "(nice-to-have) Add testIDs to PropertyScoreCard sub-elements (e.g. score-card-root, tier-pill, score-gauge-num, ai-value-amount, ai-value-fallback, expand-chevron, breakdown-<factor>) so future UI regression tests can assert them deterministically without pixel-coordinate clicks."
+  ],
+  "critical_code_review_comments": [
+    "PropertyScoreCard uses Promise.allSettled correctly so passport still renders if either endpoint fails — verified: legacy AMASS-LAG-00000233 has no comparables and the valuation strip degrades to the fallback copy without breaking layout.",
+    "Score endpoint payload shape matches spec exactly: amass_property_id, score, tier, breakdown, computed_at, verified_at, location_verification_status.",
+    "Valuation payload matches spec exactly: value/range_low/range_high/currency/confidence/method/comparables_count/dispersion_pct/narrative/valued_at.",
+    "Admin fraud flags endpoint returns items + count + counts_by_type as documented (live env shows 34 active flags across MISSING_PROOF_PHOTO, HIGH_GPS_DRIFT, LOW_GPS_ACCURACY_SET, CLUSTER_DUPLICATE — good signal the D-5 verify hook is firing)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (14/14 D-6/D-8 + 27/27 D-4/D-5 regression)", "frontend": "100% (passport renders + score card + gauge + fallback + expansion breakdown all verified)"},
+  "seed_data_creation": "None — used the pre-existing legacy AMASS-LAG-00000233 property as requested; pytest suite seeds its own candidates through /api/admin/discovery.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Deployed URL: https://property-os-africa.preview.emergentagent.com. Admin creds demo@amass.africa / amass2026. Test suite at /app/backend/tests/test_phase_d6_d8_scoring_valuation.py runs cleanly in ~7s with 2 workers. For the frontend score card, expand chevron is at approx (343, 490) in 390x844 viewport since there are no testIDs yet.",
+  "rca_of_issue": "N/A — no bugs found. Legacy property AMASS-LAG-00000233 correctly shows tier=UNVERIFIED (score 5/100) because it was migrated without an agent verification; this is expected behaviour and the UI handles it gracefully."
+}

@@ -91,3 +91,37 @@ See `/app/memory/test_credentials.md`
   - `/agent/territory` — state chip picker + LGA/area inputs + radius + active toggle
   - `agent-tasks-entry` card added to `/agent-dashboard`
 - Tests: `/app/backend/tests/test_phase_d5_agent_tasks.py` — 14/14 pass
+
+## Phases D-6 + D-7 + D-8 — Scoring, Fraud, Passport UI, AI Valuation (Jun 2026)
+### D-6 · Verification Scoring + Fraud Signals
+- Backend `/app/backend/verification_scoring.py`
+- Score (0–100): recency 40 + gps_tier 20 + drift 15 + photo 10 + agent_trust 10 + duplicate_cleanliness 5
+- Tiers: SUPER ≥85, VERIFIED ≥70, UNSTABLE ≥50, else UNVERIFIED
+- Score decays linearly from 40→0 over 12 months since verified_at
+- Fraud rules: HIGH_GPS_DRIFT (>250m), LOW_GPS_ACCURACY_SET (>50m), MISSING_PROOF_PHOTO,
+  RAPID_VERIFICATION (agent >6/30min), CLUSTER_DUPLICATE (3+ props within 15m), STALE_UNVERIFIED (30+ days)
+- Auto-computed after every verify submit; endpoints:
+  - GET `/api/properties-v2/{amass_id}/score`
+  - GET `/api/admin/fraud/flags?status=ACTIVE&flag_type=`
+  - POST `/api/admin/fraud/flags/{id}/dismiss`
+  - POST `/api/admin/fraud/sweep`
+  - POST `/api/admin/properties/{amass_id}/recompute-score`
+
+### D-7 · Passport Score Card + AI Value Strip
+- Component `/app/frontend/src/components/PropertyScoreCard.tsx`
+- Inserted into `/property-passport/[amass_id]` between title block and tabs
+- Radial score gauge (react-native-svg), tier chip, AI value + range, confidence bar, LLM narrative box, expandable breakdown
+
+### D-8 · AI Valuation Engine (HybridComparableEstimator)
+- Backend `/app/backend/property_valuations.py`
+- Algorithm: median ₦/sqm of same-type comparables × target size, + verification/amenities bumps, − fraud penalties
+- Confidence: 30 + 4/comp + tier bonus + dispersion bonus
+- LLM narrative via Claude Sonnet 4.5 (Emergent LLM key)
+- Cached 24h in `property_valuations`; compact copy stamped on `properties_geo.ai_valuation`
+- Endpoints:
+  - GET `/api/properties-v2/{amass_id}/valuation?force_refresh=`
+  - POST `/api/admin/valuations/{amass_id}/refresh`
+
+### Tests
+- `/app/backend/tests/test_phase_d6_d8_scoring_valuation.py` — 14/14 pass
+- Regression D-4 + D-5 — 27/27 still pass
