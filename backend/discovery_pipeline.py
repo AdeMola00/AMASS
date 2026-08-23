@@ -35,6 +35,32 @@ def infer_candidate_type(google_types: List[str]) -> str:
     return "UNKNOWN"
 
 
+# ── Phase D-9: map candidate → registry slug so promoted properties get a colour ──
+def registry_slug_for_candidate(candidate_type: str, google_types: Optional[List[str]] = None) -> str:
+    """Map an internal candidate_type + raw google_types to a property_types slug
+    (one of: residential, apartment, estate, land, commercial, industrial,
+    hospitality, institutional, other)."""
+    ts = set((t or "").lower() for t in (google_types or []))
+    ct = (candidate_type or "").upper()
+    if ct == "COMMERCIAL" or ts & {"office", "shopping_mall", "store", "showroom"}:
+        return "commercial"
+    if ts & {"warehouse", "factory", "logistics"}: return "industrial"
+    if ts & {"lodging", "hotel", "resort", "hotel_commercial"}: return "hospitality"
+    if ts & {"school", "university", "hospital", "church", "mosque",
+             "place_of_worship", "government"}:
+        return "institutional"
+    if ct == "ESTATE" or ts & {"gated_community", "housing_development",
+                               "residential_area", "residential_complex"}:
+        return "estate"
+    if ct == "PROPERTY_COMPLEX" or ts & {"apartment_complex", "apartment_building",
+                                          "condominium", "penthouse"}:
+        return "apartment"
+    if ts & {"land", "plot", "farm"}: return "land"
+    if ct == "PROPERTY" or ts & {"premise", "subpremise", "point_of_interest"}:
+        return "residential"
+    return "other"
+
+
 def _place_to_candidate_doc(place: dict, source_type: str = "GOOGLE_PLACES") -> dict:
     loc = place.get("location") or {}
     lat = loc.get("latitude")
@@ -507,7 +533,9 @@ def register_discovery_pipeline_routes(db, require_admin):
             "location_verification_status": "UNVERIFIED",  # awaits on-site GPS
             "property_identity_status": "PENDING_REVIEW",
             "physical_status": "ACTIVE",
-            "property_type": cand.get("candidate_type"),
+            "property_type": registry_slug_for_candidate(
+                cand.get("candidate_type"), cand.get("google_types")
+            ),
             "details": {},
             "media_ids": [],
             "aliases": [],

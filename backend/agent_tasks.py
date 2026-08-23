@@ -119,6 +119,12 @@ async def create_verification_task_for_property(
     }
     await db.agent_verification_tasks.insert_one(task)
     task.pop("_id", None)
+    # D-10: notify agents in matching territory (best-effort)
+    try:
+        from discovery_notifications import notify_task_assigned
+        await notify_task_assigned(db, task)
+    except Exception:
+        pass
     return task
 
 
@@ -413,6 +419,14 @@ def register_agent_tasks_routes(db, get_current_user, require_admin):
                 await evaluate_property_fraud(db, t["property_uuid"])
         except Exception:
             pass
+
+        # D-10: notify agent of verification win (only on completion)
+        if new_task_status == "COMPLETED":
+            try:
+                from discovery_notifications import notify_verification_win
+                await notify_verification_win(db, user["id"], t, drift_m)
+            except Exception:
+                pass
 
         # D-8: trigger valuation refresh (best-effort, only on verified)
         if data.verdict == "PROPERTY_EXISTS":

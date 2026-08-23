@@ -125,3 +125,20 @@ See `/app/memory/test_credentials.md`
 ### Tests
 - `/app/backend/tests/test_phase_d6_d8_scoring_valuation.py` — 14/14 pass
 - Regression D-4 + D-5 — 27/27 still pass
+
+## Phases D-9 + D-10 — Property Type Colours + Notifications (Jun 2026)
+### D-9 · Property-type colour propagation
+- New `PropertyTypeChip` component uses the `usePropertyTypes` registry
+- Map pins accept `typeColor` prop → registry-driven accent dot
+- Colored chips on: passport title row, agent tasks list + detail, admin duplicate-review match cards
+- `registry_slug_for_candidate()` at promote time maps google_types → registry slug so promoted properties always get a colour
+
+### D-10 · Notifications
+- New `/app/backend/discovery_notifications.py` writes to existing `notifications` collection
+- Events: `VERIFICATION_WIN`, `FRAUD_FLAG_RAISED`, `VERIFICATION_TASK_ASSIGNED`, `CANDIDATE_PROMOTED`
+- Territory-aware fan-out for task assignments (state + LGA match)
+- Admin fan-out via `ADMIN_EMAILS` env (matches by email or is_admin flag)
+
+### Final Phase-D acceptance report
+- `/app/test_reports/phase_d_final_acceptance.md`
+- 134 pass · 1 skipped · 0 failed across 7 test files (D-1 through D-10)

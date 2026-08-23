@@ -64,12 +64,15 @@ export function PropertyMarker({
   active = false,
   hot = false,
   viewed = false,
+  typeColor,
 }: {
   property: Property;
   label: string;
   active?: boolean;
   hot?: boolean;
   viewed?: boolean;
+  /** Phase D-9: override the accent dot color with a registry-driven property-type color */
+  typeColor?: string;
 }) {
   const tone = toneFor(property);
   const c = TONE_COLORS[tone];
@@ -78,6 +81,8 @@ export function PropertyMarker({
   const bg = active ? "#0A0A0A" : c.bg;
   const border = active ? "#0A0A0A" : c.border;
   const text = active ? "#FFFFFF" : c.text;
+  // Prefer registry-driven property-type color for the accent dot when available.
+  const dotColor = typeColor && !isSold && !active ? typeColor : c.dot;
 
   return (
     <View style={styles.wrap} testID={`marker-${tone}${active ? "-active" : ""}${hot ? "-hot" : ""}`}>
@@ -92,7 +97,7 @@ export function PropertyMarker({
           active ? styles.shadowActive : styles.shadowPin,
         ]}
       >
-        <View style={[styles.dot, { backgroundColor: c.dot }]} />
+        <View style={[styles.dot, { backgroundColor: dotColor }]} />
         {tone === "premium" && (
           <Ionicons name="star" size={10} color={active ? "#F5B301" : "#D97706"} />
         )}

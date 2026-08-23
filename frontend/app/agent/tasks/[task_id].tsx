@@ -21,6 +21,7 @@ import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { PropertyTypeChip } from "@/src/components/PropertyTypeChip";
 
 export default function AgentTaskDetail() {
   const router = useRouter();
@@ -140,7 +141,7 @@ export default function AgentTaskDetail() {
           </Text>
           <Text style={styles.propAddr} numberOfLines={3}>{t.raw_address ?? "—"}</Text>
           <View style={styles.metaRow}>
-            {t.property_type && <MetaChip icon="pricetag" label={t.property_type} />}
+            {t.property_type && <PropertyTypeChip type={t.property_type} variant="soft" size="sm" />}
             {p?.location_verification_status && (
               <MetaChip icon="shield-checkmark" label={p.location_verification_status} />
             )}

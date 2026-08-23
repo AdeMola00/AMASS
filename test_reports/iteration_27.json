@@ -1,0 +1,32 @@
+{
+  "summary": "Phase D-9 (property-type colour propagation) + D-10 (notifications) verified end-to-end. Backend: 5/5 D-9/D-10 tests pass and the full Phase-D suite passes 134/134 + 1 skipped (108s serial) — matches the acceptance report exactly. Backend spot-checks: GET /api/property-types returns 9 items each with #RRGGBB color/icon/slug/order; demo admin /api/notifications inbox contains 74 FRAUD_FLAG_RAISED items proving admin fan-out via ADMIN_EMAILS works. Frontend: PropertyTypeChip renders correctly on passport (residential blue soft pill under title), agent/tasks (50 chips, coloured by registry with grey 'Other' fallback for seeded PROPERTY candidates), admin/duplicate-review (chip visible on each matched card), and PropertyMarker on the home map paints an accent dot in the registry colour (rgb(37,99,235) for residential) while the outer price pill keeps its tone colour rgb(255,251,235) — no regression.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/agent/tasks + /admin/duplicate-review", "issues": ["Every candidate/task carries property_type='PROPERTY' (candidate_type) — this is not a registry slug so all chips display the grey 'Other' fallback. The chip component is working correctly; if diverse colours are desired in these screens the promote pipeline should hydrate task/property_candidate property_type with the registry slug (residential/land/apartment/…) inferred from google_types."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_d9_d10_colours_notifications.py",
+    "/app/test_reports/pytest/pytest_iteration27_phase_d9_d10.xml",
+    "/app/test_reports/pytest/pytest_iteration27_phase_d_full.xml"
+  ],
+  "action_items": [
+    "Optional data hygiene: when a Google candidate is promoted, map google_types → property_types slug (e.g. 'lodging'→'hospitality', 'restaurant'→'commercial', 'premise'→'residential') so agent-tasks + duplicate-review cards render diverse chip colours instead of grey 'Other'.",
+    "No other action required — Phase D-9 + D-10 pass acceptance."
+  ],
+  "critical_code_review_comments": [
+    "usePropertyTypes fallback map in resolve() is duplicated to a small degree with backend spec; consider moving these heuristics server-side (return normalized slug on the property doc) so mobile/web/analytics share one truth.",
+    "PropertyTypeChip and PropertyMarker are neat, well-scoped components; testID conventions (prop-type-chip-<slug>, marker-<tone>[-active][-hot]) are consistent and testable."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "No new seed data written. Demo user territory was set to Lagos [Eti-Osa,Lekki,Ikoyi] via PUT /api/agent/territory/me during frontend verification — this is idempotent and matches expected demo state.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase-D backend suite runs 134 pass + 1 skipped in ~108s with -o 'addopts=-n 0'. xdist parallel mode still occasionally 502s on D-1/D-2/D-3 seeding (documented flake). All D-9/D-10 UI hooks confirmed via testIDs: passport-type-chip, prop-type-chip-<slug>, marker-<tone>. When testing duplicate-review UI, use candidate 0eb90fa4-882f-4a72-b791-768332c01802 (has matches score 70).",
+  "rca_of_issue": "N/A — no bugs found. Grey 'Other' chip on tasks/duplicate-review is expected given candidate.property_type='PROPERTY' payload; behaviour matches usePropertyTypes.resolve() fallback and does not violate D-9 spec."
+}

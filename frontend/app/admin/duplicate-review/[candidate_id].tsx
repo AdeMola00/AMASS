@@ -28,6 +28,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
 import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
+import { PropertyTypeChip } from "@/src/components/PropertyTypeChip";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
@@ -307,7 +308,7 @@ export default function DuplicateReviewScreen() {
               {[m.area, m.lga, m.state].filter(Boolean).join(", ")}
             </Text>
             <View style={styles.metaRow}>
-              <MetaChip icon="pricetag" label={m.property_type ?? "—"} />
+              <PropertyTypeChip type={m.property_type} variant="soft" size="sm" />
               <MetaChip icon="location" label={`${m.distance_meters}m away`} />
               <MetaChip icon="business" label={`${m.listings_count ?? 0} listing${(m.listings_count ?? 0) === 1 ? "" : "s"}`} />
               <MetaChip icon="people" label={`${m.representations_count ?? 0} rep${(m.representations_count ?? 0) === 1 ? "" : "s"}`} />

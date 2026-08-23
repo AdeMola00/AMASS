@@ -142,7 +142,7 @@ async def _upsert_flag(db, property_uuid: str, flag_type: str, detail: Dict[str,
         )
         return existing["id"]
     fid = str(uuid.uuid4())
-    await db.fraud_flags.insert_one({
+    flag_doc = {
         "id": fid,
         "property_uuid": property_uuid,
         "flag_type": flag_type,
@@ -152,7 +152,18 @@ async def _upsert_flag(db, property_uuid: str, flag_type: str, detail: Dict[str,
         "created_at": now,
         "updated_at": now,
         "last_seen_at": now,
-    })
+    }
+    await db.fraud_flags.insert_one(flag_doc)
+    # D-10: notify admins about the newly raised flag (best-effort)
+    try:
+        from discovery_notifications import notify_fraud_flag
+        prop = await db.properties_geo.find_one(
+            {"property_uuid": property_uuid},
+            {"_id": 0, "amass_property_id": 1, "state": 1, "lga": 1, "area": 1},
+        )
+        await notify_fraud_flag(db, flag_doc, property_snapshot=prop)
+    except Exception:
+        pass
     return fid
 
 

@@ -33,6 +33,7 @@ import { api } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { PropertyScoreCard } from "@/src/components/PropertyScoreCard";
+import { PropertyTypeChip } from "@/src/components/PropertyTypeChip";
 
 type PassportData = Awaited<ReturnType<typeof api.getPassport>>;
 
@@ -179,6 +180,7 @@ export default function PropertyPassportScreen() {
           <Text style={styles.area}>{areaStr || "—"}</Text>
 
           <View style={styles.factsRow}>
+            <PropertyTypeChip type={p.property_type} variant="soft" size="sm" showIcon testID="passport-type-chip" />
             {p.details?.bedrooms != null && <Fact icon="bed-outline" label={`${p.details.bedrooms} bd`} />}
             {p.details?.bathrooms != null && <Fact icon="water-outline" label={`${p.details.bathrooms} ba`} />}
             {p.size?.building_size_sqm != null && <Fact icon="expand-outline" label={`${p.size.building_size_sqm} m²`} />}

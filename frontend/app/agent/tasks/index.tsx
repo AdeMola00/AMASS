@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { PropertyTypeChip } from "@/src/components/PropertyTypeChip";
 
 type TaskItem = {
   id: string;
@@ -218,7 +219,7 @@ function TaskRow({
         {task.raw_address ?? [task.area, task.lga, task.state].filter(Boolean).join(", ")}
       </Text>
       <View style={styles.metaRow}>
-        {task.property_type && <MetaChip icon="pricetag" label={task.property_type} />}
+        {task.property_type && <PropertyTypeChip type={task.property_type} variant="soft" size="sm" />}
         {task.distance_km != null && <MetaChip icon="navigate" label={`${task.distance_km} km`} />}
         {task.expires_at && (
           <MetaChip
