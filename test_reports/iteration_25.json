@@ -1,0 +1,37 @@
+{
+  "summary": "Phase D-5 (Agent Verification Task Queue + Territory + Verify-Existing-Lead Wizard) tested end-to-end. Backend: 14/14 D-5 pytest cases pass against deployed URL; D-4 regression 13/13 also pass. File download route auth guard (401 unauth, 400 bad prefix, 403 foreign path, 404 missing) verified via curl. Frontend: authenticated a fresh user, saw agent-dashboard entry card, /agent/tasks banner-set-territory renders, /agent/territory chip picker + save works, tasks populate in Lagos/Eti-Osa (12 OPEN tasks visible), Claim moves task to claimed_by_me, task detail loads with AMASS ID + address + mini-map + Start/Release/View passport CTAs, 4-step wizard renders correctly (GPS excellent chip ±8m, camera disabled on web, gallery visible, all 5 verdicts, IS_DUPLICATE reveals input-dup-of, review + submit). Submit round-trip verified via API: task→COMPLETED, drift_from_pin_meters=0, property.location_verification_status=VERIFIED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "verify-wizard", "issue": "React Native web warning: 'Unexpected text node: . A text node cannot be a child of a <View>.' — a stray text/whitespace between View children on one of the wizard steps. Non-blocking.", "testID": "verify-wizard", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/agent/tasks/[task_id]", "issues": ["Mini-map on web renders a static world-map placeholder with 'Interactive map available on mobile' overlay — expected behaviour per Phase 6C convention but flagged for awareness."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_d5_agent_tasks.py",
+    "/app/test_reports/pytest/pytest_iteration25_phase_d5.xml"
+  ],
+  "action_items": [
+    "Optional: track down the 'Unexpected text node' warning inside /app/frontend/app/agent/tasks/verify/[task_id].tsx — probably a stray '.' or space rendered inside a <View> (not wrapped in <Text>). Web-only warning; does not affect native build.",
+    "No functional blockers — Phase D-5 is production-ready."
+  ],
+  "critical_code_review_comments": [
+    "object_storage._storage_key retry-on-503 logic is single-attempt — acceptable for MVP but should be a small retry loop with jitter for production traffic.",
+    "agent_tasks.submit_verification uses `property_updates.setdefault('$addToSet', {})` then splits ops later — safe but the setdefault line is effectively dead code; could remove for clarity.",
+    "GET /api/files/{path} only matches files where the requesting agent is CURRENTLY the assigned_agent_id; if a completed task's photo needs re-viewing by the original submitter, it may 403. Consider extending the reference check to `verification_data.submitted_by == user.id`."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (14/14 D-5 + 13/13 D-4)", "frontend": "100% of tested flows (territory, tasks list, claim, detail, wizard, submit)"},
+  "seed_data_creation": "Test suite auto-seeds candidates via MongoDB then promotes via /api/admin/discovery/candidates/{id}/promote — 12+ OPEN tasks now exist in Lagos/Eti-Osa. Two throwaway agent users created via /api/auth/register with prefix d5_agent_/agentuiA-D_.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Deployed URL uses EXPO_PUBLIC_BACKEND_URL (not EXPO_BACKEND_URL) in frontend/.env; the pytest suite falls back to the hard-coded preview URL default so tests work. To simulate an authenticated user in Playwright on web, register via API then localStorage.setItem('amass_auth_token', JSON.stringify(token)) — the app's storage layer JSON.parses on read. Wizard camera is intentionally disabled on web; Gallery uses <input type=file> under the hood. Submit dispatches a native Alert on success and then router.replace('/agent/tasks').",
+  "rca_of_issue": "N/A — no bug found. All D-5 backend endpoints (territory GET/PUT, list, claim, release, verify with 5 verdicts, admin list/assign/cancel/create-for-property, /api/files auth) and all frontend screens (dashboard entry, tasks list, territory setup, task detail, 4-step verify wizard) function as specified."
+}

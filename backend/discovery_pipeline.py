@@ -535,6 +535,15 @@ def register_discovery_pipeline_routes(db, require_admin):
                           "amass_property_id": amass_id},
             "created_at": now,
         })
+        # Auto-create verification task (Phase D-5) — best-effort
+        try:
+            from agent_tasks import create_verification_task_for_property
+            await create_verification_task_for_property(
+                db, property_doc=doc, candidate_id=cand_id, created_by=admin["id"],
+                priority="normal",
+            )
+        except Exception:
+            pass
         return {"ok": True, "amass_property_id": amass_id, "property_uuid": prop_uuid,
                 "status": "PENDING_REVIEW"}
 

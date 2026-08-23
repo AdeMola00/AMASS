@@ -1855,6 +1855,112 @@ export const api = {
       count: number;
     }>(`/admin/discovery/overrides${qs ? `?${qs}` : ""}`);
   },
+
+  // ─── Phase D-5: Agent verification tasks + territory ───
+  agentGetTerritory: () =>
+    req<{
+      agent_id: string;
+      state: string | null;
+      lgas: string[];
+      areas: string[];
+      center_lat?: number | null;
+      center_lng?: number | null;
+      radius_km?: number | null;
+      is_active: boolean;
+    }>("/agent/territory/me"),
+  agentSetTerritory: (payload: {
+    state: string;
+    lgas: string[];
+    areas?: string[];
+    center_lat?: number | null;
+    center_lng?: number | null;
+    radius_km?: number | null;
+    is_active?: boolean;
+  }) =>
+    req<any>("/agent/territory/me", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  agentVerificationTasks: (include_completed = false) =>
+    req<{
+      territory: any | null;
+      claimed_by_me: any[];
+      open_in_territory: any[];
+      counts: { claimed: number; open: number };
+    }>(`/agent/verification-tasks?include_completed=${include_completed}`),
+  agentVerificationTask: (id: string) =>
+    req<{ task: any; property: any | null }>(
+      `/agent/verification-tasks/${encodeURIComponent(id)}`
+    ),
+  agentClaimTask: (id: string) =>
+    req<any>(`/agent/verification-tasks/${encodeURIComponent(id)}/claim`, {
+      method: "POST",
+    }),
+  agentReleaseTask: (id: string) =>
+    req<any>(`/agent/verification-tasks/${encodeURIComponent(id)}/release`, {
+      method: "POST",
+    }),
+  agentSubmitVerification: (
+    id: string,
+    payload: {
+      verdict:
+        | "PROPERTY_EXISTS"
+        | "DIFFERENT_ADDRESS"
+        | "IS_DUPLICATE"
+        | "NOT_A_PROPERTY"
+        | "INACCESSIBLE";
+      latitude: number;
+      longitude: number;
+      accuracy_meters?: number;
+      photo_data_url?: string;
+      notes?: string;
+      corrected_address?: Record<string, any>;
+      duplicate_of_amass_id?: string;
+    }
+  ) =>
+    req<{
+      ok: boolean;
+      task_status: string;
+      property_status?: string;
+      drift_from_pin_meters?: number | null;
+      photo_path?: string | null;
+    }>(`/agent/verification-tasks/${encodeURIComponent(id)}/verify`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  // ─── Phase D-5: Admin verification tasks ───
+  adminListVerificationTasks: (params: {
+    status?: string;
+    state?: string;
+    agent_id?: string;
+    limit?: number;
+  } = {}) => {
+    const qs = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== "" && v !== null)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join("&");
+    return req<{
+      items: any[];
+      count: number;
+      counts_by_status: Record<string, number>;
+    }>(`/admin/verification-tasks${qs ? `?${qs}` : ""}`);
+  },
+  adminAssignVerificationTask: (id: string, agent_id: string) =>
+    req<any>(`/admin/verification-tasks/${encodeURIComponent(id)}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ agent_id }),
+    }),
+  adminCancelVerificationTask: (id: string, reason?: string) =>
+    req<{ ok: boolean }>(
+      `/admin/verification-tasks/${encodeURIComponent(id)}/cancel`,
+      { method: "POST", body: JSON.stringify({ reason: reason ?? "cancelled" }) }
+    ),
+  adminCreateVerificationTask: (amass_id: string, priority = "normal") =>
+    req<any>(
+      `/admin/verification-tasks/create-for-property/${encodeURIComponent(amass_id)}`,
+      { method: "POST", body: JSON.stringify({ priority }) }
+    ),
   adminGetVisibility: (amass_id: string) =>
     req<Record<string, boolean>>(
       `/admin/passport/${encodeURIComponent(amass_id)}/visibility`

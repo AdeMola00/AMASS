@@ -1968,6 +1968,47 @@ app.include_router(register_discovery_google_routes(db, require_admin))
 from discovery_pipeline import register_discovery_pipeline_routes, fail_crashed_jobs
 app.include_router(register_discovery_pipeline_routes(db, require_admin))
 
+# ─── D-5: Agent task queue + territory + verification wizard ─
+from agent_tasks import register_agent_tasks_routes, expire_stale_tasks
+_agent_router, _admin_tasks_router = register_agent_tasks_routes(db, get_current_user, require_admin)
+app.include_router(_agent_router)
+app.include_router(_admin_tasks_router)
+
+# ─── D-5: Emergent Object Storage — authenticated file download ─
+from object_storage import get_object as _os_get_object, init_storage as _os_init
+from fastapi import Response as _FileResp
+
+@app.get("/api/files/{file_path:path}")
+async def _download_file(file_path: str, user: dict = Depends(get_current_user)):
+    """Auth-checked passthrough to Emergent Object Storage.
+    Path convention: `amass/uploads/{user_id}/{uuid}.{ext}`. Admins can
+    read any path; other users can only read paths that begin with
+    `amass/uploads/{their_user_id}/` — which is where their own uploads land."""
+    if not file_path.startswith("amass/"):
+        raise HTTPException(400, "Invalid path")
+    if not user.get("is_admin"):
+        prefix = f"amass/uploads/{user['id']}/"
+        # Also allow files referenced from agent_verification_tasks the agent claimed
+        # or from properties they can see, but for MVP we scope strictly to owner.
+        if not file_path.startswith(prefix):
+            # Allow if the file is referenced on a property they've verified or an
+            # agent_verification_task they own
+            ref_task = await db.agent_verification_tasks.find_one(
+                {"$or": [
+                    {"verification_data.photo_path": file_path, "assigned_agent_id": user["id"]},
+                ]},
+                {"_id": 0, "id": 1},
+            )
+            if not ref_task:
+                raise HTTPException(403, "Forbidden")
+    try:
+        data, ct = await _os_get_object(file_path)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(404, "File not found")
+    return _FileResp(content=data, media_type=ct)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -2072,10 +2113,13 @@ async def on_startup():
         await db.google_places_usage.create_index([("day", 1)])
         # Verification tasks + territories + valuations (populated D-5..D-8)
         await db.agent_verification_tasks.create_index("id", unique=True)
-        await db.agent_verification_tasks.create_index([("agent_id", 1), ("status", 1)])
+        await db.agent_verification_tasks.create_index([("assigned_agent_id", 1), ("status", 1)])
+        await db.agent_verification_tasks.create_index([("status", 1), ("state", 1), ("created_at", -1)])
+        await db.agent_verification_tasks.create_index([("property_uuid", 1), ("status", 1)])
         await db.agent_verification_tasks.create_index([("location", "2dsphere")])
-        await db.agent_territories.create_index([("agent_id", 1)])
-        await db.agent_territories.create_index([("polygon", "2dsphere")])
+        await db.agent_verification_tasks.create_index([("expires_at", 1)])
+        await db.agent_territories.create_index([("agent_id", 1)], unique=True, name="agent_territories_agent_id_uniq")
+        await db.agent_territories.create_index([("state", 1), ("is_active", 1)])
         await db.property_valuations.create_index([("amass_property_id", 1), ("valued_at", -1)])
         await db.property_valuations.create_index("id", unique=True)
         # Seed defaults (idempotent)
@@ -2086,6 +2130,17 @@ async def on_startup():
         # D-3: mark any RUNNING/QUEUED jobs as FAILED (crash recovery)
         from discovery_pipeline import fail_crashed_jobs as _fail_crashed
         await _fail_crashed(db)
+        # D-5: expire stale verification tasks
+        from agent_tasks import expire_stale_tasks as _expire_tasks
+        expired = await _expire_tasks(db)
+        if expired:
+            logger.info(f"Expired {expired} stale verification tasks")
+        # D-5: initialize Emergent Object Storage handshake (best-effort)
+        try:
+            from object_storage import init_storage as _init_os
+            await _init_os()
+        except Exception as e:
+            logger.warning(f"Object storage init failed (uploads may fail): {e}")
     except Exception as e:
         logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
 

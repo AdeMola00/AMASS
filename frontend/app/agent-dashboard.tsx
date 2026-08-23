@@ -161,6 +161,22 @@ export default function AgentDashboard() {
 
           <AgentScoreCard />
 
+          {/* Phase D-5: Verification Task Queue entry */}
+          <Pressable
+            onPress={() => router.push("/agent/tasks" as any)}
+            style={styles.tasksCard}
+            testID="agent-tasks-entry"
+          >
+            <View style={styles.tasksIcon}>
+              <Ionicons name="checkmark-done" size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tasksTitle}>Verification Tasks</Text>
+              <Text style={styles.tasksSub}>Pick up open leads in your territory and verify them on-site.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+          </Pressable>
+
           {quota && (
             <Pressable
               onPress={() => router.push("/agent-plans")}
@@ -651,6 +667,27 @@ function LeadRow({ lead }: { lead: Lead }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  tasksCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.soft,
+  },
+  tasksIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.red,
+  },
+  tasksTitle: { ...typography.bodyBold, color: colors.ink },
+  tasksSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   quotaCard: {
     backgroundColor: colors.bg,
     borderRadius: radius.lg,

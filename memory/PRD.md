@@ -73,3 +73,21 @@ See `/app/memory/test_credentials.md`
   - `/admin/discovery.tsx` — added "Pending duplicate review" section listing PENDING_DEDUPLICATION + DUPLICATE candidates
   - Fixed pre-existing bug: `_authHeaders()` now reads `AUTH_STORAGE_KEY` via `storage.secureGet`
 - Tests: `/app/backend/tests/test_phase_d4_duplicate_review.py` — 13/13 pass
+
+## Phase D-5 — Agent Task Queue + Territory + Verify-existing-lead Wizard (Jun 2026)
+- Backend `/app/backend/agent_tasks.py`:
+  - Task lifecycle: OPEN → CLAIMED → COMPLETED | DISPUTED | OPEN (retry) | EXPIRED | CANCELLED
+  - Auto-created on candidate promote (D-3 hook)
+  - Territory model: state + LGAs + optional radius from center point
+  - 5 verdicts: PROPERTY_EXISTS · DIFFERENT_ADDRESS · IS_DUPLICATE · NOT_A_PROPERTY · INACCESSIBLE
+  - PROPERTY_EXISTS bumps location_verification_status→VERIFIED, refreshes entrance_point if drift >25m
+  - Startup task expiry sweep + Emergent Object Storage init
+- Emergent Object Storage: new `/app/backend/object_storage.py` wraps the storage API
+  - Auth-checked download at `/api/files/{path:path}` — only owner or claimed-task agent can read
+- Frontend:
+  - `/agent/tasks` — claimed + open lists, territory banner
+  - `/agent/tasks/[id]` — detail + map + claim/release/passport actions
+  - `/agent/tasks/verify/[id]` — 4-step wizard: GPS → Photo → Verdict → Review
+  - `/agent/territory` — state chip picker + LGA/area inputs + radius + active toggle
+  - `agent-tasks-entry` card added to `/agent-dashboard`
+- Tests: `/app/backend/tests/test_phase_d5_agent_tasks.py` — 14/14 pass
