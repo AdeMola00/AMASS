@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
 import { colors, radius, spacing } from "@/src/constants/theme";
-import { LegendDot, MARKER_LEGEND } from "@/src/components/PropertyMarker";
+import { LegendDot, PROPERTY_TYPE_LEGEND } from "@/src/components/PropertyMarker";
 
 export type MapLayer = "standard" | "satellite" | "hybrid" | "terrain";
 
@@ -114,11 +114,11 @@ export const LayerPickerSheet = forwardRef<
           </View>
 
           <View style={{ marginTop: spacing.lg }}>
-            <Text style={styles.legendTitle}>Marker Legend</Text>
+            <Text style={styles.legendTitle}>Property Type Legend</Text>
             <View style={styles.legendGrid}>
-              {MARKER_LEGEND.map((l) => (
-                <View key={l.tone} style={styles.legendItem}>
-                  <LegendDot tone={l.tone} />
+              {PROPERTY_TYPE_LEGEND.map((l) => (
+                <View key={l.slug} style={styles.legendItem} testID={`legend-${l.slug}`}>
+                  <LegendDot slug={l.slug} />
                   <Text style={styles.legendText}>{l.label}</Text>
                 </View>
               ))}

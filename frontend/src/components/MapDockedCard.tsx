@@ -12,7 +12,7 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
-import { toneFor } from "@/src/components/PropertyMarker";
+import { propertyTypeColor } from "@/src/components/PropertyMarker";
 import type { Property } from "@/src/lib/api";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -21,19 +21,24 @@ const CARD_W = SCREEN_W - CARD_HGAP * 2;
 const CARD_GAP = 12;
 const SNAP = CARD_W + CARD_GAP;
 
-const TONE_CHIP: Record<
-  ReturnType<typeof toneFor>,
-  { label: string; bg: string; fg: string }
-> = {
-  sale: { label: "For Sale", bg: "rgba(5,150,105,0.10)", fg: "#059669" },
-  rent: { label: "For Rent", bg: "rgba(37,99,235,0.10)", fg: "#2563EB" },
-  shortlet: { label: "Short Let", bg: "rgba(14,165,233,0.10)", fg: "#0369A1" },
-  coming: { label: "Coming Soon", bg: "rgba(234,179,8,0.14)", fg: "#854D0E" },
-  sold: { label: "Sold", bg: "rgba(220,38,38,0.10)", fg: "#B91C1C" },
-  commercial: { label: "Commercial", bg: "rgba(139,92,246,0.10)", fg: "#7C3AED" },
-  land: { label: "Land", bg: "rgba(180,83,9,0.10)", fg: "#92400E" },
-  premium: { label: "Premium", bg: "rgba(245,179,1,0.15)", fg: "#B45309" },
+// Public map cards now show the transaction-type chip using AMASS listing
+// colours (green sale / blue rent / cyan shortlet / grey sold).
+type TxnChipKey = "sale" | "rent" | "shortlet" | "sold" | "coming";
+const TXN_CHIP: Record<TxnChipKey, { label: string; bg: string; fg: string }> = {
+  sale:     { label: "For Sale",    bg: "rgba(5,150,105,0.10)",  fg: "#059669" },
+  rent:     { label: "For Rent",    bg: "rgba(37,99,235,0.10)",  fg: "#2563EB" },
+  shortlet: { label: "Short Let",   bg: "rgba(14,165,233,0.10)", fg: "#0369A1" },
+  sold:     { label: "Sold",        bg: "rgba(220,38,38,0.10)",  fg: "#B91C1C" },
+  coming:   { label: "Coming Soon", bg: "rgba(234,179,8,0.14)",  fg: "#854D0E" },
 };
+
+function txnChipFor(p: Property): TxnChipKey {
+  if (p.status === "sold") return "sold";
+  if (p.status === "coming_soon") return "coming";
+  if (p.listing_type === "shortlet") return "shortlet";
+  if (p.listing_type === "rent" || p.listing_type === "lease") return "rent";
+  return "sale";
+}
 
 /**
  * Redfin-style **docked** bottom property card.
@@ -165,17 +170,20 @@ function DockedCard({
   onFavorite: () => void;
 }) {
   const cover = item.images?.[0];
-  const tone = toneFor(item);
-  const chip = TONE_CHIP[tone];
+  const chip = TXN_CHIP[txnChipFor(item)];
+  const typeColor = propertyTypeColor(item.property_type);
+  const hasValidPrice = item.price != null && item.price > 0;
   const priceSuffix =
-    item.listing_type === "rent" ? "/yr"
+    item.listing_type === "rent" || item.listing_type === "lease" ? "/yr"
     : item.listing_type === "shortlet" ? "/night"
     : "";
 
   const share = () => {
     Share.share({
       title: item.title,
-      message: `${item.title} — ${formatNaira(item.price)}${priceSuffix} · ${item.location} on AMASS.`,
+      message: hasValidPrice
+        ? `${item.title} — ${formatNaira(item.price)}${priceSuffix} · ${item.location} on AMASS.`
+        : `${item.title} — Price on Request · ${item.location} on AMASS.`,
     }).catch(() => {});
   };
 
@@ -233,8 +241,14 @@ function DockedCard({
         <View style={styles.body}>
           <View style={styles.priceRow}>
             <Text style={styles.price}>
-              {formatNaira(item.price)}
-              <Text style={styles.priceSuffix}>{priceSuffix}</Text>
+              {hasValidPrice ? (
+                <>
+                  {formatNaira(item.price)}
+                  <Text style={styles.priceSuffix}>{priceSuffix}</Text>
+                </>
+              ) : (
+                <Text style={styles.priceOnRequest}>Price on Request</Text>
+              )}
             </Text>
             <Pressable onPress={onPress} style={styles.viewBtn}>
               <Text style={styles.viewBtnText}>View Details</Text>
@@ -248,7 +262,10 @@ function DockedCard({
             {item.bedrooms > 0 && <MetaSpec icon="bed-outline" value={`${item.bedrooms} bed`} />}
             {item.bathrooms > 0 && <MetaSpec icon="water-outline" value={`${item.bathrooms} bath`} />}
             <MetaSpec icon="resize-outline" value={`${item.size_sqm} m²`} />
-            <MetaSpec icon="pricetag-outline" value={item.property_type} />
+            <View style={[styles.typeChip, { backgroundColor: `${typeColor}1A`, borderColor: typeColor }]}>
+              <View style={[styles.typeDot, { backgroundColor: typeColor }]} />
+              <Text style={[styles.typeText, { color: typeColor }]}>{item.property_type}</Text>
+            </View>
           </View>
         </View>
       </Pressable>
@@ -365,6 +382,28 @@ const styles = StyleSheet.create({
   },
   price: { fontSize: 20, fontWeight: "900", color: colors.text, letterSpacing: -0.4 },
   priceSuffix: { fontSize: 12, fontWeight: "700", color: colors.textTertiary, letterSpacing: 0 },
+  priceOnRequest: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: colors.textSecondary,
+    letterSpacing: 0.2,
+  },
+  typeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  typeDot: { width: 5, height: 5, borderRadius: 3 },
+  typeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+    textTransform: "capitalize",
+  },
   viewBtn: {
     flexDirection: "row",
     alignItems: "center",

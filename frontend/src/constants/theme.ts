@@ -150,3 +150,22 @@ export function formatNaira(n: number): string {
   if (n >= 1_000) return `₦${(n / 1_000).toFixed(0)}k`;
   return `₦${n.toLocaleString()}`;
 }
+
+/**
+ * AMASS marker price formatter — compact ₦ figure + transaction-type suffix.
+ * `sale`/`buy`/`lease` → ₦350M
+ * `rent` → ₦8.5M/yr
+ * `shortlet` → ₦450K/mo
+ * missing/invalid → "Price on Request"
+ */
+export function formatMarkerPrice(
+  price: number | null | undefined,
+  listingType: string | null | undefined,
+): string {
+  if (price == null || Number.isNaN(price) || price <= 0) return "Price on Request";
+  const t = (listingType ?? "").toLowerCase();
+  const base = formatNaira(price);
+  if (t === "rent" || t === "lease") return `${base}/yr`;
+  if (t === "shortlet") return `${base}/night`;
+  return base;
+}

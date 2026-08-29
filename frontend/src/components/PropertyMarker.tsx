@@ -1,91 +1,85 @@
+/**
+ * AMASS Public Property Marker (Redfin-style correction — Jun 2026)
+ *
+ * ONE marker system for every AMASS listing on the public map:
+ *   • Border colour = property_type registry colour (never verification)
+ *   • Label        = compact ₦ price with transaction-type suffix, or
+ *                    "Price on Request" when the listing lacks a valid price
+ *   • Verified     = small shield icon layered on top (opt-in)
+ *   • Hot          = flame icon (unchanged)
+ *   • Selected     = ink-inverted (dark) fill + larger scale + richer shadow;
+ *                    outer border keeps its type colour so users still know
+ *                    what kind of property they're looking at.
+ */
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Property } from "@/src/lib/api";
 
-// ─── AMASS Marker Color System ─────────────────────────────
-// Priority (highest to lowest):
-//   1. Sold  → red-brown  (dead listings shouldn't dominate)
-//   2. Verified / Premium / Exclusive → gold outline
-//   3. Property type = land → brown
-//   4. Property type = commercial → purple
-//   5. Listing type = rent → blue
-//   6. Listing type = shortlet → blue (short-let is a rent flavor)
-//   7. Status = coming_soon → yellow
-//   8. Default (For Sale) → green (emerald)
-export type MarkerTone =
-  | "sale"
-  | "rent"
-  | "shortlet"
-  | "coming"
-  | "sold"
-  | "commercial"
-  | "land"
-  | "premium";
-
-const TONE_COLORS: Record<MarkerTone, { bg: string; border: string; text: string; dot: string; icon?: string }> = {
-  sale:       { bg: "#FFFFFF", border: "#059669", text: "#065F46", dot: "#10B981" },
-  rent:       { bg: "#FFFFFF", border: "#2563EB", text: "#1E40AF", dot: "#3B82F6" },
-  shortlet:   { bg: "#FFFFFF", border: "#0EA5E9", text: "#0369A1", dot: "#0EA5E9" },
-  coming:     { bg: "#FFFFFF", border: "#EAB308", text: "#854D0E", dot: "#F59E0B" },
-  sold:       { bg: "#F3F4F6", border: "#B91C1C", text: "#7F1D1D", dot: "#DC2626" },
-  commercial: { bg: "#FFFFFF", border: "#7C3AED", text: "#5B21B6", dot: "#8B5CF6" },
-  land:       { bg: "#FFFFFF", border: "#92400E", text: "#78350F", dot: "#B45309" },
-  premium:    { bg: "#FFFBEB", border: "#F59E0B", text: "#78350F", dot: "#D97706", icon: "star" },
+// Hardcoded registry mirror (keep in sync with /app/backend/property_types.py
+// and /app/frontend/src/hooks/usePropertyTypes.ts). We inline it so we don't
+// force every consumer to hit the async hook for a colour lookup.
+const TYPE_COLORS: Record<string, string> = {
+  residential:   "#2563EB",
+  apartment:     "#7C3AED",
+  estate:        "#059669",
+  land:          "#92400E",
+  commercial:    "#EA580C",
+  industrial:    "#374151",
+  hospitality:   "#0D9488",
+  institutional: "#4338CA",
+  other:         "#6B7280",
 };
 
-export function toneFor(property: Property): MarkerTone {
-  if (property.status === "sold") return "sold";
-  if (property.is_amass_exclusive || property.status === "premium" || (property.verified && property.status !== "sold")) {
-    // Verified overrides only for non-typed listings; still keep type/rent tint if land/commercial
-    if (property.property_type === "land") return "land";
-    if (property.property_type === "commercial") return "commercial";
-    if (property.listing_type === "rent") return "rent";
-    if (property.listing_type === "shortlet") return "shortlet";
-    return "premium";
-  }
-  if (property.property_type === "land") return "land";
-  if (property.property_type === "commercial") return "commercial";
-  if (property.listing_type === "rent") return "rent";
-  if (property.listing_type === "shortlet") return "shortlet";
-  if (property.status === "coming_soon") return "coming";
-  return "sale";
+function normalizePropertyType(t?: string | null): string {
+  const k = (t ?? "").toLowerCase().trim();
+  if (!k) return "other";
+  if (TYPE_COLORS[k]) return k;
+  if (["duplex", "detached", "semi_detached", "semi-detached", "terrace", "bungalow", "mansion"].some((x) => k.includes(x))) return "residential";
+  if (k.includes("apart") || k.includes("penthouse") || k.includes("condo") || k.includes("studio")) return "apartment";
+  if (k.includes("estate") || k.includes("gated") || k.includes("community") || k.includes("residential_complex")) return "estate";
+  if (k.includes("land") || k.includes("plot") || k.includes("farm")) return "land";
+  if (k.includes("office") || k.includes("shop") || k.includes("showroom") || k.includes("commercial") || k.includes("retail")) return "commercial";
+  if (k.includes("warehouse") || k.includes("factory") || k.includes("logistics") || k.includes("industrial")) return "industrial";
+  if (k.includes("hotel") || k.includes("shortlet") || k.includes("short_let") || k.includes("resort") || k.includes("hospitality") || k.includes("lodging")) return "hospitality";
+  if (k.includes("school") || k.includes("university") || k.includes("hospital") || k.includes("church") || k.includes("mosque") || k.includes("institutional") || k.includes("government")) return "institutional";
+  return "other";
 }
 
-/**
- * AMASS property marker — price pill with color-coded outline + status dot.
- *  - Active state: fills ink, scales slightly, drops richer shadow.
- *  - Verified / premium: gold outline with a small star.
- *  - Sold: greyed out, strikethrough label.
- */
+export function propertyTypeColor(t?: string | null): string {
+  return TYPE_COLORS[normalizePropertyType(t)];
+}
+
+// ── Marker ───────────────────────────────────────────────────────
 export function PropertyMarker({
   property,
   label,
   active = false,
   hot = false,
   viewed = false,
-  typeColor,
+  verified,
 }: {
   property: Property;
+  /** compact price string, e.g. "₦350M" or "Price on Request" */
   label: string;
   active?: boolean;
   hot?: boolean;
   viewed?: boolean;
-  /** Phase D-9: override the accent dot color with a registry-driven property-type color */
-  typeColor?: string;
+  /** override for verified badge — falls back to property.verified */
+  verified?: boolean;
 }) {
-  const tone = toneFor(property);
-  const c = TONE_COLORS[tone];
-  const isSold = tone === "sold";
+  const slug = normalizePropertyType(property.property_type);
+  const color = TYPE_COLORS[slug];
+  const isSold = property.status === "sold";
+  const isPOR = label === "Price on Request";
+  const isVerified = verified ?? !!property.verified;
 
-  const bg = active ? "#0A0A0A" : c.bg;
-  const border = active ? "#0A0A0A" : c.border;
-  const text = active ? "#FFFFFF" : c.text;
-  // Prefer registry-driven property-type color for the accent dot when available.
-  const dotColor = typeColor && !isSold && !active ? typeColor : c.dot;
+  const bg = active ? "#0A0A0A" : "#FFFFFF";
+  const border = active ? "#0A0A0A" : color;
+  const text = active ? "#FFFFFF" : color;
 
   return (
-    <View style={styles.wrap} testID={`marker-${tone}${active ? "-active" : ""}${hot ? "-hot" : ""}`}>
+    <View style={styles.wrap} testID={`marker-${slug}${active ? "-active" : ""}${hot ? "-hot" : ""}`}>
       <View
         style={[
           styles.pill,
@@ -95,21 +89,27 @@ export function PropertyMarker({
             transform: [{ scale: active ? 1.1 : 1 }],
           },
           active ? styles.shadowActive : styles.shadowPin,
+          isPOR && !active && { minWidth: 105 },
         ]}
       >
-        <View style={[styles.dot, { backgroundColor: dotColor }]} />
-        {tone === "premium" && (
-          <Ionicons name="star" size={10} color={active ? "#F5B301" : "#D97706"} />
+        <View style={[styles.dot, { backgroundColor: color }]} />
+        {isVerified && !isSold && (
+          <Ionicons
+            name="shield-checkmark"
+            size={11}
+            color={active ? "#F5B301" : "#059669"}
+          />
         )}
-        {hot && !isSold && tone !== "premium" && (
+        {hot && !isSold && !isVerified && (
           <Ionicons name="flame" size={10} color={active ? "#F87171" : "#DC2626"} />
         )}
         <Text
           style={[
             styles.label,
             { color: text },
+            isPOR && !active && styles.labelPor,
             isSold && { textDecorationLine: "line-through", opacity: 0.85 },
-            viewed && !active && !isSold && { opacity: 0.72 },
+            viewed && !active && !isSold && { opacity: 0.75 },
           ]}
           numberOfLines={1}
         >
@@ -122,17 +122,11 @@ export function PropertyMarker({
   );
 }
 
-/** Numeric cluster marker (used for zoomed-out views). */
+/** Numeric cluster marker — Redfin-style AMASS-only count. */
 export function ClusterMarker({ count, active = false }: { count: number; active?: boolean }) {
   const size = count > 50 ? 56 : count > 20 ? 48 : count > 10 ? 42 : 38;
   return (
     <View style={styles.clusterWrap} testID={`cluster-${count}`}>
-      <View
-        style={[
-          styles.clusterOuter,
-          { width: size + 12, height: size + 12, borderRadius: (size + 12) / 2 },
-        ]}
-      />
       <View
         style={[
           styles.cluster,
@@ -145,34 +139,38 @@ export function ClusterMarker({ count, active = false }: { count: number; active
         ]}
       >
         <Text style={styles.clusterCount}>{count}</Text>
+        <Text style={styles.clusterUnit}>{count === 1 ? "home" : "homes"}</Text>
       </View>
     </View>
   );
 }
 
-// Legend helper — exported for use inside UI (bottom sheet, layers picker etc.)
-export const MARKER_LEGEND: { tone: MarkerTone; label: string }[] = [
-  { tone: "sale", label: "For Sale" },
-  { tone: "rent", label: "For Rent" },
-  { tone: "shortlet", label: "Short Let" },
-  { tone: "coming", label: "Coming Soon" },
-  { tone: "sold", label: "Sold" },
-  { tone: "commercial", label: "Commercial" },
-  { tone: "land", label: "Land" },
-  { tone: "premium", label: "Verified / Premium" },
+// ── Legend export ────────────────────────────────────────────────
+export type PropertyTypeSlug = keyof typeof TYPE_COLORS;
+
+export const PROPERTY_TYPE_LEGEND: { slug: PropertyTypeSlug; label: string }[] = [
+  { slug: "residential",   label: "Residential" },
+  { slug: "apartment",     label: "Apartment" },
+  { slug: "estate",        label: "Estate" },
+  { slug: "land",          label: "Land" },
+  { slug: "commercial",    label: "Commercial" },
+  { slug: "industrial",    label: "Industrial" },
+  { slug: "hospitality",   label: "Hospitality" },
+  { slug: "institutional", label: "Institutional" },
+  { slug: "other",         label: "Other" },
 ];
 
-export function LegendDot({ tone }: { tone: MarkerTone }) {
-  const c = TONE_COLORS[tone];
+export function LegendDot({ slug }: { slug: PropertyTypeSlug | string }) {
+  const color = TYPE_COLORS[slug as string] ?? TYPE_COLORS.other;
   return (
     <View
       style={{
         width: 12,
         height: 12,
         borderRadius: 6,
-        backgroundColor: c.dot,
-        borderWidth: 2,
-        borderColor: c.border,
+        backgroundColor: color,
+        borderWidth: 1.5,
+        borderColor: "#FFFFFF",
       }}
     />
   );
@@ -183,25 +181,22 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 999,
     borderWidth: 1.5,
-    minWidth: 60,
+    minWidth: 64,
     justifyContent: "center",
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
+  dot: { width: 6, height: 6, borderRadius: 3 },
   label: {
     fontSize: 12.5,
     fontWeight: "800",
     letterSpacing: -0.2,
     includeFontPadding: false,
   },
+  labelPor: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.1 },
   shadowPin: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -242,12 +237,6 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   clusterWrap: { alignItems: "center", justifyContent: "center" },
-  clusterOuter: {
-    // Retained slot kept intentionally minimal for future use.
-    // Removed the previous coloured halo — the map should never
-    // sprout coloured circle overlays.
-    display: "none",
-  },
   cluster: {
     alignItems: "center",
     justifyContent: "center",
@@ -262,7 +251,16 @@ const styles = StyleSheet.create({
   clusterCount: {
     color: "#fff",
     fontWeight: "800",
-    fontSize: 14,
+    fontSize: 15,
     letterSpacing: -0.3,
+    lineHeight: 16,
+  },
+  clusterUnit: {
+    color: "rgba(255,255,255,0.85)",
+    fontWeight: "700",
+    fontSize: 8,
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+    marginTop: 1,
   },
 });

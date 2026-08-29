@@ -8,6 +8,7 @@ import { listingSourceMeta } from "@/src/constants/listingSource";
 import { PriceText } from "@/src/components/PriceText";
 import { HotFlame } from "@/src/components/HotFlame";
 import { TokenIcon } from "@/src/components/TokenIcon";
+import { propertyTypeColor } from "@/src/components/PropertyMarker";
 import type { Property } from "@/src/lib/api";
 
 export function PropertyCard({
@@ -39,8 +40,10 @@ export function PropertyCard({
       : "";
 
   if (variant === "row") {
+    const typeColor = propertyTypeColor(property.property_type);
     return (
       <Pressable onPress={onPress} style={styles.rowCard} testID={`property-row-${property.id}`}>
+        <View style={[styles.rowLeftAccent, { backgroundColor: typeColor }]} />
         <View style={styles.rowImageWrap}>
           {img ? (
             <Image source={{ uri: img }} style={styles.rowImage} contentFit="cover" transition={200} />
@@ -314,10 +317,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.md,
     padding: spacing.md,
+    paddingLeft: spacing.md + 4, // leaves room for the property-type accent bar
     backgroundColor: "#fff",
     borderRadius: radius.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.divider,
+    position: "relative",
+    overflow: "hidden",
+  },
+  rowLeftAccent: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   rowImageWrap: { width: 120, height: 100, borderRadius: 12, overflow: "hidden" },
   rowImage: { width: "100%", height: "100%" },

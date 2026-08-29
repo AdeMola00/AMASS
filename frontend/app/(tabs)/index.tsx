@@ -21,9 +21,8 @@ import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { api, Property } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { colors, radius, shadows, spacing, typography, formatMarkerPrice } from "@/src/constants/theme";
 import { PropertyMarker, ClusterMarker } from "@/src/components/PropertyMarker";
-import { usePropertyTypes } from "@/src/hooks/usePropertyTypes";
 import { FilterChip } from "@/src/components/FilterChip";
 import { PropertyCard } from "@/src/components/PropertyCard";
 import { MapDockedCard } from "@/src/components/MapDockedCard";
@@ -102,7 +101,6 @@ export default function HomeMap() {
   const filterSheetRef = useRef<FilterSheetRef>(null);
   const layerSheetRef = useRef<LayerPickerRef>(null);
   const insightsRef = useRef<NeighborhoodSheetRef>(null);
-  const { colorFor: typeColorFor } = usePropertyTypes();
 
   const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [filters, setFilters] = useState<FilterState>({});
@@ -742,10 +740,10 @@ export default function HomeMap() {
             >
               <PropertyMarker
                 property={p}
-                label={formatNaira(p.price)}
+                label={formatMarkerPrice(p.price, p.listing_type)}
                 active={p.id === activeId}
                 hot={isHot}
-                typeColor={typeColorFor(p.property_type)}
+                verified={!!p.verified}
               />
             </Marker>
           );

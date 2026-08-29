@@ -22,7 +22,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { api, Property } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { colors, radius, shadows, spacing, typography, formatNaira, formatMarkerPrice } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { PropertyMarker } from "@/src/components/PropertyMarker";
 import { PriceText } from "@/src/components/PriceText";
@@ -349,8 +349,9 @@ export default function PropertyDetails() {
                 <Marker coordinate={{ latitude: property.latitude, longitude: property.longitude }}>
                   <PropertyMarker
                     property={property}
-                    label={formatNaira(property.price)}
+                    label={formatMarkerPrice(property.price, property.listing_type)}
                     active
+                    verified={!!property.verified}
                   />
                 </Marker>
               </MapView>

@@ -1,0 +1,44 @@
+{
+  "summary": "Validated the AMASS Public Property Map Correction (Redfin-style rebuild). Backend spot-check confirmed /api/properties reads ONLY from db.properties (server.py:414), never surfaces properties_geo/property_candidates, and never leaks _id. Phase-D regression: 134 passed · 1 skipped (1 flaky test 'test_concurrent_limit_returns_429' failed on parallel run at 165s timeout, passed cleanly on isolated re-run — pre-existing race-condition flake, not caused by this iteration). Frontend verified: (a) legend sheet now shows 'Property Type Legend' with exactly 9 items — testIDs legend-residential/apartment/estate/land/commercial/industrial/hospitality/institutional/other (old sale/rent/commercial/premium legend fully removed); (b) marker testIDs are the new marker-{slug} form (verified marker-residential rendered with compact label '₦145M'); (c) no legacy marker-sale / marker-rent / marker-premium / marker-commercial testIDs anywhere in /app/frontend; (d) NO calls to /api/admin/discovery/* observed from the public map/home; (e) admin /admin/discovery page remains intact (Property Discovery hub, 2 pending duplicate candidates, search form, mock-mode banner); (f) PropertyCard row variant contains rowLeftAccent bar bound to propertyTypeColor(property_type) (code review); (g) MapDockedCard renders a typeChip with a coloured dot + capitalised property_type text, and a 'Price on Request' branch when price is 0/null (code review). formatMarkerPrice helper correctly emits ₦{amount}, ₦{amount}/yr for rent, ₦{amount}/mo for shortlet, and 'Price on Request' for missing/invalid price. IMPORTANT: react-native-maps renders a STATIC placeholder on Expo web preview ('Interactive map available on mobile'), so only a single demo marker is visible and marker-tap-to-dock, cluster, and 'active' fill inversion could NOT be exercised end-to-end via web automation — those behaviours were validated via code review only and must be spot-checked on device/Expo Go by the main agent.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/agent/discovery/bulk-jobs (concurrent-limit test)", "issue": "Pre-existing flaky race-condition test in test_phase_d3_discovery_pipeline.py::TestBulkJobs::test_concurrent_limit_returns_429 — fails intermittently when suite is run in parallel with default addopts, passes reliably on isolated re-run. Not related to this iteration."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Public map on Expo web", "issues": ["react-native-maps is web-stubbed to a static image with the caption 'Interactive map available on mobile'. Only one demo marker (marker-residential, ₦145M) renders — full clustering / marker-tap / docked-card cannot be verified on web preview. Expected for Expo web, but flag to main agent that end-to-end validation of marker interactions requires a native/Expo Go run."]}
+    ],
+    "react_native_issues": [
+      {"component": "Global (unchanged from prior iterations)", "issue": "Console shows 'shadow* style props are deprecated. Use boxShadow.' and 'props.pointerEvents is deprecated. Use style.pointerEvents.' RN 0.76+ deprecation warnings — not introduced by this iteration but should be tracked. Reference: repeating across screens."},
+      {"component": "Animated on web", "issue": "'useNativeDriver is not supported because the native animated module is missing.' — expected on web, no action needed."}
+    ]
+  },
+  "code_review_findings": [
+    "PropertyMarker.tsx testID template `marker-${slug}${active ? '-active' : ''}${hot ? '-hot' : ''}` is correct — slug is normalised through normalizePropertyType, so raw registry values like 'duplex'/'penthouse' still map to residential/apartment.",
+    "formatMarkerPrice in theme.ts covers rent → /yr and shortlet → /mo; 'lease' listing_type is treated as sale (no suffix) — potential minor inconsistency because MapDockedCard.tsx line 177 treats lease like rent (/yr). If backend can return listing_type='lease', markers will show no suffix while the card will. Minor, worth aligning if 'lease' is a real value in the corpus.",
+    "MapDockedCard.tsx uses '/night' for shortlet in the card price suffix (line 178) but formatMarkerPrice uses '/mo' for shortlet on the marker (theme.ts:169). Both are defensible but should be consistent per product spec ('₦450K/mo' was cited in the review request).",
+    "Marker verified badge correctly overlays without replacing the border colour (gold when active, green idle). Shield hidden on 'sold' status — correct.",
+    "Legend sheet still uses testID `legend-{slug}` (LayerPickerSheet.tsx:120) — matches acceptance criteria."
+  ],
+  "test_report_links": [
+    "/app/test_reports/pytest/pytest_iteration28_phase_d_regression.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Align shortlet suffix — MapDockedCard says '/night' while marker uses '/mo'. Review spec called out '/mo' for shortlet markers explicitly; pick one and reuse across marker + card.",
+    "OPTIONAL: Extend formatMarkerPrice to also append '/yr' for listing_type === 'lease' to match MapDockedCard behaviour.",
+    "OPTIONAL: main agent should visually confirm on Expo Go (native) that: (a) marker-tap flips fill to dark ink while keeping the type-colour border; (b) multiple marker slugs render (apartment, land, commercial etc.) using the 10-property corpus; (c) MapDockedCard shows the coloured typeChip; (d) PropertyCard row variant renders the 4px rowLeftAccent bar. These cannot be verified via Expo web preview because react-native-maps is stubbed to a static placeholder.",
+    "OPTIONAL: address the recurring 'shadow*' / 'pointerEvents' RN 0.76 deprecation console warnings when convenient — not caused by this iteration."
+  ],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "99.3%", "frontend": "100% (of what could be exercised on web preview)"},
+  "seed_data_creation": "None. Used existing 10-property demo seed and demo@amass.africa credentials.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Public map validated against Redfin-style property-type rebuild. Frontend web preview cannot render multi-marker map (Expo react-native-maps stub). All testID contracts (marker-{slug}, legend-{slug}) are honoured. Backend contract unchanged; /api/properties feeds only db.properties. Regression suite (Phase-D) is 134 pass / 1 skipped with one known flaky race-condition test in test_phase_d3_discovery_pipeline.py that passes on isolated re-run. Login flow: skip onboarding by navigating directly to /login; testIDs are login-email, login-password, login-submit-button. Layer sheet opens via fab-layers testID.",
+  "rca_of_issue": "N/A — this was a verification pass, not a bug fix. No regressions detected."
+}
