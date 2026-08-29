@@ -2019,6 +2019,52 @@ export const api = {
       method: "POST",
       body: JSON.stringify({}),
     }),
+
+  // ─── In-App Chat (Phase 1) ───
+  chatStartFromProperty: (property_id: string) =>
+    req<any>(`/chat/conversations/from-property/${encodeURIComponent(property_id)}`, {
+      method: "POST",
+    }),
+  chatStartSupport: () =>
+    req<any>("/chat/conversations/support", { method: "POST" }),
+  chatListConversations: (limit = 50) =>
+    req<{ items: any[]; count: number }>(`/chat/conversations?limit=${limit}`),
+  chatGetConversation: (id: string) =>
+    req<any>(`/chat/conversations/${encodeURIComponent(id)}`),
+  chatListMessages: (id: string, before?: string, limit = 30) => {
+    const qs = new URLSearchParams();
+    if (before) qs.set("before", before);
+    qs.set("limit", String(limit));
+    return req<{ items: any[]; count: number }>(
+      `/chat/conversations/${encodeURIComponent(id)}/messages?${qs.toString()}`
+    );
+  },
+  chatSendMessage: (
+    id: string,
+    payload: { text: string; client_msg_id?: string; kind?: "text" | "property_card"; attachments?: any[] }
+  ) =>
+    req<any>(`/chat/conversations/${encodeURIComponent(id)}/messages`, {
+      method: "POST", body: JSON.stringify(payload),
+    }),
+  chatMarkRead: (id: string) =>
+    req<any>(`/chat/conversations/${encodeURIComponent(id)}/read`, { method: "POST" }),
+  chatPollUpdates: (id: string, after: string, wait_ms = 8000) =>
+    req<{ items: any[]; server_time: string }>(
+      `/chat/conversations/${encodeURIComponent(id)}/updates?after=${encodeURIComponent(after)}&wait_ms=${wait_ms}`
+    ),
+  chatUnreadCount: () =>
+    req<{ unread_count: number; conversation_count: number }>("/chat/unread-count"),
+  chatBlockUser: (user_id: string) =>
+    req<any>(`/chat/block/${encodeURIComponent(user_id)}`, { method: "POST" }),
+  chatUnblockUser: (user_id: string) =>
+    req<any>(`/chat/block/${encodeURIComponent(user_id)}`, { method: "DELETE" }),
+  chatReport: (payload: {
+    conversation_id: string; message_id?: string; reported_user_id?: string; reason: string;
+  }) =>
+    req<any>("/chat/report", { method: "POST", body: JSON.stringify(payload) }),
+  adminChatReports: (status = "OPEN", limit = 50) =>
+    req<any>(`/chat/admin/reports?status=${status}&limit=${limit}`),
+  adminChatStats: () => req<any>("/chat/admin/stats"),
   adminGetVisibility: (amass_id: string) =>
     req<Record<string, boolean>>(
       `/admin/passport/${encodeURIComponent(amass_id)}/visibility`

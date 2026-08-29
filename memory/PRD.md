@@ -149,3 +149,26 @@ See `/app/memory/test_credentials.md`
 - Share button (testID `btn-share-score`) added next to the chevron on the passport score card
 - Uses `react-native-view-shot` (`captureRef → tmpfile`), `expo-sharing` for native share sheet, and `expo-media-library` fallback to save-to-gallery when share isn't available; on web falls back to `Share.share` (Web Share API where supported)
 - Passport passes `propertyType`, `addressLine`, `cover` context so the card is always branded correctly per property
+
+## In-App Chat — Phase 1 (Jun 2026)
+- Backend `/app/backend/chat.py` — collections: conversations, chat_messages, chat_reads, chat_blocks, chat_reports
+- Endpoints:
+  - Property-linked: `POST /api/chat/conversations/from-property/{property_id}` (idempotent)
+  - Support thread: `POST /api/chat/conversations/support` (buyer ↔ admin)
+  - List + get: `GET /api/chat/conversations`, `/{id}`
+  - Messages: `GET /messages`, `POST /messages` (idempotent via `client_msg_id`)
+  - Read: `POST /read` (also marks NEW_MESSAGE notifications read)
+  - Real-time: `GET /updates?after=<ISO>&wait_ms=8000` (long-poll)
+  - Unread badge: `GET /unread-count`
+  - Block: `POST /block/{id}` · `DELETE /block/{id}` · `GET /blocks`
+  - Report: `POST /report`
+  - Admin: `GET /admin/stats` · `GET /admin/reports` · `POST /admin/reports/{id}/resolve`
+- Notifications hook — every message writes a `NEW_MESSAGE` entry to `notifications` for each other participant
+- Rate-limit: 30 msgs/60s/user/conversation
+- Frontend:
+  - `/inbox` — conversation list with unread badges and property preview
+  - `/(tabs)/messages` — aliases the InboxScreen
+  - `/chat/[conversation_id]` — long-poll bubbles, optimistic sends with `client_msg_id`, AsyncStorage offline queue, block + report menu, property card header
+  - `/property/[id]` — new "Contact Agent" primary button (testID `btn-contact-agent`) that starts/opens the thread
+- Tests: `/app/backend/tests/test_chat_phase1.py` — 15/15 pass
+- Phase-D regression preserved (134 pass · 1 skipped)

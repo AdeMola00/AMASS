@@ -1986,6 +1986,10 @@ app.include_router(register_verification_scoring_routes(db, get_current_user, re
 from property_valuations import register_valuation_routes
 app.include_router(register_valuation_routes(db, get_current_user, require_admin))
 
+# ─── In-app Chat (Phase 1) ───
+from chat import register_chat_routes, create_chat_indexes
+app.include_router(register_chat_routes(db, get_current_user, require_admin))
+
 @app.get("/api/files/{file_path:path}")
 async def _download_file(file_path: str, user: dict = Depends(get_current_user)):
     """Auth-checked passthrough to Emergent Object Storage.
@@ -2135,6 +2139,9 @@ async def on_startup():
         await db.fraud_flags.create_index("id", unique=True)
         await db.fraud_flags.create_index([("property_uuid", 1), ("flag_type", 1), ("status", 1)])
         await db.fraud_flags.create_index([("status", 1), ("created_at", -1)])
+        # Chat indexes
+        from chat import create_chat_indexes as _chat_idx
+        await _chat_idx(db)
         # Seed defaults (idempotent)
         from property_types import ensure_default_property_types as _ensure_pt
         from app_settings import ensure_default_settings as _ensure_as

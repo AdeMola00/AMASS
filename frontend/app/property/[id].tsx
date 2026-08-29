@@ -13,6 +13,7 @@ import {
   Share,
   Modal,
   StatusBar,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -394,6 +395,23 @@ export default function PropertyDetails() {
                   </View>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              </Pressable>
+
+              {/* Contact Agent — opens in-app chat */}
+              <Pressable
+                style={[styles.contactBtn]}
+                onPress={async () => {
+                  try {
+                    const c = await api.chatStartFromProperty(property.id);
+                    router.push(`/chat/${c.id}` as any);
+                  } catch (e: any) {
+                    Alert.alert("Cannot start chat", e?.message ?? "Try again");
+                  }
+                }}
+                testID="btn-contact-agent"
+              >
+                <Ionicons name="chatbubbles" size={16} color="#fff" />
+                <Text style={styles.contactBtnText}>Contact Agent</Text>
               </Pressable>
             </View>
           )}
@@ -885,6 +903,12 @@ const styles = StyleSheet.create({
   },
   agentInitials: { color: "#fff", fontSize: 18, fontWeight: "800" },
   agentName: { ...typography.body, fontWeight: "800", color: colors.text },
+  contactBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, height: 48, marginTop: spacing.md,
+    borderRadius: 24, backgroundColor: colors.red,
+  },
+  contactBtnText: { color: "#fff", fontSize: 14, fontWeight: "800", letterSpacing: 0.4 },
   agentRole: { ...typography.caption, color: colors.red, fontWeight: "700" },
   callBtn: {
     width: 44,
