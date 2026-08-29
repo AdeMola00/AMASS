@@ -3,19 +3,31 @@
  * A single self-contained component that fetches both endpoints and renders
  * the shareable score gauge on top of an AI value range.
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
+import * as MediaLibrary from "expo-media-library";
+import * as Sharing from "expo-sharing";
+import * as Haptics from "expo-haptics";
+import { captureRef } from "react-native-view-shot";
 
 import { api } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import {
+  ShareableScoreCard,
+  SHARE_CARD_HEIGHT,
+  SHARE_CARD_WIDTH,
+} from "@/src/components/ShareableScoreCard";
 
 type Tier = "SUPER" | "VERIFIED" | "UNSTABLE" | "UNVERIFIED";
 
@@ -29,11 +41,24 @@ const TIER_META: Record<Tier, { color: string; label: string; icon: any }> = {
   UNVERIFIED: { color: "#9CA3AF", label: "Unverified",     icon: "shield-outline" },
 };
 
-export function PropertyScoreCard({ amassId }: { amassId: string }) {
+export function PropertyScoreCard({
+  amassId,
+  propertyType,
+  addressLine,
+  cover,
+}: {
+  amassId: string;
+  /** Optional context for the shareable card — pulled from the passport parent */
+  propertyType?: string | null;
+  addressLine?: string | null;
+  cover?: string | null;
+}) {
   const [score, setScore] = useState<ScoreResp | null>(null);
   const [value, setValue] = useState<ValueResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const shareRef = useRef<View>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,6 +75,49 @@ export function PropertyScoreCard({ amassId }: { amassId: string }) {
   }, [amassId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const onShare = useCallback(async () => {
+    if (!score) return;
+    Haptics.selectionAsync().catch(() => {});
+    setSharing(true);
+    try {
+      // Give the offscreen card a frame to lay out
+      await new Promise((r) => setTimeout(r, 300));
+      const uri = await captureRef(shareRef, {
+        format: "png",
+        quality: 1,
+        result: "tmpfile",
+        width: SHARE_CARD_WIDTH,
+        height: SHARE_CARD_HEIGHT,
+      });
+      // Prefer native share sheet — falls back to save-to-gallery / RN Share
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "image/png",
+          dialogTitle: `AMASS ${amassId} Score Card`,
+          UTI: "public.png",
+        });
+      } else if (Platform.OS === "web") {
+        // On web, open the image in a new tab
+        Share.share({
+          title: `AMASS ${amassId}`,
+          message: `AMASS ${amassId} — Verification Score ${score.score}/100 · ${score.tier}. See it on amass.africa`,
+        }).catch(() => {});
+      } else {
+        // Native fallback — save to gallery
+        const perm = await MediaLibrary.requestPermissionsAsync();
+        if (perm.granted) {
+          await MediaLibrary.saveToLibraryAsync(uri);
+          Alert.alert("Saved", "Score card saved to your gallery.");
+        }
+      }
+    } catch (e: any) {
+      Alert.alert("Share failed", e?.message ?? "Try again");
+    } finally {
+      setSharing(false);
+    }
+  }, [amassId, score]);
 
   if (loading) {
     return (
@@ -70,9 +138,24 @@ export function PropertyScoreCard({ amassId }: { amassId: string }) {
           <Ionicons name={tier.icon} size={12} color="#fff" />
           <Text style={styles.tierPillText}>{tier.label.toUpperCase()}</Text>
         </View>
-        <Pressable onPress={() => setExpanded((x) => !x)} hitSlop={10} testID="expand-chevron">
-          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={colors.textSecondary} />
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Pressable
+            onPress={onShare}
+            hitSlop={10}
+            style={styles.shareBtn}
+            disabled={sharing}
+            testID="btn-share-score"
+          >
+            {sharing ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <Ionicons name="share-social" size={16} color={colors.text} />
+            )}
+          </Pressable>
+          <Pressable onPress={() => setExpanded((x) => !x)} hitSlop={10} testID="expand-chevron">
+            <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={colors.textSecondary} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.gaugeRow}>
@@ -163,6 +246,27 @@ export function PropertyScoreCard({ amassId }: { amassId: string }) {
           )}
         </View>
       )}
+
+      {/* Offscreen shareable card — captured on demand. Zero opacity keeps it
+          in the layout tree without visually stealing space. */}
+      <View
+        collapsable={false}
+        style={styles.offscreenWrap}
+      >
+        <ShareableScoreCard
+          ref={shareRef}
+          amassId={amassId}
+          propertyType={propertyType}
+          addressLine={addressLine}
+          cover={cover}
+          score={score.score}
+          tier={score.tier}
+          value={value?.value}
+          rangeLow={value?.range_low}
+          rangeHigh={value?.range_high}
+          confidence={value?.confidence}
+        />
+      </View>
     </View>
   );
 }
@@ -238,4 +342,19 @@ const styles = StyleSheet.create({
   breakdownVal: { fontSize: 12, fontWeight: "800", color: colors.emerald },
   footnoteBox: { marginTop: 8, padding: 8, borderRadius: radius.sm, backgroundColor: colors.surfaceSecondary },
   footnote: { fontSize: 10, color: colors.textTertiary, fontWeight: "600" },
+  shareBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceSecondary,
+  },
+  offscreenWrap: {
+    position: "absolute",
+    left: -10000,
+    top: 0,
+    opacity: 0,
+    pointerEvents: "none",
+  },
 });

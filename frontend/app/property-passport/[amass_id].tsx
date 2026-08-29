@@ -189,8 +189,13 @@ export default function PropertyPassportScreen() {
           </View>
         </View>
 
-        {/* D-6/D-7/D-8: Verification score + AI value strip */}
-        <PropertyScoreCard amassId={p.amass_property_id} />
+        {/* D-6/D-7/D-8: Verification score + AI value strip · shareable */}
+        <PropertyScoreCard
+          amassId={p.amass_property_id}
+          propertyType={p.property_type}
+          addressLine={areaStr || p.raw_address}
+          cover={p.photos?.[0] ?? p.media_ids?.[0]}
+        />
 
         {/* Segmented tabs */}
         <View style={styles.tabs}>

@@ -142,3 +142,10 @@ See `/app/memory/test_credentials.md`
 ### Final Phase-D acceptance report
 - `/app/test_reports/phase_d_final_acceptance.md`
 - 134 pass · 1 skipped · 0 failed across 7 test files (D-1 through D-10)
+
+## Shareable Score Card (Jun 2026)
+- New `/app/frontend/src/components/ShareableScoreCard.tsx` — 720×1080 branded card with SVG gauge, tier pill, AI value, AMASS footer
+- Rendered offscreen inside `PropertyScoreCard` (position:-10000, opacity:0, pointerEvents:none) so it stays in the layout tree ready for capture
+- Share button (testID `btn-share-score`) added next to the chevron on the passport score card
+- Uses `react-native-view-shot` (`captureRef → tmpfile`), `expo-sharing` for native share sheet, and `expo-media-library` fallback to save-to-gallery when share isn't available; on web falls back to `Share.share` (Web Share API where supported)
+- Passport passes `propertyType`, `addressLine`, `cover` context so the card is always branded correctly per property

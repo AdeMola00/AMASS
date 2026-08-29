@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only verification of the new Shareable Score Card feature on /property-passport/AMASS-LAG-00000233 (anon). All 5 acceptance criteria pass: btn-share-score renders visibly next to expand-chevron; the offscreen ShareableScoreCard is present in the DOM exactly once with computed left ~ -9976 (parent at -10000 + 24 inner offset — off-screen as intended); shareable card text content includes AMASS-LAG-00000233, Duplex, address 'Admiralty Way, Lekki Phase 1, Lekki, Lagos', score 5, '/ 100', UNVERIFIED tier pill, 'AI ESTIMATED VALUE', 'Awaiting comparable listings', 'Every listing is title-checked on AMASS', and 'amass.africa'; tapping the share button did not crash the app (no red screen, passport-screen still alive) — on web Sharing.isAvailableAsync() is false so the Share.share fallback path is invoked (or silently swallowed); existing PropertyScoreCard interactive UI unchanged (tier-pill, ai-value-fallback, score-gauge-num=5, breakdown-* rows = 6 when expanded); PropertyTypeChip passport-type-chip still visible and passport title block intact.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "PropertyScoreCard offscreen wrapper", "issue": "Uses deprecated `pointerEvents=\"none\"` prop instead of `style={{ pointerEvents: 'none' }}`. RN Web logs a deprecation warning. Reference: /app/frontend/src/components/PropertyScoreCard.tsx:253"},
+      {"component": "shadows.soft styles", "issue": "'shadow*' style props are deprecated in RN Web — logged as console warning. Not a new regression from this feature, but present in the score card render path. Reference: shared theme util (shadows.soft used in PropertyScoreCard.tsx:135)"}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Low priority) Replace deprecated `pointerEvents=\"none\"` prop with `style={{ pointerEvents: 'none' }}` on the offscreen wrapper View in PropertyScoreCard.tsx to silence RN Web warning.",
+    "(Optional) Consider migrating shadow* style props to the newer `boxShadow` per RN Web recommendation (repo-wide, out of scope for this feature)."
+  ],
+  "critical_code_review_comments": [
+    "captureRef in onShare will silently fail on web if `shareRef` is measured before layout — the 300 ms pre-capture delay mitigates this. Good defensive coding.",
+    "Sharing.shareAsync fallback chain (Sharing → Share.share on web → MediaLibrary.saveToLibraryAsync on native) is properly guarded and does not throw when unsupported.",
+    "Offscreen wrapper uses position:absolute + opacity:0 + collapsable=false + pointerEvents=none — correct pattern for view-shot capture without visual/interaction bleed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not tested per request)", "frontend": "100%"},
+  "seed_data_creation": "None. Used existing public passport AMASS-LAG-00000233.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "ShareableScoreCard verified on web preview at mobile viewport 390x844. Offscreen card bounding box observed at x=-9976 (parent left:-10000 + StyleSheet padding:48 minus width alignment => still fully off-screen). Native share sheet cannot be exercised on web preview — expected. All required text content, testIDs, tier pill, and existing interactive PropertyScoreCard behavior confirmed intact.",
+  "rca_of_issue": "N/A — no bugs found."
+}
