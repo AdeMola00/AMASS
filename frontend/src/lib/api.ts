@@ -2027,8 +2027,15 @@ export const api = {
     }),
   chatStartSupport: () =>
     req<any>("/chat/conversations/support", { method: "POST" }),
-  chatListConversations: (limit = 50) =>
-    req<{ items: any[]; count: number }>(`/chat/conversations?limit=${limit}`),
+  chatListConversations: (
+    limit = 50,
+    opts?: { verified_only?: boolean; q?: string }
+  ) => {
+    const qs = new URLSearchParams({ limit: String(limit) });
+    if (opts?.verified_only) qs.set("verified_only", "true");
+    if (opts?.q?.trim()) qs.set("q", opts.q.trim());
+    return req<{ items: any[]; count: number }>(`/chat/conversations?${qs.toString()}`);
+  },
   chatGetConversation: (id: string) =>
     req<any>(`/chat/conversations/${encodeURIComponent(id)}`),
   chatListMessages: (id: string, before?: string, limit = 30) => {
@@ -2041,7 +2048,7 @@ export const api = {
   },
   chatSendMessage: (
     id: string,
-    payload: { text: string; client_msg_id?: string; kind?: "text" | "property_card"; attachments?: any[] }
+    payload: { text: string; client_msg_id?: string; kind?: "text" | "property_card" | "image"; attachments?: any[] }
   ) =>
     req<any>(`/chat/conversations/${encodeURIComponent(id)}/messages`, {
       method: "POST", body: JSON.stringify(payload),
@@ -2064,7 +2071,35 @@ export const api = {
     req<any>("/chat/report", { method: "POST", body: JSON.stringify(payload) }),
   adminChatReports: (status = "OPEN", limit = 50) =>
     req<any>(`/chat/admin/reports?status=${status}&limit=${limit}`),
+  adminChatResolveReport: (id: string, resolution?: string) =>
+    req<{ ok: boolean }>(`/chat/admin/reports/${encodeURIComponent(id)}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ resolution: resolution ?? "resolved" }),
+    }),
   adminChatStats: () => req<any>("/chat/admin/stats"),
+
+  // ─── Chat Phase 2: image, search, presence, typing ───
+  chatUploadImage: (conv_id: string, data_url: string, width?: number, height?: number) =>
+    req<{ url: string; path: string; width?: number; height?: number }>(
+      `/chat/conversations/${encodeURIComponent(conv_id)}/upload-image`,
+      { method: "POST", body: JSON.stringify({ data_url, width, height }) }
+    ),
+  chatSearch: (q: string, limit = 30) =>
+    req<{ items: any[]; count: number }>(
+      `/chat/search?q=${encodeURIComponent(q)}&limit=${limit}`
+    ),
+  chatHeartbeat: () => req<any>("/chat/heartbeat", { method: "POST" }),
+  chatTyping: (id: string, is_typing: boolean) =>
+    req<any>(`/chat/conversations/${encodeURIComponent(id)}/typing`, {
+      method: "POST",
+      body: JSON.stringify({ is_typing }),
+    }),
+  chatPresence: (id: string) =>
+    req<{
+      typing_user_ids: string[];
+      presence: { user_id: string; last_seen_at: string }[];
+      server_time: string;
+    }>(`/chat/conversations/${encodeURIComponent(id)}/presence`),
   adminGetVisibility: (amass_id: string) =>
     req<Record<string, boolean>>(
       `/admin/passport/${encodeURIComponent(amass_id)}/visibility`

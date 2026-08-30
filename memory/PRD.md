@@ -172,3 +172,18 @@ See `/app/memory/test_credentials.md`
   - `/property/[id]` — new "Contact Agent" primary button (testID `btn-contact-agent`) that starts/opens the thread
 - Tests: `/app/backend/tests/test_chat_phase1.py` — 15/15 pass
 - Phase-D regression preserved (134 pass · 1 skipped)
+
+## In-App Chat — Phase 2 (Jun 2026)
+- Backend `/app/backend/chat.py` extended (Phase 2 endpoints):
+  - Images: `POST /api/chat/conversations/{id}/upload-image` (5 MB cap, base64 data URL → Emergent Object Storage)
+  - Search: `GET /api/chat/search?q=…&limit=…` (regex-escaped, scoped to my conversations)
+  - Presence: `POST /api/chat/heartbeat` + `GET /api/chat/conversations/{id}/presence` (typing + last_seen for OTHER participants)
+  - Typing: `POST /api/chat/conversations/{id}/typing {is_typing}` (TTL 15 s auto-expire)
+  - Filters: `GET /api/chat/conversations?verified_only=true&q=needle` — Verified-only + inline participant/property search
+- Collections added: `chat_presence` (7 d TTL), `chat_typing` (15 s TTL)
+- Frontend:
+  - `/inbox` — Verified-only chip + inline debounced message search (falls back to `/chat/search` for hits)
+  - `/chat/[conversation_id]` — image attach button (expo-image-picker + expo-file-system/legacy → data URL → object storage), typing dots + "online/last seen" subtitle, tap-to-preview image bubbles, 25 s heartbeat + 6 s presence poll
+  - `/admin/chat-reports` — one-tap moderation queue with Resolve + Block user + View conversation actions, KPI stats
+- Tests: `/app/backend/tests/test_chat_phase2.py` — 21/21 pass · Frontend testing agent green on inbox + chat + admin surfaces
+

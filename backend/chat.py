@@ -40,10 +40,20 @@ POLL_INTERVAL_S = 0.6
 
 # ── Schemas ──────────────────────────────────────────────────────
 class SendMessageIn(BaseModel):
-    text: str = Field(..., min_length=1, max_length=MAX_TEXT_LEN)
+    text: Optional[str] = Field(None, max_length=MAX_TEXT_LEN)
     client_msg_id: Optional[str] = Field(None, max_length=64)
-    kind: Literal["text", "property_card"] = "text"
+    kind: Literal["text", "property_card", "image"] = "text"
     attachments: Optional[List[Dict[str, Any]]] = None
+
+
+class UploadImageIn(BaseModel):
+    data_url: str  # data:image/jpeg;base64,...
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+
+class TypingIn(BaseModel):
+    is_typing: bool = True
 
 
 class ReportIn(BaseModel):
@@ -221,6 +231,8 @@ def register_chat_routes(db, get_current_user, require_admin):
     # ── List my conversations ────────────────────────────────
     @router.get("/conversations")
     async def list_conversations(user: dict = Depends(get_current_user),
+                                  verified_only: bool = Query(False),
+                                  q: Optional[str] = Query(None),
                                   limit: int = Query(50, ge=1, le=200)):
         cur = db.conversations.find(
             {"participant_ids": user["id"]}, {"_id": 0},
@@ -236,6 +248,20 @@ def register_chat_routes(db, get_current_user, require_admin):
             c["other_participants"] = [by_id.get(oid) for oid in other_ids if by_id.get(oid)]
             c["property"] = await _hydrate_property(db, c.get("property_id"))
             c["unread_count"] = await _unread_count_for(db, c["id"], user["id"])
+            # Phase-2 filters
+            if verified_only:
+                if not any((p or {}).get("verified") for p in c["other_participants"]):
+                    continue
+            if q:
+                needle = q.lower()
+                hay = " ".join(filter(None, [
+                    (c.get("last_message_preview") or ""),
+                    *(p.get("full_name") or "" for p in c["other_participants"]),
+                    *(p.get("email") or "" for p in c["other_participants"]),
+                    (c.get("property") or {}).get("title", ""),
+                ])).lower()
+                if needle not in hay:
+                    continue
             out.append(c)
         return {"items": out, "count": len(out)}
 
@@ -278,6 +304,9 @@ def register_chat_routes(db, get_current_user, require_admin):
         user: dict = Depends(get_current_user),
     ):
         conv = await _assert_participant(db, conv_id, user["id"])
+        # Text OR image required
+        if not (data.text and data.text.strip()) and not data.attachments:
+            raise HTTPException(422, "Message must have text or attachments")
         # Blocked either way?
         other_ids = [uid for uid in conv["participant_ids"] if uid != user["id"]]
         for oid in other_ids:
@@ -307,12 +336,13 @@ def register_chat_routes(db, get_current_user, require_admin):
             if dupe: return dupe
 
         now = _now()
+        text_val = (data.text or "").strip()
         msg = {
             "id": str(uuid.uuid4()),
             "conversation_id": conv_id,
             "sender_id": user["id"],
             "sender_name": user.get("full_name") or user.get("email") or "Someone",
-            "text": data.text.strip(),
+            "text": text_val,
             "kind": data.kind,
             "attachments": data.attachments or [],
             "client_msg_id": data.client_msg_id,
@@ -320,10 +350,11 @@ def register_chat_routes(db, get_current_user, require_admin):
             "created_at": now,
         }
         await db.chat_messages.insert_one(msg)
-        await _bump_conversation(db, conv_id, msg["text"], now)
+        preview = text_val if text_val else "📷 Image"
+        await _bump_conversation(db, conv_id, preview, now)
         # Notifications to other participants
         for oid in other_ids:
-            await _notify(db, oid, conv_id, msg["sender_name"], msg["text"],
+            await _notify(db, oid, conv_id, msg["sender_name"], preview,
                           conv.get("property_id"))
         msg.pop("_id", None)
         return msg
@@ -416,6 +447,108 @@ def register_chat_routes(db, get_current_user, require_admin):
         })
         return {"ok": True, "id": rid}
 
+    # ── Phase 2: Upload image → Emergent Object Storage ───────
+    @router.post("/conversations/{conv_id}/upload-image")
+    async def upload_image(
+        conv_id: str,
+        data: UploadImageIn = Body(...),
+        user: dict = Depends(get_current_user),
+    ):
+        await _assert_participant(db, conv_id, user["id"])
+        # 5MB cap enforced in object_storage (>15MB) but re-check tighter here
+        import base64
+        try:
+            b64 = data.data_url.split(",", 1)[1] if data.data_url.startswith("data:") else data.data_url
+            approx_bytes = int(len(b64) * 0.75)
+            if approx_bytes > 5 * 1024 * 1024:
+                raise HTTPException(413, "Image too large (max 5 MB)")
+        except HTTPException: raise
+        except Exception:
+            raise HTTPException(400, "Invalid image payload")
+        from object_storage import upload_photo_base64
+        path = await upload_photo_base64(user["id"], data.data_url)
+        return {
+            "url": f"/api/files/{path}",
+            "path": path,
+            "width": data.width,
+            "height": data.height,
+        }
+
+    # ── Phase 2: Message search across my conversations ───────
+    @router.get("/search")
+    async def search(q: str = Query(..., min_length=2, max_length=100),
+                     limit: int = Query(30, ge=1, le=100),
+                     user: dict = Depends(get_current_user)):
+        my_convs = await db.conversations.find(
+            {"participant_ids": user["id"]}, {"_id": 0, "id": 1},
+        ).to_list(500)
+        conv_ids = [c["id"] for c in my_convs]
+        if not conv_ids: return {"items": [], "count": 0}
+        # Escape regex chars
+        import re
+        pattern = re.escape(q.strip())
+        rows = await db.chat_messages.find(
+            {"conversation_id": {"$in": conv_ids},
+             "text": {"$regex": pattern, "$options": "i"}},
+            {"_id": 0},
+        ).sort("created_at", -1).limit(limit).to_list(limit)
+        return {"items": rows, "count": len(rows)}
+
+    # ── Phase 2: Heartbeat (last_seen) ───────────────────────
+    @router.post("/heartbeat")
+    async def heartbeat(user: dict = Depends(get_current_user)):
+        now = _now()
+        await db.chat_presence.update_one(
+            {"user_id": user["id"]},
+            {"$set": {"user_id": user["id"], "last_seen_at": now}},
+            upsert=True,
+        )
+        return {"ok": True, "last_seen_at": now.isoformat()}
+
+    # ── Phase 2: Typing signal (TTL 6s) ──────────────────────
+    @router.post("/conversations/{conv_id}/typing")
+    async def typing(conv_id: str, data: TypingIn = Body(...),
+                     user: dict = Depends(get_current_user)):
+        await _assert_participant(db, conv_id, user["id"])
+        now = _now()
+        if data.is_typing:
+            await db.chat_typing.update_one(
+                {"conversation_id": conv_id, "user_id": user["id"]},
+                {"$set": {"conversation_id": conv_id, "user_id": user["id"],
+                          "started_at": now, "expires_at": now.replace(microsecond=0)}},
+                upsert=True,
+            )
+        else:
+            await db.chat_typing.delete_one(
+                {"conversation_id": conv_id, "user_id": user["id"]}
+            )
+        return {"ok": True}
+
+    # ── Phase 2: Presence + typing of OTHER participants ─────
+    @router.get("/conversations/{conv_id}/presence")
+    async def presence(conv_id: str, user: dict = Depends(get_current_user)):
+        conv = await _assert_participant(db, conv_id, user["id"])
+        others = [uid for uid in conv["participant_ids"] if uid != user["id"]]
+        now = _now()
+        typing_cutoff = now.timestamp() - 6  # 6s window
+        typing_rows = await db.chat_typing.find(
+            {"conversation_id": conv_id, "user_id": {"$in": others}},
+            {"_id": 0},
+        ).to_list(20)
+        typing_active = [r["user_id"] for r in typing_rows
+                         if r.get("started_at") and r["started_at"].timestamp() >= typing_cutoff]
+        presence_rows = await db.chat_presence.find(
+            {"user_id": {"$in": others}}, {"_id": 0},
+        ).to_list(20)
+        return {
+            "typing_user_ids": typing_active,
+            "presence": [
+                {"user_id": r["user_id"], "last_seen_at": r["last_seen_at"].isoformat()}
+                for r in presence_rows
+            ],
+            "server_time": now.isoformat(),
+        }
+
     # ── Admin ────────────────────────────────────────────────
     @router.get("/admin/reports")
     async def admin_reports(status: str = Query("OPEN"),
@@ -491,3 +624,8 @@ async def create_chat_indexes(db):
     )
     await db.chat_reports.create_index("id", unique=True)
     await db.chat_reports.create_index([("status", 1), ("created_at", -1)])
+    # Phase 2 — presence + typing
+    await db.chat_presence.create_index("user_id", unique=True)
+    await db.chat_presence.create_index("last_seen_at", expireAfterSeconds=60 * 60 * 24 * 7)
+    await db.chat_typing.create_index([("conversation_id", 1), ("user_id", 1)], unique=True)
+    await db.chat_typing.create_index("started_at", expireAfterSeconds=15)

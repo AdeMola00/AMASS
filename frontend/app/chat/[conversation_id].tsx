@@ -1,13 +1,19 @@
 /**
- * AMASS Chat — Conversation Screen (Phase 1)
+ * AMASS Chat — Conversation Screen (Phase 1 + 2)
  * Threaded messages with:
  *  • Long-poll updates (8s per request) with reconnect
  *  • Client-side idempotency (client_msg_id) — no duplicate sends
  *  • Offline queue persisted via AsyncStorage, retried on reconnect
  *  • Property-card header when the conversation is property-linked
  *  • Block + Report actions
+ *
+ *  Phase 2 additions:
+ *   • Image attachments via Emergent Object Storage (expo-image-picker)
+ *   • Typing indicator (both send + display)
+ *   • Presence heartbeat + "last seen" for the other participant
+ *   • Image bubbles (media_url render)
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal,
   Platform, Pressable, StyleSheet, Text, TextInput, View,
@@ -16,18 +22,23 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { colors, radius, shadows, spacing, typography, formatMarkerPrice } from "@/src/constants/theme";
 
+type Attachment = { url: string; path?: string; width?: number; height?: number; type?: string };
 type Msg = {
   id: string;
   conversation_id: string;
   sender_id: string;
+  sender_name?: string;
   text: string;
   kind: string;
+  attachments?: Attachment[];
   status?: string;
   client_msg_id?: string;
   created_at: string;
@@ -36,6 +47,10 @@ type Msg = {
 };
 
 const QUEUE_KEY = "amass_chat_queue_v1";
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "";
+const HEARTBEAT_MS = 25_000;
+const TYPING_STOP_MS = 3_500;
+const PRESENCE_POLL_MS = 6_000;
 
 async function _getQueue(): Promise<Record<string, Msg[]>> {
   try {
@@ -45,6 +60,27 @@ async function _getQueue(): Promise<Record<string, Msg[]>> {
 }
 async function _setQueue(q: Record<string, Msg[]>) {
   try { await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch {}
+}
+
+function _absUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("http")) return url;
+  if (url.startsWith("/") && BACKEND_URL) return `${BACKEND_URL}${url}`;
+  return url;
+}
+
+function _lastSeenLabel(iso?: string | null): string {
+  if (!iso) return "";
+  try {
+    const t = new Date(iso).getTime();
+    const diff = (Date.now() - t) / 1000;
+    if (diff < 60) return "online";
+    if (diff < 300) return "active just now";
+    if (diff < 3600) return `active ${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `active ${Math.floor(diff / 3600)}h ago`;
+    const d = new Date(iso);
+    return `last seen ${d.toLocaleDateString()}`;
+  } catch { return ""; }
 }
 
 export default function ConversationScreen() {
@@ -57,12 +93,17 @@ export default function ConversationScreen() {
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [presence, setPresence] = useState<{ typing: boolean; last_seen?: string | null }>({ typing: false });
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const listRef = useRef<FlatList<Msg>>(null);
   const stopPollRef = useRef(false);
   const lastSeenRef = useRef<string>("");
+  const typingStopRef = useRef<NodeJS.Timeout | null>(null);
+  const isTypingRef = useRef(false);
 
   // ─ Load conversation + latest messages ─
   const load = useCallback(async () => {
@@ -90,7 +131,7 @@ export default function ConversationScreen() {
 
   useEffect(() => { if (user) load(); }, [user, load]);
 
-  // ─ Long-poll loop ─
+  // ─ Long-poll message loop ─
   useEffect(() => {
     if (!convId || !user) return;
     stopPollRef.current = false;
@@ -116,6 +157,40 @@ export default function ConversationScreen() {
     })();
     return () => { cancelled = true; stopPollRef.current = true; };
   }, [convId, user]);
+
+  // ─ Presence heartbeat + typing poll (Phase 2) ─
+  useEffect(() => {
+    if (!convId || !user) return;
+    let cancelled = false;
+
+    // Heartbeat every 25s so the other side sees us "online"
+    const beat = async () => {
+      try { await api.chatHeartbeat(); } catch {}
+    };
+    beat();
+    const hbInt = setInterval(beat, HEARTBEAT_MS);
+
+    // Poll presence + typing status of others every ~6s
+    const pollPresence = async () => {
+      try {
+        const r = await api.chatPresence(convId);
+        if (cancelled) return;
+        const others = conv?.participants?.filter((p: any) => p.id !== user.id) ?? [];
+        const otherId = others[0]?.id;
+        const isTyping = otherId ? r.typing_user_ids?.includes(otherId) : false;
+        const seenRow = r.presence?.find((p: any) => p.user_id === otherId);
+        setPresence({ typing: !!isTyping, last_seen: seenRow?.last_seen_at });
+      } catch {}
+    };
+    pollPresence();
+    const psInt = setInterval(pollPresence, PRESENCE_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(hbInt);
+      clearInterval(psInt);
+    };
+  }, [convId, user, conv?.participants]);
 
   // ─ Flush offline queue ─
   const flushQueue = useCallback(async () => {
@@ -144,6 +219,31 @@ export default function ConversationScreen() {
     await _setQueue(q2);
   }, [convId]);
 
+  // ─ Typing signal (debounced stop) ─
+  const signalTyping = useCallback((val: boolean) => {
+    if (val === isTypingRef.current) return;
+    isTypingRef.current = val;
+    api.chatTyping(convId, val).catch(() => {});
+  }, [convId]);
+
+  const handleTextChange = (t: string) => {
+    setText(t);
+    if (t.length > 0) {
+      signalTyping(true);
+      if (typingStopRef.current) clearTimeout(typingStopRef.current);
+      typingStopRef.current = setTimeout(() => signalTyping(false), TYPING_STOP_MS);
+    } else {
+      if (typingStopRef.current) clearTimeout(typingStopRef.current);
+      signalTyping(false);
+    }
+  };
+
+  // Stop typing on unmount
+  useEffect(() => () => {
+    if (typingStopRef.current) clearTimeout(typingStopRef.current);
+    if (isTypingRef.current) api.chatTyping(convId, false).catch(() => {});
+  }, [convId]);
+
   const send = async () => {
     const t = text.trim();
     if (!t || sending) return;
@@ -155,6 +255,7 @@ export default function ConversationScreen() {
     };
     setMsgs((prev) => [...prev, optimistic]);
     setText("");
+    signalTyping(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     listRef.current?.scrollToEnd({ animated: true });
     setSending(true);
@@ -172,6 +273,62 @@ export default function ConversationScreen() {
         prev.map((m) => (m.client_msg_id === client_msg_id ? { ...m, _failed: true } : m))
       );
     } finally { setSending(false); }
+  };
+
+  // ─ Image attachment (Phase 2) ─
+  const sendImage = async () => {
+    if (uploading || sending) return;
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Photos access needed", "Allow photo access to send images.");
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.75,
+        base64: false,
+        allowsEditing: false,
+      });
+      if (res.canceled || !res.assets?.length) return;
+      const asset = res.assets[0];
+      setUploading(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+      // Read the picked file as base64 → data URL
+      const b64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const mime = asset.mimeType || "image/jpeg";
+      const dataUrl = `data:${mime};base64,${b64}`;
+
+      const uploaded = await api.chatUploadImage(convId, dataUrl, asset.width, asset.height);
+      const client_msg_id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const optimistic: Msg = {
+        id: client_msg_id, conversation_id: convId, sender_id: user!.id,
+        text: "", kind: "image",
+        attachments: [{ url: uploaded.url, path: uploaded.path, width: uploaded.width, height: uploaded.height }],
+        client_msg_id,
+        created_at: new Date().toISOString(), _local: true,
+      };
+      setMsgs((prev) => [...prev, optimistic]);
+      listRef.current?.scrollToEnd({ animated: true });
+      try {
+        const sent = await api.chatSendMessage(convId, {
+          text: "", kind: "image", client_msg_id,
+          attachments: [{ url: uploaded.url, path: uploaded.path, width: uploaded.width, height: uploaded.height }],
+        });
+        setMsgs((prev) =>
+          prev.map((m) => (m.client_msg_id === client_msg_id ? { ...sent, _local: false } : m))
+        );
+      } catch {
+        setMsgs((prev) =>
+          prev.map((m) => (m.client_msg_id === client_msg_id ? { ...m, _failed: true } : m))
+        );
+      }
+    } catch (e: any) {
+      Alert.alert("Upload failed", e?.message ?? "Try again");
+    } finally { setUploading(false); }
   };
 
   const openReport = () => { setMenuOpen(false); setReportOpen(true); };
@@ -214,6 +371,11 @@ export default function ConversationScreen() {
   const other = conv?.participants?.find((p: any) => p.id !== user?.id);
   const property = conv?.property;
 
+  const headerSubtitle = useMemo(() => {
+    if (presence.typing) return "typing…";
+    return _lastSeenLabel(presence.last_seen);
+  }, [presence.typing, presence.last_seen]);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
@@ -227,6 +389,8 @@ export default function ConversationScreen() {
     <SafeAreaView style={styles.container} edges={["top"]} testID="chat-screen">
       <ChatHeader
         title={other?.full_name || other?.email || "Chat"}
+        subtitle={headerSubtitle}
+        typing={presence.typing}
         verified={!!other?.verified}
         onBack={() => router.back()}
         onMenu={() => setMenuOpen(true)}
@@ -263,11 +427,21 @@ export default function ConversationScreen() {
               </Pressable>
             ) : null
           }
+          ListFooterComponent={
+            presence.typing ? (
+              <View style={[styles.bubbleRow, styles.bubbleRowTheirs, { marginTop: 6 }]}>
+                <View style={[styles.bubble, styles.bubbleTheirs, styles.typingBubble]}>
+                  <TypingDots />
+                </View>
+              </View>
+            ) : null
+          }
           renderItem={({ item, index }) => {
             const mine = item.sender_id === user?.id;
             const prev = msgs[index - 1];
             const showTs = !prev
               || new Date(item.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000;
+            const imageUrl = _absUrl(item.attachments?.[0]?.url);
             return (
               <View>
                 {showTs && (
@@ -276,24 +450,46 @@ export default function ConversationScreen() {
                   </Text>
                 )}
                 <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
-                  <View
-                    style={[
-                      styles.bubble,
-                      mine ? styles.bubbleMine : styles.bubbleTheirs,
-                      item._failed && { borderWidth: 1.5, borderColor: colors.red },
-                    ]}
-                  >
-                    <Text style={[styles.bubbleText, mine && { color: "#fff" }]}>{item.text}</Text>
-                    {mine && (
-                      <Text style={styles.bubbleStatus}>
-                        {item._failed
-                          ? "· failed — tap to retry"
-                          : item._local
-                          ? "· sending…"
-                          : "· sent"}
-                      </Text>
-                    )}
-                  </View>
+                  {imageUrl ? (
+                    <Pressable onPress={() => setPreviewUrl(imageUrl)}>
+                      <View
+                        style={[
+                          styles.imageBubble,
+                          mine && styles.imageBubbleMine,
+                          item._failed && { borderWidth: 1.5, borderColor: colors.red },
+                        ]}
+                      >
+                        <Image source={{ uri: imageUrl }} style={styles.imageMsg} />
+                        {item.text ? (
+                          <Text style={[styles.imageCaption, mine && { color: "#fff" }]}>{item.text}</Text>
+                        ) : null}
+                        {mine && (
+                          <Text style={styles.imageStatus}>
+                            {item._failed ? "· failed" : item._local ? "· sending…" : "· sent"}
+                          </Text>
+                        )}
+                      </View>
+                    </Pressable>
+                  ) : (
+                    <View
+                      style={[
+                        styles.bubble,
+                        mine ? styles.bubbleMine : styles.bubbleTheirs,
+                        item._failed && { borderWidth: 1.5, borderColor: colors.red },
+                      ]}
+                    >
+                      <Text style={[styles.bubbleText, mine && { color: "#fff" }]}>{item.text}</Text>
+                      {mine && (
+                        <Text style={styles.bubbleStatus}>
+                          {item._failed
+                            ? "· failed — tap to retry"
+                            : item._local
+                            ? "· sending…"
+                            : "· sent"}
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </View>
               </View>
             );
@@ -301,10 +497,23 @@ export default function ConversationScreen() {
         />
 
         <View style={styles.composer}>
+          <Pressable
+            style={[styles.attachBtn, (uploading || sending) && { opacity: 0.4 }]}
+            onPress={sendImage}
+            disabled={uploading || sending}
+            testID="chat-attach"
+            hitSlop={8}
+          >
+            {uploading ? (
+              <ActivityIndicator color={colors.red} />
+            ) : (
+              <Ionicons name="image-outline" size={22} color={colors.red} />
+            )}
+          </Pressable>
           <TextInput
             style={styles.input}
             value={text}
-            onChangeText={setText}
+            onChangeText={handleTextChange}
             placeholder="Message…"
             placeholderTextColor={colors.textMuted}
             multiline
@@ -368,12 +577,49 @@ export default function ConversationScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Image preview modal */}
+      <Modal
+        transparent
+        visible={!!previewUrl}
+        animationType="fade"
+        onRequestClose={() => setPreviewUrl(null)}
+      >
+        <Pressable style={styles.previewBackdrop} onPress={() => setPreviewUrl(null)}>
+          <Image source={{ uri: previewUrl ?? "" }} style={styles.previewImage} resizeMode="contain" />
+          <Pressable style={styles.previewClose} onPress={() => setPreviewUrl(null)} hitSlop={12}>
+            <Ionicons name="close" size={22} color="#fff" />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-function ChatHeader({ title, verified, onBack, onMenu }: {
-  title: string; verified?: boolean; onBack: () => void; onMenu: () => void;
+function TypingDots() {
+  const [dot, setDot] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setDot((d) => (d + 1) % 3), 400);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <View style={{ flexDirection: "row", gap: 3, paddingVertical: 2 }}>
+      {[0, 1, 2].map((i) => (
+        <View
+          key={i}
+          style={{
+            width: 6, height: 6, borderRadius: 3,
+            backgroundColor: dot === i ? colors.text : colors.textMuted,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+function ChatHeader({ title, subtitle, typing, verified, onBack, onMenu }: {
+  title: string; subtitle?: string; typing?: boolean;
+  verified?: boolean; onBack: () => void; onMenu: () => void;
 }) {
   return (
     <View style={styles.header}>
@@ -385,6 +631,11 @@ function ChatHeader({ title, verified, onBack, onMenu }: {
           <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
           {verified && <Ionicons name="checkmark-circle" size={14} color={colors.emerald} />}
         </View>
+        {subtitle ? (
+          <Text style={[styles.headerSubtitle, typing && { color: colors.emerald }]} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
       <Pressable style={styles.iconBtn} onPress={onMenu} testID="chat-menu">
         <Ionicons name="ellipsis-vertical" size={20} color={colors.text} />
@@ -402,6 +653,7 @@ const styles = StyleSheet.create({
   },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   headerTitle: { ...typography.h2, fontSize: 15, maxWidth: 220 },
+  headerSubtitle: { fontSize: 10, fontWeight: "700", color: colors.textTertiary, marginTop: 1, letterSpacing: 0.3 },
   propCard: {
     flexDirection: "row", gap: 10, padding: 10, marginBottom: 8,
     borderRadius: radius.md, backgroundColor: "#fff", alignItems: "center",
@@ -422,11 +674,30 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: "#fff", borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 14, color: colors.text, lineHeight: 20 },
   bubbleStatus: { fontSize: 9, color: "rgba(255,255,255,0.65)", marginTop: 2, textAlign: "right" },
+  typingBubble: { paddingHorizontal: 14, paddingVertical: 10 },
+  imageBubble: {
+    padding: 4, borderRadius: 16,
+    backgroundColor: "#fff",
+    maxWidth: 240,
+    borderBottomLeftRadius: 4,
+  },
+  imageBubbleMine: { backgroundColor: colors.ink, borderBottomLeftRadius: 16, borderBottomRightRadius: 4 },
+  imageMsg: {
+    width: 220, height: 220, borderRadius: 12,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  imageCaption: { fontSize: 13, color: colors.text, marginTop: 6, marginHorizontal: 4 },
+  imageStatus: { fontSize: 9, color: "rgba(255,255,255,0.65)", marginTop: 2, marginRight: 6, textAlign: "right" },
   composer: {
-    flexDirection: "row", alignItems: "flex-end", gap: 8,
+    flexDirection: "row", alignItems: "flex-end", gap: 6,
     padding: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider,
     backgroundColor: "#fff",
+  },
+  attachBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.surfaceSecondary,
   },
   input: {
     flex: 1, minHeight: 40, maxHeight: 120,
@@ -452,4 +723,15 @@ const styles = StyleSheet.create({
   reportCancelText: { fontSize: 14, fontWeight: "700", color: colors.text },
   reportSubmit: { flex: 1, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 22, backgroundColor: colors.red },
   reportSubmitText: { fontSize: 14, fontWeight: "800", color: "#fff" },
+  previewBackdrop: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.92)",
+    alignItems: "center", justifyContent: "center",
+  },
+  previewImage: { width: "100%", height: "80%" },
+  previewClose: {
+    position: "absolute", top: 40, right: 20,
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center", justifyContent: "center",
+  },
 });

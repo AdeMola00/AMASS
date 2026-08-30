@@ -1,9 +1,14 @@
 /**
- * AMASS Chat — Inbox (Phase 1)
+ * AMASS Chat — Inbox (Phase 1 + 2)
  * Lists conversations you're a participant in, with unread badges and the
  * most-recent message preview. Tapping opens `/chat/[id]`.
+ *
+ * Phase 2 additions:
+ *  • Search bar (matches by participant, property title, or last preview).
+ *  • Verified-only toggle (limits to conversations with a verified other participant).
+ *  • Global message search (falls back to /chat/search when a query is entered).
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +17,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -40,10 +46,18 @@ export default function InboxScreen() {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [q, setQ] = useState("");
+  const [searchHits, setSearchHits] = useState<any[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const searchTimer = useRef<NodeJS.Timeout | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const r = await api.chatListConversations(50);
+      const r = await api.chatListConversations(50, {
+        verified_only: verifiedOnly,
+        q: q.trim().length >= 2 ? q.trim() : undefined,
+      });
       setRows(r.items);
     } catch {
       // silent
@@ -51,9 +65,28 @@ export default function InboxScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [verifiedOnly, q]);
 
   useEffect(() => { if (user) load(); }, [user, load]);
+
+  // Debounced message search across all my conversations
+  useEffect(() => {
+    if (!user) return;
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (q.trim().length < 2) { setSearchHits(null); return; }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await api.chatSearch(q.trim(), 30);
+        setSearchHits(r.items ?? []);
+      } catch {
+        setSearchHits([]);
+      } finally { setSearching(false); }
+    }, 350);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [q, user]);
+
+  const showSearch = q.trim().length >= 2;
 
   if (!user) {
     return (
@@ -70,8 +103,80 @@ export default function InboxScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]} testID="inbox-screen">
       <Header title="Messages" onBack={() => router.back()} />
+
+      {/* Search + filter row */}
+      <View style={styles.filterRow}>
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={16} color={colors.textTertiary} />
+          <TextInput
+            value={q}
+            onChangeText={setQ}
+            placeholder="Search messages, agents…"
+            placeholderTextColor={colors.textMuted}
+            style={styles.searchInput}
+            testID="inbox-search"
+            returnKeyType="search"
+            autoCapitalize="none"
+          />
+          {q.length > 0 && (
+            <Pressable onPress={() => setQ("")} hitSlop={10}>
+              <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
+            </Pressable>
+          )}
+        </View>
+        <Pressable
+          onPress={() => setVerifiedOnly((v) => !v)}
+          style={[styles.filterChip, verifiedOnly && styles.filterChipActive]}
+          testID="verified-only-toggle"
+        >
+          <Ionicons
+            name={verifiedOnly ? "checkmark-circle" : "shield-outline"}
+            size={13}
+            color={verifiedOnly ? "#fff" : colors.text}
+          />
+          <Text style={[styles.filterChipText, verifiedOnly && { color: "#fff" }]}>Verified</Text>
+        </Pressable>
+      </View>
+
       {loading ? (
         <ActivityIndicator style={{ marginTop: 60 }} color={colors.red} />
+      ) : showSearch ? (
+        <FlatList
+          data={searchHits ?? []}
+          keyExtractor={(x, i) => `${x.id}-${i}`}
+          contentContainerStyle={{ padding: spacing.md, gap: 8, paddingBottom: 40 }}
+          ListHeaderComponent={
+            <View style={styles.searchHeader}>
+              <Text style={styles.searchLabel}>
+                {searching ? "Searching…" : `${searchHits?.length ?? 0} messages match "${q.trim()}"`}
+              </Text>
+            </View>
+          }
+          ListEmptyComponent={
+            !searching ? (
+              <View style={styles.empty}>
+                <Ionicons name="search" size={40} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>No messages found</Text>
+                <Text style={styles.emptySub}>Try a different keyword.</Text>
+              </View>
+            ) : null
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              style={[styles.hitCard, shadows.soft]}
+              onPress={() => router.push(`/chat/${item.conversation_id}` as any)}
+              testID={`hit-${item.id}`}
+            >
+              <View style={styles.hitTop}>
+                <Text style={styles.hitFrom} numberOfLines={1}>
+                  {item.sender_name ?? "Message"}
+                </Text>
+                <Text style={styles.time}>{_time(item.created_at)}</Text>
+              </View>
+              <Text style={styles.hitText} numberOfLines={3}>{item.text}</Text>
+            </Pressable>
+          )}
+        />
       ) : (
         <FlatList
           data={rows}
@@ -81,8 +186,14 @@ export default function InboxScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="chatbubble-ellipses" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>No conversations yet</Text>
-              <Text style={styles.emptySub}>Contact an agent from a property to start.</Text>
+              <Text style={styles.emptyTitle}>
+                {verifiedOnly ? "No verified conversations yet" : "No conversations yet"}
+              </Text>
+              <Text style={styles.emptySub}>
+                {verifiedOnly
+                  ? "Turn off the Verified filter to see all messages."
+                  : "Contact an agent from a property to start."}
+              </Text>
             </View>
           }
           renderItem={({ item }) => {
@@ -164,6 +275,30 @@ const styles = StyleSheet.create({
   },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
+  filterRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: spacing.md, paddingTop: 10, paddingBottom: 4,
+  },
+  searchBox: {
+    flex: 1, flexDirection: "row", alignItems: "center", gap: 6,
+    height: 40, paddingHorizontal: 12, borderRadius: 20,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  searchInput: { flex: 1, fontSize: 13, color: colors.text, paddingVertical: 0 },
+  filterChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    height: 36, paddingHorizontal: 12, borderRadius: 18,
+    backgroundColor: "#fff",
+    borderWidth: 1.5, borderColor: colors.border,
+  },
+  filterChipActive: { backgroundColor: colors.emerald, borderColor: colors.emerald },
+  filterChipText: { fontSize: 12, fontWeight: "800", color: colors.text },
+  searchHeader: { paddingBottom: 6 },
+  searchLabel: { fontSize: 11, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.4 },
+  hitCard: { padding: 12, borderRadius: radius.md, backgroundColor: "#fff", gap: 4 },
+  hitTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  hitFrom: { flex: 1, fontSize: 13, fontWeight: "800", color: colors.text },
+  hitText: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   row: {
     flexDirection: "row", gap: 12, padding: 12,
     borderRadius: radius.md, backgroundColor: "#fff", alignItems: "center",
