@@ -29,6 +29,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { colors, radius, shadows, spacing, typography, formatMarkerPrice } from "@/src/constants/theme";
+import { VoiceComposer } from "@/src/components/VoiceComposer";
+import { VoiceBubble } from "@/src/components/VoiceBubble";
 
 type Attachment = { url: string; path?: string; width?: number; height?: number; type?: string };
 type Msg = {
@@ -331,6 +333,33 @@ export default function ConversationScreen() {
     } finally { setUploading(false); }
   };
 
+  // ─ Voice note upload (Phase 2b) ─
+  const handleVoiceUploaded = async (url: string, path: string, durationMs: number) => {
+    const client_msg_id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: Msg = {
+      id: client_msg_id, conversation_id: convId, sender_id: user!.id,
+      text: "", kind: "audio",
+      attachments: [{ url, path, duration_ms: durationMs, type: "audio" }],
+      client_msg_id,
+      created_at: new Date().toISOString(), _local: true,
+    };
+    setMsgs((prev) => [...prev, optimistic]);
+    listRef.current?.scrollToEnd({ animated: true });
+    try {
+      const sent = await api.chatSendMessage(convId, {
+        text: "", kind: "audio", client_msg_id,
+        attachments: [{ url, path, duration_ms: durationMs, type: "audio" }],
+      });
+      setMsgs((prev) =>
+        prev.map((m) => (m.client_msg_id === client_msg_id ? { ...sent, _local: false } : m))
+      );
+    } catch {
+      setMsgs((prev) =>
+        prev.map((m) => (m.client_msg_id === client_msg_id ? { ...m, _failed: true } : m))
+      );
+    }
+  };
+
   const openReport = () => { setMenuOpen(false); setReportOpen(true); };
   const submitReport = async () => {
     if (!reportReason.trim()) return;
@@ -441,7 +470,10 @@ export default function ConversationScreen() {
             const prev = msgs[index - 1];
             const showTs = !prev
               || new Date(item.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000;
-            const imageUrl = _absUrl(item.attachments?.[0]?.url);
+            const att0 = item.attachments?.[0];
+            const isAudio = item.kind === "audio" || (att0?.type === "audio");
+            const imageUrl = !isAudio ? _absUrl(att0?.url) : undefined;
+            const audioUrl = isAudio ? _absUrl(att0?.url) : undefined;
             return (
               <View>
                 {showTs && (
@@ -450,7 +482,16 @@ export default function ConversationScreen() {
                   </Text>
                 )}
                 <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
-                  {imageUrl ? (
+                  {audioUrl ? (
+                    <View style={{ maxWidth: "78%" }}>
+                      <VoiceBubble url={audioUrl} durationMs={att0?.duration_ms} mine={mine} />
+                      {mine && (
+                        <Text style={[styles.audioStatus, item._failed && { color: colors.red }]}>
+                          {item._failed ? "· failed" : item._local ? "· sending…" : "· sent"}
+                        </Text>
+                      )}
+                    </View>
+                  ) : imageUrl ? (
                     <Pressable onPress={() => setPreviewUrl(imageUrl)}>
                       <View
                         style={[
@@ -520,18 +561,28 @@ export default function ConversationScreen() {
             maxLength={4000}
             testID="chat-input"
           />
-          <Pressable
-            style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]}
-            onPress={send}
-            disabled={!text.trim() || sending}
-            testID="chat-send"
-          >
-            {sending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Ionicons name="send" size={18} color="#fff" />
-            )}
-          </Pressable>
+          {text.trim().length > 0 ? (
+            <Pressable
+              style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]}
+              onPress={send}
+              disabled={!text.trim() || sending}
+              testID="chat-send"
+            >
+              {sending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Ionicons name="send" size={18} color="#fff" />
+              )}
+            </Pressable>
+          ) : (
+            <VoiceComposer
+              conversationId={convId}
+              disabled={sending || uploading}
+              onSending={setUploading}
+              onUploaded={handleVoiceUploaded}
+              onError={(m) => Alert.alert("Voice note", m)}
+            />
+          )}
         </View>
       </KeyboardAvoidingView>
 
@@ -688,6 +739,7 @@ const styles = StyleSheet.create({
   },
   imageCaption: { fontSize: 13, color: colors.text, marginTop: 6, marginHorizontal: 4 },
   imageStatus: { fontSize: 9, color: "rgba(255,255,255,0.65)", marginTop: 2, marginRight: 6, textAlign: "right" },
+  audioStatus: { fontSize: 9, color: colors.textTertiary, marginTop: 2, marginRight: 6, textAlign: "right" },
   composer: {
     flexDirection: "row", alignItems: "flex-end", gap: 6,
     padding: spacing.md,

@@ -2048,7 +2048,7 @@ export const api = {
   },
   chatSendMessage: (
     id: string,
-    payload: { text: string; client_msg_id?: string; kind?: "text" | "property_card" | "image"; attachments?: any[] }
+    payload: { text: string; client_msg_id?: string; kind?: "text" | "property_card" | "image" | "audio"; attachments?: any[] }
   ) =>
     req<any>(`/chat/conversations/${encodeURIComponent(id)}/messages`, {
       method: "POST", body: JSON.stringify(payload),
@@ -2100,6 +2100,21 @@ export const api = {
       presence: { user_id: string; last_seen_at: string }[];
       server_time: string;
     }>(`/chat/conversations/${encodeURIComponent(id)}/presence`),
+
+  // ─── Chat Phase 2b: Voice notes ───
+  chatUploadAudio: (conv_id: string, data_url: string, duration_ms?: number) =>
+    req<{ url: string; path: string; duration_ms?: number }>(
+      `/chat/conversations/${encodeURIComponent(conv_id)}/upload-audio`,
+      { method: "POST", body: JSON.stringify({ data_url, duration_ms }) }
+    ),
+
+  // ─── Push notifications (Emergent-managed) ───
+  registerPush: (body: { user_id: string; platform: "ios" | "android"; device_token: string }) =>
+    req<{ status: string }>("/register-push", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   adminGetVisibility: (amass_id: string) =>
     req<Record<string, boolean>>(
       `/admin/passport/${encodeURIComponent(amass_id)}/visibility`

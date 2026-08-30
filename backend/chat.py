@@ -42,7 +42,7 @@ POLL_INTERVAL_S = 0.6
 class SendMessageIn(BaseModel):
     text: Optional[str] = Field(None, max_length=MAX_TEXT_LEN)
     client_msg_id: Optional[str] = Field(None, max_length=64)
-    kind: Literal["text", "property_card", "image"] = "text"
+    kind: Literal["text", "property_card", "image", "audio"] = "text"
     attachments: Optional[List[Dict[str, Any]]] = None
 
 
@@ -50,6 +50,11 @@ class UploadImageIn(BaseModel):
     data_url: str  # data:image/jpeg;base64,...
     width: Optional[int] = None
     height: Optional[int] = None
+
+
+class UploadAudioIn(BaseModel):
+    data_url: str  # data:audio/m4a;base64,...
+    duration_ms: Optional[int] = Field(None, ge=0, le=300_000)  # ≤5 min
 
 
 class TypingIn(BaseModel):
@@ -150,6 +155,21 @@ async def _notify(db, user_id: str, conversation_id: str, sender_name: str,
                  "sender_name": sender_name},
         "created_at": _now().isoformat(),
     })
+    # Push relay (best-effort; must not block message send)
+    try:
+        from push_notifications import send_push
+        await send_push(
+            recipients=[user_id],
+            data={
+                "title": sender_name,
+                "message": preview[:180] or "New message",
+                "action_url": f"/chat/{conversation_id}",
+            },
+            idempotency_key=f"chat-{conversation_id}-{_now().timestamp()}",
+        )
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger("amass.chat").warning("push send failed: %s", e)
 
 
 # ── Router ───────────────────────────────────────────────────────
@@ -350,7 +370,14 @@ def register_chat_routes(db, get_current_user, require_admin):
             "created_at": now,
         }
         await db.chat_messages.insert_one(msg)
-        preview = text_val if text_val else "📷 Image"
+        if text_val:
+            preview = text_val
+        elif data.kind == "audio":
+            preview = "🎙️ Voice note"
+        elif data.kind == "image":
+            preview = "📷 Image"
+        else:
+            preview = "📎 Attachment"
         await _bump_conversation(db, conv_id, preview, now)
         # Notifications to other participants
         for oid in other_ids:
@@ -472,6 +499,43 @@ def register_chat_routes(db, get_current_user, require_admin):
             "path": path,
             "width": data.width,
             "height": data.height,
+        }
+
+    # ── Voice notes: upload audio (Phase 2b) ─────────────────
+    @router.post("/conversations/{conv_id}/upload-audio")
+    async def upload_audio(
+        conv_id: str,
+        data: UploadAudioIn = Body(...),
+        user: dict = Depends(get_current_user),
+    ):
+        await _assert_participant(db, conv_id, user["id"])
+        import base64
+        try:
+            b64 = data.data_url.split(",", 1)[1] if data.data_url.startswith("data:") else data.data_url
+            approx_bytes = int(len(b64) * 0.75)
+            # 10 MB is generous for m4a @ 5 min
+            if approx_bytes > 10 * 1024 * 1024:
+                raise HTTPException(413, "Voice note too large (max ~5 min / 10 MB)")
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(400, "Invalid audio payload")
+        from object_storage import upload_file_base64
+        # Infer extension from data URL header ("data:audio/m4a;base64,...")
+        ext = "m4a"
+        try:
+            head = data.data_url.split(",", 1)[0]
+            if "audio/" in head:
+                mime = head.split("audio/")[1].split(";")[0].strip().lower()
+                if mime in {"m4a", "mp4", "aac", "wav", "webm", "mpeg", "mp3", "ogg", "3gpp", "amr"}:
+                    ext = "mp3" if mime == "mpeg" else ("m4a" if mime in {"mp4", "aac"} else mime)
+        except Exception:
+            pass
+        path = await upload_file_base64(user["id"], data.data_url, extension=ext)
+        return {
+            "url": f"/api/files/{path}",
+            "path": path,
+            "duration_ms": data.duration_ms,
         }
 
     # ── Phase 2: Message search across my conversations ───────

@@ -1990,6 +1990,10 @@ app.include_router(register_valuation_routes(db, get_current_user, require_admin
 from chat import register_chat_routes, create_chat_indexes
 app.include_router(register_chat_routes(db, get_current_user, require_admin))
 
+# ─── Push notifications (Emergent-managed) ───
+from push_notifications import register_push_routes
+app.include_router(register_push_routes())
+
 @app.get("/api/files/{file_path:path}")
 async def _download_file(file_path: str, user: dict = Depends(get_current_user)):
     """Auth-checked passthrough to Emergent Object Storage.

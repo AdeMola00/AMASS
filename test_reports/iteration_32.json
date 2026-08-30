@@ -1,0 +1,33 @@
+{
+  "summary": "AMASS Chat Phase 2b (push notifications + WhatsApp-style voice notes) — backend 12/12 pytest green, frontend composer swap + VoiceBubble render verified in Expo web preview.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_push_and_voice.py",
+    "/app/test_reports/pytest/pytest_iteration32_push_voice.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional: since actual mic recording requires a native build, no automated web test can exercise the tap-and-hold gesture or slide-to-lock/cancel behaviour — verify manually with Expo Go / TestFlight before release.",
+    "Note (informational): expo-notifications logs a benign 'Listening to push token changes is not yet fully supported on web' warning during web preview — expected."
+  ],
+  "critical_code_review_comments": [
+    "push_notifications.py correctly maps upstream 401 -> HTTP 500 'Push key not configured', 5xx -> 502, and best-effort send_push swallows errors — verified end-to-end.",
+    "chat.py::_notify wraps send_push in try/except so message insert is never blocked by push failure — verified (plain text send returns 200 with placeholder key).",
+    "object_storage.upload_file_base64 correctly enforces 15MB raw cap; chat.upload_audio pre-checks a tighter 10MB cap and returns 413 accurately.",
+    "VoiceComposer swaps to mic on empty input, send on non-empty input — verified visually and via testID counts (mic=1↔send=1 flip)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_push_and_voice.py (new)"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% (composer swap + audio bubble render)"},
+  "seed_data_creation": "Registered two throw-away users test_buyer_* and test_stranger_* @amass.africa for participant/outsider assertions; created one property-linked conversation between buyer and demo with 1 audio message + 1 text message via API.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Chat now supports kind='audio' attachments with duration_ms. Backend endpoints POST /api/register-push and POST /api/chat/conversations/{id}/upload-audio are stable. EMERGENT_PUSH_KEY is 'placeholder' in dev — upstream 401 -> our 500 'Push key not configured' is the expected error path (asserted). Voice mic recording itself can only be tested on native builds (VoiceComposer surfaces 'Voice notes work on iOS and Android builds only.' on web).",
+  "rca_of_issue": "N/A — no bugs found. Note: the seeded admin@amass.africa test credential in test_credentials.md does not accept password 'amass2026' (returns 401 and register returns 400 'Email already registered'). Suggest main agent update /app/memory/test_credentials.md with the actual admin@ password or clarify that only demo@amass.africa is a live shared credential."
+}

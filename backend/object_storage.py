@@ -140,3 +140,34 @@ async def upload_photo_base64(user_id: str, data_url_or_b64: str) -> str:
         except Exception:
             raise HTTPException(400, "Invalid base64 payload")
     return await upload_photo_bytes(user_id, raw, content_type)
+
+
+async def upload_file_base64(user_id: str, data_url_or_b64: str, extension: str = "bin") -> str:
+    """Generic base64 → object-storage upload for non-image payloads (e.g., audio).
+
+    Accepts either a `data:audio/m4a;base64,...` URL or raw base64. Content type
+    is preserved from the data URL header when present; otherwise falls back
+    to `application/octet-stream`. Storage path uses the supplied `extension`.
+    """
+    s = data_url_or_b64.strip()
+    content_type = "application/octet-stream"
+    if s.startswith("data:"):
+        try:
+            header, b64 = s.split(",", 1)
+            if ";base64" not in header:
+                raise ValueError("only base64 data URLs accepted")
+            content_type = header[len("data:"):].split(";", 1)[0] or content_type
+            raw = base64.b64decode(b64)
+        except Exception as e:
+            raise HTTPException(400, f"Invalid base64 data URL: {e}")
+    else:
+        try:
+            raw = base64.b64decode(s)
+        except Exception:
+            raise HTTPException(400, "Invalid base64 payload")
+    if len(raw) > 15 * 1024 * 1024:
+        raise HTTPException(413, "File too large (max 15 MB)")
+    ext = (extension or "bin").lstrip(".").lower() or "bin"
+    path = f"{APP_NAME}/uploads/{user_id}/{uuid.uuid4().hex}.{ext}"
+    await put_object(path, raw, content_type)
+    return path

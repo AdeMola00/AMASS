@@ -19,7 +19,8 @@
         "NSLocationWhenInUseUsageDescription": "Discover properties near you on the map",
         "NSPhotoLibraryUsageDescription": "Choose photos for your property listings",
         "NSPhotoLibraryAddUsageDescription": "Save AMASS flyers and QR codes to your camera roll",
-        "NSCameraUsageDescription": "Take photos of properties to list on AMASS"
+        "NSCameraUsageDescription": "Take photos of properties to list on AMASS",
+        "NSMicrophoneUsageDescription": "Record voice notes to send in chat"
       }
     },
     "android": {
@@ -29,6 +30,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.propertyosafrica.znbqmw",
+      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyAknqfu3Tx0v_XwLHMaGRj5fMQ7rJxYYLY"
@@ -38,8 +40,10 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
+        "RECORD_AUDIO",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -71,6 +75,14 @@
           "imageWidth": 260,
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF"
+        }
+      ],
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/amass-icon.png",
+          "color": "#E11D48"
         }
       ]
     ],

@@ -187,3 +187,28 @@ See `/app/memory/test_credentials.md`
   - `/admin/chat-reports` — one-tap moderation queue with Resolve + Block user + View conversation actions, KPI stats
 - Tests: `/app/backend/tests/test_chat_phase2.py` — 21/21 pass · Frontend testing agent green on inbox + chat + admin surfaces
 
+
+## Push Notifications + Voice Notes (Jun 2026)
+
+### Emergent-managed Push
+- Backend `/app/backend/push_notifications.py` — httpx proxy to `integrations.emergentagent.com`
+- Endpoint: `POST /api/register-push {user_id, platform, device_token}` (also short-circuits `web` platform)
+- Helper: `send_push(recipients, data, idempotency_key?)` — non-blocking; called from `chat.py::_notify` for every new message with `action_url:/chat/{conv_id}` for one-tap deep-linking
+- `EMERGENT_PUSH_KEY=placeholder` added to `/app/backend/.env` — deployer replaces at build time
+- Frontend:
+  - `/app/frontend/app/_layout.tsx` — module-scope `setNotificationHandler` + Android channel `default`; useEffect wires `addNotificationResponseReceivedListener` (warm tap), `getLastNotificationResponseAsync` (cold-start), plus a weekly denied-permission nudge → `Linking.openSettings()`
+  - `/app/frontend/src/lib/push.ts` — `registerForPush(userId)` helper: permission → `getDevicePushTokenAsync()` → POST `/api/register-push`
+  - Auth context calls `registerForPush()` after login/register/apple sign-in and on every session restore
+- Config: `app.json` adds `expo-notifications` plugin, `POST_NOTIFICATIONS` Android permission, and `googleServicesFile: "./google-services.json"` (user must supply the file before Android build)
+- Requires **real device build** (dev-client / TestFlight / .APK); does NOT fire in Expo Go or web preview
+
+### Voice Notes (WhatsApp-style)
+- Backend: `POST /api/chat/conversations/{id}/upload-audio {data_url, duration_ms}` — 10 MB cap, extension inferred from data URL, stored via `object_storage.upload_file_base64` (new generic helper)
+- `chat.py::SendMessageIn.kind` extended to include `"audio"`; message preview auto-switches to `🎙️ Voice note`
+- Frontend components:
+  - `/app/frontend/src/components/VoiceComposer.tsx` — tap-and-hold recorder using `expo-audio` `useAudioRecorder` + PanResponder for slide-up-to-lock and slide-left-to-cancel, 60 s max, pulse animation, haptics
+  - `/app/frontend/src/components/VoiceBubble.tsx` — play/pause + progress bar + duration counter using `expo-audio` `createAudioPlayer`
+- Composer swaps `send` button for `VoiceComposer` when the text input is empty; audio messages render as `VoiceBubble` in the thread
+- Permissions: `NSMicrophoneUsageDescription` (iOS), `RECORD_AUDIO` (Android)
+- Tests: `/app/backend/tests/test_push_and_voice.py` — 12/12 pass · Frontend testing agent green on composer swap + VoiceBubble render
+
