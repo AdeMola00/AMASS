@@ -212,3 +212,22 @@ See `/app/memory/test_credentials.md`
 - Permissions: `NSMicrophoneUsageDescription` (iOS), `RECORD_AUDIO` (Android)
 - Tests: `/app/backend/tests/test_push_and_voice.py` — 12/12 pass · Frontend testing agent green on composer swap + VoiceBubble render
 
+
+## Redfin-style Map + Social Sign-In (Jun 2026)
+
+### Map polish
+- New component `/app/frontend/src/components/MapLegend.tsx` — chip in the bottom-left of the home map that opens a modal explaining all 8 property-type marker colours + separate ✓ Verified and 🔥 Hot listing badges (never green markers for verification)
+- `MapDockedCard.tsx` — three-way quick action row: Save (❤ heart, toggles favorite), View Details (primary ink pill), Contact Agent (emerald outline → starts / opens `/chat/{id}`). Testable via `docked-save-<id>`, `docked-view-<id>`, `docked-contact-<id>`.
+- Existing filter chips (For Sale · For Rent · Land · Commercial · Luxury · Verified · Recently Added · Open House), Search-this-area pill, clustering, and price-on-marker labels preserved.
+
+### Social sign-in
+- Backend `/app/backend/google_auth.py` — bridges Emergent hosted Google OAuth into existing JWT auth.
+  - `POST /api/auth/google-session {session_id}` → exchanges via `demobackend.emergentagent.com/auth/v1/env/oauth/session-data` → **upsert-by-email** in `users` collection (existing password user is linked, never duplicated) → returns identical `{access_token, user}` shape as `/api/auth/login`
+- Frontend components:
+  - `GoogleSignInButton.tsx` — mobile (`WebBrowser.openAuthSessionAsync` + fragment-safe `session_id` extraction from `result.url` / URL listener / `getInitialURL`) + web (`window.location.href` full-page nav → session parsed on mount from `#session_id`)
+  - `FacebookSignInButton.tsx` — coming-soon stub (blue, Alert on tap); real Meta OAuth pending Facebook App ID/Secret from user
+  - Existing `AppleSignInButton.tsx` still gated to iOS
+- `AuthContext.refresh()` added so social sign-ins can hydrate the user without touching password endpoints
+- Login + register screens (`/app/frontend/app/(auth)/{login,register}.tsx`) now show all four options: Google · Apple (iOS only) · Facebook · Email/password
+- Tests: `/app/backend/tests/test_google_auth_and_map.py` — 11/11 pass · Frontend testing agent green on both auth screens + map legend + filter chips
+

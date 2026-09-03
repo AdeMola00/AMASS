@@ -1994,6 +1994,12 @@ app.include_router(register_chat_routes(db, get_current_user, require_admin))
 from push_notifications import register_push_routes
 app.include_router(register_push_routes())
 
+# ─── Emergent-managed Google Auth bridge ───
+from google_auth import register_google_auth_routes
+app.include_router(
+    register_google_auth_routes(db, create_token, user_to_out, hash_password)
+)
+
 @app.get("/api/files/{file_path:path}")
 async def _download_file(file_path: str, user: dict = Depends(get_current_user)):
     """Auth-checked passthrough to Emergent Object Storage.

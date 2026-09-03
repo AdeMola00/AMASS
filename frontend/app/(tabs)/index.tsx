@@ -32,6 +32,7 @@ import { PropertyCardSkeleton } from "@/src/components/Skeleton";
 import { LayerPickerSheet, LayerPickerRef, MapLayer } from "@/src/components/LayerPickerSheet";
 import { NeighborhoodSheet, NeighborhoodSheetRef } from "@/src/components/NeighborhoodSheet";
 import { AmassLogo } from "@/src/components/AmassLogo";
+import { MapLegend } from "@/src/components/MapLegend";
 import { mapMinimal } from "@/src/constants/mapStyle";
 import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 
@@ -816,6 +817,13 @@ export default function HomeMap() {
         </View>
       )}
 
+      {/* Map legend chip (bottom-left) */}
+      {viewMode === "map" && !activeId && (
+        <View style={{ position: "absolute", left: spacing.lg, bottom: dockedBottom + 12 }} pointerEvents="box-none">
+          <MapLegend />
+        </View>
+      )}
+
       {/* Location permission banner */}
       {locationPermission === "blocked" && (
         <View style={[styles.permBanner, { top: searchTop + 140 }]} testID="location-perm-banner">
@@ -844,6 +852,15 @@ export default function HomeMap() {
           }}
           onPressCard={(p) => router.push(`/property/${p.id}`)}
           onFavorite={onFavorite}
+          onContact={async (p) => {
+            Haptics.selectionAsync().catch(() => {});
+            try {
+              const conv = await api.chatStartFromProperty(p.id);
+              router.push(`/chat/${conv.id}` as any);
+            } catch (e: any) {
+              Alert.alert("Cannot contact agent", e?.message ?? "Try again later");
+            }
+          }}
           onDismiss={() => {
             Haptics.selectionAsync().catch(() => {});
             setActiveId(null);

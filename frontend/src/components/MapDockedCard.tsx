@@ -54,6 +54,7 @@ export function MapDockedCard({
   onIndexChange,
   onPressCard,
   onFavorite,
+  onContact,
   onDismiss,
 }: {
   properties: Property[];
@@ -62,6 +63,7 @@ export function MapDockedCard({
   onIndexChange: (property: Property) => void;
   onPressCard: (property: Property) => void;
   onFavorite: (id: string) => void;
+  onContact?: (property: Property) => void;
   onDismiss?: () => void;
 }) {
   const listRef = useRef<FlatList<Property>>(null);
@@ -147,6 +149,7 @@ export function MapDockedCard({
             favorited={favorites.has(item.id)}
             onPress={() => onPressCard(item)}
             onFavorite={() => onFavorite(item.id)}
+            onContact={onContact ? () => onContact(item) : undefined}
           />
         )}
       />
@@ -161,6 +164,7 @@ function DockedCard({
   favorited,
   onPress,
   onFavorite,
+  onContact,
 }: {
   item: Property;
   width: number;
@@ -168,6 +172,7 @@ function DockedCard({
   favorited: boolean;
   onPress: () => void;
   onFavorite: () => void;
+  onContact?: () => void;
 }) {
   const cover = item.images?.[0];
   const chip = TXN_CHIP[txnChipFor(item)];
@@ -250,10 +255,6 @@ function DockedCard({
                 <Text style={styles.priceOnRequest}>Price on Request</Text>
               )}
             </Text>
-            <Pressable onPress={onPress} style={styles.viewBtn}>
-              <Text style={styles.viewBtnText}>View Details</Text>
-              <Ionicons name="arrow-forward" size={12} color="#fff" />
-            </Pressable>
           </View>
           <Text style={styles.address} numberOfLines={1}>
             {item.location}
@@ -266,6 +267,46 @@ function DockedCard({
               <View style={[styles.typeDot, { backgroundColor: typeColor }]} />
               <Text style={[styles.typeText, { color: typeColor }]}>{item.property_type}</Text>
             </View>
+          </View>
+
+          {/* Quick actions — Save · View · Contact */}
+          <View style={styles.actionRow}>
+            <Pressable
+              onPress={onFavorite}
+              style={[styles.actionBtn, favorited && styles.actionBtnActive]}
+              testID={`docked-save-${item.id}`}
+              accessibilityLabel={favorited ? "Saved" : "Save property"}
+              hitSlop={6}
+            >
+              <Ionicons
+                name={favorited ? "heart" : "heart-outline"}
+                size={15}
+                color={favorited ? colors.red : colors.text}
+              />
+              <Text style={[styles.actionText, favorited && { color: colors.red }]}>
+                {favorited ? "Saved" : "Save"}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onPress}
+              style={[styles.actionBtn, styles.viewBtnPrimary]}
+              testID={`docked-view-${item.id}`}
+            >
+              <Text style={styles.viewBtnPrimaryText}>View Details</Text>
+              <Ionicons name="arrow-forward" size={12} color="#fff" />
+            </Pressable>
+            {onContact && (
+              <Pressable
+                onPress={onContact}
+                style={[styles.actionBtn, styles.contactBtn]}
+                testID={`docked-contact-${item.id}`}
+                accessibilityLabel="Contact agent"
+                hitSlop={6}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.emerald} />
+                <Text style={[styles.actionText, { color: colors.emerald }]}>Contact</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </Pressable>
@@ -418,4 +459,33 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: "row", gap: 12, marginTop: 4, flexWrap: "wrap" },
   spec: { flexDirection: "row", alignItems: "center", gap: 4 },
   specText: { fontSize: 11, color: colors.textSecondary, fontWeight: "700" },
+  actionRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 10,
+  },
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    height: 36,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  actionBtnActive: { borderColor: colors.red, backgroundColor: "rgba(225,29,72,0.06)" },
+  actionText: { fontSize: 11, fontWeight: "800", color: colors.text, letterSpacing: 0.1 },
+  viewBtnPrimary: {
+    flex: 1,
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
+  },
+  viewBtnPrimaryText: { color: "#fff", fontSize: 12, fontWeight: "800", letterSpacing: -0.1 },
+  contactBtn: {
+    borderColor: colors.emerald,
+    backgroundColor: "rgba(5,150,105,0.06)",
+  },
 });

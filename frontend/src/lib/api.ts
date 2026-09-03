@@ -325,6 +325,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  googleSession: (session_id: string) =>
+    req<{ access_token: string; user: UserProfile }>("/auth/google-session", {
+      method: "POST",
+      body: JSON.stringify({ session_id }),
+    }),
   me: () => req<UserProfile>("/auth/me"),
 
   // Properties

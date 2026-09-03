@@ -10,6 +10,7 @@ type AuthContextValue = {
   signUp: (email: string, password: string, full_name: string, phone?: string) => Promise<void>;
   signInWithApple: (payload: { identity_token: string; full_name?: string; email?: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -68,8 +69,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const refresh = useCallback(async () => {
+    try {
+      const me = await api.me();
+      setUser(me);
+      registerForPush(me.id).catch(() => {});
+    } catch {
+      await storage.secureRemove(AUTH_STORAGE_KEY);
+      setUser(null);
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signInWithApple, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signInWithApple, signOut, refresh }}>
       {children}
     </AuthContext.Provider>
   );
