@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { View, Text, StyleSheet, Pressable, TextInput, Alert } from "react-native";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { api, MarketplaceItem } from "@/src/lib/api";
 import { colors, radius, spacing, formatNaira } from "@/src/constants/theme";

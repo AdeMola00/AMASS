@@ -7,7 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api, FixEarnRule } from "@/src/lib/api";
@@ -17,7 +17,7 @@ import { colors, radius, shadows, spacing } from "@/src/constants/theme";
 const FIX_COLOR = "#22C55E";
 const FIX_DEEP = "#15803D";
 
-const EVENT_ICON: Record<string, keyof typeof import("@expo/vector-icons/Ionicons").Ionicons.glyphMap> = {
+const EVENT_ICON: Record<string, keyof typeof import("@react-native-vector-icons/ionicons").default.glyphMap> = {
   job_completed: "checkmark-done",
   positive_rating: "star",
   referral_signup: "person-add",

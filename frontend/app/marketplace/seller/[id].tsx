@@ -12,7 +12,7 @@ import {
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 
 import { api, MarketplaceItem, SellerProfile } from "@/src/lib/api";
@@ -197,7 +197,7 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: keyof typeof import("@expo/vector-icons").Ionicons.glyphMap; label: string; value: string }) {
+function InfoRow({ icon, label, value }: { icon: keyof typeof import("@react-native-vector-icons/ionicons").default.glyphMap; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>

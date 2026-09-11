@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { PriceText } from "@/src/components/PriceText";

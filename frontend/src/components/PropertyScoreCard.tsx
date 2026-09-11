@@ -15,8 +15,8 @@ import {
   View,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
-import { Ionicons } from "@expo/vector-icons";
-import * as MediaLibrary from "expo-media-library";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import * as MediaLibrary from "@/src/lib/mediaLibrary";
 import * as Sharing from "expo-sharing";
 import * as Haptics from "expo-haptics";
 import { captureRef } from "react-native-view-shot";

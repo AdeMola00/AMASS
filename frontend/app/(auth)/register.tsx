@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator } from 
 import { useRouter, Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { useAuth } from "@/src/contexts/auth";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { AppleSignInButton } from "@/src/components/AppleSignInButton";

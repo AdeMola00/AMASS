@@ -16,7 +16,7 @@ import {
   ActivityIndicator, Animated, Easing, PanResponder, Platform,
   Pressable, StyleSheet, Text, View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import * as FileSystem from "expo-file-system/legacy";
 import {

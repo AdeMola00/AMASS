@@ -13,7 +13,7 @@
  */
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import type { Property } from "@/src/lib/api";
 
 // Hardcoded registry mirror (keep in sync with /app/backend/property_types.py

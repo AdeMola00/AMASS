@@ -9,7 +9,7 @@ import {
   Share,
 } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
 import { propertyTypeColor } from "@/src/components/PropertyMarker";

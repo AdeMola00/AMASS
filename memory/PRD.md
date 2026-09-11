@@ -231,3 +231,26 @@ See `/app/memory/test_credentials.md`
 - Login + register screens (`/app/frontend/app/(auth)/{login,register}.tsx`) now show all four options: Google · Apple (iOS only) · Facebook · Email/password
 - Tests: `/app/backend/tests/test_google_auth_and_map.py` — 11/11 pass · Frontend testing agent green on both auth screens + map legend + filter chips
 
+
+## Expo SDK 57 Upgrade (Jun 2026)
+
+Upgraded the Expo SDK from **54 → 57** using the `expo-version-upgrade` skill.
+
+### Package changes
+- `expo` 54.0.36 → **57.0.21**; `yarn expo install --fix` pinned every Expo-managed dep to its SDK 57 pair
+- **Icons migration**: `@expo/vector-icons@15.1.1` → `@react-native-vector-icons/ionicons@13.1.4`. Only Ionicons was used across the 99 files that imported the old package — a scripted `sed` swap kept the migration surgical.
+- Removed `expo-status-bar` (unused, was in plugins array causing PluginError in SDK 57's strict resolver)
+
+### Config changes (`app.json`)
+- Removed `newArchEnabled` and `edgeToEdgeEnabled` (defaults now handled by the SDK per the 54→55 guide)
+- Purged non-config-plugin entries that were rejected by SDK 57's plugin loader
+
+### Runtime fixes
+- **`expo-media-library@57` web crash workaround**: the package top-level-imports its "Next" native module which does not exist on web, breaking every RN-Web bundle. Added `/app/frontend/src/lib/mediaLibrary.ts` that lazy-loads via `require()` guarded by `Platform.OS !== "web"`, and swapped every consumer (`app/share/[id].tsx`, `ShareableScoreCard.tsx`, `PropertyScoreCard.tsx`) to use the wrapper. Web callers now no-op instead of crashing.
+- Updated `use-icon-fonts.ts` CDN URL to fetch `Ionicons.ttf` from the new `@react-native-vector-icons/ionicons` package (Expo Go font-loading only; native builds autolink)
+
+### Verification
+- `yarn expo-doctor` — 19/20 checks pass (1 pre-existing icon-square warning, unrelated)
+- Backend + frontend regression pytest: `/app/backend/tests/test_sdk57_regression.py` — 8/8 pass
+- Testing agent green on: auth (email + Google + Apple + Facebook stub), map + Legend + filter chips, inbox, chat thread, admin cockpit, profile — every Ionicons glyph renders (no ? boxes) after the migration
+

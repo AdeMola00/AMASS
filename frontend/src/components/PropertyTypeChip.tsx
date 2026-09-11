@@ -8,7 +8,7 @@
  */
 import React from "react";
 import { StyleSheet, Text, View, ViewStyle } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { usePropertyTypes } from "@/src/hooks/usePropertyTypes";
 
 type Props = {

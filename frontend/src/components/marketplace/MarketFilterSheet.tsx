@@ -7,7 +7,7 @@ import React, {
   useState,
 } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
 import { colors, radius, spacing } from "@/src/constants/theme";

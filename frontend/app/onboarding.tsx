@@ -12,7 +12,7 @@ import {
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { colors, radius, spacing, typography } from "@/src/constants/theme";
 

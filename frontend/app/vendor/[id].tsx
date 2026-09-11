@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, FlatList, ActivityIndica
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { api, MarketplaceItem, Vendor } from "@/src/lib/api";
 import { useCart } from "@/src/contexts/cart";

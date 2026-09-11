@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing } from "@/src/constants/theme";
 import { PriceText } from "@/src/components/PriceText";
 import { HotFlame } from "@/src/components/HotFlame";

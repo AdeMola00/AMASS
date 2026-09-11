@@ -17,7 +17,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { api, MarketplaceItem } from "@/src/lib/api";

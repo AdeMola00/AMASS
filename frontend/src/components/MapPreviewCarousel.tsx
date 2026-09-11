@@ -16,7 +16,7 @@ import Animated, {
   Easing,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { PropertyCard } from "@/src/components/PropertyCard";
 import { colors, shadows } from "@/src/constants/theme";

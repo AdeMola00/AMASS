@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { createAudioPlayer, type AudioPlayer } from "expo-audio";
 
 import { colors } from "@/src/constants/theme";

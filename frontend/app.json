@@ -7,7 +7,6 @@
     "icon": "./assets/images/amass-icon.png",
     "scheme": "amass",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.propertyosafrica.znbqmw",
@@ -28,7 +27,6 @@
         "foregroundImage": "./assets/images/amass-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.emergent.propertyosafrica.znbqmw",
       "googleServicesFile": "./google-services.json",
       "config": {
@@ -84,7 +82,14 @@
           "icon": "./assets/images/amass-icon.png",
           "color": "#E11D48"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-web-browser",
+      "@react-native-vector-icons/ionicons",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

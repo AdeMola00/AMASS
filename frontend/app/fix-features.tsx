@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -19,7 +19,7 @@ import { colors, radius, shadows, spacing } from "@/src/constants/theme";
 const FIX_COLOR = "#22C55E";
 const FIX_DEEP = "#15803D";
 
-const ACTION_ICON: Record<string, keyof typeof import("@expo/vector-icons/Ionicons").Ionicons.glyphMap> = {
+const ACTION_ICON: Record<string, keyof typeof import("@react-native-vector-icons/ionicons").default.glyphMap> = {
   profile_boost_7d: "rocket",
   priority_listing: "trending-up",
   featured_pro_30d: "ribbon",
