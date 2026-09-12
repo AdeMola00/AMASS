@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { storage } from "@/src/utils/storage";
 import { api, AUTH_STORAGE_KEY, UserProfile } from "@/src/lib/api";
-import { registerForPush, resetPushRegistration } from "@/src/lib/push";
+// Push notifications disabled — expo-notifications removed for Android build.
+// import { registerForPush, resetPushRegistration } from "@/src/lib/push";
 
 type AuthContextValue = {
   user: UserProfile | null;
@@ -26,8 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const me = await api.me();
           setUser(me);
-          // Fire-and-forget push registration on every app open.
-          registerForPush(me.id).catch(() => {});
+          // Push registration disabled.
+          // registerForPush(me.id).catch(() => {});
         } catch {
           await storage.secureRemove(AUTH_STORAGE_KEY);
         }
@@ -40,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await api.login({ email, password });
     await storage.secureSet(AUTH_STORAGE_KEY, res.access_token);
     setUser(res.user);
-    registerForPush(res.user.id).catch(() => {});
+    // registerForPush(res.user.id).catch(() => {});
   }, []);
 
   const signUp = useCallback(
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await api.register({ email, password, full_name, phone });
       await storage.secureSet(AUTH_STORAGE_KEY, res.access_token);
       setUser(res.user);
-      registerForPush(res.user.id).catch(() => {});
+      // registerForPush(res.user.id).catch(() => {});
     },
     []
   );
@@ -58,14 +59,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await api.appleSignIn(payload);
       await storage.secureSet(AUTH_STORAGE_KEY, res.access_token);
       setUser(res.user);
-      registerForPush(res.user.id).catch(() => {});
+      // registerForPush(res.user.id).catch(() => {});
     },
     []
   );
 
   const signOut = useCallback(async () => {
     await storage.secureRemove(AUTH_STORAGE_KEY);
-    resetPushRegistration();
+    // resetPushRegistration();
     setUser(null);
   }, []);
 
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const me = await api.me();
       setUser(me);
-      registerForPush(me.id).catch(() => {});
+      // registerForPush(me.id).catch(() => {});
     } catch {
       await storage.secureRemove(AUTH_STORAGE_KEY);
       setUser(null);

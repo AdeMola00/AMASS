@@ -1,50 +1,19 @@
 /**
- * AMASS Push — device registration helper (Emergent-managed).
+ * AMASS Push — DISABLED.
  *
- * Called from AuthProvider after login and on every app open (tokens rotate).
- * Never blocks the auth flow: if permissions denied or backend errors, we
- * silently no-op and let the app carry on.
+ * The expo-notifications package has been removed from this project so the
+ * Android build can succeed. This file now exports no-op stubs so any existing
+ * imports keep type-checking, but nothing is registered or sent.
+ *
+ * To re-enable push, add expo-notifications back to package.json/app.json and
+ * restore the original implementation from git history.
  */
-import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
-import { api } from "@/src/lib/api";
 
-let _lastRegisteredUser: string | null = null;
-
-export async function registerForPush(userId: string): Promise<boolean> {
-  // Web has no meaningful native push; skip.
-  if (Platform.OS === "web") return false;
-  // Push tokens are only issued on real devices, not on simulators.
-  if (!Device.isDevice) return false;
-  // Avoid re-registering redundantly within the same session.
-  if (_lastRegisteredUser === userId) return true;
-
-  try {
-    const existing = await Notifications.getPermissionsAsync();
-    let status = existing.status;
-    if (status !== "granted" && existing.canAskAgain) {
-      const req = await Notifications.requestPermissionsAsync();
-      status = req.status;
-    }
-    if (status !== "granted") return false;
-
-    const tokenResp = await Notifications.getDevicePushTokenAsync();
-    const token = tokenResp?.data;
-    if (!token) return false;
-
-    await api.registerPush({
-      user_id: userId,
-      platform: Platform.OS === "ios" ? "ios" : "android",
-      device_token: String(token),
-    });
-    _lastRegisteredUser = userId;
-    return true;
-  } catch {
-    return false;
-  }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function registerForPush(_userId: string): Promise<boolean> {
+  return false;
 }
 
-export function resetPushRegistration() {
-  _lastRegisteredUser = null;
+export function resetPushRegistration(): void {
+  /* no-op */
 }

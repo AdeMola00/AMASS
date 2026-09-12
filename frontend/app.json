@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.propertyosafrica.znbqmw",
+      "bundleIdentifier": "com.meshince.amass",
       "usesAppleSignIn": true,
       "config": {
         "googleMapsApiKey": "AIzaSyAknqfu3Tx0v_XwLHMaGRj5fMQ7rJxYYLY"
@@ -27,7 +27,7 @@
         "foregroundImage": "./assets/images/amass-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.emergent.propertyosafrica.znbqmw",
+      "package": "com.meshince.amass",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyAknqfu3Tx0v_XwLHMaGRj5fMQ7rJxYYLY"
@@ -75,13 +75,6 @@
         }
       ],
       "expo-audio",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/amass-icon.png",
-          "color": "#E11D48"
-        }
-      ],
       "expo-font",
       "expo-image",
       "expo-secure-store",
