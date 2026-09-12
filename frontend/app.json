@@ -28,7 +28,6 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.emergent.propertyosafrica.znbqmw",
-      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyAknqfu3Tx0v_XwLHMaGRj5fMQ7rJxYYLY"

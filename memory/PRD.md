@@ -278,3 +278,14 @@ def api_health_check():
 - `curl http://localhost:8001/health` → `{"status":"ok"}` (200)
 - `curl http://localhost:8001/api/health` → `{"status":"ok"}` (200)
 - Backend supervisor status: RUNNING, no startup errors after reload
+
+
+## Android EAS Build Fix — Missing google-services.json (Jun 2026)
+
+**Symptom:** Android EAS Gradle build kept failing on Expo's servers (build ids d8f10477 AAB, 361bc82d APK). Container deploy was healthy; the failure was strictly on the `prebuild` step of the Expo-side Android compile.
+
+**Root cause:** `/app/frontend/app.json` had `"googleServicesFile": "./google-services.json"` under `android`, but the file **did not exist** on disk. Any attempt by EAS `prebuild` to hash / copy that file into `android/app/` errored out before Gradle could even start.
+
+**Fix:** Removed the `googleServicesFile` key from `app.json → expo.android`. Push notifications continue to work because we use **Emergent-managed push** (which injects `EMERGENT_PUSH_KEY` server-side at deploy). Real FCM is not required unless the user later opts to bring their own Firebase project — at which point they can upload `google-services.json` and re-add the key.
+
+**Verification path:** User must re-click **Publish → Generate Build** in the deployment panel. The Gradle step should now progress past prebuild.
