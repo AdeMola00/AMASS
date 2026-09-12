@@ -62,6 +62,19 @@ app = FastAPI(title="AMASS API")
 api = APIRouter(prefix="/api")
 bearer = HTTPBearer(auto_error=False)
 
+
+# ─── Health Check Endpoints (Kubernetes Ingress) ──────────
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Kubernetes liveness/readiness probes."""
+    return {"status": "ok"}
+
+
+@app.get("/api/health")
+def api_health_check():
+    """Health check endpoint accessible via /api ingress path."""
+    return {"status": "ok"}
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("amass")
 

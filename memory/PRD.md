@@ -254,3 +254,27 @@ Upgraded the Expo SDK from **54 → 57** using the `expo-version-upgrade` skill.
 - Backend + frontend regression pytest: `/app/backend/tests/test_sdk57_regression.py` — 8/8 pass
 - Testing agent green on: auth (email + Google + Apple + Facebook stub), map + Legend + filter chips, inbox, chat thread, admin cockpit, profile — every Ionicons glyph renders (no ? boxes) after the migration
 
+
+
+## Kubernetes Health Check Fix (Jun 2026)
+
+Deployment was failing because Kubernetes liveness/readiness probes hit `GET /health` and received **404 Not Found** — the FastAPI app only exposed `/api/*` routes behind the ingress prefix.
+
+### Fix
+Added two lightweight health endpoints in `/app/backend/server.py` (immediately after `app = FastAPI(...)`):
+```python
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+@app.get("/api/health")
+def api_health_check():
+    return {"status": "ok"}
+```
+
+`/health` unblocks the container health probe; `/api/health` gives the ingress-routed clients (frontend, monitoring) a parallel path with no auth requirements.
+
+### Verification
+- `curl http://localhost:8001/health` → `{"status":"ok"}` (200)
+- `curl http://localhost:8001/api/health` → `{"status":"ok"}` (200)
+- Backend supervisor status: RUNNING, no startup errors after reload
