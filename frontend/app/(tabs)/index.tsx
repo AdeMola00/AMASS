@@ -12,7 +12,7 @@ import {
   Alert,
   Animated,
 } from "react-native";
-import { MapView, Marker, Circle, Polygon, PROVIDER_DEFAULT, Region } from "@/src/lib/map";
+import { MapView, Marker, Circle, Polygon, PROVIDER_DEFAULT, Region, IS_MAP_LIMITED_IN_EXPO_GO } from "@/src/lib/map";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -824,6 +824,16 @@ export default function HomeMap() {
         </View>
       )}
 
+      {/* Expo Go hint — full Google Maps only works in dev-client / prod build */}
+      {IS_MAP_LIMITED_IN_EXPO_GO && viewMode === "map" && (
+        <View style={[styles.expoGoHint, { top: searchTop + 76 }]} pointerEvents="none" testID="expo-go-map-hint">
+          <Ionicons name="information-circle" size={14} color="#fff" />
+          <Text style={styles.expoGoHintText}>
+            Google Maps activates in the dev / production build.
+          </Text>
+        </View>
+      )}
+
       {/* Location permission banner */}
       {locationPermission === "blocked" && (
         <View style={[styles.permBanner, { top: searchTop + 140 }]} testID="location-perm-banner">
@@ -1199,6 +1209,19 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   permBtnText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  expoGoHint: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(15,23,42,0.82)",
+  },
+  expoGoHintText: { flex: 1, color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.1 },
   emptyText: { ...typography.body, color: colors.textSecondary },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xxl, gap: 12 },
   emptyIcon: {
