@@ -281,13 +281,9 @@ export default function ConversationScreen() {
   const sendImage = async () => {
     if (uploading || sending) return;
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert("Photos access needed", "Allow photo access to send images.");
-        return;
-      }
+      // System Photo Picker — no media-library permission required.
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         quality: 0.75,
         base64: false,
         allowsEditing: false,

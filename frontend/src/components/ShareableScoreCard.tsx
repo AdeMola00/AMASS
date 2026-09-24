@@ -3,7 +3,7 @@
  *
  * Rendered off-screen (positioned absolutely with opacity 0) whenever the
  * user taps "Share" on the passport score card, captured with react-native-
- * view-shot, and handed to expo-sharing or expo-media-library.
+ * view-shot, and handed to expo-sharing (system share sheet).
  *
  * Kept intentionally self-contained — pass in the numbers you already have
  * from `getPropertyScore` + `getPropertyValuation`; no network calls here.

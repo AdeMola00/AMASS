@@ -74,15 +74,16 @@ export default function BecomeAgent() {
 
   const pickPhoto = async (setter: (u: string) => void, mode: "id" | "selfie") => {
     try {
-      const { status } = mode === "selfie"
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") return;
+      if (mode === "selfie") {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== "granted") return;
+      }
+      // Gallery path uses the system Photo Picker — no media-library permission required.
       const res =
         mode === "selfie"
           ? await ImagePicker.launchCameraAsync({ quality: 0.6, base64: true })
           : await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ["images"] as any,
+              mediaTypes: ["images"],
               quality: 0.6,
               base64: true,
             });

@@ -289,3 +289,19 @@ def api_health_check():
 **Fix:** Removed the `googleServicesFile` key from `app.json → expo.android`. Push notifications continue to work because we use **Emergent-managed push** (which injects `EMERGENT_PUSH_KEY` server-side at deploy). Real FCM is not required unless the user later opts to bring their own Firebase project — at which point they can upload `google-services.json` and re-add the key.
 
 **Verification path:** User must re-click **Publish → Generate Build** in the deployment panel. The Gradle step should now progress past prebuild.
+
+## Google Play Photo & Video Permissions Compliance (Jun 2026)
+
+**Symptom:** Play Console flagged versionCode 104 for requesting `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO`.
+
+**Root cause:** The `expo-media-library` config plugin injects `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO` (+ `requestLegacyExternalStorage`) by default. It was only used for "Save flyer / score card to gallery". `expo-image-picker` (SDK 57) already uses Android's system Photo Picker (`PickVisualMedia`) and requests **no** permissions on Android 13+.
+
+**Fix:**
+- Removed `expo-media-library` (package + plugin) and `src/lib/mediaLibrary.ts`
+- "Save flyer" (`app/share/[id].tsx`) and score-card fallback (`PropertyScoreCard.tsx`) now hand the PNG to the system share sheet via `expo-sharing` (user picks "Save to Photos")
+- All 9 gallery pickers (chat attach, submit-property, improve-request photo+video, become-agent ID, marketplace sell, agent representations, agent onboarding, task verify) no longer call `requestMediaLibraryPermissionsAsync`; they launch the system Photo Picker directly. Camera flows still gate on `requestCameraPermissionsAsync`.
+- `app.json → android.permissions` trimmed to `ACCESS_FINE/COARSE_LOCATION`, `CAMERA`, `RECORD_AUDIO`
+- `app.json → android.blockedPermissions` added for `READ_MEDIA_IMAGES/VIDEO/AUDIO`, `READ_MEDIA_VISUAL_USER_SELECTED`, `ACCESS_MEDIA_LOCATION`, `POST_NOTIFICATIONS` → emitted as `tools:node="remove"` so no dependency can re-add them in the merged manifest
+- versionCode intentionally left to the Emergent build pipeline (auto-increments past 104)
+
+**Verification:** `expo prebuild --platform android` output manifest shows the three READ_MEDIA_* entries with `tools:node="remove"`; grep of every `node_modules/**/AndroidManifest.xml` and config plugin finds zero declarations of READ_MEDIA_IMAGES/VIDEO. Signed AAB is produced via **Publish**; device tests (Android 13/14/15) are on the user side.

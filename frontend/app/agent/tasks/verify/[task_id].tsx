@@ -113,26 +113,27 @@ export default function VerifyWizardScreen() {
   const pickPhoto = async (fromCamera: boolean) => {
     setPickBusy(true);
     try {
-      const perm = fromCamera
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (perm.status !== "granted") {
-        if (!perm.canAskAgain) {
-          Alert.alert(
-            fromCamera ? "Camera required" : "Photos required",
-            "Grant access in Settings to attach a photo.",
-            [
-              { text: "Not now", style: "cancel" },
-              { text: "Open Settings", onPress: () => Linking.openSettings() },
-            ]
-          );
+      if (fromCamera) {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (perm.status !== "granted") {
+          if (!perm.canAskAgain) {
+            Alert.alert(
+              "Camera required",
+              "Grant camera access in Settings to attach a photo.",
+              [
+                { text: "Not now", style: "cancel" },
+                { text: "Open Settings", onPress: () => Linking.openSettings() },
+              ]
+            );
+          }
+          return;
         }
-        return;
       }
+      // Gallery path uses the system Photo Picker — no media-library permission required.
       const res = fromCamera
         ? await ImagePicker.launchCameraAsync({ quality: 0.5, base64: true })
         : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ["images"] as any,
+            mediaTypes: ["images"],
             quality: 0.5,
             base64: true,
           });

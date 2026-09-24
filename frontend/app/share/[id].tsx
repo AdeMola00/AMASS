@@ -18,7 +18,6 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import * as Sharing from "expo-sharing";
-import * as MediaLibrary from "@/src/lib/mediaLibrary";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import QRCode from "react-native-qrcode-svg";
 
@@ -102,28 +101,21 @@ export default function ShareProperty() {
     if (!bundle || !flyerRef.current) return;
     setBusyChannel("flyer_save");
     try {
-      // Ask for save-to-photos permission (iOS: PhotoLibraryAddUsage).
-      const perm = await MediaLibrary.requestPermissionsAsync();
-      if (!perm.granted) {
-        if (!perm.canAskAgain) {
-          Alert.alert(
-            "Permission blocked",
-            "Enable Photos access for AMASS in Settings to save flyers.",
-            [
-              { text: "Not now", style: "cancel" },
-              { text: "Open settings", onPress: () => Linking.openSettings() },
-            ]
-          );
-        } else {
-          Alert.alert("Permission needed", "AMASS needs Photos access to save the flyer.");
-        }
+      // No media-library permission: hand the PNG to the system share sheet,
+      // where the user can pick "Save to Photos" / "Save image" themselves.
+      const uri = await captureRef(flyerRef, { format: "png", quality: 1 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("Not available", "Saving the flyer is only available in the AMASS app.");
         return;
       }
-      const uri = await captureRef(flyerRef, { format: "png", quality: 1 });
-      await MediaLibrary.saveToLibraryAsync(uri);
+      await Sharing.shareAsync(uri, {
+        mimeType: "image/png",
+        dialogTitle: "Save flyer to Photos",
+        UTI: "public.png",
+      });
       track("flyer");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert("Saved to Photos", "Your AMASS property flyer is now in your camera roll.");
     } catch (e: any) {
       Alert.alert("Could not save flyer", e?.message ?? "Try again");
     } finally {

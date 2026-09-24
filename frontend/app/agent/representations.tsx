@@ -189,18 +189,9 @@ function ClaimSheet({
   const [submitting, setSubmitting] = useState(false);
 
   const pickDoc = async () => {
-    const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      if (!canAskAgain) {
-        Alert.alert("Permission needed", "Grant photo access to upload documents.", [
-          { text: "Not now", style: "cancel" },
-          { text: "Open Settings", onPress: () => Linking.openSettings() },
-        ]);
-      }
-      return;
-    }
+    // System Photo Picker — no media-library permission required.
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"] as any,
+      mediaTypes: ["images"],
       allowsMultipleSelection: true,
       selectionLimit: 6,
       quality: 0.5,

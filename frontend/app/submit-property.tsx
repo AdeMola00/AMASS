@@ -641,13 +641,9 @@ function Step3({
   const pickFromLibrary = async () => {
     setPicking("library");
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        setPicking(null);
-        return;
-      }
+      // System Photo Picker — no media-library permission required.
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"] as any,
+        mediaTypes: ["images"],
         allowsMultipleSelection: true,
         selectionLimit: 8,
         quality: 0.6,

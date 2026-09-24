@@ -86,16 +86,9 @@ export default function SellListing() {
   const pickImages = async () => {
     setPickingImgs(true);
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Photos access needed",
-          "Please allow photo access in Settings to add listing photos.",
-        );
-        return;
-      }
+      // System Photo Picker — no media-library permission required.
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"] as any,
+        mediaTypes: ["images"],
         allowsMultipleSelection: true,
         selectionLimit: Math.max(1, 8 - images.length),
         quality: 0.7,

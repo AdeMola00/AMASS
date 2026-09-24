@@ -16,7 +16,6 @@ import {
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import * as MediaLibrary from "@/src/lib/mediaLibrary";
 import * as Sharing from "expo-sharing";
 import * as Haptics from "expo-haptics";
 import { captureRef } from "react-native-view-shot";
@@ -98,19 +97,12 @@ export function PropertyScoreCard({
           dialogTitle: `AMASS ${amassId} Score Card`,
           UTI: "public.png",
         });
-      } else if (Platform.OS === "web") {
-        // On web, open the image in a new tab
+      } else {
+        // No share sheet available (rare) — fall back to RN Share text.
         Share.share({
           title: `AMASS ${amassId}`,
           message: `AMASS ${amassId} — Verification Score ${score.score}/100 · ${score.tier}. See it on amass.africa`,
         }).catch(() => {});
-      } else {
-        // Native fallback — save to gallery
-        const perm = await MediaLibrary.requestPermissionsAsync();
-        if (perm.granted) {
-          await MediaLibrary.saveToLibraryAsync(uri);
-          Alert.alert("Saved", "Score card saved to your gallery.");
-        }
       }
     } catch (e: any) {
       Alert.alert("Share failed", e?.message ?? "Try again");

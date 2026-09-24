@@ -58,13 +58,9 @@ export default function InspectionRequest() {
   }, [propertyId]);
 
   const pickPhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Please allow photo library access to upload photos.");
-      return;
-    }
+    // System Photo Picker — no media-library permission required.
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       quality: 0.6,
       base64: true,
       allowsMultipleSelection: false,
@@ -81,19 +77,15 @@ export default function InspectionRequest() {
   };
 
   const pickVideo = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Please allow media library access to upload videos.");
-      return;
-    }
     if (videos.length >= 3) {
       Alert.alert("Max 3 videos", "You've reached the video limit for a single inspection request.");
       return;
     }
     setPickingVideo(true);
     try {
+      // System Photo Picker (video tab) — no media-library permission required.
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        mediaTypes: ["videos"],
         quality: 0.5,
         videoMaxDuration: 30, // seconds — keeps payload manageable
         allowsMultipleSelection: false,

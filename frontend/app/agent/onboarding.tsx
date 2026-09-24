@@ -1029,18 +1029,9 @@ function StagePhotos({
   const pickFromLibrary = async () => {
     setPicking("library");
     try {
-      const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        if (!canAskAgain) {
-          Alert.alert("Photos required", "Grant photo access in Settings to add listing photos.", [
-            { text: "Not now", style: "cancel" },
-            { text: "Open Settings", onPress: () => Linking.openSettings() },
-          ]);
-        }
-        return;
-      }
+      // System Photo Picker — no media-library permission required.
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"] as any,
+        mediaTypes: ["images"],
         allowsMultipleSelection: true,
         selectionLimit: 8,
         quality: 0.5,
