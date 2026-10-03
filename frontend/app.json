@@ -2,9 +2,9 @@
   "expo": {
     "name": "AMASS",
     "slug": "frontend",
-    "version": "1.0.1",
+    "version": "1.0.7",
     "orientation": "portrait",
-    "icon": "./assets/images/amass-icon.png",
+    "icon": "./assets/images/amass-icon-square.png",
     "scheme": "amass",
     "userInterfaceStyle": "light",
     "ios": {
@@ -23,11 +23,11 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/amass-icon.png",
+        "foregroundImage": "./assets/images/amass-adaptive-foreground.png",
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.amassafrica.app",
-      "versionCode": 2,
+      "versionCode": 109,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyAknqfu3Tx0v_XwLHMaGRj5fMQ7rJxYYLY"

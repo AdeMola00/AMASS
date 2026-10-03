@@ -305,3 +305,9 @@ def api_health_check():
 - versionCode intentionally left to the Emergent build pipeline (auto-increments past 104)
 
 **Verification:** `expo prebuild --platform android` output manifest shows the three READ_MEDIA_* entries with `tools:node="remove"`; grep of every `node_modules/**/AndroidManifest.xml` and config plugin finds zero declarations of READ_MEDIA_IMAGES/VIDEO. Signed AAB is produced via **Publish**; device tests (Android 13/14/15) are on the user side.
+
+## Play Console Release Prep — v1.0.7 (versionCode 109) (Jun 2026)
+- `app.json`: `version` 1.0.1 → **1.0.7**, `android.versionCode` 2 → **109** (Play already has 108 / 1.0.6). Package `com.amassafrica.app` unchanged.
+- Launcher icon fixed: generated square `assets/images/amass-icon-square.png` (1024²), `amass-adaptive-foreground.png` (1024², safe-zone padded) and Play hi-res `playstore-icon-512.png` from the original 1536×1024 artwork; app.json now points at the square files (expo-doctor icon warning gone).
+- Build: managed Expo workflow, no local Android SDK/Java → the signed AAB is produced by the Emergent **Publish** pipeline (keystore held by the pipeline, Play App Signing upload key already registered since build 108). Verified via `expo prebuild`: applicationId/namespace `com.amassafrica.app`, versionCode 109, versionName 1.0.7, READ_MEDIA_* only as `tools:node="remove"`.
+- Open policy items for the user (not code): Google Play Billing for token packs + agent subscriptions (currently Paystack/Flutterwave, `MOCK_PAYMENT=true`), privacy-policy URL + Data safety form, Google Maps key restriction, Facebook/voice-search "coming soon" stubs, account-deletion coverage of chat collections, dependency patch bumps per expo-doctor.
