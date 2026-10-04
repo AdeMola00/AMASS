@@ -311,3 +311,8 @@ def api_health_check():
 - Launcher icon fixed: generated square `assets/images/amass-icon-square.png` (1024²), `amass-adaptive-foreground.png` (1024², safe-zone padded) and Play hi-res `playstore-icon-512.png` from the original 1536×1024 artwork; app.json now points at the square files (expo-doctor icon warning gone).
 - Build: managed Expo workflow, no local Android SDK/Java → the signed AAB is produced by the Emergent **Publish** pipeline (keystore held by the pipeline, Play App Signing upload key already registered since build 108). Verified via `expo prebuild`: applicationId/namespace `com.amassafrica.app`, versionCode 109, versionName 1.0.7, READ_MEDIA_* only as `tools:node="remove"`.
 - Open policy items for the user (not code): Google Play Billing for token packs + agent subscriptions (currently Paystack/Flutterwave, `MOCK_PAYMENT=true`), privacy-policy URL + Data safety form, Google Maps key restriction, Facebook/voice-search "coming soon" stubs, account-deletion coverage of chat collections, dependency patch bumps per expo-doctor.
+
+## App Store (iOS) Marketing Assets (Jun 2026)
+- Generator: `/app/frontend/scripts/generate_appstore_ios.py` (PIL + numpy). Raw 3×-DPR captures (1170×2532) in `assets/images/ios-raw/` taken via Playwright with a logged-in demo session; home map is synthesised (vector Lagos map + AMASS price pins + docked card) under the chroma-keyed real app chrome.
+- Output `assets/images/appstore-ios/screenshots/ios-screenshot-01…10.png` (1284×2778) and `app-previews/ios-preview-01…03.png` (2778×1284). iPhone titanium frame + Dynamic Island + iOS status bar; alternating ivory/jet-black canvases with AMASS red accents.
+- Showcase chat seeded between demo agent and `tunde.showcase@amass.africa` (see test_credentials.md).
