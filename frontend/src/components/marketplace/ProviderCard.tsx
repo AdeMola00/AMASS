@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Linking, Alert } from "react-native"
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { colors, radius, shadows, spacing, fontFamily as F, formatNaira } from "@/src/constants/theme";
 import type { MarketplaceItem } from "@/src/lib/api";
 
 export type ProviderCardVariant = "list" | "featured";
@@ -222,15 +222,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    ...shadows.soft,
     gap: 10,
   },
   headRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
   avatarWrap: { position: "relative" },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     backgroundColor: colors.surfaceSecondary,
     borderWidth: 2,
     borderColor: "#fff",
@@ -250,7 +249,7 @@ const styles = StyleSheet.create({
   },
   identityCol: { flex: 1, gap: 4 },
   nameRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  name: { fontSize: 16, fontWeight: "800", color: colors.text, letterSpacing: -0.3, flex: 1 },
+  name: { fontSize: 16, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3, flex: 1 },
   tradeRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   tradeChip: {
     paddingHorizontal: 8,
@@ -258,10 +257,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "rgba(34,197,94,0.12)",
   },
-  tradeChipText: { fontSize: 10, fontWeight: "900", color: "#15803D", letterSpacing: 0.4 },
+  tradeChipText: { fontSize: 10, fontFamily: F.bold, color: "#15803D", letterSpacing: 0.4 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
-  metaText: { fontSize: 11, color: colors.textTertiary, fontWeight: "600" },
-  metaTextStrong: { fontSize: 12, color: colors.text, fontWeight: "800" },
+  metaText: { fontSize: 12, color: colors.textMuted, fontFamily: F.regular },
+  metaTextStrong: { fontSize: 12, color: colors.text, fontFamily: F.semibold },
   dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.textMuted, marginHorizontal: 2 },
 
   badgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
@@ -276,12 +275,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(34,197,94,0.25)",
   },
-  fixaBadgeText: { fontSize: 10, fontWeight: "800", color: "#15803D" },
+  fixaBadgeText: { fontSize: 10, fontFamily: F.semibold, color: "#15803D" },
 
-  specText: { fontSize: 12, color: colors.textSecondary, fontWeight: "500", lineHeight: 16 },
+  specText: { fontSize: 13, color: colors.textSecondary, fontFamily: F.regular, lineHeight: 18 },
 
   areaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  areaText: { fontSize: 11, color: colors.textTertiary, fontWeight: "600", flex: 1 },
+  areaText: { fontSize: 12, color: colors.textMuted, fontFamily: F.regular, flex: 1 },
 
   footerRow: {
     flexDirection: "row",
@@ -293,26 +292,26 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   priceCol: { gap: 1 },
-  priceLabel: { fontSize: 10, color: colors.textTertiary, fontWeight: "700", letterSpacing: 0.4 },
-  price: { fontSize: 17, fontWeight: "900", color: colors.text, letterSpacing: -0.3 },
+  priceLabel: { fontSize: 10, color: colors.textMuted, fontFamily: F.semibold, letterSpacing: 0.4 },
+  price: { fontSize: 17, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
   actionsRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconAction: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",
   },
   bookBtn: {
-    height: 38,
-    paddingHorizontal: 16,
-    borderRadius: 19,
+    height: 40,
+    paddingHorizontal: 18,
+    borderRadius: 20,
     backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
   },
-  bookBtnText: { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 0.2 },
+  bookBtnText: { color: "#fff", fontSize: 13, fontFamily: F.bold, letterSpacing: 0.2 },
 
   // Featured (horizontal card)
   featuredCard: {
@@ -352,12 +351,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: colors.ink,
   },
-  tradeChipInkText: { fontSize: 9, fontWeight: "900", color: "#fff", letterSpacing: 0.5 },
-  featuredName: { fontSize: 14, fontWeight: "800", color: colors.text, letterSpacing: -0.2, marginTop: 6 },
-  featuredMeta: { fontSize: 12, fontWeight: "800", color: colors.text },
-  featuredMetaDim: { fontSize: 11, color: colors.textTertiary, fontWeight: "600" },
-  featuredExp: { fontSize: 11, color: colors.textSecondary, fontWeight: "600" },
+  tradeChipInkText: { fontSize: 9, fontFamily: F.bold, color: "#fff", letterSpacing: 0.5 },
+  featuredName: { fontSize: 14, fontFamily: F.bold, color: colors.text, letterSpacing: -0.2, marginTop: 6 },
+  featuredMeta: { fontSize: 12, fontFamily: F.semibold, color: colors.text },
+  featuredMetaDim: { fontSize: 11, color: colors.textMuted, fontFamily: F.regular },
+  featuredExp: { fontSize: 11, color: colors.textSecondary, fontFamily: F.regular },
   featuredPriceRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: 4 },
-  featuredPriceLabel: { fontSize: 10, color: colors.textTertiary, fontWeight: "700" },
-  featuredPrice: { fontSize: 15, fontWeight: "900", color: colors.text, letterSpacing: -0.3 },
+  featuredPriceLabel: { fontSize: 10, color: colors.textMuted, fontFamily: F.semibold },
+  featuredPrice: { fontSize: 15, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
 });

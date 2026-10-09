@@ -1,8 +1,9 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { colors, radius, shadows, spacing, fontFamily as F, formatNaira } from "@/src/constants/theme";
 import type { MarketplaceItem } from "@/src/lib/api";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -41,22 +42,20 @@ export function ClassifiedCard({
   if (variant === "list") return <ListRow item={item} onPress={onPress} onFavorite={onFavorite} favorited={favorited} />;
   if (variant === "featured") return <FeaturedCard item={item} onPress={onPress} onFavorite={onFavorite} favorited={favorited} />;
 
-  // Grid card (default) — 2 columns
+  // Grid card (default) — 2 columns, image-hero with scrim
   const cardWidth = (SCREEN_W - gridPad) / 2;
   return (
     <Pressable onPress={onPress} style={[styles.gridCard, { width: cardWidth }]} testID={`market-item-${item.id}`}>
       <View style={styles.gridImageWrap}>
-        <Image
-          source={{ uri: item.image }}
-          style={styles.gridImage}
-          contentFit="cover"
-          transition={180}
+        <Image source={{ uri: item.image }} style={styles.gridImage} contentFit="cover" transition={180} />
+        <LinearGradient
+          colors={["transparent", "rgba(10,10,10,0.55)"]}
+          style={styles.scrim}
+          pointerEvents="none"
         />
-        {/* Price pill (image-first, price bottom-left) */}
         <View style={styles.pricePill}>
           <Text style={styles.pricePillText}>{formatNaira(item.price)}</Text>
         </View>
-        {/* Badges: boosted / new / featured */}
         <View style={styles.badgeStack} pointerEvents="none">
           {item.is_boosted && <Badge label="Boosted" color="#F5B301" textColor="#0A0A0A" />}
           {!item.is_boosted && item.is_featured && <Badge label="Featured" color="#7C3AED" />}
@@ -64,38 +63,31 @@ export function ClassifiedCard({
             <Badge label={`-${Math.round(((item.original_price - item.price) / item.original_price) * 100)}%`} color={colors.red} />
           )}
         </View>
-        {/* Favorite heart */}
         {onFavorite && (
           <Pressable
             onPress={onFavorite}
             style={styles.heartBtn}
             hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={favorited ? "Remove from saved" : "Save item"}
             testID={`favorite-${item.id}`}
           >
-            <Ionicons
-              name={favorited ? "heart" : "heart-outline"}
-              size={18}
-              color={favorited ? colors.red : "#fff"}
-            />
+            <Ionicons name={favorited ? "heart" : "heart-outline"} size={17} color={favorited ? colors.red : "#fff"} />
           </Pressable>
         )}
       </View>
       <View style={styles.gridBody}>
         <Text numberOfLines={2} style={styles.gridTitle}>{item.name}</Text>
         <View style={styles.metaRow}>
-          <Ionicons name="location" size={11} color={colors.textTertiary} />
+          <Ionicons name="location-outline" size={11} color={colors.textMuted} />
           <Text numberOfLines={1} style={styles.metaText}>{item.city || item.location || "—"}</Text>
-        </View>
-        <View style={styles.metaRow}>
-          <Text style={styles.metaText}>{timeAgo(item.posted_at)}</Text>
-          <View style={styles.dot} />
-          <Text style={styles.metaText}>{formatCondition(item.condition)}</Text>
-          {item.seller_verified && (
+          {!!timeAgo(item.posted_at) && (
             <>
               <View style={styles.dot} />
-              <Ionicons name="shield-checkmark" size={11} color={colors.emerald} />
+              <Text style={styles.metaText}>{timeAgo(item.posted_at)}</Text>
             </>
           )}
+          {item.seller_verified && <Ionicons name="shield-checkmark" size={11} color={colors.success} style={{ marginLeft: 2 }} />}
         </View>
       </View>
     </Pressable>
@@ -127,25 +119,21 @@ function ListRow({
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Text style={styles.rowPrice}>{formatNaira(item.price)}</Text>
           {onFavorite && (
-            <Pressable
-              onPress={onFavorite}
-              hitSlop={8}
-              testID={`favorite-${item.id}`}
-            >
-              <Ionicons name={favorited ? "heart" : "heart-outline"} size={20} color={favorited ? colors.red : colors.textTertiary} />
+            <Pressable onPress={onFavorite} hitSlop={8} accessibilityRole="button" accessibilityLabel={favorited ? "Remove from saved" : "Save item"} testID={`favorite-${item.id}`}>
+              <Ionicons name={favorited ? "heart" : "heart-outline"} size={20} color={favorited ? colors.red : colors.textMuted} />
             </Pressable>
           )}
         </View>
         <Text numberOfLines={2} style={styles.rowTitle}>{item.name}</Text>
         <View style={styles.metaRow}>
-          <Ionicons name="location" size={11} color={colors.textTertiary} />
+          <Ionicons name="location-outline" size={11} color={colors.textMuted} />
           <Text numberOfLines={1} style={styles.metaText}>{item.city || item.location || "—"}</Text>
           <View style={styles.dot} />
           <Text style={styles.metaText}>{timeAgo(item.posted_at)}</Text>
         </View>
         <View style={styles.chipRow}>
           <MiniChip label={formatCondition(item.condition)} />
-          {item.seller_verified && <MiniChip label="Verified" tone="emerald" />}
+          {item.seller_verified && <MiniChip label="Verified" tone="success" />}
           {item.seller_type === "dealer" && <MiniChip label="Dealer" tone="ink" />}
           {item.seller_type === "brand" && <MiniChip label="Brand" tone="purple" />}
         </View>
@@ -166,26 +154,22 @@ function FeaturedCard({
   favorited?: boolean;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={styles.featuredCard}
-      testID={`market-featured-${item.id}`}
-    >
+    <Pressable onPress={onPress} style={styles.featuredCard} testID={`market-featured-${item.id}`}>
       <Image source={{ uri: item.image }} style={styles.featuredImage} contentFit="cover" transition={200} />
-      <View style={styles.featuredOverlay} />
+      <LinearGradient colors={["transparent", "rgba(10,10,10,0.75)"]} style={styles.featuredScrim} pointerEvents="none" />
       <View style={styles.featuredTop}>
         <Badge label={item.is_boosted ? "BOOSTED" : "FEATURED"} color={item.is_boosted ? "#F5B301" : "#7C3AED"} textColor={item.is_boosted ? "#0A0A0A" : "#fff"} />
         {onFavorite && (
-          <Pressable onPress={onFavorite} style={styles.featuredHeart} hitSlop={10}>
-            <Ionicons name={favorited ? "heart" : "heart-outline"} size={18} color={favorited ? colors.red : "#fff"} />
+          <Pressable onPress={onFavorite} style={styles.featuredHeart} hitSlop={10} accessibilityRole="button" accessibilityLabel={favorited ? "Remove from saved" : "Save item"}>
+            <Ionicons name={favorited ? "heart" : "heart-outline"} size={17} color={favorited ? colors.red : "#fff"} />
           </Pressable>
         )}
       </View>
       <View style={styles.featuredBottom}>
-        <Text numberOfLines={2} style={styles.featuredTitle}>{item.name}</Text>
+        <Text numberOfLines={1} style={styles.featuredTitle}>{item.name}</Text>
         <Text style={styles.featuredPrice}>{formatNaira(item.price)}</Text>
         <View style={styles.metaRow}>
-          <Ionicons name="location" size={12} color="rgba(255,255,255,0.85)" />
+          <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.85)" />
           <Text style={[styles.metaText, { color: "rgba(255,255,255,0.85)" }]} numberOfLines={1}>
             {item.city || item.location || "—"}
           </Text>
@@ -203,14 +187,14 @@ function Badge({ label, color, textColor = "#fff" }: { label: string; color: str
   );
 }
 
-function MiniChip({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "emerald" | "ink" | "purple" }) {
+function MiniChip({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "success" | "ink" | "purple" }) {
   const bg =
-    tone === "emerald" ? "rgba(5,150,105,0.10)"
-    : tone === "ink" ? "rgba(10,10,10,0.08)"
+    tone === "success" ? "rgba(34,197,94,0.10)"
+    : tone === "ink" ? "rgba(10,10,10,0.07)"
     : tone === "purple" ? "rgba(124,58,237,0.10)"
     : "rgba(0,0,0,0.05)";
   const fg =
-    tone === "emerald" ? "#059669"
+    tone === "success" ? "#15803D"
     : tone === "ink" ? "#0A0A0A"
     : tone === "purple" ? "#7C3AED"
     : colors.textSecondary;
@@ -236,7 +220,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     overflow: "hidden",
-    ...shadows.soft,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   gridImageWrap: {
     aspectRatio: 1,
@@ -244,6 +229,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSecondary,
   },
   gridImage: { width: "100%", height: "100%" },
+  scrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: "45%" },
   pricePill: {
     position: "absolute",
     left: 8,
@@ -251,16 +237,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: radius.pill,
-    backgroundColor: "rgba(10,10,10,0.85)",
+    backgroundColor: colors.surfaceInverse,
   },
-  pricePillText: { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: -0.2 },
-  badgeStack: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    flexDirection: "row",
-    gap: 4,
-  },
+  pricePillText: { color: "#fff", fontSize: 13, fontFamily: F.bold, letterSpacing: -0.2 },
+  badgeStack: { position: "absolute", top: 8, left: 8, flexDirection: "row", gap: 4 },
   heartBtn: {
     position: "absolute",
     top: 8,
@@ -268,14 +248,14 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: "rgba(10,10,10,0.38)",
     alignItems: "center",
     justifyContent: "center",
   },
-  gridBody: { padding: 10, gap: 3 },
-  gridTitle: { fontSize: 13, fontWeight: "600", color: colors.text, minHeight: 34, lineHeight: 17 },
+  gridBody: { padding: 10, gap: 4 },
+  gridTitle: { fontSize: 14, fontFamily: F.medium, color: colors.text, minHeight: 36, lineHeight: 18 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 3 },
-  metaText: { fontSize: 11, color: colors.textTertiary, fontWeight: "600" },
+  metaText: { fontSize: 12, color: colors.textMuted, fontFamily: F.regular },
   dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.textMuted, marginHorizontal: 3 },
 
   // List row
@@ -287,9 +267,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginHorizontal: spacing.lg,
     marginBottom: 10,
-    ...shadows.soft,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  rowImageWrap: { width: 108, height: 108, borderRadius: 12, overflow: "hidden", position: "relative", backgroundColor: colors.surfaceSecondary },
+  rowImageWrap: { width: 104, height: 104, borderRadius: 12, overflow: "hidden", position: "relative", backgroundColor: colors.surfaceSecondary },
   rowImage: { width: "100%", height: "100%" },
   rowBoostBadge: {
     position: "absolute",
@@ -303,31 +284,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rowBody: { flex: 1, gap: 4 },
-  rowPrice: { fontSize: 17, fontWeight: "900", color: colors.text, letterSpacing: -0.3 },
-  rowTitle: { fontSize: 13, fontWeight: "500", color: colors.text, lineHeight: 17 },
-  chipRow: { flexDirection: "row", gap: 6, marginTop: 4, flexWrap: "wrap" },
+  rowPrice: { fontSize: 17, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
+  rowTitle: { fontSize: 14, fontFamily: F.regular, color: colors.text, lineHeight: 18 },
+  chipRow: { flexDirection: "row", gap: 6, marginTop: 2, flexWrap: "wrap" },
   miniChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  miniChipText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.2 },
+  miniChipText: { fontSize: 10, fontFamily: F.semibold, letterSpacing: 0.2 },
 
   // Badges
   badge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  badgeText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  badgeText: { fontSize: 9, fontFamily: F.bold, letterSpacing: 0.5 },
 
   // Featured (hero)
   featuredCard: {
-    width: 300,
-    height: 190,
+    width: 260,
+    height: 180,
     borderRadius: radius.lg,
     overflow: "hidden",
     position: "relative",
     backgroundColor: colors.surfaceSecondary,
-    ...shadows.card,
+    ...shadows.soft,
   },
   featuredImage: { ...StyleSheet.absoluteFillObject },
-  featuredOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.28)",
-  },
+  featuredScrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: "70%" },
   featuredTop: {
     position: "absolute",
     top: 12,
@@ -341,11 +319,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: "rgba(10,10,10,0.38)",
     alignItems: "center",
     justifyContent: "center",
   },
   featuredBottom: { position: "absolute", left: 14, right: 14, bottom: 14, gap: 2 },
-  featuredTitle: { color: "#fff", fontSize: 15, fontWeight: "700", letterSpacing: -0.2 },
-  featuredPrice: { color: "#fff", fontSize: 22, fontWeight: "900", letterSpacing: -0.4 },
+  featuredTitle: { color: "#fff", fontSize: 14, fontFamily: F.medium, letterSpacing: -0.2 },
+  featuredPrice: { color: "#fff", fontSize: 22, fontFamily: F.bold, letterSpacing: -0.4 },
 });

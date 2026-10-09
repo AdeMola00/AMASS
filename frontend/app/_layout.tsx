@@ -12,6 +12,7 @@ import * as Linking from "expo-linking";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
+import { useAppFonts } from "@/src/hooks/use-app-fonts";
 import { AuthProvider } from "@/src/contexts/auth";
 import { CartProvider } from "@/src/contexts/cart";
 import { WalletProvider } from "@/src/contexts/wallet";
@@ -43,7 +44,10 @@ SplashScreen.preventAutoHideAsync();
 // }
 
 export default function RootLayout() {
-  const [loaded, error] = useIconFonts();
+  const [iconsLoaded, iconsError] = useIconFonts();
+  const [appFontsLoaded, appFontsError] = useAppFonts();
+  const loaded = iconsLoaded && appFontsLoaded;
+  const error = iconsError || appFontsError;
   const router = useRouter();
 
   useEffect(() => {

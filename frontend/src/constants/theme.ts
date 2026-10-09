@@ -130,8 +130,7 @@ export const typography = {
 
 // Premium serif font stack — for prices & luxury headlines (magazine feel).
 // Uses system serif fonts to avoid extra bundle weight or FOUT.
-export const fonts = {
-  serif: Platform.select({
+export const fonts = {  serif: Platform.select({
     ios: "Georgia",
     android: "serif",
     default: "Georgia, 'Times New Roman', serif",
@@ -142,6 +141,16 @@ export const fonts = {
     default: "Georgia, 'Times New Roman', serif",
   }) as string,
 };
+
+// Plus Jakarta Sans — clean, highly readable sans used for the premium Market
+// experience (loaded in app/_layout via useAppFonts). Reference by fontFamily
+// instead of fontWeight so the correct weighted face is always picked.
+export const fontFamily = {
+  regular: "PlusJakartaSans-400",
+  medium: "PlusJakartaSans-500",
+  semibold: "PlusJakartaSans-600",
+  bold: "PlusJakartaSans-700",
+} as const;
 
 // Format naira nicely: ₦145M, ₦8.5M, ₦65k
 export function formatNaira(n: number): string {

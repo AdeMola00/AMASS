@@ -1,0 +1,42 @@
+{
+  "summary": "Market tab (frontend/app/(tabs)/marketplace.tsx) redesign verified end-to-end at mobile viewport (390x844) after demo login. ALL requested testIDs rendered and all critical flows passed. Sticky glass header renders AMASS emblem + 'Market' title, location pill (location-selector), saved (market-saved-btn), notifications (market-notif-btn), search bar (market-search-bar), filter button (market-filter-btn) and segmented control (mkt-tab-brands/mkt-tab-fixa/mkt-tab-declutter). Section switching updates feed count/subtitle ('3 stores / Verified stores & showrooms' → '17 pros / FIXA verified providers' → '12 items / Pre-owned finds near you'), swaps the chip rail (brand-chip-* / fixa-chip-Plumbing..Architects / declutter-chip-*) and switches the FAB label (Add Store / Join FIXA / Sell). Section persists across reload (FIXA still active after reload). Brands feed shows 2-column ClassifiedCard grid (market-item-* + favorite-*), Declutter likewise; FIXA renders the FIXA Verified Services banner + featured 'Top rated pros' rail + ProviderCards (fixa-provider-*) each with fixa-call-*, fixa-whatsapp-*, fixa-book-*, fixa-heart-*. Tapping Book Now opens the BookingSheet. Grid/List toggle (view-toggle) flips the Brands/Declutter feed and persists after reload. Favorite heart toggles and persists after reload (api.marketplaceToggleSave). Filter sheet (MarketFilterSheet) opens with Sort/Category/Condition/Price Range/Location sections and Apply/Reset actions. Location pill opens inline city picker; selected city persists after reload. Search bar navigates to /marketplace/search; FAB → /marketplace/sell; market-saved-btn → /marketplace/saved; market-notif-btn → /notifications; card tap → /marketplace/{id}. Plus Jakarta Sans fonts verified via document.fonts — PlusJakartaSans-400/500/600/700 all 'loaded', and feed titles ('Brands','FIXA','Declutter','Featured','3 stores','Add Store') resolve to PlusJakartaSans-600/700. Only non-blocking console noise observed: shadow*/pointerEvents/useNativeDriver web warnings (already documented and explicitly listed as 'ignore' in the agent-to-agent context).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "StyleSheet shadow props", "issue": "Repeating console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' Non-blocking RN-web warning the request explicitly lists as ignore. Reference: /app/frontend/src/constants/theme.ts shadows + widespread usage via ...shadows.soft/floating."},
+      {"component": "props.pointerEvents", "issue": "Repeating console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents.' Non-blocking, listed as ignore. Reference: /app/frontend/app/index.tsx:81 and :89."},
+      {"component": "Animated useNativeDriver (web)", "issue": "Console warning: 'useNativeDriver is not supported because the native animated module is missing. Falling back to JS-based animation.' Expected on web preview; listed as ignore."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_40.json"
+  ],
+  "action_items": [
+    "(none blocking) Optional cosmetic: migrate shadow* → boxShadow and move pointerEvents into style={} to silence RN-web warnings (same action item as iteration 39)."
+  ],
+  "critical_code_review_comments": [
+    "marketplace.tsx cleanly separates presentation from logic — all handlers (buildParams, loadItems, loadSaved, toggleSave, selectSection, setCityAndSave, toggleView) remain intact and still call api.marketplace / api.marketplaceCategories / api.marketplaceSavedIds / api.marketplaceToggleSave.",
+    "Preferences correctly persisted via storage (amass_market_view, amass_market_city, amass_market_section) and restored on mount.",
+    "testID coverage is comprehensive — every interactive element in the spec is reachable by its documented testID.",
+    "activeFilterCount computed with Object.values(filters).filter(v => v !== undefined && v !== '' && v !== false) — correctly ignores default/empty values; good UX for the badge dot.",
+    "chipRail is correctly scoped per section and horizontal ScrollView uses sensible spacing.",
+    "File length ~905 lines — still under the 1k threshold but close; consider extracting MarketHeader + MarketChipRail + MarketFeedHeader into components if the file grows further.",
+    "fontFamily is referenced via theme.F (PlusJakartaSans-400/500/600/700) — matches the 'reference by fontFamily not fontWeight' requirement."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only testing requested)",
+    "frontend": "100% (all documented testIDs + flows verified)"
+  },
+  "seed_data_creation": "None. Used demo@amass.africa / amass2026. One listing was briefly favorited then unfavorited to validate persistence; final saved state restored to pre-test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Market tab is stable at /marketplace. All testIDs match the spec. When the AdModal (useAdTrigger with triggerAfter:8, mountDelayMs:3000) appears, it may transiently intercept header taps — dismiss it before tapping market-filter-btn / sell-fab / market-saved-btn. BookingSheet and MarketFilterSheet are modal bottom-sheets; use page.keyboard.press('Escape') to close them between flows. Plus Jakarta Sans is loaded via useAppFonts (expo-font) and all 4 weights are present in document.fonts.",
+  "rca_of_issue": "N/A — redesign passes acceptance tests. No regressions detected."
+}
