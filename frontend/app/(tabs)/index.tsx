@@ -119,6 +119,7 @@ export default function HomeMap() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [region, setRegion] = useState<Region>(BOOTSTRAP_REGION);
+  const [heading, setHeading] = useState(0);
   const [showSearchArea, setShowSearchArea] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<
@@ -387,6 +388,12 @@ export default function HomeMap() {
 
   const onRegionChangeComplete = (r: Region) => {
     setRegion(r);
+    // Track camera heading so we can show/hide the compass (native only).
+    if (Platform.OS !== "web") {
+      mapRef.current?.getCamera?.().then((cam: any) => {
+        if (cam && typeof cam.heading === "number") setHeading(cam.heading);
+      }).catch(() => {});
+    }
     // Persist last-viewed region, throttled to once per 800ms.
     const now = NOW();
     if (now - lastRegionSaveRef.current > 800) {
@@ -400,6 +407,20 @@ export default function HomeMap() {
     if (dLat > r.latitudeDelta * 0.35 || dLng > r.longitudeDelta * 0.35 || zoomChange > 0.5) {
       setShowSearchArea(true);
     }
+  };
+
+  // Compass — reset the map to north-up (and keep the current tilt).
+  const resetNorth = () => {
+    Haptics.selectionAsync().catch(() => {});
+    if (Platform.OS !== "web") {
+      try {
+        mapRef.current?.animateCamera?.(
+          { heading: 0, pitch: DEFAULT_PITCH_DEG } as any,
+          { duration: 300 }
+        );
+      } catch {}
+    }
+    setHeading(0);
   };
 
   const applySearchThisArea = () => {
@@ -580,7 +601,7 @@ export default function HomeMap() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_DEFAULT}
-        mapType="satellite"
+        mapType="hybrid"
         initialRegion={BOOTSTRAP_REGION}
         showsCompass={false}
         showsMyLocationButton={false}
@@ -603,6 +624,7 @@ export default function HomeMap() {
               <Marker
                 key={`cluster-${c.properties.cluster_id}`}
                 coordinate={{ latitude: lat, longitude: lng }}
+                accessibilityLabel={`Cluster of ${count} homes. Tap to zoom in.`}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                   const zoom = clusterIndex ? expandCluster(clusterIndex, c.properties.cluster_id) : 14;
@@ -626,6 +648,7 @@ export default function HomeMap() {
             <Marker
               key={p.id}
               coordinate={{ latitude: p.latitude, longitude: p.longitude }}
+              accessibilityLabel={`${formatMarkerPrice(p.price, p.listing_type)} ${p.property_type ?? "property"} in ${p.location ?? "map"}. Tap for details.`}
               onPress={() => onMarkerPress(p)}
               anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={Platform.OS === "android" || p.id === activeId}
@@ -659,11 +682,24 @@ export default function HomeMap() {
         />
       </View>
 
+      {/* Compass — appears only when the map is rotated; tap to face north */}
+      {Math.abs(heading) > 2 && (
+        <View style={[styles.compassWrap, { top: searchTop + 86 }]} pointerEvents="box-none">
+          <ActionBtn
+            icon="compass"
+            onPress={resetNorth}
+            testID="fab-compass"
+            label="Reset map to face north"
+            iconRotation={-heading}
+          />
+        </View>
+      )}
+
       {/* Right-side floating actions */}
       <View style={[styles.rightActions, { top: searchTop + 140 }]} pointerEvents="box-none">
-        <ActionBtn icon="locate" onPress={recenter} testID="fab-locate" />
-        <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" />
-        <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" />
+        <ActionBtn icon="locate" onPress={recenter} testID="fab-locate" label="Center map on my location" />
+        <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" label="Zoom in" />
+        <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" label="Zoom out" />
       </View>
 
       {/* Centered map status: loading / error / empty */}
@@ -884,9 +920,10 @@ function TopOverlay({
           onChangeText={setQuery}
           onSubmitEditing={onSubmit}
           returnKeyType="search"
+          accessibilityLabel="Search by city, neighborhood or landmark"
           testID="home-search-input"
         />
-        <Pressable onPress={onFilters} style={styles.filterIcon} testID="open-filter-sheet">
+        <Pressable onPress={onFilters} style={styles.filterIcon} testID="open-filter-sheet" accessibilityRole="button" accessibilityLabel="Open filters">
           <Ionicons name="options" size={16} color="#fff" />
           {activeFilters > 0 && (
             <View style={styles.filterDot}>
@@ -894,7 +931,7 @@ function TopOverlay({
             </View>
           )}
         </Pressable>
-        <Pressable onPress={() => router.push("/ai-search")} style={styles.aiBadge} testID="home-ai-btn">
+        <Pressable onPress={() => router.push("/ai-search")} style={styles.aiBadge} testID="home-ai-btn" accessibilityRole="button" accessibilityLabel="AI-powered search">
           <Ionicons name="sparkles" size={14} color="#fff" />
         </Pressable>
         {hasActiveSearch && (
@@ -902,6 +939,8 @@ function TopOverlay({
             onPress={onSaveSearch}
             style={styles.bookmarkBtn}
             hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Save this search"
             testID="save-search-btn"
           >
             <Ionicons name="bookmark" size={15} color={colors.text} />
@@ -935,6 +974,8 @@ function TopOverlay({
             setViewMode(viewMode === "map" ? "list" : "map");
           }}
           style={[styles.viewToggle, shadows.soft]}
+          accessibilityRole="button"
+          accessibilityLabel={viewMode === "map" ? "Switch to list view" : "Switch to map view"}
           testID="view-toggle"
         >
           <Ionicons name={viewMode === "map" ? "list" : "map"} size={14} color={colors.text} />
@@ -950,19 +991,31 @@ function ActionBtn({
   onPress,
   testID,
   highlight = false,
+  label,
+  iconRotation,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   testID?: string;
   highlight?: boolean;
+  label?: string;
+  iconRotation?: number;
 }) {
   return (
     <Pressable
       onPress={onPress}
       style={[styles.actionBtn, shadows.card, highlight && styles.actionBtnActive]}
       testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={6}
     >
-      <Ionicons name={icon} size={19} color={highlight ? "#fff" : colors.text} />
+      <Ionicons
+        name={icon}
+        size={19}
+        color={highlight ? "#fff" : colors.text}
+        style={iconRotation != null ? { transform: [{ rotate: `${iconRotation}deg` }] } : undefined}
+      />
     </Pressable>
   );
 }
@@ -1099,6 +1152,7 @@ const styles = StyleSheet.create({
   },
   viewToggleText: { fontSize: 12, fontWeight: "800", color: colors.text },
   rightActions: { position: "absolute", right: spacing.lg, gap: 10 },
+  compassWrap: { position: "absolute", right: spacing.lg },
   bottomLeftStack: {
     position: "absolute",
     left: spacing.lg,

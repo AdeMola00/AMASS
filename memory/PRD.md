@@ -363,7 +363,13 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - Verified: `backend/tests/test_auth_forgot_reset_lockout.py` 12/12; frontend E2E all critical paths (iteration_39). Social buttons (Google/Apple) pre-existing, untouched.
 - Cosmetic only: RN-web console warnings (shadow*/pointerEvents/useNativeDriver) — no functional impact.
 
-## Sequential intro — AMASS then FIXA, no overlap (Jun 2026)
+## Map upgrade — readable-roads satellite, compass, a11y (Jun 2026)
+- `(tabs)/index.tsx`:
+  - **Satellite with readable roads**: `mapType` changed `"satellite"` → `"hybrid"` (Google satellite imagery + road lines/labels). Still a satellite view; now roads/place names are legible as requested. (Native only — web uses the placeholder.)
+  - **Compass control**: new `heading` state read from `mapRef.getCamera()` in `onRegionChangeComplete` (native only). A custom compass FAB (`fab-compass`) appears only when the map is rotated (`|heading| > 2`), its needle rotates `-heading`, and tapping (`resetNorth`) animates the camera back to north-up keeping the tilt.
+  - **Accessibility**: `ActionBtn` now takes `label`/`iconRotation` and sets `accessibilityRole="button"` + `accessibilityLabel` (locate / zoom in / zoom out / compass). Markers + cluster markers get `accessibilityLabel` (price·type·location / "Cluster of N homes"). Search input, filter, AI, save-search, and view-toggle got labels too.
+- Everything else preserved: existing clustering (supercluster), status/type filters + interactive legend, docked preview cards, search-this-area, recenter/zoom, loading/error/empty/offline states, wallet & property-access rules (untouched).
+- Verified: web smoke test (map screen + all overlays render, no crash); lint clean (only 2 pre-existing ternary warnings). Native behaviors (hybrid tiles, compass, marker a11y, live location) require a dev/production build to QA.
 - `app/index.tsx` reworked so the opening animation always plays (removed first-launch gate + `storage`/`BRAND_INTRO_KEY`): **AMASS alone ~2s → AMASS fully fades out → FIXA alone ~2s → navigate** to onboarding/login.
 - Guaranteed no overlap: each phase is conditionally mounted (`phase === "amass"` vs `"fixa"`); FIXA is only mounted after AMASS's fade-out animation `finished` callback, so the two logos are never on screen together (verified: at FIXA opacity 1, AMASS node unmounted).
 - Backgrounds: AMASS on `colors.bg` (white), container switches to `#7ED958` for FIXA (matches the asset's baked green). Each logo keeps original design/proportions/colors. AMASS emblem size 128; FIXA card width 116%. Each enters with fade + spring scale.
