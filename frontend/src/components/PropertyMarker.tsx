@@ -50,6 +50,52 @@ export function propertyTypeColor(t?: string | null): string {
   return TYPE_COLORS[normalizePropertyType(t)];
 }
 
+// ── Availability status → MARKER COLOUR ──────────────────────────
+// Colour communicates availability (from real listing data). Each colour is
+// ALSO paired with an icon/shape + legend text so meaning is never colour-alone.
+export type AvailabilityStatus = "available" | "coming_soon" | "closed";
+
+export function availabilityStatus(p: { status?: string | null }): AvailabilityStatus {
+  const s = (p?.status ?? "").toLowerCase().trim();
+  if (["sold", "rented", "let", "leased", "closed"].includes(s)) return "closed";
+  if (["coming_soon", "coming", "pending", "reserved", "under_offer"].includes(s)) return "coming_soon";
+  return "available"; // available / verified / premium / unset → on the market
+}
+
+export const STATUS_META: Record<
+  AvailabilityStatus,
+  { label: string; color: string; glyph: keyof typeof Ionicons.glyphMap | null }
+> = {
+  available:   { label: "Available",   color: "#16A34A", glyph: null },          // green
+  coming_soon: { label: "Coming soon", color: "#D97706", glyph: "time" },        // amber + clock
+  closed:      { label: "Sold / Let",  color: "#64748B", glyph: "lock-closed" }, // slate + lock (price struck through)
+};
+
+export const STATUS_LEGEND: AvailabilityStatus[] = ["available", "coming_soon", "closed"];
+
+// ── Listing type → MARKER ICON ───────────────────────────────────
+export type ListingKind = "sale" | "rent" | "shortlet" | "lease";
+
+export function listingKind(t?: string | null): ListingKind {
+  const k = (t ?? "").toLowerCase().trim();
+  if (k.includes("short")) return "shortlet";
+  if (k.includes("rent")) return "rent";
+  if (k.includes("lease")) return "lease";
+  return "sale"; // buy / sale / default
+}
+
+export const LISTING_TYPE_META: Record<
+  ListingKind,
+  { label: string; icon: keyof typeof Ionicons.glyphMap }
+> = {
+  sale:     { label: "For sale", icon: "pricetag" },
+  rent:     { label: "For rent", icon: "key" },
+  shortlet: { label: "Shortlet", icon: "bed" },
+  lease:    { label: "Lease",    icon: "document-text" },
+};
+
+export const LISTING_TYPE_LEGEND: ListingKind[] = ["sale", "rent", "shortlet", "lease"];
+
 // ── Marker ───────────────────────────────────────────────────────
 export function PropertyMarker({
   property,
@@ -68,56 +114,68 @@ export function PropertyMarker({
   /** override for verified badge — falls back to property.verified */
   verified?: boolean;
 }) {
-  const slug = normalizePropertyType(property.property_type);
-  const color = TYPE_COLORS[slug];
-  const isSold = property.status === "sold";
+  const status = availabilityStatus(property);
+  const sMeta = STATUS_META[status];
+  const kMeta = LISTING_TYPE_META[listingKind(property.listing_type)];
+  const isClosed = status === "closed";
   const isPOR = label === "Price on Request";
   const isVerified = verified ?? !!property.verified;
 
+  const statusColor = sMeta.color;
   const bg = active ? "#0A0A0A" : "#FFFFFF";
-  const border = active ? "#0A0A0A" : color;
-  const text = active ? "#FFFFFF" : color;
+  const text = active ? "#FFFFFF" : "#0A0A0A";
+  const iconTint = active ? "rgba(255,255,255,0.9)" : "#374151";
 
   return (
-    <View style={styles.wrap} testID={`marker-${slug}${active ? "-active" : ""}${hot ? "-hot" : ""}`}>
+    <View
+      style={styles.wrap}
+      testID={`marker-${status}-${listingKind(property.listing_type)}${active ? "-active" : ""}${hot ? "-hot" : ""}`}
+    >
       <View
         style={[
           styles.pill,
           {
             backgroundColor: bg,
-            borderColor: border,
-            transform: [{ scale: active ? 1.1 : 1 }],
+            borderColor: statusColor,
+            transform: [{ scale: active ? 1.12 : 1 }],
           },
           active ? styles.shadowActive : styles.shadowPin,
-          isPOR && !active && { minWidth: 105 },
+          isPOR && !active && { minWidth: 112 },
         ]}
       >
-        <View style={[styles.dot, { backgroundColor: color }]} />
-        {isVerified && !isSold && (
-          <Ionicons
-            name="shield-checkmark"
-            size={11}
-            color={active ? "#F5B301" : "#059669"}
-          />
-        )}
-        {hot && !isSold && !isVerified && (
-          <Ionicons name="flame" size={10} color={active ? "#F87171" : "#DC2626"} />
-        )}
+        <View style={[styles.dot, { backgroundColor: statusColor }]} />
+        <Ionicons name={kMeta.icon} size={11} color={iconTint} />
         <Text
           style={[
             styles.label,
             { color: text },
             isPOR && !active && styles.labelPor,
-            isSold && { textDecorationLine: "line-through", opacity: 0.85 },
-            viewed && !active && !isSold && { opacity: 0.75 },
+            isClosed && { textDecorationLine: "line-through", opacity: 0.82 },
+            viewed && !active && !isClosed && { opacity: 0.72 },
           ]}
           numberOfLines={1}
         >
           {label}
         </Text>
+        {sMeta.glyph && (
+          <Ionicons name={sMeta.glyph} size={10} color={active ? "#F5B301" : statusColor} />
+        )}
       </View>
+
+      {/* Verified / Hot — small corner badge, kept separate from colour meaning */}
+      {isVerified && !isClosed && (
+        <View style={[styles.cornerBadge, { backgroundColor: "#059669" }]}>
+          <Ionicons name="shield-checkmark" size={9} color="#fff" />
+        </View>
+      )}
+      {!isVerified && hot && !isClosed && (
+        <View style={[styles.cornerBadge, { backgroundColor: "#DC2626" }]}>
+          <Ionicons name="flame" size={9} color="#fff" />
+        </View>
+      )}
+
       <View style={[styles.tail, { borderTopColor: bg }]} />
-      <View style={[styles.tailBorder, { borderTopColor: border }]} />
+      <View style={[styles.tailBorder, { borderTopColor: statusColor }]} />
     </View>
   );
 }
@@ -195,6 +253,19 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: -0.2,
     includeFontPadding: false,
+  },
+  cornerBadge: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#fff",
+    zIndex: 5,
   },
   labelPor: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.1 },
   shadowPin: {

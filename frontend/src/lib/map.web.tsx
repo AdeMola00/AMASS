@@ -47,9 +47,18 @@ export const MapView = React.forwardRef<any, MapProps>(function MapView(
   );
 });
 
-export function Marker({ children }: { children?: React.ReactNode; coordinate?: LatLng; anchor?: any; onPress?: () => void; tracksViewChanges?: boolean; draggable?: boolean; onDragEnd?: (e: any) => void }) {
-  // On web we only render the first few markers roughly to give a hint of density.
-  return <View style={styles.marker}>{children}</View>;
+export function Marker({ children, onPress }: { children?: React.ReactNode; coordinate?: LatLng; anchor?: any; onPress?: () => void; tracksViewChanges?: boolean; draggable?: boolean; onDragEnd?: (e: any) => void }) {
+  // On web we only render the markers roughly to give a hint of density.
+  // Forward onPress so the marker → docked-card flow is still testable on web.
+  return (
+    <View
+      style={styles.marker}
+      // @ts-ignore web-only onClick keeps the placeholder tappable
+      onClick={onPress}
+    >
+      {children}
+    </View>
+  );
 }
 
 // No-op web fallbacks for map overlays used on native.

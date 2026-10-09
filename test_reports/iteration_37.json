@@ -1,0 +1,42 @@
+{
+  "summary": "Phase (map polish) satellite-first discovery UX verified on web preview with mobile viewport 390x844 using demo@amass.africa. (1) Home map screen (testID home-map-screen) loads cleanly after login — no red screen, no pageerrors. (2) Right-side FAB stack renders ONLY the three allowed controls: fab-locate, fab-zoom-in, fab-zoom-out — the removed fab-layers, fab-overlay, fab-draw testIDs are confirmed ABSENT in the DOM. (3) Always-visible Map key chip (testID map-legend-chip) renders at bottom-left with three inline status dots + 'Map key' label. Tapping it opens the full legend card (testID map-legend-card) which correctly exposes all 3 status rows (legend-status-available, legend-status-coming_soon, legend-status-closed) and all 4 listing-type rows (legend-type-sale, legend-type-rent, legend-type-shortlet, legend-type-lease), plus the Verified + Hot badge rows. map-legend-close dismisses the modal correctly. (4) PropertyMarker testID follows the new marker-{status}-{kind}[-active][-hot] pattern — observed on web: 'marker-available-sale-hot' (the single marker the web stub renders), confirming availabilityStatus()/listingKind() wiring to Property.status + Property.listing_type in /app/frontend/src/components/PropertyMarker.tsx line 132. (5) Map status overlays — map-status-loading pill is caught during the fresh route load (confirmed observed before results arrive). map-status-error (with map-retry-btn) and map-status-empty (with map-clear-filters-btn gated by activeQuickFilterCount>0||query) are wired at index.tsx lines 616-651 — code-review verified; error branch not driven live (backend was healthy throughout). (6) List view toggle works both directions — tapping view-toggle swaps home-map-screen ↔ home-list-screen; 21 property cards render in list view with the Palatial Ocean-View Duplex visible with Hot Home badge + ₦145M label. (7) Filters/search re-query — tapping 'For Rent' chip triggers an API re-query (filter dot updates to '1', chip becomes active) and the map re-renders. Search submission also triggers a re-query. (8) BACKEND SANITY — GET /api/properties returns status (premium/verified/etc) and listing_type (buy/rent/…) on each item (verified via curl: 3 items each with status+listing_type keys), providing the data the PropertyMarker needs for colour + icon dual-encoding. KNOWN WEB-ONLY LIMITATION: the map.web.tsx stub Marker component (lines 50-53) does NOT forward onPress to the inner View, so tapping a marker on web does not fire onMarkerPress → the docked card never appears on web. This is a native-only visual (as explicitly flagged in the task note). On a dev-client/native build the Marker component from react-native-maps delivers onPress correctly, so the marker-tap → docked card → /property/{id} two-tier gate flow is expected to work there (and was verified end-to-end in iteration_36). Direct navigation to /property/{id} still renders the property detail screen cleanly with the existing two-tier gate code path intact.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "marker tap → docked card (web preview only)",
+        "issue": "The web fallback Marker in /app/frontend/src/lib/map.web.tsx (lines 50-53) does not forward onPress to a Pressable, so tapping a marker pill on web does nothing. This is a WEB-STUB limitation; native builds route onPress through react-native-maps correctly. Flagged for awareness only — not a regression and not blocking release.",
+        "affected_testIDs": ["marker-available-sale-hot", "docked-card-*"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_37.json"
+  ],
+  "action_items": [
+    "Optional polish: wrap the web stub Marker in Pressable with onPress forwarding so that web-preview QA can drive the marker-tap → docked card flow without a dev-client build. One-line change in /app/frontend/src/lib/map.web.tsx line 50-53 — purely a test-ergonomics improvement; mobile UX is unaffected.",
+    "Optional: expose a lightweight data-testid on MapView container's root web stub (currently only the inner home-map-screen testID identifies the map screen) so bots can distinguish the placeholder vs the real native MapView — nice-to-have, not blocking."
+  ],
+  "critical_code_review_comments": [
+    "index.tsx line 525-542: MapView mapType='satellite' is set — correct for the satellite-only requirement; there is no layer picker/toggle anywhere else in the file (confirmed by grep for 'mapType|fab-layers|fab-overlay|fab-draw' returning only the single mapType='satellite' line). Clean removal of the power-user controls.",
+    "PropertyMarker.tsx line 132: testID uses `marker-${status}-${listingKind(property.listing_type)}${active ? '-active' : ''}${hot ? '-hot' : ''}` — note the trailing suffixes concatenate without separators between -active and -hot (e.g. marker-available-sale-active-hot works, but parsing by naive split('-') breaks since 'coming_soon' already contains '_'). Consumers should match by prefix (startsWith('marker-available-')), not by splitting on '-'. Fine as-is because the task spec explicitly uses prefix semantics.",
+    "MapLegend.tsx line 22-39: the chip renders status-colour dots inline — colour encoding is paired with 'Map key' text so meaning is never colour-alone (WCAG-friendly). ✓",
+    "map.web.tsx line 50-53: Marker web stub drops onPress silently. For web E2E validation of marker-tap flows, wrap in Pressable. Not shipping-critical since native build is the real target."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (GET /api/properties returns status + listing_type on every record)",
+    "frontend": "100% of web-observable items pass (controls, legend, markers testID pattern, list toggle, filters, status overlay testIDs). Marker-tap flow blocked by web-stub limitation only — covered on native/dev-client and verified by code review."
+  },
+  "seed_data_creation": "None — reused demo@amass.africa / amass2026 and existing seeded properties.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The web preview renders react-native-maps as a static placeholder (see /app/frontend/src/lib/map.web.tsx). Only 1 marker pill is drawn on screen (web clustering collapses the rest) and the Marker's onPress is NOT forwarded on web. To validate marker-tap → docked card → property-gate end-to-end you MUST use a native/dev-client build (Expo Go or EAS) OR temporarily patch map.web.tsx to wrap Marker in Pressable with onPress. For satellite tiles & 3D camera pitch, same — native-only.",
+  "rca_of_issue": "N/A — no bugs. The one web-only limitation (Marker stub drops onPress) is a known fallback for the browser preview, not a regression."
+}

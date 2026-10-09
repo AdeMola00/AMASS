@@ -248,7 +248,35 @@ backend:
         comment: "Added idempotent create_index calls on properties, wallets, token_transactions, notifications, users, favorites, marketplace, agent_referrals."
 
 frontend:
-  - task: "Phase1 — Two-tier property access UX (access gate + agent reveal)"
+  - task: "Map upgrade — satellite-only, status-colour markers, listing-type icons, always-on legend, loading/error/empty states, decluttered controls"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/(tabs)/index.tsx, frontend/src/components/PropertyMarker.tsx, frontend/src/components/MapLegend.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Satellite-only: mapType hardcoded to 'satellite' (pure, per user); removed the
+          Standard/Hybrid/Terrain layer toggle + LayerPickerSheet mount, the heatmap overlay
+          tool, and the draw-area tool (uncluttered). Right-side controls now only: locate,
+          zoom in, zoom out.
+          Markers: COLOUR = availability status (available=green / coming_soon=amber /
+          closed(sold/let)=slate) derived from real `status`; ICON = listing type
+          (sale=pricetag / rent=key / shortlet=bed / lease=document-text). Non-colour cues:
+          coming_soon adds a clock glyph, closed strikes through the price + lock glyph.
+          Verified/Hot moved to a small corner badge (separate from colour). Selected state =
+          dark fill + scale. Clustering (supercluster) preserved; marker tap → docked card →
+          property detail (two-tier wallet gate preserved).
+          Legend: always-visible 'Map key' chip (shows the 3 status colours inline) → opens a
+          full key explaining status colours, listing-type icons, and badges.
+          States: centered loading pill, error card with Retry, empty card with Clear filters.
+          NOTE: react-native-maps is NATIVE ONLY — satellite imagery + real markers render in a
+          dev/standalone build, NOT in web preview or (fully) Expo Go. Web shows a placeholder.
+
+
     implemented: true
     working: "NA"
     file: "frontend/app/property/[id].tsx, frontend/src/components/UnlockSheet.tsx, frontend/src/contexts/wallet.tsx, frontend/src/lib/api.ts"

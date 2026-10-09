@@ -330,3 +330,12 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - `server.get_property`/`list_properties` return `access_cost`, `agent_contact_cost`, `agent_unlocked`; agent phone/email gated behind Tier 2; legacy `/properties/unlock` still grants both tiers (backward compatible).
 - Frontend: generalized `UnlockSheet` (mode `access`|`agent`), property-detail access gate + agent-reveal block (tappable tel:/mailto:), free in-app "Chat with Agent".
 - Tests: `/app/backend/tests/test_property_access_two_tier.py` — 9/9 pass.
+
+## Map Upgrade — Satellite-First Discovery (Jun 2026)
+- **Satellite only**: `mapType="satellite"` (pure, per user). Removed Standard/Hybrid/Terrain toggle + LayerPickerSheet mount, the heatmap overlay tool, and the draw-area tool for an uncluttered UI. Right controls = locate + zoom in/out only.
+- **Markers (dual encoding)**: COLOUR = availability status from real `status` data — Available (green #16A34A) / Coming soon (amber #D97706 + clock) / Sold-Let (slate #64748B + lock + struck-through price). ICON = listing type — sale(pricetag)/rent(key)/shortlet(bed)/lease(document-text). Colour never alone (icon + legend text + shape cues). Verified/Hot = small corner badge. Selected = dark fill + scale. Supercluster clustering preserved.
+- **Legend**: always-visible "Map key" chip (`src/components/MapLegend.tsx`) → full key explaining status colours, listing-type icons and badges. New PropertyMarker exports: `availabilityStatus`, `STATUS_META`, `STATUS_LEGEND`, `listingKind`, `LISTING_TYPE_META`, `LISTING_TYPE_LEGEND` (type-colour exports kept for cards/back-compat).
+- **States**: centered loading pill, error card + Retry (`map-retry-btn`), empty card + Clear filters (`map-clear-filters-btn`). Permission handling + default market region + recenter unchanged.
+- **Marker testIDs**: `marker-{status}-{kind}[-active][-hot]`.
+- **Web note**: react-native-maps is native-only; web uses a placeholder (markers now forward onPress). Real satellite imagery + native markers require a dev/standalone build (not Expo Go web).
+- **Google Maps key**: lives in `app.json` (ios.config.googleMapsApiKey + android.config.googleMaps.apiKey) — standard for the mobile SDK (restrict by bundle id / SHA-1 in Google Cloud). User must verify in Google Cloud Console: Maps SDK for Android + iOS enabled, billing active, and key app-restrictions set.

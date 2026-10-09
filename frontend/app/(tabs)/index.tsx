@@ -11,8 +11,9 @@ import {
   Linking,
   Alert,
   Animated,
+  ActivityIndicator,
 } from "react-native";
-import { MapView, Marker, Circle, Polygon, PROVIDER_DEFAULT, Region, IS_MAP_LIMITED_IN_EXPO_GO } from "@/src/lib/map";
+import { MapView, Marker, PROVIDER_DEFAULT, Region, IS_MAP_LIMITED_IN_EXPO_GO } from "@/src/lib/map";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -29,18 +30,12 @@ import { MapDockedCard } from "@/src/components/MapDockedCard";
 import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
 import { PropertyCardSkeleton } from "@/src/components/Skeleton";
-import { LayerPickerSheet, LayerPickerRef, MapLayer } from "@/src/components/LayerPickerSheet";
 import { NeighborhoodSheet, NeighborhoodSheetRef } from "@/src/components/NeighborhoodSheet";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { MapLegend } from "@/src/components/MapLegend";
-import { mapMinimal } from "@/src/constants/mapStyle";
 import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 
-const LAYER_KEY = "amass_map_layer";
-const OVERLAY_KEY = "amass_map_overlay";
 const LAST_REGION_KEY = "amass_map_last_region";
-
-type OverlayType = "none" | "price_per_sqm" | "verified_density" | "views";
 
 // Active market default — Lekki Phase 1 (Nigeria's most active property market).
 // Delta ~0.014 corresponds to zoom ≈ 15 (street level, ~1.5 km wide).
@@ -100,7 +95,6 @@ export default function HomeMap() {
   const searchParams = useLocalSearchParams<{ ai_filters?: string }>();
   const mapRef = useRef<MapView>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
-  const layerSheetRef = useRef<LayerPickerRef>(null);
   const insightsRef = useRef<NeighborhoodSheetRef>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>("map");
@@ -108,6 +102,7 @@ export default function HomeMap() {
   const [query, setQuery] = useState("");
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [region, setRegion] = useState<Region>(BOOTSTRAP_REGION);
@@ -116,11 +111,6 @@ export default function HomeMap() {
   const [locationPermission, setLocationPermission] = useState<
     "unknown" | "granted" | "denied" | "blocked"
   >("unknown");
-  const [layer, setLayer] = useState<MapLayer>("standard");
-  const [overlay, setOverlay] = useState<OverlayType>("none");
-  const [heatCells, setHeatCells] = useState<{ lat: number; lng: number; count: number; weight: number }[]>([]);
-  const [drawing, setDrawing] = useState(false);
-  const [polygon, setPolygon] = useState<{ latitude: number; longitude: number }[]>([]);
   const initialRegionRef = useRef<Region>(BOOTSTRAP_REGION);
   const introDoneRef = useRef(false);
   const lastRegionSaveRef = useRef(0);
@@ -163,17 +153,6 @@ export default function HomeMap() {
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
-
-  // Restore preferred layer only. Overlay defaults to "none" per refined UX
-  // spec (no coloured circle overlays on the map unless the user asks).
-  useEffect(() => {
-    (async () => {
-      const saved = await storage.getItem<string>(LAYER_KEY, "standard");
-      if (saved === "standard" || saved === "satellite" || saved === "hybrid" || saved === "terrain") {
-        setLayer(saved);
-      }
-    })();
-  }, []);
 
   // Smart Location bootstrap: user location > last viewed > active market default
   useEffect(() => {
@@ -259,6 +238,7 @@ export default function HomeMap() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const params: Record<string, any> = {};
       if (filters.listingType && filters.listingType !== "land" && filters.listingType !== "commercial") {
@@ -282,6 +262,7 @@ export default function HomeMap() {
       setShowSearchArea(false);
     } catch {
       setProperties([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -314,30 +295,6 @@ export default function HomeMap() {
   // ─── Supercluster: prebuild index whenever properties change ───────
   const clusterIndex = useMemo(() => buildIndex(properties), [properties]);
   const clusters = useMemo(() => getClusters(clusterIndex, region), [clusterIndex, region]);
-
-  // ─── Fetch heatmap cells whenever overlay OR region change (debounced) ───
-  useEffect(() => {
-    if (overlay === "none") {
-      setHeatCells([]);
-      return;
-    }
-    const handle = setTimeout(async () => {
-      try {
-        const res = await api.mapHeatmap({
-          metric: overlay,
-          cells: 18,
-          min_lat: region.latitude - region.latitudeDelta / 2,
-          max_lat: region.latitude + region.latitudeDelta / 2,
-          min_lng: region.longitude - region.longitudeDelta / 2,
-          max_lng: region.longitude + region.longitudeDelta / 2,
-        });
-        setHeatCells(res.cells);
-      } catch {
-        setHeatCells([]);
-      }
-    }, 350);
-    return () => clearTimeout(handle);
-  }, [overlay, region]);
 
   // Reset activeId when properties refresh; do NOT auto-select a marker on load.
   // The docked card is hidden until the user taps a marker (per refined spec).
@@ -445,62 +402,10 @@ export default function HomeMap() {
     );
   };
 
-  const openLayerSheet = () => {
-    Haptics.selectionAsync().catch(() => {});
-    layerSheetRef.current?.open();
-  };
-
-  const changeLayer = (l: MapLayer) => {
-    setLayer(l);
-    storage.setItem(LAYER_KEY, l);
-  };
-
-  const drawArea = () => {
-    Haptics.selectionAsync().catch(() => {});
-    if (drawing) {
-      // Second tap: submit polygon if valid
-      if (polygon.length >= 3) {
-        (async () => {
-          try {
-            const list = await api.mapPolygonSearch(polygon);
-            setProperties(list);
-            setActiveId(list[0]?.id ?? null);
-          } catch {}
-        })();
-        Alert.alert("Area searched", `Found ${polygon.length}-vertex area — loading listings inside.`);
-      }
-      setDrawing(false);
-      setPolygon([]);
-      return;
-    }
-    setDrawing(true);
-    setPolygon([]);
-    Alert.alert(
-      "Draw Search Area",
-      "Tap the map to add corners (min 3). Tap the Draw button again to finish and search inside the shape.",
-      [{ text: "OK" }]
-    );
-  };
-
-  const cycleOverlay = () => {
-    Haptics.selectionAsync().catch(() => {});
-    const order: OverlayType[] = ["none", "price_per_sqm", "verified_density", "views"];
-    const next = order[(order.indexOf(overlay) + 1) % order.length];
-    setOverlay(next);
-    storage.setItem(OVERLAY_KEY, next);
-  };
-
   const openInsights = () => {
     if (!activeId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     insightsRef.current?.open(activeId);
-  };
-
-  const overlayLabel: Record<OverlayType, string> = {
-    none: "Overlays",
-    price_per_sqm: "₦/m²",
-    verified_density: "Verified",
-    views: "Views",
   };
 
   // Progressive disclosure — derived zoom level drives a lightweight UX hint.
@@ -559,13 +464,6 @@ export default function HomeMap() {
 
   const searchTop = insets.top + 6;
   const dockedBottom = 68 + Math.max(insets.bottom, 12) + 12;
-
-  const layerMapType: "standard" | "satellite" | "hybrid" | "terrain" =
-    layer === "standard" ? "standard"
-    : layer === "satellite" ? "satellite"
-    : layer === "hybrid" ? "hybrid"
-    : "terrain";
-  const customStyle = layer === "standard" ? mapMinimal : undefined;
 
   // ────── LIST VIEW ──────
   if (viewMode === "list") {
@@ -628,8 +526,7 @@ export default function HomeMap() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_DEFAULT}
-        mapType={layerMapType}
-        customMapStyle={customStyle as any}
+        mapType="satellite"
         initialRegion={BOOTSTRAP_REGION}
         showsCompass={false}
         showsMyLocationButton={false}
@@ -642,61 +539,7 @@ export default function HomeMap() {
         rotateEnabled={true}
         toolbarEnabled={false}
         onRegionChangeComplete={onRegionChangeComplete}
-        onPress={(e: any) => {
-          if (!drawing) return;
-          const c = e?.nativeEvent?.coordinate;
-          if (c) {
-            Haptics.selectionAsync().catch(() => {});
-            setPolygon((prev) => [...prev, { latitude: c.latitude, longitude: c.longitude }]);
-          }
-        }}
       >
-        {/* Heatmap overlay — colored circles per cell */}
-        {overlay !== "none" && heatCells.map((c, i) => {
-          const w = c.weight;
-          // Normalize per metric — pick a color ramp per overlay type
-          let color = "rgba(220,38,38,0.35)";
-          if (overlay === "price_per_sqm") {
-            // Sort tiers
-            const tier = w > 500_000 ? 0.55 : w > 250_000 ? 0.4 : w > 100_000 ? 0.28 : 0.18;
-            color = `rgba(220,38,38,${tier})`;
-          } else if (overlay === "verified_density") {
-            const tier = w > 0.75 ? 0.5 : w > 0.5 ? 0.35 : w > 0.25 ? 0.22 : 0.12;
-            color = `rgba(5,150,105,${tier})`;
-          } else if (overlay === "views") {
-            const tier = w > 0.75 ? 0.55 : w > 0.5 ? 0.4 : w > 0.25 ? 0.25 : 0.15;
-            color = `rgba(245,158,11,${tier})`;
-          }
-          // radius in meters: scale with cell count
-          const radiusM = 900 + Math.min(1600, c.count * 220);
-          return (
-            <Circle
-              key={`heat-${i}`}
-              center={{ latitude: c.lat, longitude: c.lng }}
-              radius={radiusM}
-              fillColor={color}
-              strokeColor="rgba(0,0,0,0.05)"
-              strokeWidth={1}
-              zIndex={1}
-            />
-          );
-        })}
-
-        {/* Draw-area polygon */}
-        {polygon.length >= 3 && (
-          <Polygon
-            coordinates={polygon}
-            fillColor="rgba(225,27,34,0.15)"
-            strokeColor="#E11B22"
-            strokeWidth={2}
-          />
-        )}
-        {polygon.length > 0 && polygon.length < 3 && polygon.map((p, i) => (
-          <Marker key={`polypt-${i}`} coordinate={p} anchor={{ x: 0.5, y: 0.5 }}>
-            <View style={styles.drawDot} />
-          </Marker>
-        ))}
-
         {clusters.map((c: any, i: number) => {
           const isCluster = c.properties?.cluster;
           if (isCluster) {
@@ -767,40 +610,43 @@ export default function HomeMap() {
         <ActionBtn icon="locate" onPress={recenter} testID="fab-locate" />
         <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" />
         <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" />
-        <ActionBtn icon="layers-outline" onPress={openLayerSheet} testID="fab-layers" />
-        <ActionBtn
-          icon={overlay === "none" ? "thermometer-outline" : "thermometer"}
-          onPress={cycleOverlay}
-          testID="fab-overlay"
-          highlight={overlay !== "none"}
-        />
-        <ActionBtn
-          icon={drawing ? "checkmark" : "analytics-outline"}
-          onPress={drawArea}
-          testID="fab-draw"
-          highlight={drawing}
-        />
       </View>
 
-      {/* Overlay label chip (shows current metric name) */}
-      {overlay !== "none" && (
-        <View style={[styles.overlayLabelWrap, { top: searchTop + 120 }]} pointerEvents="none">
-          <View style={styles.overlayLabel}>
-            <Ionicons name="thermometer" size={12} color="#fff" />
-            <Text style={styles.overlayLabelText}>{overlayLabel[overlay]}</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Drawing hint */}
-      {drawing && (
-        <View style={[styles.overlayLabelWrap, { top: searchTop + 156 }]} pointerEvents="none">
-          <View style={[styles.overlayLabel, { backgroundColor: colors.red }]}>
-            <Ionicons name="brush" size={12} color="#fff" />
-            <Text style={styles.overlayLabelText}>
-              Draw: {polygon.length} {polygon.length === 1 ? "point" : "points"} — tap map to add
-            </Text>
-          </View>
+      {/* Centered map status: loading / error / empty */}
+      {(loading || loadError || properties.length === 0) && !activeId && (
+        <View style={styles.mapStatusWrap} pointerEvents="box-none">
+          {loading ? (
+            <View style={[styles.mapStatusPill, shadows.card]} testID="map-status-loading">
+              <ActivityIndicator size="small" color={colors.ink} />
+              <Text style={styles.mapStatusText}>Loading homes…</Text>
+            </View>
+          ) : loadError ? (
+            <View style={[styles.mapStatusCard, shadows.card]} testID="map-status-error">
+              <Ionicons name="cloud-offline-outline" size={22} color={colors.red} />
+              <Text style={styles.mapStatusTitle}>Couldn&apos;t load the map</Text>
+              <Text style={styles.mapStatusSub}>Check your connection and try again.</Text>
+              <Pressable style={styles.mapStatusBtn} onPress={load} testID="map-retry-btn">
+                <Ionicons name="refresh" size={14} color="#fff" />
+                <Text style={styles.mapStatusBtnText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={[styles.mapStatusCard, shadows.card]} testID="map-status-empty">
+              <Ionicons name="home-outline" size={22} color={colors.textSecondary} />
+              <Text style={styles.mapStatusTitle}>No homes in this area</Text>
+              <Text style={styles.mapStatusSub}>Try panning the map or clearing filters.</Text>
+              {activeQuickFilterCount > 0 || query.trim() ? (
+                <Pressable
+                  style={styles.mapStatusBtn}
+                  onPress={() => { setFilters({}); setQuery(""); }}
+                  testID="map-clear-filters-btn"
+                >
+                  <Ionicons name="close-circle" size={14} color="#fff" />
+                  <Text style={styles.mapStatusBtnText}>Clear filters</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          )}
         </View>
       )}
 
@@ -909,7 +755,6 @@ export default function HomeMap() {
       />
 
       <FilterSheet ref={filterSheetRef} value={filters} onApply={setFilters} />
-      <LayerPickerSheet ref={layerSheetRef} layer={layer} onLayerChange={changeLayer} />
       <NeighborhoodSheet ref={insightsRef} />
     </View>
   );
@@ -1122,17 +967,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   actionBtnActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  overlayLabelWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
-  overlayLabel: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: colors.ink,
-  },
-  overlayLabelText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
   nbhdModeWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   nbhdMode: {
     flexDirection: "row",
@@ -1146,14 +980,44 @@ const styles = StyleSheet.create({
     borderColor: "rgba(245,179,1,0.5)",
   },
   nbhdModeText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
-  drawDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.red,
-    borderWidth: 2,
-    borderColor: "#fff",
+  mapStatusWrap: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  mapStatusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 999,
+  },
+  mapStatusText: { fontSize: 13, fontWeight: "800", color: colors.text },
+  mapStatusCard: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 22,
+    paddingVertical: 20,
+    borderRadius: 18,
+    alignItems: "center",
+    gap: 6,
+    maxWidth: 280,
+  },
+  mapStatusTitle: { fontSize: 15, fontWeight: "900", color: colors.text, marginTop: 4 },
+  mapStatusSub: { fontSize: 12, color: colors.textSecondary, textAlign: "center" },
+  mapStatusBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.ink,
+    paddingHorizontal: 16,
+    height: 40,
+    borderRadius: 20,
+    marginTop: 10,
+  },
+  mapStatusBtnText: { color: "#fff", fontSize: 13, fontWeight: "800" },
   insightsCta: {
     position: "absolute",
     right: spacing.lg,
