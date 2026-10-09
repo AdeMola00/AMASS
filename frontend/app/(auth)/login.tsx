@@ -8,7 +8,6 @@ import { useAuth } from "@/src/contexts/auth";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { AppleSignInButton } from "@/src/components/AppleSignInButton";
 import { GoogleSignInButton } from "@/src/components/GoogleSignInButton";
-import { FacebookSignInButton } from "@/src/components/FacebookSignInButton";
 import { colors, radius, spacing, typography } from "@/src/constants/theme";
 
 export default function Login() {
@@ -100,7 +99,6 @@ export default function Login() {
           <View style={{ gap: 10 }}>
             <GoogleSignInButton onError={(msg) => setError(msg)} />
             <AppleSignInButton onError={(msg) => setError(msg)} />
-            <FacebookSignInButton />
           </View>
 
           <View style={styles.footer}>

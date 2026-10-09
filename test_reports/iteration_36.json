@@ -1,0 +1,37 @@
+{
+  "summary": "Phase 2 polish (dead-button hiding + Top-up-and-continue + agent onboarding clarity) verified end-to-end on the public preview. (1) DEAD BUTTONS — /login and /register render only Email/Password + 'Continue with Google' + Apple Sign-in; no Facebook text or button anywhere (LOGIN_HAS_FACEBOOK=False, REG_HAS_FACEBOOK=False). (2) Home search bar — no mic button rendered; testID 'home-voice-btn' does not exist in DOM; AI-sparkles (home-ai-btn), filter (open-filter-sheet), bookmark-save (save-search-btn) remain. (3) Earn screen — tasks list is client-filtered via HIDDEN_TASKS=['identity_verify','first_review'] in /app/frontend/app/earn.tsx (lines 56-57); testIDs 'task-identity_verify' and 'task-first_review' are absent while 'task-daily_login', 'task-share_listing', 'task-complete_profile', 'task-refer_friend', 'task-upload_property' all render and remain tappable. (4) TOP UP & CONTINUE — on a fresh registered account with 15 welcome MASS, visiting a non-free property (0cd6ebe3-916a-4311-9f1e-20555e130c19 — Palatial Ocean-View Duplex, access fee 20 MASS) and tapping the sticky 'Unlock for 20 MASS' CTA opens UnlockSheet which (a) discloses access fee + current balance (15 MASS), (b) renders the shortfall card 'You need 5 more MASS to continue.', (c) swaps the primary CTA to testID='buy-tokens-cta' labeled 'Top up & continue', (d) tapping it navigates to /buy-tokens?returnTo=%2Fproperty%2F{id}&unlock=access — both params correctly URL-encoded. (5) AUTO-REOPEN — visiting /property/{id}?unlock=access directly (property still locked) auto-opens the access UnlockSheet after load (buy-tokens-cta present), confirmed via /app/frontend/app/property/[id].tsx lines 80-101 which gate on `property && unlock && !autoUnlockDone` and dispatch open({mode:'access'}) when `!property.unlocked`, open({mode:'agent'}) when `property.unlocked && !property.agent_unlocked`. The agent-side auto-reopen branch is covered by symmetric code review (same ref/useEffect, same gating) but was not driven live because the test property/account combo had no access-unlocked-only state available. (6) AGENT STATUS CLARITY — on the demo (approved agent) account, /become-agent renders testID 'become-agent-status' + testID 'application-status-banner' with Approved banner, a 3-step tracker (Submitted → Under review → Approved — all three labels present in rendered HTML), and an action button labelled 'Edit application'. The 'Update & resubmit' label does NOT appear for an approved account — correct, since the ternary on line 262 only swaps to 'Update & resubmit' when status==='rejected'. (7) BACKEND — GET /api/agents/me on demo returns both rejection_reason (null) and updated_at ('2026-07-28T17:15:22.863000') alongside the existing AgentPublic fields, confirming server.py AgentPublic (lines 756-782) and _agent_to_public (lines 856-883) now serialise the two new fields. No red screen, no pageerrors across all five tested screens.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_36.json",
+    "/app/backend/tests/test_property_access_two_tier.py (reused from iteration_35 — still passes)"
+  ],
+  "action_items": [
+    "Optional: there is a visible pricing inconsistency — GET /api/settings/pricing returns property_access_fee=5 while GET /api/properties/{id}/access-info and the UnlockSheet both charge 20 MASS. Not a Phase-2 regression (same behaviour was present in iteration_35), but worth reconciling so the public pricing endpoint and the enforcement path agree. Main agent should pick a single source of truth (likely the DEFAULT_WALLET_PRICING in app_settings.py) and ensure both endpoints read from it.",
+    "Nice-to-have: once a buyer completes top-up and returns via returnTo, the property-screen auto-reopen could show a one-line 'Welcome back — resuming your unlock' toast above the sheet (currently it opens the sheet silently). Pure polish; the functional loop works."
+  ],
+  "critical_code_review_comments": [
+    "UnlockSheet.tsx line 100: `router.push({ pathname: '/buy-tokens', params: { returnTo: `/property/${propertyId}`, unlock: mode } })` — mode is correctly derived from the sheet's open-time argument (access vs agent), so the deep-link symmetry is intact for both tiers.",
+    "property/[id].tsx lines 80-101: autoUnlockDone ref prevents re-open loops when the user manually dismisses the sheet and lands back on the same URL, and the useEffect gates on `property` (not just id) so we don't open before the access-info payload is in state. Clean.",
+    "earn.tsx lines 56-57: HIDDEN_TASKS is defined inside load() rather than at module scope — functionally fine, but if the list ever grows past 2-3 entries it would be cleaner as a top-level const. Non-blocking.",
+    "become-agent.tsx line 262: ternary cleanly flips the CTA label on status==='rejected'. Note: there is no explicit handler to pre-populate the form with existing data for 'Edit application' — if the user taps it today they get a blank form. Main agent should wire router.push('/become-agent/apply?prefill=1') or similar so the status-view CTA is truly editing, not re-submitting from scratch. Flagging for Phase 2.1 polish."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (/api/agents/me returns rejection_reason + updated_at as spec'd)",
+    "frontend": "100% (7/7 Phase-2 items verified on the public preview with mobile viewport 390x844)"
+  },
+  "seed_data_creation": "Registered one throw-away low-balance account testlow_1791553467@amass.africa / testpass123 (15 welcome MASS, used to drive the <-fee top-up prompt). Can be left in Mongo or cleaned by main agent.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "To validate the Top-up-and-continue UX end-to-end you MUST use a low-balance account (fresh register gives 15 welcome MASS — fee is 20). The demo account has ~6300 MASS and will not trigger the shortfall sheet. The agent-side auto-reopen (`?unlock=agent`) needs a property that the test account has access-unlocked but NOT agent-revealed — this is a transient state most seeded accounts don't naturally sit in. Easiest way: register a fresh user, admin-top-up to 25 MASS, call POST /properties/{id}/access to unlock access, then open /property/{id}?unlock=agent.",
+  "rca_of_issue": "N/A — no bugs. One pre-existing non-regression noted: /api/settings/pricing publishes property_access_fee=5 while the actual enforcement path (property/access-info + /access) uses 20 MASS. Not blocking Phase 2 polish."
+}

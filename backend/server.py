@@ -776,7 +776,9 @@ class AgentPublic(BaseModel):
     total_sold: int = 0
     total_rented: int = 0
     mandate_verification_rate: float = 0.0
+    rejection_reason: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 def _badge_for(level: int) -> str:
@@ -875,7 +877,9 @@ def _agent_to_public(doc: dict) -> AgentPublic:
         total_sold=0,
         total_rented=0,
         mandate_verification_rate=0.0,
+        rejection_reason=doc.get("rejection_reason"),
         created_at=doc.get("created_at", datetime.now(timezone.utc)),
+        updated_at=doc.get("updated_at"),
     )
 
 

@@ -40,11 +40,12 @@ const GALLERY_H = 400;
 const SHARE_BASE = "https://amass.app";
 
 export default function PropertyDetails() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, unlock } = useLocalSearchParams<{ id: string; unlock?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { wallet } = useWallet();
   const unlockRef = React.useRef<UnlockSheetRef>(null);
+  const autoUnlockDone = React.useRef(false);
   const [property, setProperty] = useState<Property | null>(null);
   const [similar, setSimilar] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +75,30 @@ export default function PropertyDetails() {
       api.recordView(id).catch(() => {});
     }
   }, [id, reload]);
+
+  // Returning from a top-up? Re-open the matching unlock sheet automatically.
+  useEffect(() => {
+    if (!property || !unlock || autoUnlockDone.current) return;
+    autoUnlockDone.current = true;
+    const t = setTimeout(() => {
+      if (unlock === "access" && !property.unlocked) {
+        unlockRef.current?.open({
+          propertyId: property.id,
+          propertyTitle: property.title,
+          tokenCost: property.access_cost ?? property.token_cost ?? 5,
+          mode: "access",
+        });
+      } else if (unlock === "agent" && property.unlocked && !property.agent_unlocked) {
+        unlockRef.current?.open({
+          propertyId: property.id,
+          propertyTitle: property.title,
+          tokenCost: property.agent_contact_cost ?? 10,
+          mode: "agent",
+        });
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [property, unlock]);
 
   const isHot = useMemo(
     () =>

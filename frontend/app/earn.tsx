@@ -52,7 +52,9 @@ export default function EarnScreen() {
   const load = useCallback(async () => {
     try {
       const [tasksRes, refRes] = await Promise.all([api.earnTasks(), api.myReferral()]);
-      setTasks(tasksRes.tasks);
+      // Hide not-yet-available stub tasks so nothing looks broken to users.
+      const HIDDEN_TASKS = ["identity_verify", "first_review"];
+      setTasks(tasksRes.tasks.filter((t) => !HIDDEN_TASKS.includes(t.id)));
       setStreak(tasksRes.streak);
       setReferral(refRes);
     } catch {}

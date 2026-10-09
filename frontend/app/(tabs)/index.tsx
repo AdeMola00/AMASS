@@ -519,10 +519,6 @@ export default function HomeMap() {
     [filters]
   );
 
-  const voiceHint = () => {
-    Alert.alert("Voice search", "Voice-to-text is coming soon. Try typing what you're looking for.");
-  };
-
   const saveCurrentSearch = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     // Build criteria from active filters + query
@@ -581,7 +577,6 @@ export default function HomeMap() {
             setQuery={setQuery}
             onSubmit={load}
             onFilters={openFilterSheet}
-            onVoice={voiceHint}
             onSaveSearch={saveCurrentSearch}
             activeFilters={activeQuickFilterCount}
             filters={filters}
@@ -758,7 +753,6 @@ export default function HomeMap() {
           setQuery={setQuery}
           onSubmit={load}
           onFilters={openFilterSheet}
-          onVoice={voiceHint}
           onSaveSearch={saveCurrentSearch}
           activeFilters={activeQuickFilterCount}
           filters={filters}
@@ -926,7 +920,6 @@ function TopOverlay({
   setQuery,
   onSubmit,
   onFilters,
-  onVoice,
   onSaveSearch,
   activeFilters,
   filters,
@@ -938,7 +931,6 @@ function TopOverlay({
   setQuery: (s: string) => void;
   onSubmit: () => void;
   onFilters: () => void;
-  onVoice: () => void;
   onSaveSearch: () => void;
   activeFilters: number;
   filters: FilterState;
@@ -973,9 +965,6 @@ function TopOverlay({
           returnKeyType="search"
           testID="home-search-input"
         />
-        <Pressable onPress={onVoice} style={styles.voiceBtn} hitSlop={8} testID="home-voice-btn">
-          <Ionicons name="mic" size={16} color={colors.textSecondary} />
-        </Pressable>
         <Pressable onPress={onFilters} style={styles.filterIcon} testID="open-filter-sheet">
           <Ionicons name="options" size={16} color="#fff" />
           {activeFilters > 0 && (
@@ -1084,11 +1073,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.7)",
   },
   searchInput: { flex: 1, fontSize: 15, color: colors.text, fontWeight: "500" },
-  voiceBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center", justifyContent: "center",
-  },
   filterIcon: {
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.text,

@@ -72,6 +72,24 @@ export default function BecomeAgent() {
   const toggle = (list: string[], value: string, setter: (n: string[]) => void) =>
     setter(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
 
+  // Prefill the wizard from the submitted application so edit/resubmit isn't a blank form.
+  const editApplication = () => {
+    if (existing) {
+      setFullName(existing.full_name ?? "");
+      setPhone(existing.phone ?? "");
+      setEmail(existing.email ?? "");
+      setAgencyName(existing.agency_name ?? "");
+      setOfficeAddress(existing.office_address ?? "");
+      setStateVal(existing.state ?? "Lagos");
+      setLga(existing.lga ?? "");
+      setYears(String(existing.years_experience ?? 2));
+      setAreas(existing.areas_of_operation ?? []);
+      setSpecs(existing.specialisations ?? []);
+    }
+    setStep(0);
+    setExisting(null);
+  };
+
   const pickPhoto = async (setter: (u: string) => void, mode: "id" | "selfie") => {
     try {
       if (mode === "selfie") {
@@ -133,7 +151,7 @@ export default function BecomeAgent() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setExisting(agent);
-    } catch (e) {
+    } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } finally {
       setSubmitting(false);
@@ -156,6 +174,46 @@ export default function BecomeAgent() {
         : existing.verification_level === 2
           ? colors.emerald
           : colors.textTertiary;
+
+    const STATUS_META: Record<
+      string,
+      { label: string; color: string; icon: string; msg: string }
+    > = {
+      pending: {
+        label: "Pending review",
+        color: colors.gold,
+        icon: "time",
+        msg: "Your application is in the queue. AMASS usually reviews within 1–2 business days — we'll notify you the moment there's an update.",
+      },
+      approved: {
+        label: "Approved",
+        color: colors.emerald,
+        icon: "checkmark-circle",
+        msg: "You're verified! You can now list properties and access the full agent toolkit.",
+      },
+      rejected: {
+        label: "Changes needed",
+        color: colors.red,
+        icon: "alert-circle",
+        msg:
+          existing.rejection_reason ||
+          "A few details need updating before we can approve your application. Tap below to update and resubmit.",
+      },
+      suspended: {
+        label: "Suspended",
+        color: colors.red,
+        icon: "pause-circle",
+        msg: "Your agent account is currently paused. Please contact AMASS support to restore access.",
+      },
+    };
+    const meta = STATUS_META[existing.status] ?? STATUS_META.pending;
+    const stepState =
+      existing.status === "approved"
+        ? 3
+        : existing.status === "rejected" || existing.status === "suspended"
+          ? 1
+          : 2;
+
     return (
       <SafeAreaView style={styles.container} edges={["top"]} testID="become-agent-status">
         <View style={styles.header}>
@@ -166,14 +224,35 @@ export default function BecomeAgent() {
           <View style={styles.iconBtn} />
         </View>
 
-        <View style={styles.statusWrap}>
+        <ScrollView contentContainerStyle={styles.statusWrap} showsVerticalScrollIndicator={false}>
           <View style={[styles.statusIcon, { backgroundColor: badgeColor }]}>
             <Ionicons name="ribbon" size={40} color="#fff" />
           </View>
           <Text style={styles.statusTitle}>{existing.verification_badge}</Text>
-          <Text style={styles.statusSub}>
-            Application {existing.status.toUpperCase()} · Level {existing.verification_level} of 3
-          </Text>
+
+          {/* Plain-language status banner */}
+          <View style={[styles.statusBanner, { backgroundColor: meta.color + "1A", borderColor: meta.color }]} testID="application-status-banner">
+            <View style={styles.statusBannerTop}>
+              <Ionicons name={meta.icon as any} size={18} color={meta.color} />
+              <Text style={[styles.statusBannerLabel, { color: meta.color }]}>{meta.label}</Text>
+            </View>
+            <Text style={styles.statusBannerMsg}>{meta.msg}</Text>
+          </View>
+
+          {/* Review progress tracker */}
+          <View style={styles.tracker}>
+            <TrackerStep n={1} label="Submitted" done={stepState >= 1} active={stepState === 1} />
+            <View style={[styles.trackerBar, stepState >= 2 && { backgroundColor: colors.emerald }]} />
+            <TrackerStep
+              n={2}
+              label={existing.status === "rejected" ? "Needs update" : "Under review"}
+              done={stepState >= 2}
+              active={stepState === 2}
+              warn={existing.status === "rejected" || existing.status === "suspended"}
+            />
+            <View style={[styles.trackerBar, stepState >= 3 && { backgroundColor: colors.emerald }]} />
+            <TrackerStep n={3} label="Approved" done={stepState >= 3} active={stepState === 3} />
+          </View>
 
           <View style={[styles.card, shadows.soft]}>
             <StatRow label="Full name" value={existing.full_name} />
@@ -192,12 +271,14 @@ export default function BecomeAgent() {
           </View>
 
           <Pressable
-            style={styles.editBtn}
-            onPress={() => setExisting(null)}
+            style={[styles.editBtn, existing.status === "rejected" && { borderColor: colors.red }]}
+            onPress={editApplication}
             testID="edit-application-btn"
           >
             <Ionicons name="create-outline" size={16} color={colors.text} />
-            <Text style={styles.editBtnText}>Edit application</Text>
+            <Text style={styles.editBtnText}>
+              {existing.status === "rejected" ? "Update & resubmit" : "Edit application"}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -235,7 +316,7 @@ export default function BecomeAgent() {
             <Ionicons name="globe-outline" size={16} color={colors.ink} />
             <Text style={styles.publicBtnText}>View my public profile</Text>
           </Pressable>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -282,7 +363,7 @@ export default function BecomeAgent() {
         {step === 1 && (
           <View style={{ gap: spacing.md }}>
             <Text style={styles.h1}>Business information</Text>
-            <Text style={styles.sub}>Optional if you're an independent agent.</Text>
+            <Text style={styles.sub}>Optional if you&apos;re an independent agent.</Text>
             <Field label="Agency name" value={agencyName} onChangeText={setAgencyName} placeholder="e.g. Amass Realty" testID="ba-agency" />
             <View style={styles.row2}>
               <Field label="CAC number" value={cacNumber} onChangeText={setCacNumber} placeholder="RC123456" testID="ba-cac" style={{ flex: 1 }} />
@@ -488,6 +569,39 @@ function LevelRow({ n, active, label, caption }: { n: number; active: boolean; l
   );
 }
 
+function TrackerStep({
+  n,
+  label,
+  done,
+  active,
+  warn,
+}: {
+  n: number;
+  label: string;
+  done: boolean;
+  active?: boolean;
+  warn?: boolean;
+}) {
+  const bg = warn && active ? colors.red : done ? colors.emerald : colors.surfaceSecondary;
+  const fg = done || (warn && active) ? "#fff" : colors.textTertiary;
+  return (
+    <View style={styles.trackerStep}>
+      <View style={[styles.trackerDot, { backgroundColor: bg }]}>
+        {done && !warn ? (
+          <Ionicons name="checkmark" size={14} color="#fff" />
+        ) : warn && active ? (
+          <Ionicons name="alert" size={14} color="#fff" />
+        ) : (
+          <Text style={[styles.trackerN, { color: fg }]}>{n}</Text>
+        )}
+      </View>
+      <Text style={[styles.trackerLabel, active && { color: colors.text, fontWeight: "800" }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
@@ -604,7 +718,32 @@ const styles = StyleSheet.create({
   ctaText: { color: "#fff", fontSize: 16, fontWeight: "800" },
 
   // Status view
-  statusWrap: { padding: spacing.xl, gap: spacing.md, alignItems: "center" },
+  statusWrap: { padding: spacing.xl, gap: spacing.md, alignItems: "center", paddingBottom: spacing.xxl },
+  statusBanner: {
+    width: "100%",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: spacing.md,
+    gap: 6,
+  },
+  statusBannerTop: { flexDirection: "row", alignItems: "center", gap: 8 },
+  statusBannerLabel: { fontSize: 14, fontWeight: "800", letterSpacing: 0.2 },
+  statusBannerMsg: { ...typography.body, color: colors.textSecondary, lineHeight: 20, fontSize: 13 },
+  tracker: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  trackerStep: { alignItems: "center", gap: 6, width: 86 },
+  trackerDot: {
+    width: 30, height: 30, borderRadius: 15,
+    alignItems: "center", justifyContent: "center",
+  },
+  trackerN: { fontSize: 13, fontWeight: "800" },
+  trackerLabel: { fontSize: 11, color: colors.textTertiary, fontWeight: "600", textAlign: "center" },
+  trackerBar: { flex: 1, height: 3, borderRadius: 2, backgroundColor: colors.surfaceSecondary, marginBottom: 20 },
   statusIcon: {
     width: 100,
     height: 100,

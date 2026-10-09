@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { useRouter, Stack } from "expo-router";
+import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
@@ -31,6 +31,7 @@ const PROVIDERS: {
 
 export default function BuyTokensScreen() {
   const router = useRouter();
+  const { returnTo, unlock } = useLocalSearchParams<{ returnTo?: string; unlock?: string }>();
   const { wallet, refresh } = useWallet();
   const [bundles, setBundles] = useState<TokenBundle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,11 +81,30 @@ export default function BuyTokensScreen() {
       if (paid) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         await refresh();
-        Alert.alert(
-          "MASS credited!",
-          `${chosen.tokens + chosen.bonus} MASS added to your wallet.`,
-          [{ text: "Great!", onPress: () => router.replace("/wallet") }]
-        );
+        const added = chosen.tokens + chosen.bonus;
+        if (returnTo) {
+          // Came from an unlock flow — take the buyer straight back to finish.
+          Alert.alert(
+            "MASS credited!",
+            `${added} MASS added. Let's finish unlocking that property.`,
+            [
+              {
+                text: "Continue",
+                onPress: () =>
+                  router.replace({
+                    pathname: returnTo as any,
+                    params: unlock ? { unlock } : {},
+                  } as any),
+              },
+            ]
+          );
+        } else {
+          Alert.alert(
+            "MASS credited!",
+            `${added} MASS added to your wallet.`,
+            [{ text: "Great!", onPress: () => router.replace("/wallet") }]
+          );
+        }
       } else if (result.type === "cancel" || result.type === "dismiss") {
         // User cancelled — no action needed
       } else {

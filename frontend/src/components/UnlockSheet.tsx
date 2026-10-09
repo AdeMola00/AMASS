@@ -90,6 +90,19 @@ export const UnlockSheet = forwardRef<
     setTimeout(() => router.push(path as any), 200);
   };
 
+  // Top up and come straight back to this property + tier to finish unlocking.
+  const gotoTopUp = () => {
+    sheetRef.current?.dismiss();
+    setTimeout(
+      () =>
+        router.push({
+          pathname: "/buy-tokens",
+          params: { returnTo: `/property/${propertyId}`, unlock: mode },
+        } as any),
+      200
+    );
+  };
+
   return (
     <BottomSheetModal
       ref={sheetRef}
@@ -187,11 +200,11 @@ export const UnlockSheet = forwardRef<
           ) : (
             <Pressable
               style={styles.primaryBtn}
-              onPress={() => goto("/buy-tokens")}
+              onPress={gotoTopUp}
               testID="buy-tokens-cta"
             >
               <Ionicons name="add-circle" size={18} color="#fff" />
-              <Text style={styles.primaryText}>Add funds</Text>
+              <Text style={styles.primaryText}>Top up & continue</Text>
             </Pressable>
           )}
           <View style={styles.secondaryRow}>

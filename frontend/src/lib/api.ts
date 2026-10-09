@@ -266,7 +266,9 @@ export type AgentPublic = {
   total_sold: number;
   total_rented: number;
   mandate_verification_rate: number;
+  rejection_reason?: string;
   created_at: string;
+  updated_at?: string;
 };
 
 export type CartLine = { item: MarketplaceItem; quantity: number };

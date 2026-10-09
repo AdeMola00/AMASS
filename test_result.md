@@ -284,6 +284,26 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
+      PHASE 2 polish — please verify (demo@amass.africa / amass2026; login testIDs:
+      login-email, login-password, login-submit-button):
+      1) TOP UP & CONTINUE: open a non-free property while logged in with LOW balance
+         (use admin adjust to set balance below the access fee), tap 'Unlock for N MASS'
+         → sheet shows shortfall + 'Top up & continue' (testID buy-tokens-cta). Tapping it
+         routes to /buy-tokens with params returnTo=/property/{id}&unlock=access. After a
+         successful (mock) top-up it should router.replace back to the property with
+         ?unlock=access and auto-reopen the unlock sheet. NOTE: mock checkout uses
+         WebBrowser deep-link which may not complete in web preview — verify the nav params
+         + the property-screen auto-open effect (reads `unlock` param) by opening
+         /property/{id}?unlock=access directly while access-unlocked=false.
+      2) DEAD BUTTONS HIDDEN: login & register no longer show Facebook (Google/Apple remain);
+         home search bar has NO mic button (home-voice-btn removed); Earn screen does NOT list
+         'identity verify' or 'first review' tasks.
+      3) AGENT STATUS CLARITY: become-agent status screen (testID become-agent-status) shows a
+         plain-language status banner (testID application-status-banner) + a 3-step tracker
+         (Submitted → Under review → Approved) + 'Edit application' ('Update & resubmit' when
+         rejected). Backend /api/agents/me now returns rejection_reason + updated_at.
+  - agent: "main"
+    message: |
       PHASE 1 shipped — two-tier property access charging. Please validate with
       demo@amass.africa / amass2026 (admin). Backend already curl-verified; focus on
       frontend E2E + edge cases:
