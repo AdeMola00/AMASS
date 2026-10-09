@@ -363,7 +363,11 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - Verified: `backend/tests/test_auth_forgot_reset_lockout.py` 12/12; frontend E2E all critical paths (iteration_39). Social buttons (Google/Apple) pre-existing, untouched.
 - Cosmetic only: RN-web console warnings (shadow*/pointerEvents/useNativeDriver) — no functional impact.
 
-## Opening Intro Logos — bolder & cleaner (Jun 2026)
+## Sequential intro — AMASS then FIXA, no overlap (Jun 2026)
+- `app/index.tsx` reworked so the opening animation always plays (removed first-launch gate + `storage`/`BRAND_INTRO_KEY`): **AMASS alone ~2s → AMASS fully fades out → FIXA alone ~2s → navigate** to onboarding/login.
+- Guaranteed no overlap: each phase is conditionally mounted (`phase === "amass"` vs `"fixa"`); FIXA is only mounted after AMASS's fade-out animation `finished` callback, so the two logos are never on screen together (verified: at FIXA opacity 1, AMASS node unmounted).
+- Backgrounds: AMASS on `colors.bg` (white), container switches to `#7ED958` for FIXA (matches the asset's baked green). Each logo keeps original design/proportions/colors. AMASS emblem size 128; FIXA card width 116%. Each enters with fade + spring scale.
+- Verified via screenshots on 390px (AMASS phase, FIXA phase); lint clean.
 - `AmassLogo.tsx`: emblem presets bumped (`lg` 60→64, `xl` 96→112); wordmark made bolder/tighter (fs h×0.34→0.38, letterSpacing ×0.16→0.10) — benefits every hero lockup (splash, onboarding, login, register).
 - Splash `app/index.tsx`:
   - AMASS moment: larger emblem (size 124), bold wordmark, a centered red accent rule above a single-line letter-spaced tagline "AFRICA'S PROPERTY OPERATING SYSTEM"; entrance now opacity 700ms + spring scale from 0.86.

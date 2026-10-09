@@ -4,13 +4,14 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/src/contexts/auth";
-import { storage } from "@/src/utils/storage";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { colors } from "@/src/constants/theme";
 
-const BRAND_INTRO_KEY = "amass_brand_intro_seen_v1";
 const FIXA_GREEN = "#7ED958";
 const FIXA_LOGO = require("../assets/images/fixa-logo.png");
+
+const HOLD_MS = 2000; // each logo stays fully visible ~2s
+const FADE_MS = 420;
 
 export default function Splash() {
   const router = useRouter();
@@ -21,39 +22,39 @@ export default function Splash() {
   const navigated = useRef(false);
 
   const amassOpacity = useRef(new Animated.Value(0)).current;
-  const amassScale = useRef(new Animated.Value(0.86)).current;
+  const amassScale = useRef(new Animated.Value(0.9)).current;
   const fixaOpacity = useRef(new Animated.Value(0)).current;
   const fixaScale = useRef(new Animated.Value(0.9)).current;
 
-  // Brand sequence: Amass first, then (first launch only) the Fixa brand moment.
+  // Sequential brand intro: AMASS alone (2s) -> smooth fade -> FIXA alone (2s).
+  // The two logos are never on screen at the same time.
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
     let cancelled = false;
-    (async () => {
-      const seen = await storage.getItem<boolean>(BRAND_INTRO_KEY, false);
-      if (cancelled) return;
-      Animated.parallel([
-        Animated.timing(amassOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.spring(amassScale, { toValue: 1, friction: 7, tension: 60, useNativeDriver: true }),
-      ]).start();
 
-      if (!seen) {
-        storage.setItem(BRAND_INTRO_KEY, true);
-        timers.push(
-          setTimeout(() => {
-            if (cancelled) return;
+    Animated.parallel([
+      Animated.timing(amassOpacity, { toValue: 1, duration: FADE_MS, useNativeDriver: true }),
+      Animated.spring(amassScale, { toValue: 1, friction: 7, tension: 60, useNativeDriver: true }),
+    ]).start();
+
+    timers.push(
+      setTimeout(() => {
+        if (cancelled) return;
+        // Fully fade AMASS out first, then reveal FIXA (no overlap).
+        Animated.timing(amassOpacity, { toValue: 0, duration: FADE_MS, useNativeDriver: true }).start(
+          ({ finished }) => {
+            if (cancelled || !finished) return;
             setPhase("fixa");
             Animated.parallel([
-              Animated.timing(fixaOpacity, { toValue: 1, duration: 550, useNativeDriver: true }),
+              Animated.timing(fixaOpacity, { toValue: 1, duration: FADE_MS, useNativeDriver: true }),
               Animated.spring(fixaScale, { toValue: 1, friction: 7, tension: 55, useNativeDriver: true }),
             ]).start();
-            timers.push(setTimeout(() => !cancelled && setReady(true), 1600));
-          }, 1450)
+            timers.push(setTimeout(() => !cancelled && setReady(true), HOLD_MS));
+          }
         );
-      } else {
-        timers.push(setTimeout(() => !cancelled && setReady(true), 1350));
-      }
-    })();
+      }, HOLD_MS)
+    );
+
     return () => {
       cancelled = true;
       timers.forEach(clearTimeout);
@@ -67,32 +68,35 @@ export default function Splash() {
     router.replace(user ? "/(tabs)" : "/onboarding");
   }, [ready, loading, user, router]);
 
-  const skip = () => {
-    storage.setItem(BRAND_INTRO_KEY, true);
-    setReady(true);
-  };
+  const skip = () => setReady(true);
 
   return (
-    <View style={styles.container} testID="splash-screen">
-      {/* Amass brand moment */}
-      <Animated.View style={[styles.center, { opacity: amassOpacity, transform: [{ scale: amassScale }] }]}>
-        <AmassLogo size={124} />
-        <View style={styles.taglineWrap}>
-          <View style={styles.taglineRule} />
-          <Text style={styles.tagline}>AFRICA&apos;S PROPERTY OPERATING SYSTEM</Text>
-        </View>
-      </Animated.View>
-
-      {/* Fixa brand moment (first launch) — crossfades over Amass */}
-      <Animated.View
-        pointerEvents={phase === "fixa" ? "auto" : "none"}
-        style={[styles.fixaLayer, { opacity: fixaOpacity }]}
-        testID="fixa-brand-moment"
-      >
-        <Animated.View style={{ width: "100%", alignItems: "center", transform: [{ scale: fixaScale }] }}>
-          <Image source={FIXA_LOGO} style={styles.fixaImg} contentFit="contain" />
+    <View style={[styles.container, phase === "fixa" && styles.containerFixa]} testID="splash-screen">
+      {/* AMASS brand moment — shown by itself */}
+      {phase === "amass" && (
+        <Animated.View
+          style={[styles.center, { opacity: amassOpacity, transform: [{ scale: amassScale }] }]}
+          testID="amass-brand-moment"
+        >
+          <AmassLogo size={128} />
+          <View style={styles.taglineWrap}>
+            <View style={styles.taglineRule} />
+            <Text style={styles.tagline}>AFRICA&apos;S PROPERTY OPERATING SYSTEM</Text>
+          </View>
         </Animated.View>
-      </Animated.View>
+      )}
+
+      {/* FIXA brand moment — shown by itself, after AMASS fully fades out */}
+      {phase === "fixa" && (
+        <Animated.View
+          style={[styles.fixaLayer, { opacity: fixaOpacity }]}
+          testID="fixa-brand-moment"
+        >
+          <Animated.View style={{ width: "100%", alignItems: "center", transform: [{ scale: fixaScale }] }}>
+            <Image source={FIXA_LOGO} style={styles.fixaImg} contentFit="contain" />
+          </Animated.View>
+        </Animated.View>
+      )}
 
       {/* Skip — always available, never blocks access */}
       <SafeAreaView style={styles.skipWrap} edges={["top"]} pointerEvents="box-none">
@@ -106,6 +110,7 @@ export default function Splash() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
+  containerFixa: { backgroundColor: FIXA_GREEN },
   center: { alignItems: "center" },
   taglineWrap: {
     alignItems: "center",
