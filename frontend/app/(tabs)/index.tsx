@@ -47,6 +47,7 @@ import { MapLegend } from "@/src/components/MapLegend";
 import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 
 const LAST_REGION_KEY = "amass_map_last_region";
+const MAP_LAYER_KEY = "amass_map_layer_v1";
 
 // Active market default — Lekki Phase 1 (Nigeria's most active property market).
 // Delta ~0.014 corresponds to zoom ≈ 15 (street level, ~1.5 km wide).
@@ -120,6 +121,8 @@ export default function HomeMap() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [region, setRegion] = useState<Region>(BOOTSTRAP_REGION);
   const [heading, setHeading] = useState(0);
+  // Satellite layer: "hybrid" = satellite + readable road labels, "satellite" = clean imagery only.
+  const [mapLayer, setMapLayer] = useState<"hybrid" | "satellite">("hybrid");
   const [showSearchArea, setShowSearchArea] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<
@@ -423,6 +426,26 @@ export default function HomeMap() {
     setHeading(0);
   };
 
+  // Restore the saved satellite layer preference once on mount.
+  useEffect(() => {
+    storage
+      .getItem<"hybrid" | "satellite">(MAP_LAYER_KEY, "hybrid")
+      .then((v) => {
+        if (v === "satellite" || v === "hybrid") setMapLayer(v);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Toggle between satellite-with-roads (hybrid) and clean satellite-only.
+  const toggleMapLayer = () => {
+    Haptics.selectionAsync().catch(() => {});
+    setMapLayer((prev) => {
+      const next = prev === "hybrid" ? "satellite" : "hybrid";
+      storage.setItem(MAP_LAYER_KEY, next);
+      return next;
+    });
+  };
+
   const applySearchThisArea = () => {
     initialRegionRef.current = region;
     setShowSearchArea(false);
@@ -601,7 +624,7 @@ export default function HomeMap() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_DEFAULT}
-        mapType="hybrid"
+        mapType={mapLayer}
         initialRegion={BOOTSTRAP_REGION}
         showsCompass={false}
         showsMyLocationButton={false}
@@ -697,6 +720,13 @@ export default function HomeMap() {
 
       {/* Right-side floating actions */}
       <View style={[styles.rightActions, { top: searchTop + 140 }]} pointerEvents="box-none">
+        <ActionBtn
+          icon="layers"
+          onPress={toggleMapLayer}
+          testID="fab-map-layer"
+          highlight={mapLayer === "hybrid"}
+          label={mapLayer === "hybrid" ? "Hide street labels (satellite only)" : "Show street labels"}
+        />
         <ActionBtn icon="locate" onPress={recenter} testID="fab-locate" label="Center map on my location" />
         <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" label="Zoom in" />
         <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" label="Zoom out" />

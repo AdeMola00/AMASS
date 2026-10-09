@@ -364,6 +364,7 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - Cosmetic only: RN-web console warnings (shadow*/pointerEvents/useNativeDriver) — no functional impact.
 
 ## Map upgrade — readable-roads satellite, compass, a11y (Jun 2026)
+- **Street-labels toggle** (`fab-map-layer`): persisted `mapLayer` state (`MAP_LAYER_KEY`) switches `mapType` between `"hybrid"` (satellite + road/place labels) and `"satellite"` (clean imagery only). Button highlights (ink) when labels are ON; preference restored on mount via `storage.getItem`. Default = hybrid.
 - `(tabs)/index.tsx`:
   - **Satellite with readable roads**: `mapType` changed `"satellite"` → `"hybrid"` (Google satellite imagery + road lines/labels). Still a satellite view; now roads/place names are legible as requested. (Native only — web uses the placeholder.)
   - **Compass control**: new `heading` state read from `mapRef.getCamera()` in `onRegionChangeComplete` (native only). A custom compass FAB (`fab-compass`) appears only when the map is rotated (`|heading| > 2`), its needle rotates `-heading`, and tapping (`resetNorth`) animates the camera back to north-up keeping the tilt.
