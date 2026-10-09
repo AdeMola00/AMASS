@@ -6,6 +6,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
+import { openPrivacyPolicy, openTerms } from "@/src/lib/legal";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -107,6 +108,11 @@ export default function Settings() {
             onPress={deleting ? undefined : onDeleteAccount}
             destructive
           />
+        </Section>
+
+        <Section title="Legal">
+          <Row icon="shield-checkmark-outline" label="Privacy Policy" onPress={() => openPrivacyPolicy()} />
+          <Row icon="document-text-outline" label="Terms of Service" onPress={() => openTerms()} />
         </Section>
 
         <Text style={styles.version}>AMASS v1.0.0 · Africa&apos;s Property OS</Text>

@@ -354,3 +354,22 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - Platform assets regenerated from the emblem: `amass-icon-square.png` (iOS, opaque white 1024), `amass-adaptive-foreground.png` (Android adaptive, transparent safe-zone), `favicon.png` (web), `amass-splash.png` + app.json splash points to it (white bg, imageWidth 220), `playstore-icon-512.png`. App-icon/splash changes apply on next build.
 - Verified login hero lockup + home header + wallet header on mobile (390) and desktop (1280); emblem loads crisp, correct aspect, strong contrast.
 - NOTE: old orphaned assets `amass-logo-full.png` (old flat wordmark) + `amass-icon.png` no longer referenced. Marketing screenshots/feature-graphic in assets/images/playstore-* + appstore-ios were NOT regenerated (may still show prior art) — regenerate on request. The supplied file is emblem-only; the in-app "AMASS" wordmark is set in app typography — if a specific wordmark art file is required, ask the client.
+
+## Auth Overhaul + Fixa Intro (Jun 2026)
+- **Intro sequence**: `app/index.tsx` splash shows the AMASS emblem first, then (first launch only — AsyncStorage `amass_brand_intro_seen_v1`) crossfades to the supplied **Fixa** brand card (`assets/images/fixa-logo.png`) on its green (#7ED958). Always-visible **Skip**; never blocks access; does not replay after first launch. Both logos used unaltered.
+- **Password reset (email)**: `backend/auth_security.py` via Emergent-managed Resend (EMERGENT_EMAIL_KEY + EMAIL_FROM_NAME=AMASS in .env, httpx). `POST /api/auth/forgot-password` is enumeration-safe (identical generic 200); emails a 6-digit code (sha256-hashed at rest, 15-min expiry, resend 60s/5-per-hr throttle). `POST /api/auth/reset-password` verifies (≤5 attempts) → new bcrypt hash → clears lockout. 400 invalid/expired, 429 too-many.
+- **Brute-force lockout**: server.login → `check_login_locked` (429 + wait) / `record_login_failure` (6 fails/15min → 15-min lock) / `clear_login_failures` on success. Indexes: password_resets.email (unique + TTL), login_attempts.email (unique).
+- **Frontend**: login gains Forgot-password link, show-password, autofill, `?redirect=` destination preservation, reset success banner (`?reset=1`), friendlier network/lockout errors. Register gains inline email/password validation + password hint + autofill + redirect. New `/forgot-password` 2-step screen (request code → code+new password) with resend cooldown + expiry guidance. `api.forgotPassword/resetPassword` added.
+- Verified: `backend/tests/test_auth_forgot_reset_lockout.py` 12/12; frontend E2E all critical paths (iteration_39). Social buttons (Google/Apple) pre-existing, untouched.
+- Cosmetic only: RN-web console warnings (shadow*/pointerEvents/useNativeDriver) — no functional impact.
+
+## Privacy Policy + Terms (Play/App Store compliance) (Jun 2026)
+- **Backend** `/app/backend/legal.py` → `register_legal_routes()` serves public, auth-free HTML:
+  - `GET /api/legal/privacy` — full AMASS privacy policy (account/profile/location/camera/payments/chat data, sharing, retention, account deletion, security, children, contact).
+  - `GET /api/legal/terms` — terms of service (account, listings/conduct, wallet/tokens/subscriptions, AI disclaimer, liability, termination).
+  - Registered in `server.py` right after admin cockpit router. Branded AMASS HTML template (inline CSS, mobile-responsive). The **hosted public URL to submit to Play Store Data Safety** is `https://<deployed-domain>/api/legal/privacy`.
+- **Frontend**:
+  - `src/lib/legal.ts` — `LEGAL_URLS` + `openPrivacyPolicy()` / `openTerms()` (expo-web-browser), URL built from `EXPO_PUBLIC_BACKEND_URL`.
+  - `src/components/LegalLinks.tsx` — `LegalConsent` ("By signing in/creating an account you agree to our Terms & Privacy Policy", testIDs legal-consent / legal-privacy-link / legal-terms-link) + `LegalLinksRow`.
+  - Login + Register screens show `LegalConsent` under the footer; Settings gains a **Legal** section (Privacy Policy + Terms rows).
+- Verified: both HTML endpoints 200 (curl) + render in browser; login screen shows consent line; lint clean.

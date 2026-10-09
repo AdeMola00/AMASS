@@ -115,7 +115,55 @@ user_problem_statement: |
       cannot be delivered; admin wallet ledger review + manual adjust.
 
 backend:
-  - task: "Phase1 — Two-tier property access (access + agent-contact) charging"
+  - task: "Auth hardening — password reset via email (Resend) + brute-force lockout + enumeration-safe"
+    implemented: true
+    working: true
+    file: "backend/auth_security.py, backend/server.py (login lockout + route registration), backend/.env"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          New module auth_security.py (Emergent managed Resend email per playbook; EMERGENT_EMAIL_KEY +
+          EMAIL_FROM_NAME=AMASS in .env). Endpoints:
+          POST /api/auth/forgot-password {email} — ALWAYS returns generic 200 (enumeration-safe); if the
+            account exists emails a 6-digit code (hashed sha256 at rest, 15-min expiry), resend throttled
+            (60s between, 5/hour).
+          POST /api/auth/reset-password {email, code, new_password} — verifies code (max 5 attempts),
+            sets new bcrypt hash, deletes reset doc, clears login lockout. 400 on invalid/expired, 429 on
+            too many attempts.
+          server.login now: check_login_locked (429 with wait time) → on failure record_login_failure
+            (6 fails/15min → 15-min lock) → on success clear_login_failures. register message friendlier.
+          Indexes: password_resets.email unique + TTL, login_attempts.email unique.
+          Verified via curl: enumeration-safe (generic for unknown valid email), full reset happy-path
+          (DB-injected known code → reset → login with new password), 6-fail lockout → 429.
+
+frontend:
+  - task: "Auth UX — Amass→Fixa intro, forgot/reset screen, login/register polish, preserve destination"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/index.tsx, frontend/app/(auth)/login.tsx, frontend/app/(auth)/register.tsx, frontend/app/(auth)/forgot-password.tsx, frontend/src/lib/api.ts, frontend/assets/images/fixa-logo.png"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Intro: splash shows AMASS emblem first, then (first launch only, flag amass_brand_intro_seen_v1)
+          crossfades to the supplied FIXA brand card on its green, Skip always available, never blocks
+          access; does not replay after first launch. Verified render on web.
+          Login: 'Forgot password?' link (testID forgot-password-link), show-password, autofill, preserves
+          ?redirect= destination, friendlier network/lockout errors, success banner after reset (?reset=1).
+          Register: inline email/password validation + password hint, autofill/keyboard types, honors
+          ?redirect=, friendlier errors. Forgot-password screen (/forgot-password): step 1 request code
+          (enumeration-safe generic notice) → step 2 enter code + new password with resend cooldown (60s)
+          + expiry guidance → on success routes to login with success banner. api.forgotPassword/resetPassword
+          added. Needs frontend E2E verification.
+
+
     implemented: true
     working: true
     file: "backend/property_access.py, backend/server.py, backend/app_settings.py, backend/tokens.py"

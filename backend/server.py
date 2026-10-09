@@ -337,7 +337,7 @@ def user_to_out(u: dict) -> UserOut:
 async def register(data: RegisterIn):
     existing = await db.users.find_one({"email": data.email.lower()})
     if existing:
-        raise HTTPException(400, "Email already registered")
+        raise HTTPException(400, "This email is already registered. Try signing in instead.")
     user_id = str(uuid.uuid4())
     user_doc = {
         "id": user_id,
@@ -355,9 +355,16 @@ async def register(data: RegisterIn):
 
 @api.post("/auth/login", response_model=TokenOut)
 async def login(data: LoginIn):
-    user = await db.users.find_one({"email": data.email.lower()})
+    email = data.email.lower()
+    locked = await check_login_locked(db, email)
+    if locked:
+        mins = max(1, round(locked / 60))
+        raise HTTPException(429, f"Too many attempts. Try again in about {mins} minute(s).")
+    user = await db.users.find_one({"email": email})
     if not user or not verify_password(data.password, user.get("password_hash", "")):
+        await record_login_failure(db, email)
         raise HTTPException(401, "Invalid email or password")
+    await clear_login_failures(db, email)
     return TokenOut(access_token=create_token(user["id"]), user=user_to_out(user))
 
 
@@ -1991,6 +1998,10 @@ app.include_router(_pp_admin)
 from admin_cockpit import register_admin_cockpit_routes
 app.include_router(register_admin_cockpit_routes(db, require_admin))
 
+# ─── Legal: public Privacy Policy + Terms (Play/App Store compliance) ─
+from legal import register_legal_routes
+app.include_router(register_legal_routes())
+
 # ─── D-1: Property Type registry + App Settings (feature flags, weights, pricing) ─
 from property_types import register_property_type_routes, ensure_default_property_types
 from app_settings import register_app_settings_routes, ensure_default_settings
@@ -2051,6 +2062,15 @@ from property_access import (
     agent_contact_for,
 )
 app.include_router(register_property_access_routes(db, get_current_user, require_admin))
+
+# ─── Auth security — password reset (email) + brute-force lockout ───
+from auth_security import (
+    register_auth_security_routes,
+    check_login_locked,
+    record_login_failure,
+    clear_login_failures,
+)
+app.include_router(register_auth_security_routes(db, hash_password))
 
 @app.get("/api/files/{file_path:path}")
 async def _download_file(file_path: str, user: dict = Depends(get_current_user)):
@@ -2118,6 +2138,10 @@ async def on_startup():
             partialFilterExpression={"tier": {"$exists": True}},
             name="property_unlocks_tier_uniq",
         )
+        # Auth security: reset codes + login lockout
+        await db.password_resets.create_index("email", unique=True)
+        await db.password_resets.create_index("expires_at", expireAfterSeconds=3600)
+        await db.login_attempts.create_index("email", unique=True)
         await db.marketplace.create_index("id", unique=True)
         await db.agent_referrals.create_index("agent_user_id")
         await db.agent_referrals.create_index("id", unique=True)

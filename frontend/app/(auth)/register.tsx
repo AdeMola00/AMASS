@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator } from "react-native";
-import { useRouter, Link } from "expo-router";
+import { useRouter, Link, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -8,10 +8,12 @@ import { useAuth } from "@/src/contexts/auth";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { AppleSignInButton } from "@/src/components/AppleSignInButton";
 import { GoogleSignInButton } from "@/src/components/GoogleSignInButton";
+import { LegalConsent } from "@/src/components/LegalLinks";
 import { colors, radius, spacing, typography } from "@/src/constants/theme";
 
 export default function Register() {
   const router = useRouter();
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
   const { signUp } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,22 +23,38 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const emailValid = /\S+@\S+\.\S+/.test(email.trim());
+  const pwValid = password.length >= 6;
+
   const submit = async () => {
     setError(null);
-    if (!fullName || !email || !password) {
+    if (!fullName.trim() || !email.trim() || !password) {
       setError("Full name, email and password are required.");
       return;
     }
-    if (password.length < 6) {
+    if (!emailValid) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!pwValid) {
       setError("Password must be at least 6 characters.");
       return;
     }
     setLoading(true);
     try {
       await signUp(email.trim().toLowerCase(), password, fullName.trim(), phone.trim() || undefined);
-      router.replace("/(tabs)");
+      if (redirect && typeof redirect === "string" && redirect.startsWith("/")) {
+        router.replace(redirect as any);
+      } else {
+        router.replace("/(tabs)");
+      }
     } catch (e: any) {
-      setError(e?.message || "Registration failed");
+      const msg = e?.message || "";
+      if (/network|fetch|timeout|connection/i.test(msg)) {
+        setError("Can't reach AMASS right now. Check your connection and try again.");
+      } else {
+        setError(msg || "Registration failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -62,31 +80,38 @@ export default function Register() {
         </View>
 
         <View style={styles.form}>
-          <Field label="Full Name" value={fullName} onChangeText={setFullName} placeholder="Adaeze Okoye" testID="reg-name" />
+          <Field label="Full Name" value={fullName} onChangeText={setFullName} placeholder="Adaeze Okoye" autoComplete="name" textContentType="name" testID="reg-name" />
           <Field
             label="Email"
             value={email}
             onChangeText={setEmail}
             placeholder="you@amass.africa"
             autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
             keyboardType="email-address"
             testID="reg-email"
           />
-          <Field label="Phone (optional)" value={phone} onChangeText={setPhone} placeholder="+234 …" keyboardType="phone-pad" testID="reg-phone" />
+          <Field label="Phone (optional)" value={phone} onChangeText={setPhone} placeholder="+234 …" keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" testID="reg-phone" />
           <Field
             label="Password"
             value={password}
             onChangeText={setPassword}
             placeholder="At least 6 characters"
             secureTextEntry={!showPw}
+            autoComplete="password-new"
+            textContentType="newPassword"
             testID="reg-password"
             right={
-              <Pressable onPress={() => setShowPw((v) => !v)} hitSlop={12}>
+              <Pressable onPress={() => setShowPw((v) => !v)} hitSlop={12} testID="reg-show-password">
                 <Ionicons name={showPw ? "eye-off" : "eye"} size={20} color={colors.textTertiary} />
               </Pressable>
             }
           />
-          {error && <Text style={styles.error}>{error}</Text>}
+          <Text style={[styles.pwHint, pwValid && { color: colors.emerald }]}>
+            {pwValid ? "✓ Password length looks good" : "Password must be at least 6 characters"}
+          </Text>
+          {error && <Text style={styles.error} testID="reg-error">{error}</Text>}
 
           <Pressable
             onPress={submit}
@@ -116,6 +141,8 @@ export default function Register() {
               </Pressable>
             </Link>
           </View>
+
+          <LegalConsent action="creating an account" />
         </View>
       </KeyboardAwareScrollView>
     </SafeAreaView>
@@ -168,6 +195,7 @@ const styles = StyleSheet.create({
   },
   ctaText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   error: { color: colors.red, fontSize: 13, marginTop: -8 },
+  pwHint: { fontSize: 12, color: colors.textTertiary, marginTop: -8, marginLeft: 4 },
   footer: { flexDirection: "row", justifyContent: "center", marginTop: spacing.lg },
   footerText: { color: colors.textTertiary, fontSize: 14 },
   link: { color: colors.emerald, fontSize: 14, fontWeight: "700" },

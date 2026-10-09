@@ -1,0 +1,43 @@
+{
+  "summary": "AMASS auth improvements fully verified end-to-end. Backend: 12/12 pytest cases pass covering enumeration-safe /api/auth/forgot-password (identical 200 bodies for known+unknown emails), /api/auth/reset-password 400 for wrong code, full happy-path (register throwaway -> forgot -> Mongo code_hash injection -> reset -> login with new password), brute-force lockout (6 wrong attempts -> 7th 429 with 'Try again in N minute(s)' + correct password also rejected while locked). Frontend: intro sequence (AMASS -> FIXA crossfade, Skip always visible, amass_brand_intro_seen_v1 persists, Fixa does not replay on second launch), /login (forgot-password-link navigates, show-password toggle flips input type password->text, wrong creds show 'Invalid email or password' testID=login-error, demo creds succeed -> tabs, redirect preserve /login?redirect=/wallet -> /wallet), /forgot-password (step1 -> step2 with 'Resend code in Ns' countdown, wrong code shows fp-error 'That code is invalid or has expired. Request a new one.', back-to-sign-in works), /register (invalid email + short password inline validation on reg-error, existing email -> 'This email is already registered. Try signing in instead.', new unique email -> tabs home, Google button present). Throwaway users and lockout rows cleaned from Mongo after run. No blocking issues found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Animated (app/index.tsx)", "issue": "Console warning: 'Animated: useNativeDriver is not supported because the native animated module is missing. Falling back to JS-based animation.' This is expected on web preview (RCTAnimation unavailable) and will go away on native builds; no action needed unless you want to silence by setting useNativeDriver:false on web via Platform.OS."},
+      {"component": "StyleSheet shadow props", "issue": "Console warning: 'shadow* style props are deprecated. Use boxShadow.' Appears globally across screens. Reference: likely in /app/frontend/src/constants/theme.ts or component style sheets using shadowColor/shadowOffset/shadowOpacity/shadowRadius. Migrate to the boxShadow shorthand."},
+      {"component": "props.pointerEvents", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents.' Reference: /app/frontend/app/index.tsx:81 (`<Animated.View pointerEvents=...>`) and /app/frontend/app/index.tsx:89 (`<SafeAreaView ... pointerEvents=\"box-none\">`). Move pointerEvents into style."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth_forgot_reset_lockout.py",
+    "/app/test_reports/pytest/pytest_iteration39_auth.xml"
+  ],
+  "action_items": [
+    "(cosmetic) Migrate shadow* style props to boxShadow and move pointerEvents into style={} to clear repeated web console warnings.",
+    "(cosmetic) Consider setting useNativeDriver:false when Platform.OS === 'web' in app/index.tsx Animated.timing/spring to silence the web warning."
+  ],
+  "critical_code_review_comments": [
+    "auth_security.py enumeration-safety is correct: identical {ok,message} body regardless of account presence, and send_email failures are swallowed to the same payload so provider state doesn't leak.",
+    "Reset code is stored as sha256 hash with 15-min TTL + 5 verify attempts + 1 send/min + 5 sends/hour: matches playbook.",
+    "Lockout logic resets fails to 0 after locking and relies on locked_until window - sensible; correct password is also rejected while locked (verified).",
+    "forgot-password.tsx useEffect dep array uses `cooldown > 0` (boolean) which triggers the eslint-disable-line already in place; works correctly in testing (countdown ticks every second)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_forgot_reset_lockout.py (NEW)"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12)",
+    "frontend": "100% (all critical paths)"
+  },
+  "seed_data_creation": "Created and deleted two throwaway users during testing: test_amass_<uuid>@amasstest.io (reset flow) and test_amass_<uuid>@amasstest.io (lockout flow). Also created test<uuid>@amasstest.io via UI register flow; all three were deleted from users/password_resets/login_attempts collections after run. Confirmed demo@amass.africa login_attempts cleared so demo is not locked.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Pytest suite at /app/backend/tests/test_auth_forgot_reset_lockout.py is self-contained (creates/cleans its own throwaway users, uses lowercase emails because server lowercases on write). Run with: python -m pytest backend/tests/test_auth_forgot_reset_lockout.py -v -o 'addopts='. The project's pytest.ini configures xdist with loadscope which is compatible. Mongo is accessed via pymongo (sync) to avoid motor cross-event-loop issues inside pytest fixtures. Email provider (Emergent Resend) actually sends during /forgot-password; the test never relies on retrieving the real code - it injects a known sha256(code) directly into password_resets.",
+  "rca_of_issue": "N/A - all requested backend & frontend behaviors passed."
+}

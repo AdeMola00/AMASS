@@ -339,6 +339,16 @@ export const api = {
       body: JSON.stringify({ session_id }),
     }),
   me: () => req<UserProfile>("/auth/me"),
+  forgotPassword: (email: string) =>
+    req<{ ok: boolean; message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  resetPassword: (email: string, code: string, new_password: string) =>
+    req<{ ok: boolean; message: string }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ email, code, new_password }),
+    }),
 
   // Properties
   listProperties: (params?: Record<string, string | number | boolean | undefined>) => {
