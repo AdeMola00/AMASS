@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 
 import { api, AgentPublic } from "@/src/lib/api";
+import { AmassLogo } from "@/src/components/AmassLogo";
 import { useAuth } from "@/src/contexts/auth";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 
@@ -343,6 +344,9 @@ export default function BecomeAgent() {
       >
         {step === 0 && (
           <View style={{ gap: spacing.md }}>
+            <View style={{ alignItems: "center", marginBottom: spacing.xs }}>
+              <AmassLogo size="md" showWordmark={false} />
+            </View>
             <Text style={styles.h1}>Personal information</Text>
             <Text style={styles.sub}>We use this to verify your identity and build your public profile.</Text>
             <Field label="Full name" value={fullName} onChangeText={setFullName} testID="ba-name" />

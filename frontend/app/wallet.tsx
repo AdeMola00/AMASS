@@ -14,6 +14,7 @@ import { useRouter, Stack } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { api, Currency, WalletTransaction } from "@/src/lib/api";
+import { AmassPinIcon } from "@/src/components/AmassLogo";
 import { useWallet } from "@/src/contexts/wallet";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 import { TokenIcon } from "@/src/components/TokenIcon";
@@ -97,7 +98,12 @@ export default function WalletScreen() {
         <Pressable onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={22} color="#fff" />
         </Pressable>
-        <Text style={styles.headerTitle}>Wallet</Text>
+        <View style={styles.headerCenter}>
+          <View style={styles.brandBadge}>
+            <AmassPinIcon size={15} />
+          </View>
+          <Text style={styles.headerTitle}>Wallet</Text>
+        </View>
         <Pressable onPress={() => router.push("/unlocks")} style={styles.iconBtn}>
           <Ionicons name="time" size={20} color="#fff" />
         </Pressable>
@@ -394,6 +400,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
+  headerCenter: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  brandBadge: {
+    width: 26, height: 26, borderRadius: 13, backgroundColor: "#fff",
+    alignItems: "center", justifyContent: "center",
+  },
 
   // Balance
   balanceCard: {

@@ -1,73 +1,103 @@
 import React from "react";
-import { View, Image, StyleSheet, ViewStyle } from "react-native";
+import { View, Image, Text, StyleSheet, ViewStyle } from "react-native";
+import { colors } from "@/src/constants/theme";
 
 type Size = "sm" | "md" | "lg" | "xl";
 
-// Height (in dp) of the logo lockup at each preset. Increased vs. the previous
-// build so AMASS has a stronger, more premium brand presence everywhere.
+// Height (in dp) of the EMBLEM at each preset.
 const SIZE_MAP: Record<Size, number> = {
-  sm: 26,   // app-bar / bottom-nav tab title (icon only)
-  md: 42,   // list-item hero (icon only) or compact wordmark
-  lg: 64,   // login / register header (wordmark)
-  xl: 104,  // splash / onboarding hero (wordmark)
+  sm: 26, // app-bar / bottom-nav (emblem only)
+  md: 44, // list hero / compact lockup
+  lg: 60, // login / register header
+  xl: 96, // splash / onboarding hero
 };
 
-// Intrinsic aspect ratios (width / height) of the source artwork — measured
-// once so the image never appears stretched, cropped, or cramped.
-const ASPECT = {
-  icon: 1.5, // pin + monogram
-  full: 3.0, // pin + AMASS wordmark
-} as const;
+// Intrinsic aspect ratio (width / height) of the authoritative emblem artwork.
+// Measured once from the supplied file so it is never stretched or cropped.
+const EMBLEM_ASPECT = 1.5275;
 
-const ICON_SRC = require("../../assets/images/amass-icon.png");
-const FULL_SRC = require("../../assets/images/amass-logo-full.png");
+// Authoritative AMASS brand emblem (supplied by the client — used unaltered,
+// transparent background so it sits on any light surface).
+const EMBLEM_SRC = require("../../assets/images/amass-emblem.png");
 
 /**
- * AMASS brand logo — one component, two visual variants.
+ * AMASS brand logo.
  *
- *   • showWordmark=true  → full lockup (pin + "AMASS"). Use on splash,
- *     onboarding, login, register, and hero branding areas.
- *   • showWordmark=false → icon-only glyph. Use in app bars, bottom nav,
- *     loading screens, map branding, profile avatar fallback.
+ *   • showWordmark=false → emblem only. Use in app bars, bottom nav, loading,
+ *     map branding, profile avatar fallback.
+ *   • showWordmark=true  → emblem + "AMASS" typographic lockup. Use on splash,
+ *     onboarding, login, register and hero branding areas.
+ *
+ * `tone="light"` renders the wordmark text white for dark backgrounds — the
+ * emblem itself is never recoloured.
  */
 export function AmassLogo({
   size = "lg",
   showWordmark = true,
+  tone = "dark",
   style,
   testID,
 }: {
   size?: Size | number;
   showWordmark?: boolean;
+  tone?: "dark" | "light";
   style?: ViewStyle;
   testID?: string;
 }) {
-  const height = typeof size === "number" ? size : SIZE_MAP[size];
-  const variant = showWordmark ? "full" : "icon";
-  const width = height * ASPECT[variant];
-  const src = showWordmark ? FULL_SRC : ICON_SRC;
+  const h = typeof size === "number" ? size : SIZE_MAP[size];
+  const w = h * EMBLEM_ASPECT;
+
+  const emblem = (
+    <Image
+      source={EMBLEM_SRC}
+      style={{ width: w, height: h }}
+      resizeMode="contain"
+      accessibilityIgnoresInvertColors
+    />
+  );
+
+  if (!showWordmark) {
+    return (
+      <View
+        style={[{ height: h, width: w, alignItems: "center", justifyContent: "center" }, style]}
+        testID={testID ?? "amass-logo-emblem"}
+        accessibilityRole="image"
+        accessibilityLabel="AMASS"
+      >
+        {emblem}
+      </View>
+    );
+  }
+
+  const fs = Math.round(h * 0.34);
   return (
     <View
-      style={[
-        { height, width, alignItems: "center", justifyContent: "center" },
-        style,
-      ]}
-      testID={testID ?? `amass-logo-${variant}`}
+      style={[{ alignItems: "center" }, style]}
+      testID={testID ?? "amass-logo-lockup"}
       accessibilityRole="image"
       accessibilityLabel="AMASS"
     >
-      <Image
-        source={src}
-        style={{ width: "100%", height: "100%" }}
-        resizeMode="contain"
-      />
+      {emblem}
+      <Text
+        style={[
+          styles.wordmark,
+          {
+            fontSize: fs,
+            letterSpacing: fs * 0.16,
+            marginTop: Math.round(h * 0.12),
+            color: tone === "light" ? "#FFFFFF" : colors.ink,
+          },
+        ]}
+      >
+        AMASS
+      </Text>
     </View>
   );
 }
 
 /**
- * Compact icon-only version (pin + monogram). Kept as a separate export so
- * existing call-sites (`AmassPinIcon`) keep working unchanged.
- * `size` controls the visual height in dp; width auto-scales.
+ * Compact emblem-only version. Kept as a separate export so existing call-sites
+ * (`AmassPinIcon`) keep working unchanged. `size` = visual height in dp.
  */
 export function AmassPinIcon({
   size = 24,
@@ -78,7 +108,7 @@ export function AmassPinIcon({
   color?: string;
   style?: ViewStyle;
 }) {
-  const width = size * ASPECT.icon;
+  const width = size * EMBLEM_ASPECT;
   return (
     <View
       style={[{ height: size, width, alignItems: "center", justifyContent: "center" }, style]}
@@ -87,13 +117,15 @@ export function AmassPinIcon({
       accessibilityLabel="AMASS"
     >
       <Image
-        source={ICON_SRC}
+        source={EMBLEM_SRC}
         style={{ width: "100%", height: "100%" }}
         resizeMode="contain"
+        accessibilityIgnoresInvertColors
       />
     </View>
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  wordmark: { fontWeight: "900", includeFontPadding: false },
+});

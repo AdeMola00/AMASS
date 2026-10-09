@@ -65,8 +65,8 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/amass-logo-full.png",
-          "imageWidth": 260,
+          "image": "./assets/images/amass-splash.png",
+          "imageWidth": 220,
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF"
         }
