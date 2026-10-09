@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -96,6 +97,61 @@ const SECTIONS: { key: MarketSection; label: string }[] = [
   { key: "declutter", label: "Declutter" },
 ];
 
+type SortKey = "nearby" | "newest" | "price_asc" | "price_desc" | "rating";
+const SORT_OPTIONS: { key: SortKey; label: string; short: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: "nearby", label: "Nearby first", short: "Nearby", icon: "navigate-outline" },
+  { key: "newest", label: "Newest", short: "Newest", icon: "time-outline" },
+  { key: "price_asc", label: "Price: Low to High", short: "Price ↑", icon: "arrow-up-outline" },
+  { key: "price_desc", label: "Price: High to Low", short: "Price ↓", icon: "arrow-down-outline" },
+  { key: "rating", label: "Top rated", short: "Top rated", icon: "star-outline" },
+];
+
+const metroOf = (c?: string) => (c || "").split(" - ")[0].trim().toLowerCase();
+
+function proximityRank(itemCity: string | undefined, chosenCity: string): number {
+  if (chosenCity === "All of Nigeria") return 0;
+  const ic = (itemCity || "").toLowerCase();
+  const cc = chosenCity.toLowerCase();
+  if (ic === cc) return 0;
+  if (metroOf(itemCity) && metroOf(itemCity) === metroOf(chosenCity)) return 1;
+  return 2;
+}
+
+function sortItems(list: MarketplaceItem[], key: SortKey, chosenCity: string): MarketplaceItem[] {
+  const arr = [...list];
+  const tdesc = (a: MarketplaceItem, b: MarketplaceItem) =>
+    new Date(b.posted_at || 0).getTime() - new Date(a.posted_at || 0).getTime();
+  switch (key) {
+    case "price_asc":
+      arr.sort((a, b) => (a.price || 0) - (b.price || 0));
+      break;
+    case "price_desc":
+      arr.sort((a, b) => (b.price || 0) - (a.price || 0));
+      break;
+    case "rating":
+      arr.sort(
+        (a, b) =>
+          (((b.seller_rating ?? b.rating) || 0) - ((a.seller_rating ?? a.rating) || 0)) ||
+          (((b.seller_reviews ?? b.reviews) || 0) - ((a.seller_reviews ?? a.reviews) || 0))
+      );
+      break;
+    case "newest":
+      arr.sort(tdesc);
+      break;
+    case "nearby":
+    default:
+      arr.sort((a, b) => {
+        const pr = proximityRank(a.city, chosenCity) - proximityRank(b.city, chosenCity);
+        if (pr !== 0) return pr;
+        const bo = (Number(b.is_boosted) || 0) - (Number(a.is_boosted) || 0);
+        if (bo !== 0) return bo;
+        return tdesc(a, b);
+      });
+      break;
+  }
+  return arr;
+}
+
 export default function Marketplace() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -122,6 +178,8 @@ export default function Marketplace() {
   const [declutterChip, setDeclutterChip] = useState<string | null>(null);
   const [brandChip, setBrandChip] = useState<string | null>(null);
   const [headerH, setHeaderH] = useState<number>(insets.top + 176);
+  const [sortKey, setSortKey] = useState<SortKey>("nearby");
+  const [sortOpen, setSortOpen] = useState(false);
 
   // Restore prefs
   useEffect(() => {
@@ -170,9 +228,10 @@ export default function Marketplace() {
     if (filters.boostedOnly) p.boosted_only = true;
     if (filters.sort) p.sort = filters.sort;
     if (!p.q && query.trim()) p.q = query.trim();
-    if (city && city !== "All of Nigeria") p.city = city;
+    // Note: city is used for client-side "Nearby first" ranking (not a hard
+    // filter) so nothing is hidden — the chosen city just floats to the top.
     return p;
-  }, [filters, query, city, section, brandChip, fixaChip, declutterChip]);
+  }, [filters, query, section, brandChip, fixaChip, declutterChip]);
 
   const loadItems = useCallback(async () => {
     try {
@@ -245,6 +304,9 @@ export default function Marketplace() {
     [items]
   );
 
+  // Smart sorting + Nearby-first ranking (client-side over the loaded set).
+  const sortedItems = useMemo(() => sortItems(items, sortKey, city), [items, sortKey, city]);
+
   const activeFilterCount = Object.values(filters).filter(
     (v) => v !== undefined && v !== "" && v !== false
   ).length;
@@ -267,9 +329,9 @@ export default function Marketplace() {
 
   const gridRows = useMemo(() => {
     const rows: MarketplaceItem[][] = [];
-    for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+    for (let i = 0; i < sortedItems.length; i += 2) rows.push(sortedItems.slice(i, i + 2));
     return rows;
-  }, [items]);
+  }, [sortedItems]);
 
   const chipRail = (
     <View style={styles.catsRail}>
@@ -385,9 +447,26 @@ export default function Marketplace() {
               : section === "fixa"
               ? "FIXA verified providers"
               : "Pre-owned finds near you"}
-            {city !== "All of Nigeria" ? ` · ${city}` : ""}
+            {sortKey === "nearby" && city !== "All of Nigeria"
+              ? ` · Near ${city.replace("Lagos - ", "").replace("Abuja - ", "")}`
+              : ""}
           </Text>
         </View>
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            setSortOpen(true);
+          }}
+          style={styles.sortPill}
+          accessibilityRole="button"
+          accessibilityLabel={`Sort: ${SORT_OPTIONS.find((o) => o.key === sortKey)?.label}. Change`}
+          testID="sort-pill"
+        >
+          <Ionicons name="swap-vertical" size={15} color={colors.text} />
+          <Text style={styles.sortPillText}>
+            {SORT_OPTIONS.find((o) => o.key === sortKey)?.short}
+          </Text>
+        </Pressable>
         {section !== "fixa" && (
           <Pressable
             onPress={toggleView}
@@ -397,7 +476,6 @@ export default function Marketplace() {
             testID="view-toggle"
           >
             <Ionicons name={viewMode === "grid" ? "list" : "grid"} size={15} color={colors.text} />
-            <Text style={styles.viewToggleText}>{viewMode === "grid" ? "List" : "Grid"}</Text>
           </Pressable>
         )}
       </View>
@@ -407,7 +485,7 @@ export default function Marketplace() {
   return (
     <View style={styles.container} testID="marketplace-screen">
       <FlatList
-        data={section === "fixa" ? items : viewMode === "grid" ? gridRows : items}
+        data={section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems}
         keyExtractor={(_, i) => `row-${i}`}
         contentContainerStyle={{ paddingTop: headerH + 8, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
@@ -602,6 +680,37 @@ export default function Marketplace() {
       <MarketFilterSheet ref={filterRef} value={filters} categories={categories} onApply={setFilters} />
       <BookingSheet ref={bookingRef} />
       {ad && <AdModal ad={ad} visible={adVisible} onClose={adDismiss} />}
+
+      {/* Sort selector */}
+      <Modal visible={sortOpen} transparent animationType="fade" onRequestClose={() => setSortOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setSortOpen(false)}>
+          <Pressable style={[styles.sortSheet, { paddingBottom: Math.max(insets.bottom, 12) + 4 }]} onPress={() => {}}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Sort by</Text>
+            {SORT_OPTIONS.map((o) => {
+              const active = sortKey === o.key;
+              return (
+                <Pressable
+                  key={o.key}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setSortKey(o.key);
+                    setSortOpen(false);
+                  }}
+                  style={styles.sortRow}
+                  testID={`sort-opt-${o.key}`}
+                >
+                  <Ionicons name={o.icon} size={19} color={active ? colors.red : colors.textSecondary} />
+                  <Text style={[styles.sortRowText, active && { color: colors.text, fontFamily: F.bold }]}>
+                    {o.label}
+                  </Text>
+                  {active && <Ionicons name="checkmark" size={19} color={colors.red} style={{ marginLeft: "auto" }} />}
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -848,17 +957,55 @@ const styles = StyleSheet.create({
   feedTitle: { fontSize: 20, fontFamily: F.bold, color: colors.text, letterSpacing: -0.4 },
   feedSub: { fontSize: 13, color: colors.textMuted, fontFamily: F.regular, marginTop: 2 },
   viewToggle: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sortPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 14,
-    height: 36,
+    height: 40,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  viewToggleText: { fontSize: 13, fontFamily: F.semibold, color: colors.text },
+  sortPillText: { fontSize: 13, fontFamily: F.semibold, color: colors.text },
+
+  // Sort modal
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(10,10,10,0.35)", justifyContent: "flex-end" },
+  sortSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 10,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.borderStrong,
+    marginBottom: 14,
+  },
+  sheetTitle: { fontSize: 17, fontFamily: F.bold, color: colors.text, marginBottom: 6, letterSpacing: -0.3 },
+  sortRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
+  },
+  sortRowText: { fontSize: 15, fontFamily: F.regular, color: colors.textSecondary },
 
   // Grid
   gridRow: { flexDirection: "row", gap: 12, marginBottom: 12, paddingHorizontal: spacing.lg },

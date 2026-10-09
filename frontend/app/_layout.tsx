@@ -13,6 +13,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { useAppFonts } from "@/src/hooks/use-app-fonts";
+import "@/src/lib/global-font";
 import { AuthProvider } from "@/src/contexts/auth";
 import { CartProvider } from "@/src/contexts/cart";
 import { WalletProvider } from "@/src/contexts/wallet";

@@ -1,0 +1,48 @@
+{
+  "summary": "Frontend-only verification of 4 AMASS enhancements: Global PJS font, Smart Sorting, Nearby First ranking, and Listing Detail polish. All features confirmed working on web preview (mobile viewport 390x844). Logged in as demo@amass.africa. No red-screen/pageerror events observed across Login, Market (Brands/FIXA/Declutter), listing detail, Home, Discover, Inbox, Profile tabs. Ionicons render correctly (80 glyphs on Market). Deprecated packages detected: none (expo-av, expo-barcode-scanner, expo-background-fetch not present).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "verifications": {
+    "global_font_pjs": {
+      "status": "PASS",
+      "evidence": "RN-web Text leaf nodes resolve to PlusJakartaSans-400/500/600/700 by weight. Login sample: 'Welcome back' -> PJS-700, 'Sign in to continue...' -> PJS-500, 'Email' -> PJS-600, 'Create an account' -> PJS-700. Icons unaffected (Ionicons glyph font preserved, 80 glyphs rendering on Market)."
+    },
+    "smart_sorting": {
+      "status": "PASS",
+      "evidence": "sort-pill opens modal with all 5 options. price_desc produced [₦1.4M, ₦950k, ₦680k] with label 'Price ↓'. price_asc produced [₦680k, ₦950k, ₦1.4M] with label 'Price ↑'. 'Newest' -> 'Newest'. 'Top rated' -> 'Top rated'. 'Nearby' -> 'Nearby'. Sort pill persists across section tab switches."
+    },
+    "nearby_first": {
+      "status": "PASS",
+      "evidence": "Default sort = 'nearby'. Selected 'Lagos - Lekki' via location-selector; location pill updated to 'Lekki', subtitle changed to 'Verified stores & showrooms · Near Lekki'. Top 3 feed items were all Lagos cities (Ikeja, Victoria Island, Ikeja) — Lagos-metro items floated to the top (city is a ranking signal, nothing hidden)."
+    },
+    "listing_detail": {
+      "status": "PASS",
+      "evidence": "Tapped market-item-bc9db9ec… -> navigated to /marketplace/bc9db9ec… with item-detail-bc9db9ec… present. Rendered: FEATURED badge, ₦1.4M price, title 'Samsung Galaxy S23 Ultra 512GB — Brand New Sealed', 'Lagos - Ikeja', '8 wk ago', 512 views, 64 saves, New condition, Description, seller card, and bottom action bar Chat/Call/WhatsApp/Make an Offer — all present. 'You might also like' section renders conditionally (related.length > 0) — this test item had no related items; not a bug."
+    },
+    "regression_market": {
+      "status": "PASS",
+      "evidence": "Section switches brands/fixa/declutter work. Chips present: brand-chip-appliances/furniture/electronics/tools; fixa-chip-* (12 trades: Plumbing, Electrical, Carpentry…); declutter-chip-furniture/appliances/electronics/fashion/tools. view-toggle flips grid<->list. favorite-<id> tappable. market-filter-btn, market-search-bar, sell-fab, location-selector, mkt-tab-* all present. FIXA ProviderCard CTAs (fixa-call-*/fixa-whatsapp-*/fixa-book-*) all rendered."
+    },
+    "stability_tabs": {
+      "status": "PASS",
+      "evidence": "Login, onboarding Skip, Home (map placeholder renders fine on web), Discover, Market, Inbox, Profile all load without page errors. 0 pageerror events across the full flow. Only RN-web console warnings (shadow*/pointerEvents/useNativeDriver) — known non-issues."
+    }
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "global-font.ts is defensively written (try/catch, modifies INPUT props before originalRender) — safe approach that works on both native and RN-web. Verified no crash on react-native-web.",
+    "sortItems client-side ranking (nearby) uses metro-aware proximityRank; works correctly for 'Lagos - Lekki' matching other Lagos sublocations (metroOf splits on ' - ')."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Demo login works (demo@amass.africa / amass2026). Session doesn't persist across new browser contexts in Playwright — always re-login via /login + [data-testid=login-email]/[login-password]/[login-submit-button], then click [data-testid=tab-marketplace]. Dismiss the occasional AdModal via [data-testid=ad-close] between interactions on the Market tab."
+}
