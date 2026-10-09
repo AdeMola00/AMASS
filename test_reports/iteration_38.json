@@ -1,0 +1,31 @@
+{
+  "summary": "Frontend testing of the two new AMASS map filter features: (1) Status Filter Chips (available/coming_soon/closed) and (2) Interactive Listing-Type Legend. All 13 Playwright scenarios on the public web preview (390x844, demo@amass.africa login) passed. Backend sanity check on GET /api/properties confirmed status and listing_type fields are present and include the full spread of availability/listing values (available, coming_soon, sold; sale, rent, shortlet, lease).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_38.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "index.tsx is now 1247 lines — well over the 700-line guideline. Suggest extracting TopOverlay, MapFilterChips, ActionBtn, EmptyState (and the big styles) into /src/components/home/* to keep the screen file lean. Not blocking, but worth doing before the file grows further.",
+    "src/lib/map.web.tsx Marker uses React Native `onPress` prop mapped via DOM `onClick` on a RN Web <View>. That currently works because View renders as a <div> in react-native-web, but it is fragile — a safer approach is `<Pressable onPress={onPress}>`. The test confirms it is functional today, flagging only for robustness."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "100% (13/13 scenarios)"
+  },
+  "seed_data_creation": "None. Used existing seeded listings (21 total with mix of available/coming_soon/sold and sale/rent/shortlet/lease).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login requires skipping the welcome carousel first (tap 'Skip' text), then standard login-email/login-password/login-submit-button. Home map renders at testID home-map-screen on web. Verified testIDs that now exist: status-chip-available|coming_soon|closed, status-chip-clear, kind-chip-sale|rent|shortlet|lease, map-legend-chip, map-legend-card, map-legend-close, legend-type-sale|rent|shortlet|lease, legend-status-available|coming_soon|closed, legend-reset-btn, map-status-empty, map-clear-mapfilters-btn, view-toggle.",
+  "rca_of_issue": "N/A — new feature validation. Verified: (a) three status chips always visible + Filter & key chip, (b) tapping a chip toggles active state and shows status-chip-clear, (c) multi-select works, (d) 'All' chip clears filters, (e) list view inherits the filter — baseline 21 homes → 1 home when 'Sold / Let' is active, (f) legend modal opens with 4 listing-type rows and 3 status rows, (g) tapping a legend row shows legend-reset-btn and after closing the modal the active listing type appears as a removable kind-chip-sale in the bottom-left, (h) tapping the chip removes the filter, (i) selecting Rent + Sold-Let yields map-status-empty with map-clear-mapfilters-btn which successfully restores pins, (j) rapid toggling (18 clicks) did not crash the screen. Backend GET /api/properties still returns status and listing_type for every record."
+}

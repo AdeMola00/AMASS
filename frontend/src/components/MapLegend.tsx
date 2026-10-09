@@ -19,8 +19,24 @@ import {
   LISTING_TYPE_LEGEND,
 } from "@/src/components/PropertyMarker";
 
-export function MapLegend({ style }: { style?: any }) {
+export function MapLegend({
+  style,
+  selectedStatuses,
+  selectedKinds,
+  onToggleStatus,
+  onToggleKind,
+  onClear,
+}: {
+  style?: any;
+  selectedStatuses?: Set<string>;
+  selectedKinds?: Set<string>;
+  onToggleStatus?: (s: any) => void;
+  onToggleKind?: (k: any) => void;
+  onClear?: () => void;
+}) {
   const [open, setOpen] = useState(false);
+  const interactive = !!(onToggleStatus || onToggleKind);
+  const activeCount = (selectedStatuses?.size ?? 0) + (selectedKinds?.size ?? 0);
 
   return (
     <>
@@ -34,7 +50,12 @@ export function MapLegend({ style }: { style?: any }) {
         {STATUS_LEGEND.map((s) => (
           <View key={s} style={[styles.chipDot, { backgroundColor: STATUS_META[s].color }]} />
         ))}
-        <Text style={styles.chipText}>Map key</Text>
+        <Text style={styles.chipText}>{interactive ? "Filter & key" : "Map key"}</Text>
+        {activeCount > 0 && (
+          <View style={styles.countBadge}>
+            <Text style={styles.countBadgeText}>{activeCount}</Text>
+          </View>
+        )}
         <Ionicons name="chevron-up" size={12} color={colors.textSecondary} />
       </Pressable>
 
@@ -42,45 +63,78 @@ export function MapLegend({ style }: { style?: any }) {
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={styles.card} onPress={(e) => e.stopPropagation()} testID="map-legend-card">
             <View style={styles.header}>
-              <Text style={styles.title}>Map key</Text>
+              <Text style={styles.title}>{interactive ? "Filter & map key" : "Map key"}</Text>
               <Pressable onPress={() => setOpen(false)} hitSlop={8} testID="map-legend-close">
                 <Ionicons name="close" size={20} color={colors.textSecondary} />
               </Pressable>
             </View>
+            {interactive && (
+              <Text style={styles.hint}>Tap a colour or icon to filter the map. Tap again to remove.</Text>
+            )}
 
-            {/* Status = colour */}
+            {/* Status = colour (tappable when interactive) */}
             <Text style={styles.section}>Pin colour · availability</Text>
             {STATUS_LEGEND.map((s) => {
               const m = STATUS_META[s];
+              const active = !!selectedStatuses?.has(s);
               return (
-                <View key={s} style={styles.row} testID={`legend-status-${s}`}>
+                <Pressable
+                  key={s}
+                  style={[styles.row, interactive && styles.rowTappable, active && styles.rowActive]}
+                  onPress={interactive ? () => onToggleStatus?.(s) : undefined}
+                  disabled={!interactive}
+                  testID={`legend-status-${s}`}
+                >
                   <View style={[styles.pinPreview, { borderColor: m.color }]}>
                     <View style={[styles.pinDot, { backgroundColor: m.color }]} />
                   </View>
                   <Text style={styles.rowLabel}>{m.label}</Text>
                   {m.glyph && <Ionicons name={m.glyph} size={13} color={m.color} />}
                   {s === "closed" && <Text style={styles.strike}>₦</Text>}
-                </View>
+                  {interactive && (
+                    <Ionicons
+                      name={active ? "checkmark-circle" : "ellipse-outline"}
+                      size={18}
+                      color={active ? m.color : colors.borderStrong}
+                      style={{ marginLeft: "auto" }}
+                    />
+                  )}
+                </Pressable>
               );
             })}
 
             <View style={styles.divider} />
 
-            {/* Listing type = icon */}
+            {/* Listing type = icon (tappable when interactive) */}
             <Text style={styles.section}>Pin icon · listing type</Text>
             <View style={styles.grid}>
               {LISTING_TYPE_LEGEND.map((k) => {
                 const m = LISTING_TYPE_META[k];
+                const active = !!selectedKinds?.has(k);
                 return (
-                  <View key={k} style={styles.gridItem} testID={`legend-type-${k}`}>
-                    <View style={styles.iconChip}>
-                      <Ionicons name={m.icon} size={13} color={colors.text} />
+                  <Pressable
+                    key={k}
+                    style={[styles.gridItem, interactive && styles.gridItemTappable, active && styles.rowActive]}
+                    onPress={interactive ? () => onToggleKind?.(k) : undefined}
+                    disabled={!interactive}
+                    testID={`legend-type-${k}`}
+                  >
+                    <View style={[styles.iconChip, active && { backgroundColor: colors.ink, borderColor: colors.ink }]}>
+                      <Ionicons name={m.icon} size={13} color={active ? "#fff" : colors.text} />
                     </View>
                     <Text style={styles.rowLabel}>{m.label}</Text>
-                  </View>
+                    {active && <Ionicons name="checkmark-circle" size={15} color={colors.ink} style={{ marginLeft: "auto" }} />}
+                  </Pressable>
                 );
               })}
             </View>
+
+            {interactive && activeCount > 0 && (
+              <Pressable style={styles.resetBtn} onPress={() => onClear?.()} testID="legend-reset-btn">
+                <Ionicons name="refresh" size={14} color={colors.text} />
+                <Text style={styles.resetBtnText}>Show all pins</Text>
+              </Pressable>
+            )}
 
             <View style={styles.divider} />
 
@@ -143,6 +197,12 @@ const styles = StyleSheet.create({
   },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
   title: { fontSize: 17, fontWeight: "900", color: colors.text },
+  hint: { fontSize: 11.5, color: colors.textSecondary, marginBottom: 2 },
+  countBadge: {
+    minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4,
+    backgroundColor: colors.ink, alignItems: "center", justifyContent: "center", marginLeft: 1,
+  },
+  countBadgeText: { color: "#fff", fontSize: 10, fontWeight: "900" },
   section: {
     fontSize: 11,
     fontWeight: "900",
@@ -153,6 +213,8 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   row: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 5 },
+  rowTappable: { paddingHorizontal: 8, borderRadius: 10, marginHorizontal: -8 },
+  rowActive: { backgroundColor: colors.surfaceSecondary },
   pinPreview: {
     width: 22,
     height: 22,
@@ -168,6 +230,13 @@ const styles = StyleSheet.create({
   strike: { fontSize: 12, fontWeight: "800", color: colors.textTertiary, textDecorationLine: "line-through" },
   grid: { flexDirection: "row", flexWrap: "wrap", rowGap: 10 },
   gridItem: { width: "50%", flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 6 },
+  gridItemTappable: { paddingVertical: 6, borderRadius: 10 },
+  resetBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
+    height: 42, borderRadius: 12, marginTop: 10,
+    borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceSecondary,
+  },
+  resetBtnText: { fontSize: 13, fontWeight: "800", color: colors.text },
   iconChip: {
     width: 24,
     height: 24,

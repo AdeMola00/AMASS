@@ -248,7 +248,30 @@ backend:
         comment: "Added idempotent create_index calls on properties, wallets, token_transactions, notifications, users, favorites, marketplace, agent_referrals."
 
 frontend:
-  - task: "Map upgrade — satellite-only, status-colour markers, listing-type icons, always-on legend, loading/error/empty states, decluttered controls"
+  - task: "Map filters — status chips + tappable legend listing-type filter (map+list+legend synced)"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/(tabs)/index.tsx, frontend/src/components/MapLegend.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Added client-side map filters on the already-loaded listings:
+          - Status chips (bottom-left, always visible while browsing): Available / Coming soon /
+            Sold-Let (testIDs status-chip-available/-coming_soon/-closed). Multi-select toggle;
+            active chip fills with the status colour. 'All' reset chip (status-chip-clear).
+          - Legend is now interactive (passed selected sets + toggles): tapping a status row or a
+            listing-type icon (legend-type-sale/-rent/-shortlet/-lease) toggles that filter, with
+            active check + 'Show all pins' reset (legend-reset-btn). Active listing-type filters
+            also appear as removable chips in the bottom-left row (kind-chip-*).
+          - Derived `visible` = properties filtered by status+kind drives clusters (map), the list
+            FlatList + count + empty state, the docked card, and the activeId reset — so map, list
+            and legend stay in sync. Empty state offers 'Reset map filters' (map-clear-mapfilters-btn).
+          Verified on web: login → map shows the 3 status chips + 'Filter & key' legend chip; controls
+          decluttered. Full filter behaviour needs E2E (web markers are placeholders).
     implemented: true
     working: "NA"
     file: "frontend/app/(tabs)/index.tsx, frontend/src/components/PropertyMarker.tsx, frontend/src/components/MapLegend.tsx"

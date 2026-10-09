@@ -339,3 +339,10 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - **Marker testIDs**: `marker-{status}-{kind}[-active][-hot]`.
 - **Web note**: react-native-maps is native-only; web uses a placeholder (markers now forward onPress). Real satellite imagery + native markers require a dev/standalone build (not Expo Go web).
 - **Google Maps key**: lives in `app.json` (ios.config.googleMapsApiKey + android.config.googleMaps.apiKey) — standard for the mobile SDK (restrict by bundle id / SHA-1 in Google Cloud). User must verify in Google Cloud Console: Maps SDK for Android + iOS enabled, billing active, and key app-restrictions set.
+
+### Map Filters — Status chips + interactive legend (Jun 2026)
+- Client-side filters on loaded listings; `visible` set drives clusters(map), list FlatList+count+empty, docked card, activeId reset → map/list/legend stay in sync.
+- Status chips (bottom-left, always visible): Available / Coming soon / Sold-Let, multi-select toggle, colour-fill when active; `status-chip-clear` ("All") reset. testIDs: status-chip-{available|coming_soon|closed}.
+- Interactive legend (`MapLegend` now accepts selectedStatuses/selectedKinds + onToggleStatus/onToggleKind/onClear): tap status rows or listing-type icons (legend-type-{sale|rent|shortlet|lease}) to filter; active check + `legend-reset-btn` ("Show all pins"). Active listing-type filters also show as removable `kind-chip-*` in the bottom-left row.
+- Empty-when-filtered shows `map-clear-mapfilters-btn` ("Reset map filters").
+- Verified: testing_agent iteration_38, 13/13 pass.

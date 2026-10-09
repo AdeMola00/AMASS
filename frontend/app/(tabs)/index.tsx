@@ -23,7 +23,18 @@ import * as Location from "expo-location";
 import { api, Property } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
 import { colors, radius, shadows, spacing, typography, formatMarkerPrice } from "@/src/constants/theme";
-import { PropertyMarker, ClusterMarker } from "@/src/components/PropertyMarker";
+import {
+  PropertyMarker,
+  ClusterMarker,
+  availabilityStatus,
+  listingKind,
+  STATUS_META,
+  STATUS_LEGEND,
+  LISTING_TYPE_META,
+  LISTING_TYPE_LEGEND,
+  type AvailabilityStatus,
+  type ListingKind,
+} from "@/src/components/PropertyMarker";
 import { FilterChip } from "@/src/components/FilterChip";
 import { PropertyCard } from "@/src/components/PropertyCard";
 import { MapDockedCard } from "@/src/components/MapDockedCard";
@@ -103,6 +114,8 @@ export default function HomeMap() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<Set<AvailabilityStatus>>(new Set());
+  const [kindFilter, setKindFilter] = useState<Set<ListingKind>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [region, setRegion] = useState<Region>(BOOTSTRAP_REGION);
@@ -292,17 +305,51 @@ export default function HomeMap() {
     api.favoriteIds().then((r) => setFavorites(new Set(r.ids))).catch(() => {});
   }, []);
 
-  // ─── Supercluster: prebuild index whenever properties change ───────
-  const clusterIndex = useMemo(() => buildIndex(properties), [properties]);
+  // ─── Client-side map filters: availability status + listing type ───
+  const visible = useMemo(
+    () =>
+      properties.filter(
+        (p) =>
+          (statusFilter.size === 0 || statusFilter.has(availabilityStatus(p))) &&
+          (kindFilter.size === 0 || kindFilter.has(listingKind(p.listing_type)))
+      ),
+    [properties, statusFilter, kindFilter]
+  );
+  const mapFiltersActive = statusFilter.size > 0 || kindFilter.size > 0;
+
+  const toggleStatus = useCallback((s: AvailabilityStatus) => {
+    Haptics.selectionAsync().catch(() => {});
+    setStatusFilter((prev) => {
+      const next = new Set(prev);
+      next.has(s) ? next.delete(s) : next.add(s);
+      return next;
+    });
+  }, []);
+  const toggleKind = useCallback((k: ListingKind) => {
+    Haptics.selectionAsync().catch(() => {});
+    setKindFilter((prev) => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  }, []);
+  const clearMapFilters = useCallback(() => {
+    Haptics.selectionAsync().catch(() => {});
+    setStatusFilter(new Set());
+    setKindFilter(new Set());
+  }, []);
+
+  // ─── Supercluster: prebuild index whenever the visible set changes ───────
+  const clusterIndex = useMemo(() => buildIndex(visible), [visible]);
   const clusters = useMemo(() => getClusters(clusterIndex, region), [clusterIndex, region]);
 
   // Reset activeId when properties refresh; do NOT auto-select a marker on load.
   // The docked card is hidden until the user taps a marker (per refined spec).
   useEffect(() => {
-    if (activeId && !properties.find((p) => p.id === activeId)) {
+    if (activeId && !visible.find((p) => p.id === activeId)) {
       setActiveId(null);
     }
-  }, [properties, activeId]);
+  }, [visible, activeId]);
 
   const focusProperty = useCallback((p: Property, zoomIn = false) => {
     // Marker-tap zoom-in level (one step tighter than current)
@@ -482,16 +529,23 @@ export default function HomeMap() {
             viewMode={viewMode}
             setViewMode={setViewMode}
           />
+          <MapFilterChips
+            statusFilter={statusFilter}
+            kindFilter={kindFilter}
+            onToggleStatus={toggleStatus}
+            onToggleKind={toggleKind}
+            onClear={clearMapFilters}
+          />
         </View>
         {loading ? (
           <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
             {Array.from({ length: 5 }).map((_, i) => <PropertyCardSkeleton key={i} />)}
           </ScrollView>
-        ) : properties.length === 0 ? (
+        ) : visible.length === 0 ? (
           <EmptyState />
         ) : (
           <FlatList
-            data={properties}
+            data={visible}
             keyExtractor={(p) => p.id}
             contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: dockedBottom + 20, gap: spacing.md, paddingTop: spacing.md }}
             renderItem={({ item }) => (
@@ -505,7 +559,7 @@ export default function HomeMap() {
             ListHeaderComponent={
               <View style={styles.listHeader}>
                 <Text style={styles.listResults}>
-                  {properties.length} {properties.length === 1 ? "home" : "homes"}
+                  {visible.length} {visible.length === 1 ? "home" : "homes"}
                 </Text>
                 <Text style={styles.listMeta}>
                   {filters.listingType ? `For ${filters.listingType}` : "For you"}
@@ -613,7 +667,7 @@ export default function HomeMap() {
       </View>
 
       {/* Centered map status: loading / error / empty */}
-      {(loading || loadError || properties.length === 0) && !activeId && (
+      {(loading || loadError || visible.length === 0) && !activeId && (
         <View style={styles.mapStatusWrap} pointerEvents="box-none">
           {loading ? (
             <View style={[styles.mapStatusPill, shadows.card]} testID="map-status-loading">
@@ -633,9 +687,18 @@ export default function HomeMap() {
           ) : (
             <View style={[styles.mapStatusCard, shadows.card]} testID="map-status-empty">
               <Ionicons name="home-outline" size={22} color={colors.textSecondary} />
-              <Text style={styles.mapStatusTitle}>No homes in this area</Text>
-              <Text style={styles.mapStatusSub}>Try panning the map or clearing filters.</Text>
-              {activeQuickFilterCount > 0 || query.trim() ? (
+              <Text style={styles.mapStatusTitle}>No homes match</Text>
+              <Text style={styles.mapStatusSub}>
+                {mapFiltersActive
+                  ? "No listings match the selected status/type here."
+                  : "Try panning the map or clearing filters."}
+              </Text>
+              {mapFiltersActive ? (
+                <Pressable style={styles.mapStatusBtn} onPress={clearMapFilters} testID="map-clear-mapfilters-btn">
+                  <Ionicons name="close-circle" size={14} color="#fff" />
+                  <Text style={styles.mapStatusBtnText}>Reset map filters</Text>
+                </Pressable>
+              ) : activeQuickFilterCount > 0 || query.trim() ? (
                 <Pressable
                   style={styles.mapStatusBtn}
                   onPress={() => { setFilters({}); setQuery(""); }}
@@ -657,10 +720,23 @@ export default function HomeMap() {
         </View>
       )}
 
-      {/* Map legend chip (bottom-left) */}
+      {/* Status filter chips + legend (bottom-left) */}
       {viewMode === "map" && !activeId && (
-        <View style={{ position: "absolute", left: spacing.lg, bottom: dockedBottom + 12 }} pointerEvents="box-none">
-          <MapLegend />
+        <View style={[styles.bottomLeftStack, { bottom: dockedBottom + 12 }]} pointerEvents="box-none">
+          <MapFilterChips
+            statusFilter={statusFilter}
+            kindFilter={kindFilter}
+            onToggleStatus={toggleStatus}
+            onToggleKind={toggleKind}
+            onClear={clearMapFilters}
+          />
+          <MapLegend
+            selectedStatuses={statusFilter}
+            selectedKinds={kindFilter}
+            onToggleStatus={toggleStatus}
+            onToggleKind={toggleKind}
+            onClear={clearMapFilters}
+          />
         </View>
       )}
 
@@ -693,7 +769,7 @@ export default function HomeMap() {
       {/* Docked bottom card — appears when a property marker is selected */}
       <View style={{ position: "absolute", left: 0, right: 0, bottom: dockedBottom }} pointerEvents="box-none">
         <MapDockedCard
-          properties={properties}
+          properties={visible}
           activeId={activeId}
           favorites={favorites}
           onIndexChange={(p) => {
@@ -903,6 +979,69 @@ function EmptyState() {
   );
 }
 
+// Quick status filter chips (+ active listing-type chips) — tap to filter the map/list.
+function MapFilterChips({
+  statusFilter,
+  kindFilter,
+  onToggleStatus,
+  onToggleKind,
+  onClear,
+}: {
+  statusFilter: Set<AvailabilityStatus>;
+  kindFilter: Set<ListingKind>;
+  onToggleStatus: (s: AvailabilityStatus) => void;
+  onToggleKind: (k: ListingKind) => void;
+  onClear: () => void;
+}) {
+  const anyActive = statusFilter.size > 0 || kindFilter.size > 0;
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.filterChipsRow}
+      style={styles.filterChipsScroll}
+    >
+      {STATUS_LEGEND.map((s) => {
+        const m = STATUS_META[s];
+        const active = statusFilter.has(s);
+        return (
+          <Pressable
+            key={s}
+            onPress={() => onToggleStatus(s)}
+            style={[styles.statusChip, shadows.soft, active && { backgroundColor: m.color, borderColor: m.color }]}
+            testID={`status-chip-${s}`}
+          >
+            <View style={[styles.statusChipDot, { backgroundColor: active ? "#fff" : m.color }]} />
+            <Text style={[styles.statusChipText, active && { color: "#fff" }]}>{m.label}</Text>
+          </Pressable>
+        );
+      })}
+      {/* Active listing-type chips (toggled from the legend) shown inline so they're removable */}
+      {LISTING_TYPE_LEGEND.filter((k) => kindFilter.has(k)).map((k) => {
+        const m = LISTING_TYPE_META[k];
+        return (
+          <Pressable
+            key={k}
+            onPress={() => onToggleKind(k)}
+            style={[styles.statusChip, styles.kindChipActive, shadows.soft]}
+            testID={`kind-chip-${k}`}
+          >
+            <Ionicons name={m.icon} size={12} color="#fff" />
+            <Text style={[styles.statusChipText, { color: "#fff" }]}>{m.label}</Text>
+            <Ionicons name="close" size={12} color="rgba(255,255,255,0.9)" />
+          </Pressable>
+        );
+      })}
+      {anyActive && (
+        <Pressable onPress={onClear} style={[styles.statusChip, shadows.soft]} testID="status-chip-clear">
+          <Ionicons name="refresh" size={12} color={colors.textSecondary} />
+          <Text style={styles.statusChipText}>All</Text>
+        </Pressable>
+      )}
+    </ScrollView>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   topOverlay: { position: "absolute", left: spacing.lg, right: spacing.lg },
@@ -960,6 +1099,29 @@ const styles = StyleSheet.create({
   },
   viewToggleText: { fontSize: 12, fontWeight: "800", color: colors.text },
   rightActions: { position: "absolute", right: spacing.lg, gap: 10 },
+  bottomLeftStack: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  filterChipsScroll: { alignSelf: "stretch", flexGrow: 0 },
+  filterChipsRow: { flexDirection: "row", gap: 8, paddingRight: spacing.lg },
+  statusChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 11,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  statusChipDot: { width: 9, height: 9, borderRadius: 5 },
+  statusChipText: { fontSize: 12, fontWeight: "800", color: colors.text, letterSpacing: 0.1 },
+  kindChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   actionBtn: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: "#fff",
