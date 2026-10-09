@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/src/contexts/auth";
 import { storage } from "@/src/utils/storage";
 import { AmassLogo } from "@/src/components/AmassLogo";
-import { colors, typography } from "@/src/constants/theme";
+import { colors } from "@/src/constants/theme";
 
 const BRAND_INTRO_KEY = "amass_brand_intro_seen_v1";
 const FIXA_GREEN = "#7ED958";
@@ -21,8 +21,9 @@ export default function Splash() {
   const navigated = useRef(false);
 
   const amassOpacity = useRef(new Animated.Value(0)).current;
-  const amassScale = useRef(new Animated.Value(0.92)).current;
+  const amassScale = useRef(new Animated.Value(0.86)).current;
   const fixaOpacity = useRef(new Animated.Value(0)).current;
+  const fixaScale = useRef(new Animated.Value(0.9)).current;
 
   // Brand sequence: Amass first, then (first launch only) the Fixa brand moment.
   useEffect(() => {
@@ -32,8 +33,8 @@ export default function Splash() {
       const seen = await storage.getItem<boolean>(BRAND_INTRO_KEY, false);
       if (cancelled) return;
       Animated.parallel([
-        Animated.timing(amassOpacity, { toValue: 1, duration: 650, useNativeDriver: true }),
-        Animated.spring(amassScale, { toValue: 1, friction: 6, useNativeDriver: true }),
+        Animated.timing(amassOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.spring(amassScale, { toValue: 1, friction: 7, tension: 60, useNativeDriver: true }),
       ]).start();
 
       if (!seen) {
@@ -42,19 +43,22 @@ export default function Splash() {
           setTimeout(() => {
             if (cancelled) return;
             setPhase("fixa");
-            Animated.timing(fixaOpacity, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-            timers.push(setTimeout(() => !cancelled && setReady(true), 1500));
-          }, 1350)
+            Animated.parallel([
+              Animated.timing(fixaOpacity, { toValue: 1, duration: 550, useNativeDriver: true }),
+              Animated.spring(fixaScale, { toValue: 1, friction: 7, tension: 55, useNativeDriver: true }),
+            ]).start();
+            timers.push(setTimeout(() => !cancelled && setReady(true), 1600));
+          }, 1450)
         );
       } else {
-        timers.push(setTimeout(() => !cancelled && setReady(true), 1300));
+        timers.push(setTimeout(() => !cancelled && setReady(true), 1350));
       }
     })();
     return () => {
       cancelled = true;
       timers.forEach(clearTimeout);
     };
-  }, [amassOpacity, amassScale, fixaOpacity]);
+  }, [amassOpacity, amassScale, fixaOpacity, fixaScale]);
 
   // Navigate once the sequence is done AND auth has resolved.
   useEffect(() => {
@@ -72,8 +76,11 @@ export default function Splash() {
     <View style={styles.container} testID="splash-screen">
       {/* Amass brand moment */}
       <Animated.View style={[styles.center, { opacity: amassOpacity, transform: [{ scale: amassScale }] }]}>
-        <AmassLogo size="xl" />
-        <Text style={styles.tagline}>Africa&apos;s Property Operating System</Text>
+        <AmassLogo size={124} />
+        <View style={styles.taglineWrap}>
+          <View style={styles.taglineRule} />
+          <Text style={styles.tagline}>AFRICA&apos;S PROPERTY OPERATING SYSTEM</Text>
+        </View>
       </Animated.View>
 
       {/* Fixa brand moment (first launch) — crossfades over Amass */}
@@ -82,7 +89,9 @@ export default function Splash() {
         style={[styles.fixaLayer, { opacity: fixaOpacity }]}
         testID="fixa-brand-moment"
       >
-        <Image source={FIXA_LOGO} style={styles.fixaImg} contentFit="contain" />
+        <Animated.View style={{ width: "100%", alignItems: "center", transform: [{ scale: fixaScale }] }}>
+          <Image source={FIXA_LOGO} style={styles.fixaImg} contentFit="contain" />
+        </Animated.View>
       </Animated.View>
 
       {/* Skip — always available, never blocks access */}
@@ -98,14 +107,27 @@ export default function Splash() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
   center: { alignItems: "center" },
-  tagline: { ...typography.body, color: colors.textTertiary, marginTop: 28, letterSpacing: 0.5 },
+  taglineWrap: {
+    alignItems: "center",
+    marginTop: 26,
+    paddingHorizontal: 24,
+  },
+  taglineRule: { width: 34, height: 3, borderRadius: 2, backgroundColor: colors.red, marginBottom: 14 },
+  tagline: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.8,
+    textAlign: "center",
+    lineHeight: 18,
+  },
   fixaLayer: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: FIXA_GREEN,
     alignItems: "center",
     justifyContent: "center",
   },
-  fixaImg: { width: "92%", aspectRatio: 1, maxWidth: 460 },
+  fixaImg: { width: "116%", aspectRatio: 1, maxWidth: 560 },
   skipWrap: { position: "absolute", top: 0, right: 0, padding: 16 },
   skipBtn: {
     paddingHorizontal: 14,

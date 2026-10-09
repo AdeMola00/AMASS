@@ -8,8 +8,8 @@ type Size = "sm" | "md" | "lg" | "xl";
 const SIZE_MAP: Record<Size, number> = {
   sm: 26, // app-bar / bottom-nav (emblem only)
   md: 44, // list hero / compact lockup
-  lg: 60, // login / register header
-  xl: 96, // splash / onboarding hero
+  lg: 64, // login / register header
+  xl: 112, // splash / onboarding hero
 };
 
 // Intrinsic aspect ratio (width / height) of the authoritative emblem artwork.
@@ -69,7 +69,7 @@ export function AmassLogo({
     );
   }
 
-  const fs = Math.round(h * 0.34);
+  const fs = Math.round(h * 0.38);
   return (
     <View
       style={[{ alignItems: "center" }, style]}
@@ -83,8 +83,8 @@ export function AmassLogo({
           styles.wordmark,
           {
             fontSize: fs,
-            letterSpacing: fs * 0.16,
-            marginTop: Math.round(h * 0.12),
+            letterSpacing: fs * 0.1,
+            marginTop: Math.round(h * 0.14),
             color: tone === "light" ? "#FFFFFF" : colors.ink,
           },
         ]}

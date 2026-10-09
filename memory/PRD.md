@@ -363,6 +363,13 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - Verified: `backend/tests/test_auth_forgot_reset_lockout.py` 12/12; frontend E2E all critical paths (iteration_39). Social buttons (Google/Apple) pre-existing, untouched.
 - Cosmetic only: RN-web console warnings (shadow*/pointerEvents/useNativeDriver) — no functional impact.
 
+## Opening Intro Logos — bolder & cleaner (Jun 2026)
+- `AmassLogo.tsx`: emblem presets bumped (`lg` 60→64, `xl` 96→112); wordmark made bolder/tighter (fs h×0.34→0.38, letterSpacing ×0.16→0.10) — benefits every hero lockup (splash, onboarding, login, register).
+- Splash `app/index.tsx`:
+  - AMASS moment: larger emblem (size 124), bold wordmark, a centered red accent rule above a single-line letter-spaced tagline "AFRICA'S PROPERTY OPERATING SYSTEM"; entrance now opacity 700ms + spring scale from 0.86.
+  - FIXA moment: crossfade now pairs opacity with a spring scale-in (from 0.9); card enlarged (width 94%→116%, maxWidth 480→560) so the FIXA brand reads boldly. Background `#7ED958` exactly matches the asset's baked-in green so it blends seamlessly (over-scaled green margins bleed off-screen harmlessly).
+- Verified via screenshots on 390px: AMASS splash, FIXA splash (opacity 0.99, no ghosting), and login header all crisp.
+
 ## Privacy Policy + Terms (Play/App Store compliance) (Jun 2026)
 - **Backend** `/app/backend/legal.py` → `register_legal_routes()` serves public, auth-free HTML:
   - `GET /api/legal/privacy` — full AMASS privacy policy (account/profile/location/camera/payments/chat data, sharing, retention, account deletion, security, children, contact).
