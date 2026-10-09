@@ -24,6 +24,18 @@ type WalletContextValue = {
     already_unlocked?: boolean;
     free?: boolean;
   }>;
+  accessProperty: (propertyId: string) => Promise<{
+    tokens_paid: number;
+    balance?: number;
+    already_unlocked?: boolean;
+    free?: boolean;
+  }>;
+  revealAgent: (propertyId: string) => Promise<{
+    tokens_paid: number;
+    balance?: number;
+    already_unlocked?: boolean;
+    contact: { name?: string; phone?: string; email?: string } | null;
+  }>;
   claimDailyLogin: () => Promise<{ credited?: number; already_claimed?: boolean }>;
 };
 
@@ -111,6 +123,34 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     [refresh]
   );
 
+  const accessProperty = useCallback(
+    async (propertyId: string) => {
+      const res = await api.accessProperty(propertyId);
+      await refresh();
+      return {
+        tokens_paid: res.tokens_paid ?? 0,
+        balance: res.balance,
+        already_unlocked: res.already_unlocked,
+        free: res.free,
+      };
+    },
+    [refresh]
+  );
+
+  const revealAgent = useCallback(
+    async (propertyId: string) => {
+      const res = await api.revealAgentContact(propertyId);
+      await refresh();
+      return {
+        tokens_paid: res.tokens_paid ?? 0,
+        balance: res.balance,
+        already_unlocked: res.already_unlocked,
+        contact: res.contact,
+      };
+    },
+    [refresh]
+  );
+
   const claimDailyLogin = useCallback(async () => {
     try {
       const res = await api.earnDailyLogin();
@@ -135,6 +175,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         spendFix,
         subscribe,
         unlockProperty,
+        accessProperty,
+        revealAgent,
         claimDailyLogin,
       }}
     >

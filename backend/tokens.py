@@ -178,6 +178,7 @@ TransactionKind = Literal[
     "bonus",              # bundle bonus / promotion
     "welcome",            # signup gift
     "refund",             # admin refund
+    "adjustment",         # admin manual credit/debit adjustment
     "expire",             # rollover expiry
     "transfer",           # currency transfer (future)
 ]

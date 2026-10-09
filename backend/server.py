@@ -470,10 +470,12 @@ async def list_properties(
             p["views_recent"] = c["views_recent"]
             p["favorites_recent"] = c["favorites_recent"]
     # Always add token economy fields on each item
+    pricing = await get_wallet_pricing(db)
     for p in docs:
         p["is_amass_exclusive"] = bool(p.get("is_amass_exclusive", False))
-        p["is_free_amass_sale"] = is_free_amass_sale(p)
-        p["token_cost"] = compute_token_cost(p)
+        p["is_free_amass_sale"] = pricing.get("free_amass_sale", True) and is_free_amass_sale(p)
+        p["token_cost"] = access_fee_for(pricing, p)
+        p["access_cost"] = p["token_cost"]
         # Free-AMASS-sale is always "unlocked" for everyone.
         p["unlocked"] = p["is_free_amass_sale"] or (p["id"] in unlocked_ids if user_id else False)
     return docs
@@ -495,22 +497,26 @@ async def get_property(
         except jwt.PyJWTError:
             user_id = None
 
+    pricing = await get_wallet_pricing(db)
     is_exclusive = bool(doc.get("is_amass_exclusive", False))
-    is_free = is_free_amass_sale(doc)
-    token_cost = compute_token_cost(doc)
+    is_free = pricing.get("free_amass_sale", True) and is_free_amass_sale(doc)
+    access_cost = access_fee_for(pricing, doc)
+    agent_cost = agent_contact_fee_for(pricing)
+
+    flags = await unlock_flags(db, user_id, property_id)
+    access_unlocked = is_free or flags["access"]
+    agent_unlocked = flags["agent"]
+
     doc["is_amass_exclusive"] = is_exclusive
     doc["is_free_amass_sale"] = is_free
-    doc["token_cost"] = token_cost
+    doc["token_cost"] = access_cost
+    doc["access_cost"] = access_cost
+    doc["agent_contact_cost"] = agent_cost
+    doc["unlocked"] = access_unlocked
+    doc["agent_unlocked"] = agent_unlocked
 
-    unlocked = is_free
-    if not unlocked and user_id:
-        unlocked = await has_unlocked(db, user_id, property_id)
-
-    doc["unlocked"] = unlocked
-
-    if not unlocked:
-        # Return only public preview — strip premium information.
-        # Keep only first image, city-level location, no exact address / agent contact.
+    if not access_unlocked:
+        # Public preview only — strip premium info + agent identity.
         first_image = doc["images"][0] if doc.get("images") else None
         preview_desc = (doc.get("description") or "")[:120]
         if len(doc.get("description") or "") > 120:
@@ -540,6 +546,8 @@ async def get_property(
             "agent_name": None,
             "agent_avatar": None,
             "agent_id": None,
+            "agent_phone": None,
+            "agent_email": None,
             "year_built": None,
             "parking": None,
             "investment_score": None,
@@ -548,11 +556,27 @@ async def get_property(
             "views_recent": doc.get("views_recent", 0),
             "favorites_recent": doc.get("favorites_recent", 0),
             "is_amass_exclusive": False,
-            "token_cost": token_cost,
+            "token_cost": access_cost,
+            "access_cost": access_cost,
+            "agent_contact_cost": agent_cost,
             "unlocked": False,
+            "agent_unlocked": False,
         }
+
+    # Access unlocked → full basic details + agent PUBLIC identity.
+    # Agent PRIVATE contact (phone/email) stays gated behind the agent tier.
     doc["views_recent"] = doc.get("views_recent", 0)
     doc["favorites_recent"] = doc.get("favorites_recent", 0)
+    if agent_unlocked:
+        contact = await agent_contact_for(db, doc)
+        doc["agent_phone"] = (contact or {}).get("phone")
+        doc["agent_email"] = (contact or {}).get("email")
+    else:
+        doc["agent_phone"] = None
+        doc["agent_email"] = None
+        # Keep owner name but hide owner's private phone until agent tier paid.
+        if isinstance(doc.get("mandate"), dict):
+            doc["mandate"] = {**doc["mandate"], "owner_phone": None}
     return doc
 
 
@@ -2013,6 +2037,17 @@ app.include_router(
     register_google_auth_routes(db, create_token, user_to_out, hash_password)
 )
 
+# ─── Two-tier property access charging (access fee + agent-contact fee) ───
+from property_access import (
+    register_property_access_routes,
+    get_wallet_pricing,
+    access_fee_for,
+    agent_contact_fee_for,
+    unlock_flags,
+    agent_contact_for,
+)
+app.include_router(register_property_access_routes(db, get_current_user, require_admin))
+
 @app.get("/api/files/{file_path:path}")
 async def _download_file(file_path: str, user: dict = Depends(get_current_user)):
     """Auth-checked passthrough to Emergent Object Storage.
@@ -2071,6 +2106,14 @@ async def on_startup():
         await db.users.create_index("referral_code", sparse=True)
         await db.favorites.create_index([("user_id", 1), ("property_id", 1)], unique=True)
         await db.favorites.create_index("property_id")
+        # Two-tier property access unlocks (access + agent_contact)
+        await db.property_unlocks.create_index([("user_id", 1), ("property_id", 1)])
+        await db.property_unlocks.create_index(
+            [("user_id", 1), ("property_id", 1), ("tier", 1)],
+            unique=True,
+            partialFilterExpression={"tier": {"$exists": True}},
+            name="property_unlocks_tier_uniq",
+        )
         await db.marketplace.create_index("id", unique=True)
         await db.agent_referrals.create_index("agent_user_id")
         await db.agent_referrals.create_index("id", unique=True)

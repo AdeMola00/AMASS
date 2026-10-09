@@ -1,0 +1,46 @@
+{
+  "summary": "Phase 1 two-tier property access charging verified. Backend: 9/9 pytest cases pass against the public preview URL — (1) GET /api/settings/pricing (no auth) returns property_access_fee, agent_contact_fee, access_period_days, currency, privacy_policy_url; (2) GET /api/properties/{id}/access-info returns fees + unlocked flags + balance + agent_contact.available for both auth and unauth callers (unauth balance=0); (3) POST /api/properties/{id}/reveal-agent before access returns 403 with detail.error='access_required'; (4) full two-tier flow — admin top-up via /api/admin/wallet/{id}/adjust (+500 MASS), POST /access charges once and is idempotent on repeat (tokens_paid=0 on 2nd call, already_unlocked=true), POST /reveal-agent then returns contact {phone,email} and GET /api/properties/{id} subsequently exposes agent_phone/agent_email with agent_unlocked=true; (5) refund-safe contact-less path — seeded a property directly in Mongo with agent_name but NO agent_id, verified POST /reveal-agent returns 422 contact_unavailable WITHOUT any wallet debit (balance total_before==total_after); (6) insufficient balance — fresh registered user with 15 welcome MASS attempting a 20-MASS access returns 402 with structured body {error:insufficient_tokens, required, balance, shortfall} and the balance is NOT debited (verified byte-for-byte); (7) admin wallet ledger GET /api/admin/wallet/transactions correctly joins user_email (returns 'demo@amass.africa') and (8) POST /api/admin/wallet/{id}/adjust supports both credit (+7) and debit (-3) with a matching 'adjustment' row in the ledger. Frontend web preview: /property/{id} renders the locked state cleanly — testID='locked-banner' displays 'Property details locked' + what-it-unlocks summary + cost pill (20 MASS); sticky testID='unlock-cta-btn' shows 'Unlock for 20 MASS' with the token icon; tapping it opens UnlockSheet which (a) discloses fee BEFORE charging ('Access fee 20 MASS'), (b) lists exactly what unlocks (Exact address & map pin · All property photos · Full specs, amenities & AI insights), (c) shows current wallet pill 'You currently have N MASS', (d) when balance < fee swaps the primary CTA from testID='unlock-confirm-btn' to testID='buy-tokens-cta' ('Add funds') and surfaces 'You need N more MASS to continue' shortfall card. The full tap-to-charge → reveal-agent → chat chain could NOT be validated via web preview in this run because web login does not persist session on this preview build (unrelated pre-existing testability gap noted in iteration_34 — the API chain is independently proven by the pytest suite above). No red screen, no pageerrors; only pre-existing deprecation warnings (shadow* props, pointerEvents prop, useNativeDriver on web) which are not regressions.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Email/password login on web preview",
+        "issue": "After submitting demo@amass.africa / amass2026 on /login the browser stays on /login (no redirect, wallet /me returns 401) — appears to be a login-form submit-button testID/selector ambiguity (two 'Sign in' matches). Not Phase-1 regression; same gap flagged in iteration_34.",
+        "affected_testIDs": ["login-signin-btn (missing)"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_property_access_two_tier.py",
+    "/app/test_reports/pytest/pytest_iteration35_two_tier.xml"
+  ],
+  "action_items": [
+    "Add explicit testIDs on login screen (email/password/sign-in-submit) so Playwright can drive the authenticated two-tier UX end-to-end in future web-preview runs. Current ambiguity blocked a full in-browser tap-to-charge regression; the money flow is covered at the API layer.",
+    "Consider surfacing the structured 402 payload from POST /access and /reveal-agent in the UnlockSheet as a toast when the balance drops between sheet-open and tap (today the client pre-check only reads cached wallet.spendable). The backend already returns {required, balance, shortfall} — the sheet just doesn't render it on 402. Optional polish.",
+    "No functional fixes required for Phase 1 — backend behaviour is spec-compliant and the UI structure (locked banner · fee disclosure · what-it-unlocks list · shortfall warning · post-reveal contact lines · free Chat with Agent CTA) is wired correctly in /app/frontend/app/property/[id].tsx and /app/frontend/src/components/UnlockSheet.tsx."
+  ],
+  "critical_code_review_comments": [
+    "property_access.py pre-checks `agent_contact_for` BEFORE charging in /reveal-agent, and ALSO re-checks after the debit with an auto-credit-refund branch (lines 300-364). This is a solid belt-and-braces design for the 'never charge for what we can't deliver' invariant.",
+    "DuplicateKeyError on the reservation insert correctly short-circuits to already_unlocked (lines 234-235, 322-323), preventing a double-tap race from double-charging. Requires a unique partial index on (user_id, property_id, tier where status != 'pending' or similar) — confirm the startup index is in place in server.py.",
+    "Admin ledger join (property_access.py lines 402-411) does an $in query over distinct user_ids once per page — O(1) extra round-trip, good. user_email returns correctly in test output.",
+    "DEFAULT_WALLET_PRICING lives in app_settings.py (lines 93-101) — admin-configurable, not hard-coded, matches PRD safeguard #2."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_property_access_two_tier.py (new regression suite — 9 cases)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9)",
+    "frontend": "Structural checks pass. Full authed tap-to-charge chain not driven via web preview due to pre-existing login-redirect gap; API coverage compensates."
+  },
+  "seed_data_creation": "One pytest-scoped Mongo-level insert: TEST_contactless_<hex> property with agent_name='Ghost Agent' and NO agent_id. Teardown deletes the property + any property_unlocks rows. Also +500 MASS admin top-up on demo user (needed to drive the full two-tier flow); demo balance after run reported as 6328 MASS.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_property_access_two_tier.py for all Phase-1 money-flow regressions. The TestContactlessRefundSafe fixture inserts directly into Mongo because the demo user is on Starter plan with its 5-listing limit already exceeded — don't try to seed via POST /api/properties with the demo account. For in-browser end-to-end you need a working login path; today the web /login form doesn't persist a session on tap. The two-tier UI structure is validated via /property/<non-free-pid>.",
+  "rca_of_issue": "N/A — no bugs. One pre-existing testability gap: login submit button on web has an ambiguous 'Sign in' text (matches two elements), making Playwright-driven auth brittle. Suggested fix: add testID='login-submit-btn' to the primary Pressable in /app/frontend/app/login.tsx (and testID='login-email-input' / 'login-password-input' on the inputs)."
+}

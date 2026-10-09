@@ -103,17 +103,42 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Deployment readiness audit → then fix critical P0 security vulnerabilities blocking launch:
-    1) POST /api/seed was unauthenticated → anyone could wipe the DB.
-    2) POST /api/tokens/purchase & /api/wallet/fix/purchase were MOCK endpoints
-       that credited wallets instantly (free-money bug).
-    3) Referral /qualify and /payout let agents self-approve their own commissions.
-    4) Wallet credit/debit was read-modify-write (race conditions).
-    5) JWT_SECRET had a weak in-source fallback.
-    6) httpx used by apple_auth.py & payments.py but missing from requirements.txt.
-    7) DB missing indexes on hot collections.
+  Productionize AMASS. Phase 1 (current): Two-tier, admin-configurable property
+  access charging + wallet safeguards.
+    - Tier 1 (property access fee): reveals BASIC property info (exact address,
+      all photos, specs, amenities, AI insights) + agent public identity.
+    - Tier 2 (agent contact fee): separate disclosed fee that reveals the agent's
+      PRIVATE direct contact (phone + email).
+    - Fees/period are admin-configurable via app_settings `wallet_pricing`.
+    - Disclose fee before charge; no duplicate charge within access window;
+      insufficient-balance → no charge + shortfall; auto-refund if agent contact
+      cannot be delivered; admin wallet ledger review + manual adjust.
 
 backend:
+  - task: "Phase1 — Two-tier property access (access + agent-contact) charging"
+    implemented: true
+    working: true
+    file: "backend/property_access.py, backend/server.py, backend/app_settings.py, backend/tokens.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          New module property_access.py. Endpoints (prefix /api):
+          GET /settings/pricing (public), GET /properties/{id}/access-info (opt auth),
+          POST /properties/{id}/access (Tier 1), POST /properties/{id}/reveal-agent (Tier 2),
+          GET /admin/wallet/transactions, POST /admin/wallet/{user_id}/adjust.
+          app_settings gains `wallet_pricing` (property_access_fee=5, agent_contact_fee=10,
+          access_period_days=0, use_per_property_cost, free_amass_sale, privacy_policy_url).
+          server.get_property now returns access_cost/agent_contact_cost/agent_unlocked and
+          gates agent phone/email behind Tier 2; legacy /properties/unlock still grants both.
+          Unique partial index on property_unlocks(user_id,property_id,tier) blocks double-charge.
+          Verified via curl: access-info, 403 reveal-before-access, charge 20, idempotent repeat,
+          reveal-agent returns contact + charges 10, admin ledger + adjust all OK.
+
+
   - task: "Deployment health check"
     implemented: true
     working: true
@@ -222,23 +247,59 @@ backend:
         agent: "main"
         comment: "Added idempotent create_index calls on properties, wallets, token_transactions, notifications, users, favorites, marketplace, agent_referrals."
 
+frontend:
+  - task: "Phase1 — Two-tier property access UX (access gate + agent reveal)"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/property/[id].tsx, frontend/src/components/UnlockSheet.tsx, frontend/src/contexts/wallet.tsx, frontend/src/lib/api.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Property detail: locked banner now explains the access fee reveals BASIC info
+          (agent contact is separate). Sticky CTA 'Unlock for N MASS' charges Tier 1
+          (accessProperty). After access, agent card shows name/profile + 'Reveal direct
+          contact · N MASS' button (Tier 2, revealAgent) → on success shows tappable
+          phone/email (tel:/mailto:). In-app 'Chat with Agent' stays free. UnlockSheet
+          generalized with mode 'access'|'agent' incl. what-you-unlock list + shortfall +
+          'Add funds'. Needs frontend E2E verification.
+
 metadata:
   created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 1
+  version: "1.1"
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
-    - "P0 — Gate POST /api/seed behind admin"
-    - "P0 — Remove mock free-money endpoints"
-    - "P0 — Atomic wallet credit/debit with $inc"
-    - "P0 — Admin-gate referral qualify & payout"
+    - "Phase1 — Two-tier property access (access + agent-contact) charging"
+    - "Phase1 — Two-tier property access UX (access gate + agent reveal)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: |
+      PHASE 1 shipped — two-tier property access charging. Please validate with
+      demo@amass.africa / amass2026 (admin). Backend already curl-verified; focus on
+      frontend E2E + edge cases:
+      1) Open a non-free property detail while logged in → preview shows locked banner
+         + sticky 'Unlock for N MASS'. Agent section hidden.
+      2) Tap Unlock → sheet discloses access fee + what it unlocks → confirm → basic
+         details reveal (address, photos, specs). Agent card now shows name/profile and
+         a 'Reveal direct contact · N MASS' button (phone/email NOT yet shown).
+      3) Tap 'Reveal direct contact' → sheet discloses agent fee → confirm → phone/email
+         appear and are tappable. 'Chat with Agent' works without paying.
+      4) Re-open same property → no re-charge (both tiers already unlocked).
+      5) Insufficient balance → sheet shows shortfall + 'Add funds' (no charge).
+      Known stale backend tests (NOT regressions): tokens/purchase 410 (endpoint removed),
+      3 unlock tests depending on it, and one polluted 'Chat Test Duplex' record missing
+      latitude.
+
   - agent: "main"
     message: |
       Phase 4 of the AMASS Agent Ecosystem shipped. New backend module

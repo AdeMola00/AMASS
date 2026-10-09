@@ -316,3 +316,17 @@ def api_health_check():
 - Generator: `/app/frontend/scripts/generate_appstore_ios.py` (PIL + numpy). Raw 3×-DPR captures (1170×2532) in `assets/images/ios-raw/` taken via Playwright with a logged-in demo session; home map is synthesised (vector Lagos map + AMASS price pins + docked card) under the chroma-keyed real app chrome.
 - Output `assets/images/appstore-ios/screenshots/ios-screenshot-01…10.png` (1284×2778) and `app-previews/ios-preview-01…03.png` (2778×1284). iPhone titanium frame + Dynamic Island + iOS status bar; alternating ivory/jet-black canvases with AMASS red accents.
 - Showcase chat seeded between demo agent and `tunde.showcase@amass.africa` (see test_credentials.md).
+
+## Phase 1 — Two-Tier Property Access Charging (Jun 2026)
+Admin-configurable, two separately-disclosed charges to progressively reveal a property.
+- **Tier 1 · property access fee** → reveals BASIC info (exact address, all photos, specs, amenities, AI insights) + agent public identity.
+- **Tier 2 · agent contact fee** → separate disclosed fee revealing the agent's PRIVATE phone + email.
+- New setting `wallet_pricing` in `app_settings` (admin-editable): `property_access_fee` (5), `agent_contact_fee` (10), `access_period_days` (0=forever), `use_per_property_cost`, `free_amass_sale`, `privacy_policy_url`.
+- Backend module `/app/backend/property_access.py`:
+  - `GET /api/settings/pricing` (public), `GET /api/properties/{id}/access-info`
+  - `POST /api/properties/{id}/access` (Tier 1), `POST /api/properties/{id}/reveal-agent` (Tier 2)
+  - `GET /api/admin/wallet/transactions`, `POST /api/admin/wallet/{user_id}/adjust`
+- Safeguards: fee disclosed before charge; unique partial index on `property_unlocks(user_id,property_id,tier)` + pre-check prevents duplicate charges; insufficient balance → 402 with shortfall, no debit; agent contact undeliverable → pre-check 422 (no charge) + post-charge auto-refund; auditable `token_transactions` ledger; admin review + manual adjust (`adjustment` kind).
+- `server.get_property`/`list_properties` return `access_cost`, `agent_contact_cost`, `agent_unlocked`; agent phone/email gated behind Tier 2; legacy `/properties/unlock` still grants both tiers (backward compatible).
+- Frontend: generalized `UnlockSheet` (mode `access`|`agent`), property-detail access gate + agent-reveal block (tappable tel:/mailto:), free in-app "Chat with Agent".
+- Tests: `/app/backend/tests/test_property_access_two_tier.py` — 9/9 pass.

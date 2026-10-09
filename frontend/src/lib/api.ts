@@ -34,6 +34,9 @@ export type Property = {
   } | null;
   agent_name?: string;
   agent_avatar?: string;
+  agent_id?: string;
+  agent_phone?: string;
+  agent_email?: string;
   year_built?: number;
   parking?: number;
   investment_score?: number;
@@ -45,7 +48,10 @@ export type Property = {
   is_amass_exclusive?: boolean;
   is_free_amass_sale?: boolean;
   token_cost?: number;
+  access_cost?: number;
+  agent_contact_cost?: number;
   unlocked?: boolean;
+  agent_unlocked?: boolean;
 };
 
 export type Currency = "MASS" | "FIX";
@@ -637,6 +643,59 @@ export const api = {
       tokens_paid?: number;
       balance?: number;
     }>("/properties/unlock", { method: "POST", body: JSON.stringify({ property_id }) }),
+
+  // ─── Two-tier property access (access fee + agent-contact fee) ───
+  propertyAccessInfo: (property_id: string) =>
+    req<{
+      property_id: string;
+      is_free: boolean;
+      currency: Currency;
+      access_period_days: number;
+      balance: number;
+      access: { unlocked: boolean; fee: number };
+      agent_contact: { unlocked: boolean; fee: number; available: boolean };
+    }>(`/properties/${encodeURIComponent(property_id)}/access-info`),
+  accessProperty: (property_id: string) =>
+    req<{
+      ok: boolean;
+      tier: string;
+      free?: boolean;
+      already_unlocked?: boolean;
+      tokens_paid: number;
+      balance?: number;
+    }>(`/properties/${encodeURIComponent(property_id)}/access`, { method: "POST" }),
+  revealAgentContact: (property_id: string) =>
+    req<{
+      ok: boolean;
+      tier: string;
+      already_unlocked?: boolean;
+      tokens_paid: number;
+      balance?: number;
+      contact: { name?: string; phone?: string; email?: string } | null;
+    }>(`/properties/${encodeURIComponent(property_id)}/reveal-agent`, { method: "POST" }),
+  settingsPricing: () =>
+    req<{
+      property_access_fee: number;
+      agent_contact_fee: number;
+      access_period_days: number;
+      currency: Currency;
+      privacy_policy_url: string;
+      free_amass_sale: boolean;
+    }>("/settings/pricing"),
+  adminWalletTransactions: (params: { user_id?: string; kind?: string; currency?: string; limit?: number } = {}) => {
+    const qs = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== "" && v !== null)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join("&");
+    return req<{ items: (WalletTransaction & { user_email?: string; user_name?: string })[]; count: number }>(
+      `/admin/wallet/transactions${qs ? `?${qs}` : ""}`
+    );
+  },
+  adminWalletAdjust: (user_id: string, amount: number, reason: string, currency: Currency = "MASS") =>
+    req<{ ok: boolean; user_id: string; currency: Currency; amount: number; balance: number }>(
+      `/admin/wallet/${encodeURIComponent(user_id)}/adjust`,
+      { method: "POST", body: JSON.stringify({ amount, reason, currency }) }
+    ),
   earnDailyLogin: () =>
     req<{ ok: boolean; credited?: number; reason?: string }>(
       "/wallet/earn?task_id=daily_login",

@@ -14,6 +14,7 @@ import {
   Modal,
   StatusBar,
   Alert,
+  Linking,
 } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -232,15 +233,15 @@ export default function PropertyDetails() {
                 <Ionicons name="lock-closed" size={18} color="#fff" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.lockedTitle}>Premium details locked</Text>
+                <Text style={styles.lockedTitle}>Property details locked</Text>
                 <Text style={styles.lockedBody}>
-                  Unlock this property to reveal full address, agent contact, all photos,
-                  documents and AI insights.
+                  Pay the access fee to reveal the exact address, all photos, full specs
+                  and AI insights. Agent contact is a separate optional fee.
                 </Text>
               </View>
               <View style={styles.lockedCostPill}>
                 <TokenIcon size={12} />
-                <Text style={styles.lockedCostText}>{property.token_cost ?? 10}</Text>
+                <Text style={styles.lockedCostText}>{property.access_cost ?? property.token_cost ?? 5}</Text>
               </View>
             </View>
           )}
@@ -397,7 +398,51 @@ export default function PropertyDetails() {
                 <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </Pressable>
 
-              {/* Contact Agent — opens in-app chat */}
+              {/* Direct contact — separate disclosed fee (Tier 2) */}
+              {property.agent_unlocked ? (
+                <View style={styles.contactRevealed} testID="agent-contact-revealed">
+                  {property.agent_phone ? (
+                    <Pressable
+                      style={styles.contactLine}
+                      onPress={() => Linking.openURL(`tel:${property.agent_phone}`)}
+                    >
+                      <Ionicons name="call" size={16} color={colors.emerald} />
+                      <Text style={styles.contactLineText}>{property.agent_phone}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                    </Pressable>
+                  ) : null}
+                  {property.agent_email ? (
+                    <Pressable
+                      style={styles.contactLine}
+                      onPress={() => Linking.openURL(`mailto:${property.agent_email}`)}
+                    >
+                      <Ionicons name="mail" size={16} color={colors.emerald} />
+                      <Text style={styles.contactLineText}>{property.agent_email}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : (
+                <Pressable
+                  style={styles.revealContactBtn}
+                  onPress={() =>
+                    unlockRef.current?.open({
+                      propertyId: property.id,
+                      propertyTitle: property.title,
+                      tokenCost: property.agent_contact_cost ?? 10,
+                      mode: "agent",
+                    })
+                  }
+                  testID="reveal-agent-contact-btn"
+                >
+                  <Ionicons name="lock-closed" size={14} color={colors.text} />
+                  <Text style={styles.revealContactText}>
+                    Reveal direct contact · {property.agent_contact_cost ?? 10} MASS
+                  </Text>
+                </Pressable>
+              )}
+
+              {/* Contact Agent — opens in-app chat (always free, no number exposed) */}
               <Pressable
                 style={[styles.contactBtn]}
                 onPress={async () => {
@@ -411,7 +456,7 @@ export default function PropertyDetails() {
                 testID="btn-contact-agent"
               >
                 <Ionicons name="chatbubbles" size={16} color="#fff" />
-                <Text style={styles.contactBtnText}>Contact Agent</Text>
+                <Text style={styles.contactBtnText}>Chat with Agent</Text>
               </Pressable>
             </View>
           )}
@@ -505,14 +550,15 @@ export default function PropertyDetails() {
               unlockRef.current?.open({
                 propertyId: property.id,
                 propertyTitle: property.title,
-                tokenCost: property.token_cost ?? 10,
+                tokenCost: property.access_cost ?? property.token_cost ?? 5,
+                mode: "access",
               })
             }
             testID="unlock-cta-btn"
           >
             <TokenIcon size={18} tone="white" />
             <Text style={styles.ctaPrimaryText}>
-              Unlock for {property.token_cost ?? 10} tokens
+              Unlock for {property.access_cost ?? property.token_cost ?? 5} MASS
             </Text>
           </Pressable>
         </View>
@@ -909,6 +955,20 @@ const styles = StyleSheet.create({
     borderRadius: 24, backgroundColor: colors.red,
   },
   contactBtnText: { color: "#fff", fontSize: 14, fontWeight: "800", letterSpacing: 0.4 },
+  revealContactBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, height: 48, marginTop: spacing.md,
+    borderRadius: 24, borderWidth: 1.5, borderColor: colors.border,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  revealContactText: { color: colors.text, fontSize: 14, fontWeight: "800", letterSpacing: 0.2 },
+  contactRevealed: { marginTop: spacing.md, gap: 8 },
+  contactLine: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 14, height: 48, borderRadius: 14,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff",
+  },
+  contactLineText: { flex: 1, fontSize: 14, fontWeight: "700", color: colors.text },
   agentRole: { ...typography.caption, color: colors.red, fontWeight: "700" },
   callBtn: {
     width: 44,

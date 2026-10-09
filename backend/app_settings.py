@@ -88,6 +88,18 @@ DEFAULT_DUPLICATE_CLASSIFICATION = {
     # 0-49 = LIKELY UNIQUE
 }
 
+# Two-tier property access pricing (MASS). Admin-editable — these are the
+# seed defaults only, NOT business-fixed values.
+DEFAULT_WALLET_PRICING = {
+    "property_access_fee": 5,      # minimum MASS to reveal BASIC property info
+    "agent_contact_fee": 10,       # separate MASS to reveal agent private contact
+    "access_period_days": 0,       # 0 = pay once / forever (no re-charge window)
+    "use_per_property_cost": True, # access fee = max(min fee, per-property token cost)
+    "free_amass_sale": True,       # AMASS-listed SALE properties stay free to access
+    "currency": "MASS",
+    "privacy_policy_url": "https://amass.africa/privacy",
+}
+
 
 SETTING_DEFAULTS: Dict[str, Any] = {
     "feature_flags": DEFAULT_FEATURE_FLAGS,
@@ -98,6 +110,7 @@ SETTING_DEFAULTS: Dict[str, Any] = {
     "google_limits": DEFAULT_GOOGLE_LIMITS,
     "valuation_config": DEFAULT_VALUATION_CONFIG,
     "duplicate_classification": DEFAULT_DUPLICATE_CLASSIFICATION,
+    "wallet_pricing": DEFAULT_WALLET_PRICING,
 }
 
 
