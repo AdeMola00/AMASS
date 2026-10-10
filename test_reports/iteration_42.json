@@ -1,0 +1,33 @@
+{
+  "summary": "Profile reorder + 5 new screens verified on web preview (390x844) with demo@amass.africa (agent+admin). Menu order matches spec exactly (Wallet → About AMASS) with Admin Cockpit row rendered above the standard menu because the demo user is admin. Header shows real data: MASS 6,328, Saved=1, Unlocked=2, Member since 2026, 'Verified Agent' badge visible. All 18 standard menu rows + Admin Cockpit + Sign-out button exist with correct testIDs. All 18 routes resolve to the expected target URL (menu-wallet→/wallet, menu-my-unlocks→/unlocks, menu-saved-properties→/saved-properties, menu-saved-searches→/saved-searches, menu-earn-tokens→/earn, menu-become-an-agent→/become-agent, menu-list-a-property→/submit-property, menu-agent-workspace→/agent-workspace, menu-agent-plans→/agent-plans, menu-provider-dashboard→/provider-dashboard, menu-improve-my-property→/improve, menu-my-ad-campaigns→/ads, menu-my-documents→/my-documents, menu-identity-verification→/identity-verification, menu-notifications→/notifications, menu-settings→/settings, menu-help-&-support→/help, menu-about-amass→/about). The 5 new screens (/saved-properties, /my-documents, /identity-verification, /help, /about) load, render their testIDs (saved-back/saved-explore, docs-back, idv-back/idv-cta, help-back/help-email/help-chat/help-privacy/help-terms/faq-0..4, about-back/about-privacy/about-terms/about-contact) and back navigation works. Agent Workspace loads the real workspace (no RoleGate) because demo is an agent. Provider Dashboard loads with real FIX balance (480) and bookings (demo is FIXA-verified) so join-fixa-btn empty-state CTA is intentionally not shown — tested via code (testID exists in provider-dashboard.tsx line 214) but not reachable with this seeded account. Fixed one real React key collision on /my-documents (`unlock-undefined`) that produced visible console errors and a red toast — now 0 errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "profile · sign-out", "issue": "Alert.alert('Sign out?') confirmation dialog does not render on React Native Web (no window.confirm fallback). Tapping sign-out-button on web preview silently does nothing visible. Works on native. Consider using a RN-web-compatible modal confirm for parity.", "testID": "sign-out-button", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "profile header Saved count vs /saved-properties list", "issue": "api.favoriteIds() returns 1 id but api.listFavorites() returns an empty array for the demo user — likely a stale favorite pointing at a deleted/filtered property. /saved-properties correctly shows the empty state, but the Profile Saved stat says 1. Backend consistency between favorite_ids and favorites listing should be reconciled.", "affected_testIDs": ["stat-saved", "saved-explore"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_42.json"],
+  "action_items": [
+    "(OPTIONAL) Replace Alert.alert sign-out confirm with a cross-platform modal/dialog so web preview shows a confirmation step too.",
+    "(OPTIONAL) Reconcile backend favoriteIds vs favorites list so Profile Saved count and /saved-properties never disagree (stale favorite references).",
+    "No blocking issues for the reorder/5-new-screens scope — all routes, testIDs, and back navigation verified."
+  ],
+  "critical_code_review_comments": [
+    "/app/frontend/app/my-documents.tsx used `unlock-${u.id}` and `rep-${r.id ?? r._id}` as keys. When those IDs were undefined (common for walletUnlocks that don't expose id), the same key was reused across all items → console 'Encountered two children with the same key' warnings and a visible red error toast. Fixed to composite keys `unlock-${idx}-...` and `rep-${idx}-...`.",
+    "Menu testID derivation uses label-slug (e.g. 'Help & Support' → 'menu-help-&-support'). The '&' is an unusual character in a testID; works but may collide with CSS/selector escaping in some automation tooling. Consider sanitizing non-alphanum to '-'.",
+    "/app/frontend/app/(tabs)/profile.tsx: initial fetches `api.favoriteIds()` and `api.walletUnlocks()` have no auth-guard; if run before auth hydrates, they fail silently and the stat renders '—' briefly. Acceptable but could gate on `user` presence.",
+    "Agent Workspace, Provider Dashboard, and Admin Cockpit entries ignore `requires` for admin (no gating pill for admin-only). Fine for this demo account (admin), but consider adding `requires: 'admin'` metadata if non-admin users ever reach that row."
+  ],
+  "updated_files": ["/app/frontend/app/my-documents.tsx"],
+  "success_rate": {"backend": "n/a", "frontend": "100% of in-scope route wiring and new-screen rendering checks passed"},
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "When testing menu rows from Profile on web preview (390x844), the bottom tab bar overlays menu items near y=800+. Scroll the ScrollView with page.mouse.wheel BEFORE clicking (scrollIntoView on the DOM node does not scroll the RN ScrollView). Without scrolling, clicks on 'Earn Tokens' / 'Become an Agent' / later rows will pass through to the 'Market' tab button and navigate to /marketplace — this is a Playwright artifact, not a product bug.",
+  "rca_of_issue": "my-documents duplicate-key bug: walletUnlocks records lack a top-level `id` field (payload uses property+timestamp without explicit document id). The map callback keyed by `unlock-${u.id}` therefore produced `unlock-undefined` for every row, triggering React dup-key warnings and surfacing a visible red error toast. Fix: build composite key `unlock-${idx}-${u.id ?? u._id ?? p.id ?? 'x'}` and same pattern for representations. Verified: 3 → 0 dup-key errors after Expo restart."
+}

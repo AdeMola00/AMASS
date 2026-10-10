@@ -16,6 +16,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { api } from "@/src/lib/api";
+import { useAuth } from "@/src/contexts/auth";
+import { RoleGate } from "@/src/components/RoleGate";
 import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
 
 type Referral = {
@@ -42,6 +44,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function AgentWorkspace() {
   const router = useRouter();
+  const { user } = useAuth();
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -59,12 +62,16 @@ export default function AgentWorkspace() {
   }, []);
 
   useEffect(() => {
+    if (!user?.is_agent) {
+      setLoading(false);
+      return;
+    }
     (async () => {
       setLoading(true);
       await load();
       setLoading(false);
     })();
-  }, [load]);
+  }, [load, user?.is_agent]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -144,7 +151,20 @@ export default function AgentWorkspace() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
+      {!user?.is_agent ? (
+        <RoleGate
+          headerTitle="Agent Workspace"
+          title="For verified AMASS agents"
+          message="The Agent Workspace tracks your referrals, commissions and payouts. Become a verified agent to unlock it — it only takes a couple of minutes."
+          icon="briefcase"
+          bullets={["Track referral commissions", "Request payouts to wallet or bank", "Grow your verified reputation"]}
+          ctaLabel="Become an agent"
+          onCta={() => router.push("/become-agent")}
+          secondaryLabel="Maybe later"
+        />
+      ) : (
+        <>
+          <SafeAreaView edges={["top"]} style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={22} color="#fff" />
         </Pressable>
@@ -201,6 +221,8 @@ export default function AgentWorkspace() {
             ))
           )}
         </ScrollView>
+      )}
+        </>
       )}
     </View>
   );

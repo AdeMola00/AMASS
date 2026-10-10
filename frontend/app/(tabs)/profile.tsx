@@ -1,36 +1,39 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Platform } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useAuth } from "@/src/contexts/auth";
 import { useWallet } from "@/src/contexts/wallet";
+import { api } from "@/src/lib/api";
 import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
 import { AmassPinIcon } from "@/src/components/AmassLogo";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-const MENU: { icon: IconName; label: string; route?: string; caption?: string }[] = [
+// Ordered by user priority (see product spec). `requires` gates a row to a
+// role; the destination screen explains how to onboard when the role is missing.
+const MENU: { icon: IconName; label: string; route: string; caption?: string; requires?: "agent" }[] = [
   { icon: "wallet-outline", label: "Wallet", route: "/wallet", caption: "MASS · FIX · Transactions · Subscriptions" },
-  { icon: "gift-outline", label: "Earn Tokens", route: "/earn", caption: "Tasks · Referrals · Daily bonuses" },
   { icon: "lock-open-outline", label: "My Unlocks", route: "/unlocks", caption: "Properties you've unlocked" },
+  { icon: "heart-outline", label: "Saved Properties", route: "/saved-properties", caption: "Your favorites" },
   { icon: "bookmark-outline", label: "Saved Searches", route: "/saved-searches", caption: "Alerts when new listings match" },
-  { icon: "construct-outline", label: "Improve My Property", route: "/improve", caption: "Inspections · Financing · Renovation" },
-  { icon: "hammer-outline", label: "Provider Dashboard", route: "/provider-dashboard", caption: "FIXA jobs · FIX earnings · Boost" },
+  { icon: "gift-outline", label: "Earn Tokens", route: "/earn", caption: "Tasks · Referrals · Daily bonuses" },
   { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", caption: "Verified authority to market properties" },
-  { icon: "pricetags-outline", label: "Agent Plans", route: "/agent-plans", caption: "Starter · Pro · Agency · Founding pricing" },
-  { icon: "briefcase-outline", label: "Agent Workspace", route: "/agent-workspace", caption: "Referrals · Commissions · Payouts" },
   { icon: "add-circle-outline", label: "List a Property", route: "/submit-property", caption: "Publish a new listing" },
+  { icon: "briefcase-outline", label: "Agent Workspace", route: "/agent-workspace", caption: "Referrals · Commissions · Payouts", requires: "agent" },
+  { icon: "pricetags-outline", label: "Agent Plans", route: "/agent-plans", caption: "Starter · Pro · Agency · Founding pricing" },
+  { icon: "hammer-outline", label: "Provider Dashboard", route: "/provider-dashboard", caption: "FIXA jobs · FIX earnings · Boost" },
+  { icon: "construct-outline", label: "Improve My Property", route: "/improve", caption: "Inspections · Financing · Renovation" },
   { icon: "megaphone-outline", label: "My Ad Campaigns", route: "/ads", caption: "Analytics · AI coach · Pause/refund" },
-  { icon: "heart-outline", label: "Saved Properties", caption: "Your favorites" },
-  { icon: "document-text-outline", label: "My Documents", caption: "Contracts & titles" },
-  { icon: "shield-checkmark-outline", label: "Identity Verification", caption: "Enhance trust" },
+  { icon: "document-text-outline", label: "My Documents", route: "/my-documents", caption: "Contracts & titles" },
+  { icon: "shield-checkmark-outline", label: "Identity Verification", route: "/identity-verification", caption: "Enhance trust" },
   { icon: "notifications-outline", label: "Notifications", route: "/notifications" },
   { icon: "settings-outline", label: "Settings", route: "/settings" },
-  { icon: "help-circle-outline", label: "Help & Support" },
-  { icon: "information-circle-outline", label: "About AMASS" },
+  { icon: "help-circle-outline", label: "Help & Support", route: "/help" },
+  { icon: "information-circle-outline", label: "About AMASS", route: "/about" },
 ];
 
 export default function Profile() {
@@ -38,16 +41,30 @@ export default function Profile() {
   const { user, signOut } = useAuth();
   const { wallet } = useWallet();
 
+  const [saved, setSaved] = useState<number | null>(null);
+  const [unlocked, setUnlocked] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Use listFavorites so the Profile count matches what the Saved Properties
+    // screen actually shows (ignores any stale/archived favorite ids).
+    api.listFavorites().then((r) => setSaved(r.length)).catch(() => setSaved(0));
+    api.walletUnlocks().then((r) => setUnlocked((r as any[]).length)).catch(() => setUnlocked(0));
+  }, []);
+
+  const memberYear = user?.created_at ? new Date(user.created_at).getFullYear() : new Date().getFullYear();
+
   const initials = user?.full_name
-    ? user.full_name
-        .split(" ")
-        .map((s) => s[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase()
+    ? user.full_name.split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase()
     : "?";
 
   const doSignOut = () => {
+    if (Platform.OS === "web") {
+      // Alert.alert with buttons doesn't render on react-native-web.
+      if (typeof window !== "undefined" && window.confirm("Sign out? You'll need to sign in again to continue.")) {
+        signOut();
+      }
+      return;
+    }
     Alert.alert("Sign out?", "You'll need to sign in again to continue.", [
       { text: "Cancel", style: "cancel" },
       { text: "Sign out", style: "destructive", onPress: () => signOut() },
@@ -69,14 +86,17 @@ export default function Profile() {
             <Text style={styles.name}>{user?.full_name || "AMASS Member"}</Text>
             <Text style={styles.email}>{user?.email}</Text>
             <View style={styles.badgeRow}>
-              <View style={styles.tier}>
-                <Ionicons name="star" size={12} color={colors.gold} />
-                <Text style={styles.tierText}>Premium</Text>
-              </View>
-              <View style={styles.tierAlt}>
-                <AmassPinIcon size={10} />
-                <Text style={styles.tierAltText}>Verified</Text>
-              </View>
+              {user?.is_agent ? (
+                <View style={styles.tierAlt}>
+                  <AmassPinIcon size={10} />
+                  <Text style={styles.tierAltText}>Verified Agent</Text>
+                </View>
+              ) : (
+                <View style={styles.tier}>
+                  <Ionicons name="star" size={12} color={colors.gold} />
+                  <Text style={styles.tierText}>Member</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -99,9 +119,27 @@ export default function Profile() {
         </Pressable>
 
         <View style={styles.stats}>
-          <StatCard label="Saved" value="12" icon="heart" color={colors.red} />
-          <StatCard label="Viewed" value="47" icon="eye" color={colors.text} />
-          <StatCard label="Tours" value="3" icon="calendar" color={colors.gold} />
+          <Pressable style={[styles.statCard, shadows.soft]} onPress={() => router.push("/saved-properties")} testID="stat-saved">
+            <View style={[styles.statIcon, { backgroundColor: colors.red + "20" }]}>
+              <Ionicons name="heart" size={16} color={colors.red} />
+            </View>
+            <Text style={styles.statValue}>{saved ?? "—"}</Text>
+            <Text style={styles.statLabel}>Saved</Text>
+          </Pressable>
+          <Pressable style={[styles.statCard, shadows.soft]} onPress={() => router.push("/unlocks")} testID="stat-unlocked">
+            <View style={[styles.statIcon, { backgroundColor: colors.text + "15" }]}>
+              <Ionicons name="lock-open" size={16} color={colors.text} />
+            </View>
+            <Text style={styles.statValue}>{unlocked ?? "—"}</Text>
+            <Text style={styles.statLabel}>Unlocked</Text>
+          </Pressable>
+          <View style={[styles.statCard, shadows.soft]}>
+            <View style={[styles.statIcon, { backgroundColor: colors.gold + "20" }]}>
+              <Ionicons name="calendar" size={16} color={colors.gold} />
+            </View>
+            <Text style={styles.statValue}>{memberYear}</Text>
+            <Text style={styles.statLabel}>Member since</Text>
+          </View>
         </View>
 
         <View style={styles.menu}>
@@ -121,23 +159,32 @@ export default function Profile() {
               <Ionicons name="chevron-forward" size={18} color={colors.red} />
             </Pressable>
           )}
-          {MENU.map((m) => (
-            <Pressable
-              key={m.label}
-              style={styles.menuRow}
-              onPress={() => (m.route ? router.push(m.route as any) : null)}
-              testID={`menu-${m.label.toLowerCase().replace(/\s+/g, "-")}`}
-            >
-              <View style={styles.menuIcon}>
-                <Ionicons name={m.icon} size={20} color={colors.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.menuLabel}>{m.label}</Text>
-                {m.caption && <Text style={styles.menuCaption}>{m.caption}</Text>}
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </Pressable>
-          ))}
+          {MENU.map((m) => {
+            const locked = m.requires === "agent" && !user?.is_agent;
+            return (
+              <Pressable
+                key={m.label}
+                style={styles.menuRow}
+                onPress={() => router.push(m.route as any)}
+                testID={`menu-${m.label.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                <View style={styles.menuIcon}>
+                  <Ionicons name={m.icon} size={20} color={colors.text} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuLabel}>{m.label}</Text>
+                  {m.caption && <Text style={styles.menuCaption}>{m.caption}</Text>}
+                </View>
+                {locked && (
+                  <View style={styles.lockPill}>
+                    <Ionicons name="lock-closed" size={10} color={colors.textSecondary} />
+                    <Text style={styles.lockPillText}>Agents</Text>
+                  </View>
+                )}
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </Pressable>
+            );
+          })}
         </View>
 
         <Pressable style={styles.signOut} onPress={doSignOut} testID="sign-out-button">
@@ -146,28 +193,6 @@ export default function Profile() {
         </Pressable>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon,
-  color,
-}: {
-  label: string;
-  value: string;
-  icon: IconName;
-  color: string;
-}) {
-  return (
-    <View style={[styles.statCard, shadows.soft]}>
-      <View style={[styles.statIcon, { backgroundColor: color + "20" }]}>
-        <Ionicons name={icon} size={16} color={color} />
-      </View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
   );
 }
 
@@ -188,11 +213,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarInitials: {
-    color: "#fff",
-    fontSize: 32,
-    fontWeight: "800",
-  },
+  avatarInitials: { color: "#fff", fontSize: 32, fontWeight: "800" },
   name: { ...typography.h2 },
   email: { ...typography.caption, color: colors.textTertiary },
   badgeRow: { flexDirection: "row", gap: 8, marginTop: 6 },
@@ -253,13 +274,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.red,
   },
   walletCtaText: { color: "#fff", fontSize: 12, fontWeight: "800" },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    padding: spacing.lg,
-    borderRadius: radius.md,
-    gap: 6,
-  },
+  statCard: { flex: 1, backgroundColor: "#fff", padding: spacing.lg, borderRadius: radius.md, gap: 6 },
   statIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   statValue: { fontSize: 22, fontWeight: "800", color: colors.text },
   statLabel: { fontSize: 12, color: colors.textTertiary, fontWeight: "600" },
@@ -288,6 +303,16 @@ const styles = StyleSheet.create({
   },
   menuLabel: { ...typography.body, fontWeight: "600" },
   menuCaption: { ...typography.caption, color: colors.textTertiary, marginTop: 2 },
+  lockPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  lockPillText: { fontSize: 10, fontWeight: "700", color: colors.textSecondary },
   signOut: {
     flexDirection: "row",
     alignItems: "center",

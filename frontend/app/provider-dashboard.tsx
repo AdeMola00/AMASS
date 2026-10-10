@@ -207,7 +207,15 @@ export default function ProviderDashboard() {
             {bookings.length === 0 ? (
               <View style={styles.emptyBlock}>
                 <Ionicons name="calendar-outline" size={30} color={colors.textMuted} />
-                <Text style={styles.emptyBody}>No bookings yet. Share your profile to get discovered.</Text>
+                <Text style={styles.emptyBody}>No bookings yet. Join FIXA and share your profile to get discovered.</Text>
+                <Pressable
+                  onPress={() => router.push("/marketplace/sell")}
+                  style={styles.joinFixaBtn}
+                  testID="join-fixa-btn"
+                >
+                  <Ionicons name="construct" size={14} color="#fff" />
+                  <Text style={styles.joinFixaText}>Join FIXA as a provider</Text>
+                </Pressable>
               </View>
             ) : (
               bookings.map((b) => (
@@ -446,6 +454,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, backgroundColor: colors.surfaceSecondary,
   },
   emptyBody: { fontSize: 12, color: colors.textSecondary, textAlign: "center" },
+  joinFixaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 16,
+    height: 42,
+    borderRadius: radius.pill,
+    backgroundColor: FIX_COLOR,
+  },
+  joinFixaText: { color: "#fff", fontSize: 12, fontWeight: "800" },
 
   book: {
     padding: 14, borderRadius: radius.md,
