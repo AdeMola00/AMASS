@@ -1,12 +1,13 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, spacing } from "@/src/constants/theme";
+import { radius } from "@/src/constants/theme";
 import { PriceText } from "@/src/components/PriceText";
 import { HotFlame } from "@/src/components/HotFlame";
 import { TokenIcon } from "@/src/components/TokenIcon";
 import type { Property } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 /**
  * Compact horizontal card used in the collapsed peek state of the map bottom
@@ -23,6 +24,9 @@ export function MiniPropertyCard({
   onFavorite?: () => void;
   favorited?: boolean;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const img = property.images?.[0];
   const isHot = (property.views_recent ?? 0) >= 5 || (property.favorites_recent ?? 0) >= 3;
   const isExclusive = !!property.is_amass_exclusive;
@@ -121,10 +125,11 @@ export function MiniPropertyCard({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   card: {
     flexDirection: "row",
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,

@@ -5,25 +5,16 @@
  * GOOGLE_PLACES_ENABLED flag is on (backend enforces).
  */
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, EmptyState, Input, ProgressBar, Screen, ScreenHeader, SegmentedControl, Skeleton, useToast } from "@/src/ui";
 
 type Place = {
   id: string;
@@ -44,18 +35,21 @@ type Status = {
   pricing: Record<string, any>;
 };
 
-const _unused = null;
-
 export default function AdminDiscoveryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const { user } = useAuth();
   const [status, setStatus] = useState<Status | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [query, setQuery] = useState("lekki estate");
   const [nearbyOn, setNearbyOn] = useState(false);
   const [lat, setLat] = useState("6.4400");
   const [lng, setLng] = useState("3.4750");
   const [radius, setRadius] = useState("2000");
   const [results, setResults] = useState<Place[]>([]);
+  const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingReview, setPendingReview] = useState<Awaited<ReturnType<typeof api.adminListCandidates>>["items"]>([]);
@@ -65,11 +59,12 @@ export default function AdminDiscoveryScreen() {
       const r = await (api as any).adminDiscoveryStatus?.() ?? _discoveryStatus();
       setStatus(r);
     } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Try again");
+      toast.error("Couldn't load discovery status", e?.message ?? "Try again");
     } finally {
       setRefreshing(false);
+      setStatusLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   const loadPendingReview = useCallback(async () => {
     try {
@@ -83,7 +78,7 @@ export default function AdminDiscoveryScreen() {
         (c: any) => !c.promoted_to_amass_property_id
       );
       setPendingReview(merged);
-    } catch (e) {
+    } catch {
       // silent — the discovery screen still works if this fails
     }
   }, []);
@@ -101,9 +96,10 @@ export default function AdminDiscoveryScreen() {
         ? await _nearbySearch({ lat: parseFloat(lat), lng: parseFloat(lng), radius_m: parseInt(radius, 10) || 2000, max_results: 20 })
         : await _textSearch({ query, max_results: 20 });
       setResults((r.places ?? []) as Place[]);
+      setSearched(true);
       loadStatus();
     } catch (e: any) {
-      Alert.alert("Search failed", e?.message ?? "Try again");
+      toast.error("Search failed", e?.message ?? "Try again");
     } finally {
       setBusy(false);
     }
@@ -111,181 +107,169 @@ export default function AdminDiscoveryScreen() {
 
   if (!user?.is_admin) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <Header title="Discovery" onBack={() => router.back()} />
-        <View style={styles.blocked}>
-          <Ionicons name="lock-closed" size={40} color={colors.red} />
-          <Text style={styles.blockedText}>Admins only</Text>
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Discovery" />
+        <EmptyState icon="lock-closed-outline" title="Admins only" body="You need an admin account to run property discovery." actionLabel="Go back" onAction={() => router.back()} />
+      </Screen>
     );
   }
 
+  const isMock = status?.client_mode === "mock";
+
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="admin-discovery">
-      <Header title="Property Discovery" onBack={() => router.back()} />
+    <Screen testID="admin-discovery">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="Property discovery" subtitle="Google Places → AMASS candidates" />
       <ScrollView
-        contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg, paddingBottom: 60 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadStatus(); loadPendingReview(); }} tintColor={colors.red} />}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: 60 + insets.bottom }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadStatus(); loadPendingReview(); }} tintColor={colors.text} />}
       >
         {/* Pending duplicate review — Phase D-4 */}
         {pendingReview.length > 0 && (
-          <View style={[styles.section, { borderColor: colors.gold, borderWidth: 1.5 }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <Text style={styles.sectionTitle}>Pending duplicate review</Text>
-              <View style={[styles.modeChip, { backgroundColor: colors.gold }]}>
-                <Text style={styles.modeChipText}>{pendingReview.length}</Text>
-              </View>
+          <Card elevation="xs" style={{ gap: 10, borderColor: colors.warning, borderWidth: 1 }}>
+            <View style={styles.rowBetween}>
+              <AppText variant="h3">Pending duplicate review</AppText>
+              <Badge label={String(pendingReview.length)} tone="warning" size="md" />
             </View>
-            <Text style={styles.mockHint}>Candidates awaiting admin decision (merge / mark related / keep separate).</Text>
-            {pendingReview.slice(0, 10).map((c: any) => (
-              <Pressable
-                key={c.id}
-                style={styles.pendingRow}
-                onPress={() => router.push(`/admin/duplicate-review/${c.id}` as any)}
-                testID={`pending-${c.id}`}
-              >
-                <View style={styles.pendingIcon}>
-                  <Ionicons name="flask" size={14} color={colors.gold} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.resultName} numberOfLines={1}>{c.name ?? "(no name)"}</Text>
-                  <Text style={styles.resultAddr} numberOfLines={1}>{c.address ?? "—"}</Text>
-                  <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
-                    <View style={[styles.typePill, { backgroundColor: c.status === "DUPLICATE" ? "#FDECEC" : "#FFF6DA" }]}>
-                      <Text style={[styles.typePillText, { color: c.status === "DUPLICATE" ? colors.red : "#A6791C" }]}>{c.status}</Text>
-                    </View>
-                    <View style={styles.typePill}>
-                      <Text style={styles.typePillText}>SCORE {c.duplicate_score ?? 0}</Text>
-                    </View>
-                    <View style={styles.typePill}>
-                      <Text style={styles.typePillText}>{(c.duplicate_matches ?? []).length} match{(c.duplicate_matches ?? []).length === 1 ? "" : "es"}</Text>
+            <AppText variant="caption" tone="tertiary">Candidates awaiting an admin decision — merge, mark related, or keep separate.</AppText>
+            <View>
+              {pendingReview.slice(0, 10).map((c: any, i: number) => (
+                <Pressable
+                  key={c.id}
+                  style={({ pressed }) => [styles.pendingRow, { borderBottomColor: colors.divider }, i === Math.min(pendingReview.length, 10) - 1 && { borderBottomWidth: 0 }, pressed && { opacity: 0.8 }]}
+                  onPress={() => router.push(`/admin/duplicate-review/${c.id}` as any)}
+                  accessibilityRole="button"
+                  testID={`pending-${c.id}`}
+                >
+                  <View style={[styles.roundIcon, { backgroundColor: colors.warningSoft }]}>
+                    <Ionicons name="flask" size={14} color={colors.warning} />
+                  </View>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <AppText variant="bodyMedium" numberOfLines={1}>{c.name ?? "(no name)"}</AppText>
+                    <AppText variant="caption" tone="tertiary" numberOfLines={1}>{c.address ?? "—"}</AppText>
+                    <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                      <Badge label={c.status === "DUPLICATE" ? "Duplicate" : "Possible duplicate"} tone={c.status === "DUPLICATE" ? "error" : "warning"} size="xs" />
+                      <Badge label={`Score ${c.duplicate_score ?? 0}`} tone="neutral" size="xs" />
+                      <Badge label={`${(c.duplicate_matches ?? []).length} match${(c.duplicate_matches ?? []).length === 1 ? "" : "es"}`} tone="neutral" size="xs" />
                     </View>
                   </View>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-              </Pressable>
-            ))}
-          </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </Pressable>
+              ))}
+            </View>
+          </Card>
         )}
 
         {/* Mode + cost meter */}
-        {status && (
-          <View style={[styles.statusCard, shadows.soft, status.client_mode === "mock" && { borderColor: colors.gold, borderWidth: 1.5 }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <View style={[styles.modeChip, { backgroundColor: status.client_mode === "real" ? colors.emerald : colors.gold }]}>
-                <Ionicons name={status.client_mode === "real" ? "cloud" : "flask"} size={12} color="#fff" />
-                <Text style={styles.modeChipText}>{status.client_mode === "real" ? "LIVE GOOGLE" : "MOCK MODE"}</Text>
+        {statusLoading ? (
+          <Skeleton height={140} radius={radii.lg} />
+        ) : status ? (
+          <Card elevation="xs" style={{ gap: 12, borderColor: isMock ? colors.warning : colors.border, borderWidth: isMock ? 1 : StyleSheet.hairlineWidth }}>
+            <View style={styles.rowBetween}>
+              <Badge label={isMock ? "Mock mode" : "Live Google"} tone={isMock ? "warning" : "success"} icon={isMock ? "flask" : "cloud-done"} size="md" />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name={status.google_key_present ? "key" : "key-outline"} size={14} color={status.google_key_present ? colors.success : colors.textMuted} />
+                <AppText variant="caption" tone="tertiary">{status.google_key_present ? "Server key present" : "No server key"}</AppText>
               </View>
-              <Text style={styles.subInfo}>Key: {status.google_key_present ? "✓" : "—"}</Text>
             </View>
-            {status.client_mode === "mock" && (
-              <Text style={styles.mockHint}>Add GOOGLE_MAPS_SERVER_KEY in deployment secrets and toggle GOOGLE_PLACES_ENABLED to enable live search.</Text>
+            {isMock && (
+              <View style={[styles.notice, { backgroundColor: colors.warningSoft }]}>
+                <Ionicons name="information-circle" size={16} color={colors.warning} />
+                <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
+                  Add GOOGLE_MAPS_SERVER_KEY in deployment secrets and switch on GOOGLE_PLACES_ENABLED to enable live search.
+                </AppText>
+              </View>
             )}
             <View style={styles.meterRow}>
               <Meter label="Today" spent={status.daily_spent_usd ?? 0} cap={status.limits?.daily_cap_usd ?? 0} />
-              <Meter label="This Month" spent={status.monthly_spent_usd ?? 0} cap={status.limits?.monthly_cap_usd ?? 0} />
+              <Meter label="This month" spent={status.monthly_spent_usd ?? 0} cap={status.limits?.monthly_cap_usd ?? 0} />
             </View>
-          </View>
-        )}
+          </Card>
+        ) : null}
 
         {/* Search form */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>New search</Text>
-          <View style={styles.toggleRow}>
-            <Text style={styles.toggleLbl}>{nearbyOn ? "Nearby Search" : "Text Search"}</Text>
-            <Switch value={nearbyOn} onValueChange={setNearbyOn} trackColor={{ true: colors.emerald, false: colors.divider }} />
-          </View>
+        <Card elevation="xs" style={{ gap: 14 }}>
+          <AppText variant="h3">New search</AppText>
+          <SegmentedControl
+            options={[
+              { value: "text", label: "Text search", icon: "text-outline" },
+              { value: "nearby", label: "Nearby search", icon: "navigate-outline" },
+            ]}
+            value={nearbyOn ? "nearby" : "text"}
+            onChange={(k) => setNearbyOn(k === "nearby")}
+            testIDPrefix="discovery-mode"
+          />
           {!nearbyOn ? (
-            <>
-              <Text style={styles.fieldLbl}>Query</Text>
-              <TextInput
-                style={styles.input}
-                value={query}
-                onChangeText={setQuery}
-                placeholder="e.g. luxury apartments Lekki"
-                placeholderTextColor={colors.textMuted}
-                testID="discovery-query"
-              />
-            </>
+            <Input
+              label="Query"
+              value={query}
+              onChangeText={setQuery}
+              placeholder="e.g. luxury apartments Lekki"
+              iconLeft="search-outline"
+              returnKeyType="search"
+              onSubmitEditing={runSearch}
+              testID="discovery-query"
+            />
           ) : (
             <>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLbl}>Latitude</Text>
-                  <TextInput style={styles.input} value={lat} onChangeText={setLat} keyboardType="numeric" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLbl}>Longitude</Text>
-                  <TextInput style={styles.input} value={lng} onChangeText={setLng} keyboardType="numeric" />
-                </View>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Input label="Latitude" value={lat} onChangeText={setLat} keyboardType="numeric" containerStyle={{ flex: 1 }} testID="discovery-lat" />
+                <Input label="Longitude" value={lng} onChangeText={setLng} keyboardType="numeric" containerStyle={{ flex: 1 }} testID="discovery-lng" />
               </View>
-              <Text style={styles.fieldLbl}>Radius (m)</Text>
-              <TextInput style={styles.input} value={radius} onChangeText={setRadius} keyboardType="numeric" />
+              <Input label="Radius (metres)" value={radius} onChangeText={setRadius} keyboardType="numeric" iconLeft="radio-outline" testID="discovery-radius" />
             </>
           )}
-          <Pressable style={styles.runBtn} onPress={runSearch} disabled={busy} testID="run-search">
-            {busy ? <ActivityIndicator color="#fff" /> : (
-              <><Ionicons name="search" size={16} color="#fff" /><Text style={styles.runBtnText}>Discover</Text></>
-            )}
-          </Pressable>
-        </View>
+          <Button label="Discover" iconLeft="search" size="lg" fullWidth loading={busy} onPress={runSearch} testID="run-search" />
+        </Card>
 
         {/* Results */}
+        {searched && results.length === 0 && !busy ? (
+          <EmptyState compact icon="location-outline" title="No places found" body="Try a broader query or a larger radius." />
+        ) : null}
         {results.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{results.length} candidates</Text>
-            <Text style={styles.mockHint}>Duplicate detection + AMASS lead creation ships in D-3.</Text>
-            {results.map((p) => (
-              <View key={p.id} style={styles.resultRow}>
-                <View style={styles.resultIcon}>
-                  <Ionicons name="location" size={16} color={colors.red} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.resultName}>{p.displayName?.text ?? "—"}</Text>
-                  <Text style={styles.resultAddr} numberOfLines={2}>{p.formattedAddress ?? "—"}</Text>
-                  <View style={styles.typesRow}>
-                    {(p.types ?? []).slice(0, 3).map((t) => (
-                      <View key={t} style={styles.typePill}>
-                        <Text style={styles.typePillText}>{t}</Text>
-                      </View>
-                    ))}
+          <Card elevation="xs" style={{ gap: 10 }}>
+            <View style={styles.rowBetween}>
+              <AppText variant="h3">{results.length} candidates</AppText>
+              <Badge label={nearbyOn ? "Nearby" : "Text"} tone="neutral" />
+            </View>
+            <View>
+              {results.map((p, i) => (
+                <View key={p.id} style={[styles.resultRow, { borderBottomColor: colors.divider }, i === results.length - 1 && { borderBottomWidth: 0 }]}>
+                  <View style={[styles.roundIcon, { backgroundColor: colors.brandSoft }]}>
+                    <Ionicons name="location" size={15} color={colors.brand} />
                   </View>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <AppText variant="bodyMedium" numberOfLines={1}>{p.displayName?.text ?? "—"}</AppText>
+                    <AppText variant="caption" tone="secondary" numberOfLines={2}>{p.formattedAddress ?? "—"}</AppText>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2 }}>
+                      {(p.types ?? []).slice(0, 3).map((t) => (
+                        <Badge key={t} label={t.replace(/_/g, " ")} tone="neutral" size="xs" />
+                      ))}
+                    </View>
+                  </View>
+                  <AppText variant="micro" tone="muted" style={styles.mono}>{p.id.slice(0, 10)}</AppText>
                 </View>
-                <Text style={styles.placeIdMono}>{p.id.slice(0, 12)}</Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          </Card>
         )}
       </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>{title}</Text>
-      <View style={styles.iconBtn} />
-    </View>
+    </Screen>
   );
 }
 
 function Meter({ label, spent, cap }: { label: string; spent: number; cap: number }) {
-  const pct = Math.min(100, Math.round((spent / Math.max(0.01, cap)) * 100));
-  const color = pct >= 90 ? colors.red : pct >= 70 ? colors.gold : colors.emerald;
+  const pct = Math.min(1, spent / Math.max(0.01, cap));
+  const tone = pct >= 0.9 ? "brand" : pct >= 0.7 ? "warning" : "success";
   return (
-    <View style={{ flex: 1, gap: 4 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={styles.meterLabel}>{label}</Text>
-        <Text style={styles.meterVal}>${spent.toFixed(2)} / ${cap.toFixed(2)}</Text>
+    <View style={{ flex: 1, gap: 6 }}>
+      <View style={styles.rowBetween}>
+        <AppText variant="label" tone="tertiary" uppercase>{label}</AppText>
+        <AppText variant="caption" weight="bold" tabular>${spent.toFixed(2)} <AppText variant="caption" tone="tertiary" tabular>/ ${cap.toFixed(2)}</AppText></AppText>
       </View>
-      <View style={styles.meterTrack}>
-        <View style={[styles.meterFill, { width: `${pct}%`, backgroundColor: color }]} />
-      </View>
+      <ProgressBar value={pct} tone={tone} />
     </View>
   );
 }
@@ -320,48 +304,11 @@ async function _nearbySearch(body: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-  statusCard: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: "#fff", gap: 10 },
-  modeChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, alignSelf: "flex-start" },
-  modeChipText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
-  subInfo: { fontSize: 11, color: colors.textTertiary, fontWeight: "700" },
-  mockHint: { fontSize: 11, color: colors.textTertiary, fontStyle: "italic" },
-  meterRow: { flexDirection: "row", gap: 12, marginTop: 4 },
-  meterLabel: { fontSize: 10, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.4 },
-  meterVal: { fontSize: 11, fontWeight: "700", color: colors.text },
-  meterTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surfaceSecondary, overflow: "hidden" },
-  meterFill: { height: "100%", borderRadius: 3 },
-  section: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: "#fff", gap: 8, ...shadows.soft },
-  sectionTitle: { ...typography.h2, fontSize: 15 },
-  toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
-  toggleLbl: { fontSize: 12, fontWeight: "800", color: colors.text, letterSpacing: 0.3 },
-  fieldLbl: { fontSize: 10, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.4, marginTop: 6 },
-  input: { minHeight: 44, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary, paddingHorizontal: 14, fontSize: 13, fontWeight: "600", color: colors.text },
-  runBtn: { height: 46, borderRadius: radius.pill, backgroundColor: colors.ink, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 },
-  runBtnText: { color: "#fff", fontSize: 13, fontWeight: "800" },
-  resultRow: { flexDirection: "row", gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider, alignItems: "flex-start" },
-  resultIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.redSurface, alignItems: "center", justifyContent: "center" },
-  resultName: { fontSize: 13, fontWeight: "800", color: colors.text },
-  resultAddr: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
-  typesRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 },
-  typePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: colors.surfaceSecondary },
-  typePillText: { fontSize: 9, color: colors.textSecondary, fontWeight: "700" },
-  placeIdMono: { fontSize: 9, color: colors.textTertiary, fontFamily: "monospace" as any },
-  pendingRow: {
-    flexDirection: "row",
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-    alignItems: "center",
-  },
-  pendingIcon: {
-    width: 30, height: 30, borderRadius: 15, backgroundColor: "#FFF6DA",
-    alignItems: "center", justifyContent: "center",
-  },
-  blocked: { padding: spacing.xl, alignItems: "center", gap: 10, marginTop: 40 },
-  blockedText: { fontSize: 14, color: colors.text, fontWeight: "700" },
+  rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  notice: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm },
+  meterRow: { flexDirection: "row", gap: 16 },
+  pendingRow: { flexDirection: "row", gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, alignItems: "center" },
+  resultRow: { flexDirection: "row", gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, alignItems: "flex-start" },
+  roundIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  mono: { fontFamily: "monospace" as any, letterSpacing: 0 },
 });

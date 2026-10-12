@@ -1,24 +1,19 @@
-import React, {
-  forwardRef,
-  useCallback,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../ui/icons";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
-import { colors, radius, spacing } from "@/src/constants/theme";
+import { radius, spacing } from "@/src/constants/theme";
 import { LegendDot, PROPERTY_TYPE_LEGEND } from "@/src/components/PropertyMarker";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export type MapLayer = "standard" | "satellite" | "hybrid" | "terrain";
 
 const LAYERS: {
   key: MapLayer;
   label: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   hint: string;
 }[] = [
   { key: "standard", label: "Standard", icon: "map-outline", hint: "AMASS minimal style" },
@@ -39,6 +34,9 @@ export const LayerPickerSheet = forwardRef<
     onLayerChange: (l: MapLayer) => void;
   }
 >(({ layer, onLayerChange }, ref) => {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const sheetRef = useRef<BottomSheetModal>(null);
   const [selected, setSelected] = useState<MapLayer>(layer);
 
@@ -132,8 +130,9 @@ export const LayerPickerSheet = forwardRef<
 
 LayerPickerSheet.displayName = "LayerPickerSheet";
 
-const styles = StyleSheet.create({
-  sheetBg: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+  sheetBg: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   handle: { backgroundColor: colors.borderStrong, width: 44, height: 5 },
   wrap: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: 4 },
   title: { fontSize: 20, fontWeight: "800", color: colors.text, letterSpacing: -0.3, marginBottom: 14 },

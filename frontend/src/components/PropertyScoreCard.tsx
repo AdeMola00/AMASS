@@ -4,16 +4,7 @@
  * the shareable score gauge on top of an AI value range.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  Share,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, Share, StyleSheet, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Sharing from "expo-sharing";
@@ -21,7 +12,11 @@ import * as Haptics from "expo-haptics";
 import { captureRef } from "react-native-view-shot";
 
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Skeleton, useToast } from "@/src/ui";
+import type { IconName } from "@/src/ui";
 import {
   ShareableScoreCard,
   SHARE_CARD_HEIGHT,
@@ -33,11 +28,11 @@ type Tier = "SUPER" | "VERIFIED" | "UNSTABLE" | "UNVERIFIED";
 type ScoreResp = Awaited<ReturnType<typeof api.getPropertyScore>>;
 type ValueResp = Awaited<ReturnType<typeof api.getPropertyValuation>>;
 
-const TIER_META: Record<Tier, { color: string; label: string; icon: any }> = {
-  SUPER:      { color: "#059669", label: "Super Verified", icon: "shield-checkmark" },
-  VERIFIED:   { color: "#10b981", label: "Verified",       icon: "shield-checkmark-outline" },
-  UNSTABLE:   { color: "#F59E0B", label: "Needs Refresh",  icon: "hourglass" },
-  UNVERIFIED: { color: "#9CA3AF", label: "Unverified",     icon: "shield-outline" },
+const TIER_META: Record<Tier, { tone: "success" | "warning" | "neutral"; label: string; icon: IconName }> = {
+  SUPER:      { tone: "success", label: "Super Verified", icon: "shield-checkmark" },
+  VERIFIED:   { tone: "success", label: "Verified",       icon: "shield-checkmark-outline" },
+  UNSTABLE:   { tone: "warning", label: "Needs Refresh",  icon: "hourglass" },
+  UNVERIFIED: { tone: "neutral", label: "Unverified",     icon: "shield-outline" },
 };
 
 export function PropertyScoreCard({
@@ -52,6 +47,8 @@ export function PropertyScoreCard({
   addressLine?: string | null;
   cover?: string | null;
 }) {
+  const { colors, shadows } = useTheme();
+  const toast = useToast();
   const [score, setScore] = useState<ScoreResp | null>(null);
   const [value, setValue] = useState<ValueResp | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,46 +102,63 @@ export function PropertyScoreCard({
         }).catch(() => {});
       }
     } catch (e: any) {
-      Alert.alert("Share failed", e?.message ?? "Try again");
+      toast.error("Share failed", e?.message ?? "Try again");
     } finally {
       setSharing(false);
     }
-  }, [amassId, score]);
+  }, [amassId, score, toast]);
 
   if (loading) {
     return (
-      <View style={[styles.card, shadows.soft, { alignItems: "center", padding: 20 }]}>
-        <ActivityIndicator color={colors.red} />
+      <View style={[styles.card, shadows.sm, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="score-card-loading">
+        <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+          <Skeleton width={110} height={110} radius={55} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <Skeleton height={10} width="40%" />
+            <Skeleton height={24} width="70%" />
+            <Skeleton height={10} width="90%" />
+          </View>
+        </View>
       </View>
     );
   }
 
   if (!score) return null;
   const tier = TIER_META[score.tier] ?? TIER_META.UNVERIFIED;
+  const tierColor = tier.tone === "success" ? colors.success : tier.tone === "warning" ? colors.warning : colors.textTertiary;
   const pct = Math.max(0, Math.min(100, score.score));
+  const confColor = value && value.confidence >= 70 ? colors.success : value && value.confidence >= 40 ? colors.mass : colors.error;
 
   return (
-    <View style={[styles.card, shadows.soft]} testID="score-card-root">
+    <View style={[styles.card, shadows.sm, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="score-card-root">
       <View style={styles.headerRow}>
-        <View style={[styles.tierPill, { backgroundColor: tier.color }]} testID="tier-pill">
+        <View style={[styles.tierPill, { backgroundColor: tierColor }]} testID="tier-pill" accessibilityLabel={`Verification tier: ${tier.label}`}>
           <Ionicons name={tier.icon} size={12} color="#fff" />
-          <Text style={styles.tierPillText}>{tier.label.toUpperCase()}</Text>
+          <AppText variant="micro" color="#fff" uppercase>
+            {tier.label}
+          </AppText>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           <Pressable
             onPress={onShare}
             hitSlop={10}
-            style={styles.shareBtn}
+            style={[styles.shareBtn, { backgroundColor: colors.surfaceAlt }]}
             disabled={sharing}
             testID="btn-share-score"
+            accessibilityRole="button"
+            accessibilityLabel="Share score card"
           >
-            {sharing ? (
-              <ActivityIndicator size="small" color={colors.text} />
-            ) : (
-              <Ionicons name="share-social" size={16} color={colors.text} />
-            )}
+            {sharing ? <ActivityIndicator size="small" color={colors.text} /> : <Ionicons name="share-social" size={16} color={colors.text} />}
           </Pressable>
-          <Pressable onPress={() => setExpanded((x) => !x)} hitSlop={10} testID="expand-chevron">
+          <Pressable
+            onPress={() => setExpanded((x) => !x)}
+            hitSlop={10}
+            testID="expand-chevron"
+            style={styles.shareBtn}
+            accessibilityRole="button"
+            accessibilityLabel={expanded ? "Hide score breakdown" : "Show score breakdown"}
+            accessibilityState={{ expanded }}
+          >
             <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={colors.textSecondary} />
           </Pressable>
         </View>
@@ -152,14 +166,14 @@ export function PropertyScoreCard({
 
       <View style={styles.gaugeRow}>
         {/* Radial score gauge */}
-        <View style={styles.gaugeWrap}>
+        <View style={styles.gaugeWrap} accessibilityLabel={`Verification score ${pct} out of 100`}>
           <Svg width={110} height={110} viewBox="0 0 110 110">
-            <Circle cx={55} cy={55} r={45} stroke={colors.surfaceSecondary} strokeWidth={10} fill="none" />
+            <Circle cx={55} cy={55} r={45} stroke={colors.surfaceSunken} strokeWidth={10} fill="none" />
             <Circle
               cx={55}
               cy={55}
               r={45}
-              stroke={tier.color}
+              stroke={tierColor}
               strokeWidth={10}
               fill="none"
               strokeLinecap="round"
@@ -168,72 +182,77 @@ export function PropertyScoreCard({
             />
           </Svg>
           <View style={styles.gaugeCenter}>
-            <Text style={styles.gaugeNum} testID="score-gauge-num">{pct}</Text>
-            <Text style={styles.gaugeSub}>/ 100</Text>
+            <AppText variant="h1" tabular testID="score-gauge-num">
+              {pct}
+            </AppText>
+            <AppText variant="micro" tone="tertiary" style={{ marginTop: -2 }}>
+              / 100
+            </AppText>
           </View>
         </View>
 
         {/* AI Value strip */}
         <View style={{ flex: 1 }}>
-          <Text style={styles.strapline}>AI Value Estimate</Text>
+          <AppText variant="label" tone="secondary" uppercase>
+            AI Value Estimate
+          </AppText>
           {value && value.value > 0 ? (
             <>
-              <Text style={styles.priceBig} numberOfLines={1} testID="ai-value-amount">
+              <AppText variant="h2" tabular numberOfLines={1} style={{ marginTop: 4 }} testID="ai-value-amount">
                 {formatNaira(value.value)}
-              </Text>
-              <Text style={styles.priceRange} numberOfLines={1}>
+              </AppText>
+              <AppText variant="caption" tone="secondary" numberOfLines={1} tabular style={{ marginTop: 2 }}>
                 Range: {formatNaira(value.range_low)} — {formatNaira(value.range_high)}
-              </Text>
+              </AppText>
               <View style={styles.confidenceRow}>
-                <View style={styles.confidenceBar}>
-                  <View
-                    style={[
-                      styles.confidenceFill,
-                      {
-                        width: `${value.confidence}%`,
-                        backgroundColor:
-                          value.confidence >= 70
-                            ? colors.emerald
-                            : value.confidence >= 40
-                            ? colors.gold
-                            : colors.red,
-                      },
-                    ]}
-                  />
+                <View style={[styles.confidenceBar, { backgroundColor: colors.surfaceSunken }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: value.confidence }}>
+                  <View style={[styles.confidenceFill, { width: `${value.confidence}%`, backgroundColor: confColor }]} />
                 </View>
-                <Text style={styles.confidenceText}>{value.confidence}% conf.</Text>
+                <AppText variant="micro" tone="secondary" tabular>
+                  {value.confidence}% conf.
+                </AppText>
               </View>
             </>
           ) : (
-            <Text style={styles.pending} testID="ai-value-fallback">Not enough comparables yet — add photos and listings to unlock AI value.</Text>
+            <AppText variant="caption" tone="tertiary" style={{ marginTop: 4, fontStyle: "italic" }} testID="ai-value-fallback">
+              Not enough comparables yet — add photos and listings to unlock AI value.
+            </AppText>
           )}
         </View>
       </View>
 
       {/* Narrative (LLM-generated) */}
       {value?.narrative ? (
-        <View style={styles.narrativeBox}>
-          <Ionicons name="sparkles" size={12} color={colors.gold} />
-          <Text style={styles.narrativeText}>{value.narrative}</Text>
+        <View style={[styles.narrativeBox, { backgroundColor: colors.massSoft }]}>
+          <Ionicons name="sparkles" size={12} color={colors.massText} />
+          <AppText variant="caption" style={{ flex: 1 }}>
+            {value.narrative}
+          </AppText>
         </View>
       ) : null}
 
       {/* Expanded breakdown */}
       {expanded && score.breakdown && (
-        <View style={styles.breakdownBox}>
-          <Text style={styles.breakdownTitle}>Score breakdown</Text>
+        <View style={[styles.breakdownBox, { borderTopColor: colors.divider }]}>
+          <AppText variant="label" tone="secondary" uppercase>
+            Score breakdown
+          </AppText>
           {Object.entries(score.breakdown).map(([k, v]) => (
             <View key={k} style={styles.breakdownRow} testID={`breakdown-${k}`}>
-              <Text style={styles.breakdownLbl}>{k.replace(/_/g, " ")}</Text>
-              <Text style={styles.breakdownVal}>+{v}</Text>
+              <AppText variant="caption" style={{ textTransform: "capitalize" }}>
+                {k.replace(/_/g, " ")}
+              </AppText>
+              <AppText variant="caption" weight="bold" tone="success" tabular>
+                +{v}
+              </AppText>
             </View>
           ))}
           {value && (
-            <View style={styles.footnoteBox}>
-              <Text style={styles.footnote}>
+            <View style={[styles.footnoteBox, { backgroundColor: colors.surfaceAlt }]}>
+              <AppText variant="micro" tone="tertiary">
                 Valuation method: {value.method.replace(/_/g, " ")} · {value.comparables_count} comparable
                 {value.comparables_count === 1 ? "" : "s"} · ±{value.dispersion_pct}% dispersion
-              </Text>
+              </AppText>
             </View>
           )}
         </View>
@@ -241,10 +260,7 @@ export function PropertyScoreCard({
 
       {/* Offscreen shareable card — captured on demand. Zero opacity keeps it
           in the layout tree without visually stealing space. */}
-      <View
-        collapsable={false}
-        style={styles.offscreenWrap}
-      >
+      <View collapsable={false} style={styles.offscreenWrap}>
         <ShareableScoreCard
           ref={shareRef}
           amassId={amassId}
@@ -265,12 +281,12 @@ export function PropertyScoreCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
-    borderRadius: radius.lg,
+    borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: 14,
     gap: 12,
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.lg,
+    marginHorizontal: space[5],
+    marginTop: space[4],
   },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   tierPill: {
@@ -279,74 +295,18 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: radius.pill,
+    borderRadius: radii.pill,
   },
-  tierPillText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
   gaugeRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   gaugeWrap: { width: 110, height: 110, alignItems: "center", justifyContent: "center" },
-  gaugeCenter: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  gaugeNum: { fontSize: 26, fontWeight: "900", color: colors.text, letterSpacing: -0.6 },
-  gaugeSub: { fontSize: 10, fontWeight: "700", color: colors.textTertiary, marginTop: -2 },
-  strapline: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  priceBig: { fontSize: 22, fontWeight: "900", color: colors.text, marginTop: 4, letterSpacing: -0.5 },
-  priceRange: { fontSize: 11, fontWeight: "700", color: colors.textSecondary, marginTop: 2 },
+  gaugeCenter: { position: "absolute", alignItems: "center", justifyContent: "center" },
   confidenceRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
-  confidenceBar: {
-    flex: 1,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: colors.surfaceSecondary,
-    overflow: "hidden",
-  },
+  confidenceBar: { flex: 1, height: 5, borderRadius: 3, overflow: "hidden" },
   confidenceFill: { height: 5, borderRadius: 3 },
-  confidenceText: { fontSize: 10, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.3 },
-  pending: { fontSize: 12, color: colors.textTertiary, fontStyle: "italic", marginTop: 4 },
-  narrativeBox: {
-    flexDirection: "row",
-    gap: 6,
-    padding: 10,
-    borderRadius: radius.md,
-    backgroundColor: "#FFF8E7",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#F5D97B",
-  },
-  narrativeText: { flex: 1, fontSize: 11, lineHeight: 16, color: colors.text, fontWeight: "600" },
-  breakdownBox: { gap: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, paddingTop: 8 },
-  breakdownTitle: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
+  narrativeBox: { flexDirection: "row", gap: 6, padding: 10, borderRadius: radii.md },
+  breakdownBox: { gap: 6, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8 },
   breakdownRow: { flexDirection: "row", justifyContent: "space-between" },
-  breakdownLbl: { fontSize: 12, fontWeight: "600", color: colors.text, textTransform: "capitalize" },
-  breakdownVal: { fontSize: 12, fontWeight: "800", color: colors.emerald },
-  footnoteBox: { marginTop: 8, padding: 8, borderRadius: radius.sm, backgroundColor: colors.surfaceSecondary },
-  footnote: { fontSize: 10, color: colors.textTertiary, fontWeight: "600" },
-  shareBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceSecondary,
-  },
-  offscreenWrap: {
-    position: "absolute",
-    left: -10000,
-    top: 0,
-    opacity: 0,
-    pointerEvents: "none",
-  },
+  footnoteBox: { marginTop: 8, padding: 8, borderRadius: radii.sm },
+  shareBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  offscreenWrap: { position: "absolute", left: -10000, top: 0, opacity: 0, pointerEvents: "none" },
 });

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import { useRouter, Link, useLocalSearchParams } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useAuth } from "@/src/contexts/auth";
@@ -9,10 +8,13 @@ import { AmassLogo } from "@/src/components/AmassLogo";
 import { AppleSignInButton } from "@/src/components/AppleSignInButton";
 import { GoogleSignInButton } from "@/src/components/GoogleSignInButton";
 import { LegalConsent } from "@/src/components/LegalLinks";
-import { colors, radius, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Button, Divider, IconButton, Input, Screen } from "@/src/ui";
 
 export default function Register() {
   const router = useRouter();
+  const { colors } = useTheme();
   const { redirect } = useLocalSearchParams<{ redirect?: string }>();
   const { signUp } = useAuth();
   const [fullName, setFullName] = useState("");
@@ -61,27 +63,23 @@ export default function Register() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <KeyboardAwareScrollView
-        contentContainerStyle={styles.scroll}
-        bottomOffset={24}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Pressable onPress={() => router.back()} style={styles.back} hitSlop={12} testID="back-button">
-          <Ionicons name="chevron-back" size={26} color={colors.text} />
-        </Pressable>
+    <Screen edges={["top", "bottom"]} testID="register-screen">
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll} bottomOffset={24} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <IconButton icon="chevron-back" label="Go back" onPress={() => router.back()} testID="back-button" style={{ marginLeft: -4 }} />
 
         <View style={styles.header}>
           <AmassLogo size="lg" />
-          <Text style={styles.title}>Create your account</Text>
-          <Text style={styles.subtitle}>
-            Join thousands discovering premium properties across Africa.
-          </Text>
+          <View style={{ gap: 6 }}>
+            <AppText variant="display">Create your account</AppText>
+            <AppText variant="body" tone="secondary">
+              Join thousands discovering premium properties across Africa.
+            </AppText>
+          </View>
         </View>
 
         <View style={styles.form}>
-          <Field label="Full Name" value={fullName} onChangeText={setFullName} placeholder="Adaeze Okoye" autoComplete="name" textContentType="name" testID="reg-name" />
-          <Field
+          <Input label="Full name" value={fullName} onChangeText={setFullName} placeholder="Adaeze Okoye" autoComplete="name" textContentType="name" iconLeft="person-outline" size="lg" testID="reg-name" />
+          <Input
             label="Email"
             value={email}
             onChangeText={setEmail}
@@ -90,10 +88,13 @@ export default function Register() {
             autoComplete="email"
             textContentType="emailAddress"
             keyboardType="email-address"
+            iconLeft="mail-outline"
+            size="lg"
+            error={email.length > 3 && !emailValid ? "Enter a valid email address" : null}
             testID="reg-email"
           />
-          <Field label="Phone (optional)" value={phone} onChangeText={setPhone} placeholder="+234 …" keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" testID="reg-phone" />
-          <Field
+          <Input label="Phone (optional)" value={phone} onChangeText={setPhone} placeholder="+234 …" keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" iconLeft="call-outline" size="lg" testID="reg-phone" />
+          <Input
             label="Password"
             value={password}
             onChangeText={setPassword}
@@ -101,31 +102,34 @@ export default function Register() {
             secureTextEntry={!showPw}
             autoComplete="password-new"
             textContentType="newPassword"
+            iconLeft="lock-closed-outline"
+            size="lg"
             testID="reg-password"
-            right={
-              <Pressable onPress={() => setShowPw((v) => !v)} hitSlop={12} testID="reg-show-password">
-                <Ionicons name={showPw ? "eye-off" : "eye"} size={20} color={colors.textTertiary} />
-              </Pressable>
-            }
+            iconRight={showPw ? "eye-off-outline" : "eye-outline"}
+            onPressIconRight={() => setShowPw((v) => !v)}
+            iconRightTestID="reg-show-password"
+            iconRightLabel={showPw ? "Hide password" : "Show password"}
+            helper={pwValid ? "✓ Password length looks good" : "Password must be at least 6 characters"}
+            onSubmitEditing={submit}
+            returnKeyType="go"
           />
-          <Text style={[styles.pwHint, pwValid && { color: colors.emerald }]}>
-            {pwValid ? "✓ Password length looks good" : "Password must be at least 6 characters"}
-          </Text>
-          {error && <Text style={styles.error} testID="reg-error">{error}</Text>}
+          {error && (
+            <View style={[styles.notice, { backgroundColor: colors.errorSoft }]} accessibilityRole="alert">
+              <Ionicons name="alert-circle" size={16} color={colors.error} />
+              <AppText variant="bodySm" tone="error" style={{ flex: 1 }} testID="reg-error">
+                {error}
+              </AppText>
+            </View>
+          )}
 
-          <Pressable
-            onPress={submit}
-            style={[styles.cta, loading && { opacity: 0.6 }]}
-            disabled={loading}
-            testID="register-submit-button"
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>Create Account</Text>}
-          </Pressable>
+          <Button label="Create Account" size="lg" fullWidth loading={loading} onPress={submit} testID="register-submit-button" />
 
           <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
+            <Divider style={{ flex: 1 }} />
+            <AppText variant="caption" tone="tertiary">
+              or
+            </AppText>
+            <Divider style={{ flex: 1 }} />
           </View>
 
           <View style={{ gap: 10 }}>
@@ -134,10 +138,14 @@ export default function Register() {
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
+            <AppText variant="bodySm" tone="tertiary">
+              Already have an account?{" "}
+            </AppText>
             <Link href="/(auth)/login" asChild>
-              <Pressable>
-                <Text style={styles.link}>Sign in</Text>
+              <Pressable accessibilityRole="link" hitSlop={8} testID="go-to-login">
+                <AppText variant="bodySm" weight="bold">
+                  Sign in
+                </AppText>
               </Pressable>
             </Link>
           </View>
@@ -145,61 +153,15 @@ export default function Register() {
           <LegalConsent action="creating an account" />
         </View>
       </KeyboardAwareScrollView>
-    </SafeAreaView>
-  );
-}
-
-function Field({
-  label,
-  right,
-  testID,
-  ...rest
-}: React.ComponentProps<typeof TextInput> & { label: string; right?: React.ReactNode; testID?: string }) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.inputWrap}>
-        <TextInput {...rest} style={styles.input} placeholderTextColor={colors.textMuted} testID={testID} />
-        {right}
-      </View>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  scroll: { flexGrow: 1, padding: spacing.xl, paddingTop: spacing.md },
-  back: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginLeft: -8 },
-  header: { gap: spacing.md, marginTop: spacing.md, marginBottom: spacing.xl },
-  title: { ...typography.display, marginTop: spacing.lg },
-  subtitle: { ...typography.body, color: colors.textTertiary, lineHeight: 22 },
-  form: { gap: spacing.lg },
-  field: { gap: 6 },
-  fieldLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: "600", marginLeft: 4 },
-  inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: 56,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: spacing.lg,
-  },
-  input: { flex: 1, fontSize: 16, color: colors.text, fontWeight: "500" },
-  cta: {
-    marginTop: spacing.md,
-    height: 56,
-    borderRadius: radius.pill,
-    backgroundColor: colors.emerald,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  error: { color: colors.red, fontSize: 13, marginTop: -8 },
-  pwHint: { fontSize: 12, color: colors.textTertiary, marginTop: -8, marginLeft: 4 },
-  footer: { flexDirection: "row", justifyContent: "center", marginTop: spacing.lg },
-  footerText: { color: colors.textTertiary, fontSize: 14 },
-  link: { color: colors.emerald, fontSize: 14, fontWeight: "700" },
-  divider: { flexDirection: "row", alignItems: "center", marginVertical: spacing.md, gap: 10 },
-  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-  dividerText: { color: colors.textTertiary, fontSize: 12, fontWeight: "700" },
+  scroll: { flexGrow: 1, padding: space[6], paddingTop: space[3] },
+  header: { gap: space[4], marginTop: space[3], marginBottom: space[6], alignItems: "flex-start" },
+  form: { gap: space[4] },
+  notice: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radii.md, padding: space[3] },
+  footer: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: space[2] },
+  divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: space[1] },
 });

@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Image, Text, StyleSheet, ViewStyle } from "react-native";
-import { colors } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
 
 type Size = "sm" | "md" | "lg" | "xl";
 
@@ -44,6 +44,7 @@ export function AmassLogo({
   style?: ViewStyle;
   testID?: string;
 }) {
+  const { colors } = useTheme();
   const h = typeof size === "number" ? size : SIZE_MAP[size];
   const w = h * EMBLEM_ASPECT;
 
@@ -85,7 +86,7 @@ export function AmassLogo({
             fontSize: fs,
             letterSpacing: fs * 0.1,
             marginTop: Math.round(h * 0.14),
-            color: tone === "light" ? "#FFFFFF" : colors.ink,
+            color: tone === "light" ? "#FFFFFF" : colors.text,
           },
         ]}
       >

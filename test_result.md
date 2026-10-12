@@ -542,3 +542,64 @@ agent_communication:
       distance/score/reasons/listings/reps and Merge/Related/View buttons,
       global "Keep Separate" button, override history timeline, decision
       modal with optional reason.
+  - agent: "main"
+    message: |
+      PHASE 3 DESIGN-SYSTEM MIGRATION — FULL FRONTEND REGRESSION (Jun 2026)
+      ~110 screens/components were migrated from raw <Text>/<TouchableOpacity>/hard-coded
+      colors to the src/ui primitives (AppText, Button, Input, Screen, ScreenHeader, Sheet,
+      Toast, Chip, Card, EmptyState, Skeleton …) + useTheme(). NO backend/API changes except
+      a demo-account delete guard. tsc is now clean (0 errors) and lint has only warnings.
+      Also fixed: duplicate api.cancelSubscription key (subscribe.tsx now calls
+      cancelTokenSubscription → /subscriptions/cancel), StyleSheet.absoluteFillObject →
+      absoluteFill (RN 0.86), showsPointsOfInterests prop rename.
+      Login: demo@amass.africa / amass2026 (testIDs login-email, login-password,
+      login-submit-button). Demo user is admin + agent.
+      Please verify that no functionality broke on the MIGRATED screens (web preview,
+      390px viewport): login/register/forgot-password, tabs (home map placeholder, discover,
+      market, inbox, profile), wallet, earn, buy-tokens, settings, notifications,
+      property/[id] (unlock sheet, contact agent), chat/[conversation_id] (send text),
+      marketplace/sell + marketplace/[id] + search + saved, submit-property, become-agent,
+      agent-dashboard, agent/onboarding (wizard step nav), agent/tasks, agent/territory,
+      agent/representations, crm, agent-score, agent-plans, provider-dashboard, improve hub,
+      ads, saved-properties, my-documents, identity-verification, help, about,
+      admin/index + admin/discovery + admin/duplicate-queue + admin/settings +
+      admin/audit-log + admin/representations + admin/chat-reports, share/[id],
+      property-passport/[amass_id]. Report any red-screen, blank screen, broken
+      navigation/back button, non-working form submit or missing text.
+  - agent: "main"
+    message: |
+      ROUND 2 — Listing Detail redesign + dark-mode coherence for legacy surfaces (Jun 2026)
+      1) /property/[id] fully rewritten on the design system (AppText/Button/Badge/Avatar/Card/
+         toasts, theme-aware light+dark). All testIDs preserved: property-details, back-btn,
+         share-btn, fav-btn, locked-banner, neighborhood-scores, agent-profile-link,
+         agent-contact-revealed, reveal-agent-contact-btn, btn-contact-agent,
+         improve-request-inspection, improve-apply-finance, save-btn, chat-agent-btn (share),
+         book-tour-btn, unlock-cta-btn, unlock-cta-balance, fullscreen-close.
+         NEW behaviour: when the logged-in user OWNS the listing (demo owns all 21 seeded
+         properties) the chat/reveal CTAs are replaced by an "own-listing-note" + a
+         "Manage listing" primary CTA (testID book-tour-btn) → /agent-dashboard. Use buyer
+         tunde.showcase@amass.africa / Showcase2026! to see the buyer CTAs (Chat with Agent · Free,
+         Reveal direct contact, Unlock for N MASS → UnlockSheet).
+      2) UnlockSheet redesigned (same testIDs unlock-balance-after, unlock-confirm-btn, buy-tokens-cta).
+      3) Mechanical theme migration (useLegacyColors + makeStyles) of: (tabs)/index (home map),
+         (tabs)/marketplace, admin/duplicate-review, submit-property, become-agent, marketplace/sell,
+         agent/onboarding, and components FilterSheet, FilterChip, MapLegend, MapDockedCard,
+         NeighborhoodSheet, PropertyCard, MiniPropertyCard, ProductCard, VendorCard, AdModal,
+         ClassifiedCard, ProviderCard, BookingSheet, MakeOfferSheet, MarketFilterSheet,
+         ImageGallery, CategoryCircle, CategoryTile, SearchThisArea, MapPreviewCarousel,
+         HotFlame, TokenIcon, Skeleton, GlassView, PriceText, VoiceComposer, PropertyScoreCard.
+         No logic changes — only colour sourcing. Verify these still render + interact in BOTH
+         light and dark (Settings → Appearance chips theme-dark / theme-light / theme-system).
+      4) Backend: /api/agent/score tz-compare 500 fixed.
+  - agent: "main"
+    message: |
+      ROUND 3 — Phase 4 UX quality bar (Jun 2026)
+      - Global OfflineBanner (root layout): testID offline-banner when offline, online-banner for
+        ~2.5s after reconnect (Playwright: context.set_offline(True/False) works on web).
+      - Market: loading skeleton (market-loading), error state w/ Retry (market-error) when
+        /api/marketplace fails; FlatList perf props. Inbox: error state w/ Retry (inbox-error).
+      - Alerts → toasts: home save-search ("Search saved" toast with View action; "Nothing to save
+        yet" info toast when no filters), contact-agent failure on docked card, GPS unavailable in
+        agent onboarding, ProviderCard no-phone/no-WhatsApp, AdModal feedback (toast + closes).
+      - a11y roles/labels/states on chip/radio/checkbox/photo pressables in submit-property,
+        become-agent, marketplace/sell, agent/onboarding (testIDs unchanged).

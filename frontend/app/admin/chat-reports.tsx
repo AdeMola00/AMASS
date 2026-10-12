@@ -3,175 +3,165 @@
  * One-tap moderation surface: open reports with resolve + block actions.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator, Alert, FlatList, Pressable, RefreshControl,
-  StyleSheet, Text, View,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Ionicons from "@react-native-vector-icons/ionicons";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { fontFamilies, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, EmptyState, IconButton, Screen, ScreenHeader, Sheet, SkeletonRows, StatTile, useToast } from "@/src/ui";
 
 export default function AdminChatReportsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const { user } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [stats, setStats] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [blockTarget, setBlockTarget] = useState<string | null>(null);
+  const [blocking, setBlocking] = useState(false);
 
   const load = useCallback(async () => {
+    setError(false);
     try {
-      const [r, s] = await Promise.all([
-        api.adminChatReports("OPEN", 50),
-        api.adminChatStats(),
-      ]);
+      const [r, s] = await Promise.all([api.adminChatReports("OPEN", 50), api.adminChatStats()]);
       setRows(r.items ?? []);
       setStats(s);
-    } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Try again");
-    } finally { setLoading(false); setRefreshing(false); }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  useEffect(() => { if (user?.is_admin) load(); }, [user, load]);
+  useEffect(() => {
+    if (user?.is_admin) load();
+  }, [user, load]);
 
   const resolve = async (id: string) => {
     try {
       await api.adminChatResolveReport(id, "reviewed");
       setRows((prev) => prev.filter((r) => r.id !== id));
-    } catch (e: any) { Alert.alert("Failed", e?.message ?? "Try again"); }
+      toast.success("Report resolved");
+    } catch (e: any) {
+      toast.error("Couldn't resolve", e?.message ?? "Try again");
+    }
   };
 
-  const block = async (userId: string) => {
-    Alert.alert("Block reported user?", "They won't be able to message on AMASS.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Block", style: "destructive",
-        onPress: async () => {
-          try { await api.chatBlockUser(userId); Alert.alert("Blocked"); }
-          catch (e: any) { Alert.alert("Failed", e?.message ?? "Try again"); }
-        },
-      },
-    ]);
+  const block = async () => {
+    if (!blockTarget) return;
+    setBlocking(true);
+    try {
+      await api.chatBlockUser(blockTarget);
+      toast.success("User blocked", "They can no longer message on AMASS.");
+      setBlockTarget(null);
+    } catch (e: any) {
+      toast.error("Couldn't block", e?.message ?? "Try again");
+    } finally {
+      setBlocking(false);
+    }
   };
 
   if (!user?.is_admin) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <Header title="Chat Reports" onBack={() => router.back()} />
-        <View style={styles.empty}><Ionicons name="lock-closed" size={40} color={colors.red} /><Text>Admins only</Text></View>
-      </SafeAreaView>
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Chat Reports" />
+        <EmptyState icon="lock-closed-outline" title="Admins only" body="You need an admin account to moderate chat reports." actionLabel="Go back" onAction={() => router.back()} />
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="admin-chat-reports">
-      <Header title="Chat Reports" onBack={() => router.back()} />
+    <Screen testID="admin-chat-reports">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="Chat Reports" subtitle={rows.length ? `${rows.length} open` : undefined} />
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.red} />
+        <View style={{ padding: space[4] }}>
+          <SkeletonRows rows={4} />
+        </View>
+      ) : error ? (
+        <EmptyState variant="error" title="Couldn't load reports" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load(); }} />
       ) : (
         <FlatList
           data={rows}
           keyExtractor={(x) => x.id}
-          contentContainerStyle={{ padding: spacing.md, gap: 10, paddingBottom: 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.red} />}
+          contentContainerStyle={{ padding: space[4], gap: 10, paddingBottom: 40 + insets.bottom }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+              }}
+              tintColor={colors.text}
+            />
+          }
           ListHeaderComponent={
             stats ? (
               <View style={styles.statsGrid}>
-                <Stat label="Conversations" value={stats.total_conversations} />
-                <Stat label="Messages" value={stats.total_messages} />
-                <Stat label="Open Reports" value={stats.open_reports} highlight={stats.open_reports > 0} />
-                <Stat label="Blocks" value={stats.total_blocks} />
+                <StatTile icon="chatbubbles-outline" label="Conversations" value={stats.total_conversations ?? 0} style={styles.stat} />
+                <StatTile icon="mail-outline" label="Messages" value={stats.total_messages ?? 0} style={styles.stat} />
+                <StatTile icon="flag-outline" label="Open reports" value={stats.open_reports ?? 0} tone={stats.open_reports > 0 ? "brand" : "default"} style={styles.stat} />
+                <StatTile icon="ban-outline" label="Blocks" value={stats.total_blocks ?? 0} style={styles.stat} />
               </View>
             ) : null
           }
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="checkmark-done-circle" size={44} color={colors.emerald} />
-              <Text style={styles.emptyTitle}>No open reports</Text>
-              <Text style={styles.emptySub}>Nice — the queue is clear.</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState variant="success" compact title="No open reports" body="Nice — the queue is clear." />}
           renderItem={({ item }) => (
-            <View style={[styles.card, shadows.soft]} testID={`report-${item.id}`}>
+            <Card elevation="xs" testID={`report-${item.id}`} style={{ gap: 10 }}>
               <View style={styles.rowTop}>
-                <View style={styles.chip}><Text style={styles.chipText}>OPEN</Text></View>
-                <Text style={styles.time}>{new Date(item.created_at).toLocaleString()}</Text>
+                <Badge label="Open" tone="brand" icon="flag" />
+                <AppText variant="caption" tone="tertiary" tabular>
+                  {new Date(item.created_at).toLocaleString()}
+                </AppText>
               </View>
-              <Text style={styles.reason} numberOfLines={4}>{item.reason}</Text>
-              <View style={styles.meta}>
-                <Text style={styles.metaText}>Reported user: <Text style={styles.metaBold}>{item.reported_user_id?.slice(0, 8) ?? "—"}</Text></Text>
-                <Text style={styles.metaText}>Conversation: <Text style={styles.metaBold}>{item.conversation_id?.slice(0, 8)}</Text></Text>
+              <AppText variant="bodyMedium" numberOfLines={4}>
+                {item.reason}
+              </AppText>
+              <View style={{ gap: 2 }}>
+                <AppText variant="caption" tone="secondary">
+                  Reported user: <AppText variant="caption" style={styles.mono}>{item.reported_user_id?.slice(0, 8) ?? "—"}</AppText>
+                </AppText>
+                <AppText variant="caption" tone="secondary">
+                  Conversation: <AppText variant="caption" style={styles.mono}>{item.conversation_id?.slice(0, 8)}</AppText>
+                </AppText>
               </View>
               <View style={styles.actions}>
-                <Pressable style={[styles.btn, styles.resolveBtn]} onPress={() => resolve(item.id)} testID={`resolve-${item.id}`}>
-                  <Ionicons name="checkmark" size={14} color="#fff" />
-                  <Text style={styles.btnText}>Resolve</Text>
-                </Pressable>
-                {item.reported_user_id && (
-                  <Pressable style={[styles.btn, styles.blockBtn]} onPress={() => block(item.reported_user_id)} testID={`block-${item.id}`}>
-                    <Ionicons name="ban" size={14} color="#fff" />
-                    <Text style={styles.btnText}>Block user</Text>
-                  </Pressable>
-                )}
-                <Pressable style={[styles.btn, styles.viewBtn]} onPress={() => router.push(`/chat/${item.conversation_id}` as any)} testID={`view-${item.id}`}>
-                  <Ionicons name="eye" size={14} color={colors.text} />
-                </Pressable>
+                <Button label="Resolve" size="sm" iconLeft="checkmark" onPress={() => resolve(item.id)} testID={`resolve-${item.id}`} style={{ flex: 1 }} />
+                {item.reported_user_id ? (
+                  <Button label="Block user" size="sm" variant="destructive" iconLeft="ban" onPress={() => setBlockTarget(item.reported_user_id)} testID={`block-${item.id}`} style={{ flex: 1 }} />
+                ) : null}
+                <IconButton icon="eye-outline" label="View conversation" size={36} iconSize={18} onPress={() => router.push(`/chat/${item.conversation_id}` as any)} testID={`view-${item.id}`} />
               </View>
-            </View>
+            </Card>
           )}
         />
       )}
-    </SafeAreaView>
-  );
-}
 
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}><Ionicons name="chevron-back" size={22} color={colors.text} /></Pressable>
-      <Text style={styles.headerTitle}>{title}</Text>
-      <View style={styles.iconBtn} />
-    </View>
-  );
-}
-
-function Stat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
-  return (
-    <View style={[styles.statCard, highlight && { backgroundColor: colors.red }]}>
-      <Text style={[styles.statValue, highlight && { color: "#fff" }]}>{value ?? 0}</Text>
-      <Text style={[styles.statLabel, highlight && { color: "rgba(255,255,255,0.85)" }]}>{label}</Text>
-    </View>
+      <Sheet visible={!!blockTarget} onClose={() => setBlockTarget(null)} title="Block reported user?">
+        <AppText variant="body" tone="secondary">
+          They won&apos;t be able to message anyone on AMASS. You can unblock them later from the Blocks list.
+        </AppText>
+        <View style={{ gap: 8, marginTop: 20 }}>
+          <Button label="Block user" variant="destructive" size="lg" fullWidth iconLeft="ban" loading={blocking} onPress={block} testID="confirm-block-user" />
+          <Button label="Cancel" variant="ghost" fullWidth onPress={() => setBlockTarget(null)} />
+        </View>
+      </Sheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-  statsGrid: { flexDirection: "row", gap: 8, marginBottom: 10, flexWrap: "wrap" },
-  statCard: { flex: 1, minWidth: "45%", padding: 12, borderRadius: radius.md, backgroundColor: "#fff", ...shadows.soft, gap: 4 },
-  statValue: { fontSize: 24, fontWeight: "900", color: colors.text, letterSpacing: -0.5 },
-  statLabel: { fontSize: 10, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.5 },
-  card: { padding: 14, borderRadius: radius.md, backgroundColor: "#fff", gap: 8 },
+  statsGrid: { flexDirection: "row", gap: 8, marginBottom: 12, flexWrap: "wrap" },
+  stat: { minWidth: "46%" },
   rowTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  chip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: colors.red },
-  chipText: { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.4 },
-  time: { fontSize: 11, fontWeight: "700", color: colors.textTertiary },
-  reason: { fontSize: 13, color: colors.text, fontWeight: "600" },
-  meta: { gap: 2, marginTop: 4 },
-  metaText: { fontSize: 11, color: colors.textSecondary },
-  metaBold: { fontWeight: "800", color: colors.text, fontFamily: "monospace" as any },
-  actions: { flexDirection: "row", gap: 6, marginTop: 6 },
-  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, height: 36, borderRadius: 18, paddingHorizontal: 12 },
-  resolveBtn: { backgroundColor: colors.emerald, flex: 1 },
-  blockBtn: { backgroundColor: colors.red, flex: 1 },
-  viewBtn: { backgroundColor: "#fff", borderWidth: 1.5, borderColor: colors.border, width: 40, flex: 0 },
-  btnText: { color: "#fff", fontSize: 12, fontWeight: "800" },
-  empty: { alignItems: "center", padding: 40, gap: 8 },
-  emptyTitle: { ...typography.h2, fontSize: 16 },
-  emptySub: { fontSize: 12, color: colors.textTertiary },
+  mono: { fontFamily: fontFamilies.bold },
+  actions: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 4 },
 });

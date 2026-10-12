@@ -7,26 +7,21 @@
  *  • Search bar (matches by participant, property title, or last preview).
  *  • Verified-only toggle (limits to conversations with a verified other participant).
  *  • Global message search (falls back to /chat/search when a query is entered).
+ *
+ * Also mounted as the Messages tab (`(tabs)/messages.tsx`) — pass `asTab` to
+ * hide the back button and use a large title.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Ionicons from "@react-native-vector-icons/ionicons";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { space } from "@/src/theme/tokens";
+import { AppText, Avatar, Badge, Card, Chip, EmptyState, Input, Screen, ScreenHeader, SkeletonRows } from "@/src/ui";
 
 function _time(iso?: string | null): string {
   if (!iso) return "";
@@ -37,11 +32,16 @@ function _time(iso?: string | null): string {
     if (diff < 3600) return `${Math.floor(diff / 60)}m`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
     return d.toLocaleDateString();
-  } catch { return ""; }
+  } catch {
+    return "";
+  }
 }
 
 export default function InboxScreen() {
   const router = useRouter();
+  const segments = useSegments() as string[];
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { user } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,8 +50,10 @@ export default function InboxScreen() {
   const [q, setQ] = useState("");
   const [searchHits, setSearchHits] = useState<any[] | null>(null);
   const [searching, setSearching] = useState(false);
-  const searchTimer = useRef<NodeJS.Timeout | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const asTab = segments.includes("(tabs)");
 
+  const [loadError, setLoadError] = useState(false);
   const load = useCallback(async () => {
     try {
       const r = await api.chatListConversations(50, {
@@ -59,21 +61,27 @@ export default function InboxScreen() {
         q: q.trim().length >= 2 ? q.trim() : undefined,
       });
       setRows(r.items);
+      setLoadError(false);
     } catch {
-      // silent
+      setLoadError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [verifiedOnly, q]);
 
-  useEffect(() => { if (user) load(); }, [user, load]);
+  useEffect(() => {
+    if (user) load();
+  }, [user, load]);
 
   // Debounced message search across all my conversations
   useEffect(() => {
     if (!user) return;
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (q.trim().length < 2) { setSearchHits(null); return; }
+    if (q.trim().length < 2) {
+      setSearchHits(null);
+      return;
+    }
     searchTimer.current = setTimeout(async () => {
       setSearching(true);
       try {
@@ -81,254 +89,164 @@ export default function InboxScreen() {
         setSearchHits(r.items ?? []);
       } catch {
         setSearchHits([]);
-      } finally { setSearching(false); }
+      } finally {
+        setSearching(false);
+      }
     }, 350);
-    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
   }, [q, user]);
 
   const showSearch = q.trim().length >= 2;
+  const unreadTotal = rows.reduce((s, r) => s + (r.unread_count ?? 0), 0);
+  const bottomPad = (asTab ? 110 : 40) + insets.bottom;
 
   if (!user) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <Header title="Messages" onBack={() => router.back()} />
-        <View style={styles.empty}>
-          <Ionicons name="lock-closed" size={40} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>Sign in to see your messages</Text>
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Messages" showBack={!asTab} />
+        <EmptyState icon="lock-closed" title="Sign in to see your messages" body="Your conversations with agents and providers live here." actionLabel="Sign in" onAction={() => router.push("/(auth)/login")} />
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="inbox-screen">
-      <Header title="Messages" onBack={() => router.back()} />
+    <Screen testID="inbox-screen">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="Messages" subtitle={unreadTotal ? `${unreadTotal} unread` : "Agents · Providers · Support"} showBack={!asTab} large={asTab} />
 
       {/* Search + filter row */}
       <View style={styles.filterRow}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={16} color={colors.textTertiary} />
-          <TextInput
-            value={q}
-            onChangeText={setQ}
-            placeholder="Search messages, agents…"
-            placeholderTextColor={colors.textMuted}
-            style={styles.searchInput}
-            testID="inbox-search"
-            returnKeyType="search"
-            autoCapitalize="none"
-          />
-          {q.length > 0 && (
-            <Pressable onPress={() => setQ("")} hitSlop={10}>
-              <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
-            </Pressable>
-          )}
-        </View>
-        <Pressable
-          onPress={() => setVerifiedOnly((v) => !v)}
-          style={[styles.filterChip, verifiedOnly && styles.filterChipActive]}
-          testID="verified-only-toggle"
-        >
-          <Ionicons
-            name={verifiedOnly ? "checkmark-circle" : "shield-outline"}
-            size={13}
-            color={verifiedOnly ? "#fff" : colors.text}
-          />
-          <Text style={[styles.filterChipText, verifiedOnly && { color: "#fff" }]}>Verified</Text>
-        </Pressable>
+        <Input
+          containerStyle={{ flex: 1 }}
+          value={q}
+          onChangeText={setQ}
+          placeholder="Search messages, agents…"
+          iconLeft="search"
+          iconRight={q.length > 0 ? "close-circle" : undefined}
+          onPressIconRight={() => setQ("")}
+          iconRightLabel="Clear search"
+          returnKeyType="search"
+          autoCapitalize="none"
+          testID="inbox-search"
+        />
+        <Chip label="Verified" icon={verifiedOnly ? "checkmark-circle" : "shield-outline"} selected={verifiedOnly} onPress={() => setVerifiedOnly((v) => !v)} testID="verified-only-toggle" style={{ height: 50 }} />
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 60 }} color={colors.red} />
+        <View style={{ padding: space[4] }}>
+          <SkeletonRows rows={6} />
+        </View>
       ) : showSearch ? (
         <FlatList
           data={searchHits ?? []}
           keyExtractor={(x, i) => `${x.id}-${i}`}
-          contentContainerStyle={{ padding: spacing.md, gap: 8, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: space[4], gap: 8, paddingBottom: bottomPad }}
+          keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
-            <View style={styles.searchHeader}>
-              <Text style={styles.searchLabel}>
-                {searching ? "Searching…" : `${searchHits?.length ?? 0} messages match "${q.trim()}"`}
-              </Text>
-            </View>
+            <AppText variant="label" tone="tertiary" uppercase style={{ marginBottom: 4 }}>
+              {searching ? "Searching…" : `${searchHits?.length ?? 0} messages match "${q.trim()}"`}
+            </AppText>
           }
-          ListEmptyComponent={
-            !searching ? (
-              <View style={styles.empty}>
-                <Ionicons name="search" size={40} color={colors.textMuted} />
-                <Text style={styles.emptyTitle}>No messages found</Text>
-                <Text style={styles.emptySub}>Try a different keyword.</Text>
-              </View>
-            ) : null
-          }
+          ListEmptyComponent={!searching ? <EmptyState compact icon="search" title="No messages found" body="Try a different keyword." /> : null}
           renderItem={({ item }) => (
-            <Pressable
-              style={[styles.hitCard, shadows.soft]}
-              onPress={() => router.push(`/chat/${item.conversation_id}` as any)}
-              testID={`hit-${item.id}`}
-            >
-              <View style={styles.hitTop}>
-                <Text style={styles.hitFrom} numberOfLines={1}>
+            <Card onPress={() => router.push(`/chat/${item.conversation_id}` as any)} testID={`hit-${item.id}`} elevation="xs" style={{ gap: 6 }}>
+              <View style={styles.rowTop}>
+                <AppText variant="title" numberOfLines={1} style={{ flex: 1 }}>
                   {item.sender_name ?? "Message"}
-                </Text>
-                <Text style={styles.time}>{_time(item.created_at)}</Text>
+                </AppText>
+                <AppText variant="micro" tone="tertiary">
+                  {_time(item.created_at)}
+                </AppText>
               </View>
-              <Text style={styles.hitText} numberOfLines={3}>{item.text}</Text>
-            </Pressable>
+              <AppText variant="bodySm" tone="secondary" numberOfLines={3}>
+                {item.text}
+              </AppText>
+            </Card>
           )}
         />
       ) : (
         <FlatList
           data={rows}
           keyExtractor={(x) => x.id}
-          contentContainerStyle={{ padding: spacing.md, gap: 10, paddingBottom: 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.red} />}
+          contentContainerStyle={{ padding: space[4], gap: 10, paddingBottom: bottomPad, flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={12}
+          windowSize={7}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+              }}
+              tintColor={colors.text}
+            />
+          }
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="chatbubble-ellipses" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>
-                {verifiedOnly ? "No verified conversations yet" : "No conversations yet"}
-              </Text>
-              <Text style={styles.emptySub}>
-                {verifiedOnly
-                  ? "Turn off the Verified filter to see all messages."
-                  : "Contact an agent from a property to start."}
-              </Text>
-            </View>
+            loadError ? (
+              <EmptyState
+                variant="error"
+                title="Couldn't load your messages"
+                body="Check your connection and try again."
+                actionLabel="Retry"
+                onAction={() => {
+                  setLoading(true);
+                  load();
+                }}
+                testID="inbox-error"
+              />
+            ) : (
+            <EmptyState
+              icon="chatbubble-ellipses-outline"
+              title={verifiedOnly ? "No verified conversations yet" : "No conversations yet"}
+              body={verifiedOnly ? "Turn off the Verified filter to see all messages." : "Contact an agent from a property to start a conversation."}
+              actionLabel={verifiedOnly ? "Show all" : "Explore properties"}
+              onAction={verifiedOnly ? () => setVerifiedOnly(false) : () => router.push("/(tabs)" as any)}
+            />
+            )
           }
           renderItem={({ item }) => {
             const other = item.other_participants?.[0];
             const isUnread = (item.unread_count ?? 0) > 0;
+            const name = other?.full_name || other?.email || "Unknown";
             return (
-              <Pressable
-                style={[styles.row, shadows.soft]}
-                onPress={() => router.push(`/chat/${item.id}` as any)}
-                testID={`conv-${item.id}`}
-              >
-                <View style={styles.avatarWrap}>
-                  {other?.profile_photo ? (
-                    <Image source={{ uri: other.profile_photo }} style={styles.avatarImg} />
-                  ) : (
-                    <View style={styles.avatarFallback}>
-                      <Text style={styles.avatarInitial}>
-                        {(other?.full_name || other?.email || "?").slice(0, 1).toUpperCase()}
-                      </Text>
+              <Card onPress={() => router.push(`/chat/${item.id}` as any)} testID={`conv-${item.id}`} elevation="xs" style={isUnread ? { borderColor: colors.borderStrong } : undefined}>
+                <View style={styles.row}>
+                  <Avatar name={name} uri={other?.profile_photo} size={48} verified={!!other?.verified} tone="soft" />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={styles.rowTop}>
+                      <AppText variant={isUnread ? "title" : "bodyMedium"} numberOfLines={1} style={{ flex: 1 }}>
+                        {name}
+                      </AppText>
+                      <AppText variant="micro" tone={isUnread ? "brand" : "tertiary"}>
+                        {_time(item.last_message_at)}
+                      </AppText>
                     </View>
-                  )}
-                  {other?.verified && (
-                    <View style={styles.verifiedDot}>
-                      <Ionicons name="checkmark" size={9} color="#fff" />
-                    </View>
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.rowTop}>
-                    <Text style={[styles.name, isUnread && styles.nameBold]} numberOfLines={1}>
-                      {other?.full_name || other?.email || "Unknown"}
-                    </Text>
-                    <Text style={styles.time}>{_time(item.last_message_at)}</Text>
+                    {item.property && (
+                      <AppText variant="micro" tone="tertiary" numberOfLines={1}>
+                        {item.property.title} · {formatNaira(item.property.price)}
+                      </AppText>
+                    )}
+                    <AppText variant="bodySm" tone={isUnread ? "primary" : "secondary"} weight={isUnread ? "semibold" : undefined} numberOfLines={1}>
+                      {item.last_message_preview ?? "Say hello"}
+                    </AppText>
                   </View>
-                  {item.property && (
-                    <Text style={styles.propRef} numberOfLines={1}>
-                      🏠 {item.property.title} · {formatNaira(item.property.price)}
-                    </Text>
-                  )}
-                  <Text
-                    style={[styles.preview, isUnread && styles.previewBold]}
-                    numberOfLines={1}
-                  >
-                    {item.last_message_preview ?? "Say hello 👋"}
-                  </Text>
+                  {isUnread && <Badge label={String(item.unread_count)} tone="brand" />}
                 </View>
-                {isUnread && (
-                  <View style={styles.unreadPill}>
-                    <Text style={styles.unreadText}>{item.unread_count}</Text>
-                  </View>
-                )}
-              </Pressable>
+              </Card>
             );
           }}
         />
       )}
-    </SafeAreaView>
-  );
-}
-
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>{title}</Text>
-      <View style={styles.iconBtn} />
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-  filterRow: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: spacing.md, paddingTop: 10, paddingBottom: 4,
-  },
-  searchBox: {
-    flex: 1, flexDirection: "row", alignItems: "center", gap: 6,
-    height: 40, paddingHorizontal: 12, borderRadius: 20,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  searchInput: { flex: 1, fontSize: 13, color: colors.text, paddingVertical: 0 },
-  filterChip: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    height: 36, paddingHorizontal: 12, borderRadius: 18,
-    backgroundColor: "#fff",
-    borderWidth: 1.5, borderColor: colors.border,
-  },
-  filterChipActive: { backgroundColor: colors.emerald, borderColor: colors.emerald },
-  filterChipText: { fontSize: 12, fontWeight: "800", color: colors.text },
-  searchHeader: { paddingBottom: 6 },
-  searchLabel: { fontSize: 11, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.4 },
-  hitCard: { padding: 12, borderRadius: radius.md, backgroundColor: "#fff", gap: 4 },
-  hitTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  hitFrom: { flex: 1, fontSize: 13, fontWeight: "800", color: colors.text },
-  hitText: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  row: {
-    flexDirection: "row", gap: 12, padding: 12,
-    borderRadius: radius.md, backgroundColor: "#fff", alignItems: "center",
-  },
-  avatarWrap: { width: 48, height: 48, position: "relative" },
-  avatarImg: { width: 48, height: 48, borderRadius: 24 },
-  avatarFallback: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.ink,
-    alignItems: "center", justifyContent: "center",
-  },
-  avatarInitial: { color: "#fff", fontSize: 18, fontWeight: "800" },
-  verifiedDot: {
-    position: "absolute", right: -1, bottom: -1,
-    width: 16, height: 16, borderRadius: 8, backgroundColor: colors.emerald,
-    borderWidth: 2, borderColor: "#fff",
-    alignItems: "center", justifyContent: "center",
-  },
-  rowTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  name: { fontSize: 14, fontWeight: "700", color: colors.text, flex: 1 },
-  nameBold: { fontWeight: "900" },
-  time: { fontSize: 11, fontWeight: "700", color: colors.textTertiary },
-  propRef: { fontSize: 11, fontWeight: "700", color: colors.red, marginTop: 2 },
-  preview: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  previewBold: { color: colors.text, fontWeight: "700" },
-  unreadPill: {
-    minWidth: 22, height: 22, paddingHorizontal: 8, borderRadius: 11,
-    backgroundColor: colors.red, alignItems: "center", justifyContent: "center",
-  },
-  unreadText: { color: "#fff", fontSize: 11, fontWeight: "900" },
-  empty: { alignItems: "center", padding: 40, gap: 8 },
-  emptyTitle: { ...typography.h2, fontSize: 16 },
-  emptySub: { fontSize: 12, color: colors.textTertiary, textAlign: "center" },
+  filterRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space[4], paddingBottom: space[3] },
+  row: { flexDirection: "row", alignItems: "center", gap: 12 },
+  rowTop: { flexDirection: "row", alignItems: "center", gap: 8 },
 });

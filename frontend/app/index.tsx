@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { View, StyleSheet, Animated, Text, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/src/contexts/auth";
 import { AmassLogo } from "@/src/components/AmassLogo";
-import { colors } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+
 
 const FIXA_GREEN = "#7ED958";
 const FIXA_LOGO = require("../assets/images/fixa-logo.png");
@@ -14,6 +15,9 @@ const HOLD_MS = 2000; // each logo stays fully visible ~2s
 const FADE_MS = 420;
 
 export default function Splash() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const router = useRouter();
   const { user, loading } = useAuth();
 
@@ -108,7 +112,8 @@ export default function Splash() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
   containerFixa: { backgroundColor: FIXA_GREEN },
   center: { alignItems: "center" },
@@ -127,7 +132,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   fixaLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: FIXA_GREEN,
     alignItems: "center",
     justifyContent: "center",

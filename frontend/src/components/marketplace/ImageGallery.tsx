@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
   NativeScrollEvent,
 } from "react-native";
 import { Image } from "expo-image";
-import { colors } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+
 
 const { width } = Dimensions.get("window");
 
@@ -20,6 +21,9 @@ export function ImageGallery({
   images: string[];
   height?: number;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [idx, setIdx] = useState(0);
 
   const onScroll = useCallback(
@@ -66,7 +70,8 @@ export function ImageGallery({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   empty: { backgroundColor: colors.surfaceSecondary },
   dots: {
     position: "absolute",
@@ -78,7 +83,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.55)" },
-  dotActive: { backgroundColor: "#fff", width: 18 },
+  dotActive: { backgroundColor: colors.surface, width: 18 },
   counter: {
     position: "absolute",
     right: 14,

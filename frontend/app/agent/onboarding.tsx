@@ -16,11 +16,10 @@
  *     never blocks the user from continuing — the draft is retried on next save.
  *   • Duplicate action ≥ possible_threshold pops a decision sheet BEFORE submit.
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -30,10 +29,11 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../../src/ui/icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -49,10 +49,13 @@ import {
   saveDraft,
   WizardStep,
 } from "@/src/lib/onboarding-draft";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { AppText, Badge, Button, Input, ProgressBar, Screen, ScreenHeader, Sheet, Skeleton, useToast } from "@/src/ui";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 // ─── Constants ────────────────────────────────────────────────────────────
-const STAGES: { key: WizardStep; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const STAGES: { key: WizardStep; label: string; icon: IconName }[] = [
   { key: 0, label: "Location", icon: "location" },
   { key: 1, label: "Property", icon: "home" },
   { key: 2, label: "Listing", icon: "pricetag" },
@@ -75,7 +78,7 @@ const AMENITIES = [
   "CCTV", "Borehole", "BQ", "Garden", "Parking", "Furnished", "Elevator",
 ];
 
-const LISTING_TYPES: { key: "buy" | "rent" | "lease" | "shortlet"; label: string; caption: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const LISTING_TYPES: { key: "buy" | "rent" | "lease" | "shortlet"; label: string; caption: string; icon: IconName }[] = [
   { key: "buy", label: "For Sale", caption: "Sell outright", icon: "pricetag" },
   { key: "rent", label: "For Rent", caption: "Yearly rental", icon: "key" },
   { key: "shortlet", label: "Short Let", caption: "Nightly stays", icon: "calendar" },
@@ -94,8 +97,12 @@ const DEFAULT_COORDS = { latitude: 6.4361, longitude: 3.4739 }; // Lagos default
 
 // ─── Component ────────────────────────────────────────────────────────────
 export default function AgentOnboardingWizard() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors: tc } = useTheme();
 
   const [draft, setDraft] = useState<OnboardingDraft | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,6 +115,10 @@ export default function AgentOnboardingWizard() {
     open: boolean;
     result?: Awaited<ReturnType<typeof api.onboardingDuplicateCheck>>;
   }>({ open: false });
+  const [dupReasonOpen, setDupReasonOpen] = useState(false);
+  const [dupReason, setDupReason] = useState("");
+  const [successSheet, setSuccessSheet] = useState<{ amass_property_id: string; attached: boolean } | null>(null);
+  const toast = useToast();
 
   const isMounted = useRef(true);
   useEffect(() => () => { isMounted.current = false; }, []);
@@ -189,11 +200,11 @@ export default function AgentOnboardingWizard() {
   // ── Stage 1: Save Location ──
   const saveStage1 = useCallback(async (): Promise<boolean> => {
     if (!draft?.location) {
-      Alert.alert("Location needed", "Capture GPS or drop a pin before continuing.");
+      toast.info("Location needed", "Capture GPS or drop a pin before continuing.");
       return false;
     }
     if (!draft.address?.state) {
-      Alert.alert("Address needed", "Select at least a state before continuing.");
+      toast.info("Address needed", "Select at least a state before continuing.");
       return false;
     }
     setSaving(true);
@@ -202,7 +213,7 @@ export default function AgentOnboardingWizard() {
       await api.onboardingSaveLocation(oid, draft.location, draft.address);
       return true;
     } catch (e: any) {
-      Alert.alert("Could not save location", e?.message ?? "Please try again");
+      toast.error("Couldn't save location", e?.message ?? "Please try again");
       return false;
     } finally {
       if (isMounted.current) setSaving(false);
@@ -212,7 +223,7 @@ export default function AgentOnboardingWizard() {
   // ── Stage 2 + 3: save details/listing ──
   const saveStage2 = useCallback(async (): Promise<boolean> => {
     if (!draft?.details?.property_type) {
-      Alert.alert("Missing", "Pick a property type first.");
+      toast.info("Pick a property type", "Choose the type that best describes this property.");
       return false;
     }
     setSaving(true);
@@ -221,7 +232,7 @@ export default function AgentOnboardingWizard() {
       await api.onboardingSaveDetails(oid, { details: draft.details });
       return true;
     } catch (e: any) {
-      Alert.alert("Could not save details", e?.message ?? "Please try again");
+      toast.error("Couldn't save details", e?.message ?? "Please try again");
       return false;
     } finally {
       if (isMounted.current) setSaving(false);
@@ -230,7 +241,7 @@ export default function AgentOnboardingWizard() {
 
   const saveStage3 = useCallback(async (): Promise<boolean> => {
     if (!draft?.listing?.listing_type || !draft?.listing?.price) {
-      Alert.alert("Missing", "Listing type and price are required.");
+      toast.info("Almost there", "Listing type and price are required.");
       return false;
     }
     setSaving(true);
@@ -239,7 +250,7 @@ export default function AgentOnboardingWizard() {
       await api.onboardingSaveDetails(oid, { listing: draft.listing });
       return true;
     } catch (e: any) {
-      Alert.alert("Could not save listing", e?.message ?? "Please try again");
+      toast.error("Couldn't save listing", e?.message ?? "Please try again");
       return false;
     } finally {
       if (isMounted.current) setSaving(false);
@@ -249,7 +260,7 @@ export default function AgentOnboardingWizard() {
   // ── Stage 4: photos ──
   const saveStage4 = useCallback(async (): Promise<boolean> => {
     if (!draft?.media_ids?.length) {
-      Alert.alert("Photos", "Please add at least one photo.");
+      toast.info("Add a photo", "Please add at least one photo of the property.");
       return false;
     }
     setSaving(true);
@@ -258,7 +269,7 @@ export default function AgentOnboardingWizard() {
       await api.onboardingSaveDetails(oid, { media_ids: draft.media_ids });
       return true;
     } catch (e: any) {
-      Alert.alert("Could not save photos", e?.message ?? "Please try again");
+      toast.error("Couldn't save photos", e?.message ?? "Please try again");
       return false;
     } finally {
       if (isMounted.current) setSaving(false);
@@ -280,7 +291,7 @@ export default function AgentOnboardingWizard() {
       setDuplicateSheet({ open: true, result });
       return { ok: false, action: result.action, result };
     } catch (e: any) {
-      Alert.alert("Duplicate check failed", e?.message ?? "Please try again");
+      toast.error("Duplicate check failed", e?.message ?? "Please try again");
       return { ok: false, action: "allow" as const };
     } finally {
       if (isMounted.current) setSaving(false);
@@ -294,27 +305,13 @@ export default function AgentOnboardingWizard() {
       const res = await api.onboardingSubmit(draft.onboarding_id, draft.client_submission_id);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await clearActiveDraft();
-      Alert.alert(
-        res.attached_to_existing ? "Attached to existing property" : "Listing submitted",
-        `AMASS ID: ${res.amass_property_id}\n\nA PENDING representation was created for you. Upload your mandate documents next.`,
-        [
-          {
-            text: "View Passport",
-            onPress: () => router.replace(`/property-passport/${res.amass_property_id}` as any),
-          },
-          {
-            text: "My Representations",
-            onPress: () => router.replace("/agent/representations" as any),
-            style: "default",
-          },
-        ]
-      );
+      setSuccessSheet({ amass_property_id: res.amass_property_id, attached: !!res.attached_to_existing });
     } catch (e: any) {
       const msg = String(e?.message ?? "");
       if (msg.includes("duplicate_decision_required") || msg.includes("possible existing")) {
         await runDuplicateCheck();
       } else {
-        Alert.alert("Could not submit", msg || "Please try again");
+        toast.error("Couldn't submit", msg || "Please try again");
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } finally {
@@ -357,7 +354,7 @@ export default function AgentOnboardingWizard() {
         // Now submit
         await submitOnboarding();
       } catch (e: any) {
-        Alert.alert("Could not record decision", e?.message ?? "Please try again");
+        toast.error("Couldn't record decision", e?.message ?? "Please try again");
       }
     },
     [draft, patchDraft, submitOnboarding]
@@ -366,27 +363,33 @@ export default function AgentOnboardingWizard() {
   // ── Render ──
   if (loading || !draft) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={{ marginTop: 60 }} color={colors.red} />
-      </SafeAreaView>
+      <Screen testID="onboarding-loading">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="List a property" />
+        <View style={{ padding: spacing.xl, gap: 14 }}>
+          <Skeleton height={4} radius={2} />
+          <Skeleton height={220} radius={radius.lg} style={{ marginTop: 10 }} />
+          <Skeleton height={20} width="50%" />
+          <Skeleton height={48} radius={radius.md} />
+          <Skeleton height={48} radius={radius.md} />
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="onboarding-wizard">
+    <Screen testID="onboarding-wizard">
+      <Stack.Screen options={{ headerShown: false }} />
       {/* Header + Progress */}
-      <View style={styles.header}>
-        <Pressable onPress={goBack} style={styles.iconBtn} testID="wiz-back">
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={styles.stepLbl}>Step {step + 1} of {STAGES.length}</Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${((step + 1) / STAGES.length) * 100}%` }]} />
-          </View>
-          <Text style={styles.stageTitle}>{STAGES[step].label}</Text>
-        </View>
-        <View style={styles.iconBtn} />
+      <ScreenHeader
+        title={STAGES[step].label}
+        subtitle={`Step ${step + 1} of ${STAGES.length}`}
+        onBack={goBack}
+        backTestID="wiz-back"
+        right={saving ? <Badge label="Saving…" tone="neutral" icon="cloud-upload-outline" /> : <Badge label="Draft saved" tone="success" icon="cloud-done-outline" />}
+      />
+      <View style={{ paddingHorizontal: spacing.xl }}>
+        <ProgressBar value={(step + 1) / STAGES.length} tone="brand" height={4} />
       </View>
 
       {/* Stage stepper */}
@@ -396,15 +399,19 @@ export default function AgentOnboardingWizard() {
           const done = i < step;
           return (
             <View key={s.key} style={styles.stepperCell}>
-              <View style={[styles.stepDot, active && styles.stepDotActive, done && styles.stepDotDone]}>
+              <View
+                style={[
+                  styles.stepDot,
+                  { backgroundColor: done ? tc.success : active ? tc.brand : tc.surfaceAlt, borderColor: active ? tc.brand : "transparent" },
+                ]}
+              >
                 {done ? (
-                  <Ionicons name="checkmark" size={12} color="#fff" />
+                  <Ionicons name="checkmark" size={13} color="#fff" />
                 ) : (
-                  <Ionicons name={s.icon} size={12} color={active ? "#fff" : colors.textTertiary} />
+                  <Ionicons name={s.icon} size={13} color={active ? tc.onBrand : tc.textMuted} />
                 )}
               </View>
-              <Text style={[styles.stepDotLbl, active && { color: colors.text, fontWeight: "800" }]}>{s.label}</Text>
-              {i < STAGES.length - 1 && <View style={[styles.stepLine, done && { backgroundColor: colors.emerald }]} />}
+              <AppText variant="micro" color={active ? tc.text : tc.textTertiary} uppercase numberOfLines={1}>{s.label}</AppText>
             </View>
           );
         })}
@@ -423,127 +430,140 @@ export default function AgentOnboardingWizard() {
       </KeyboardAwareScrollView>
 
       {/* Sticky bottom bar */}
-      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <Pressable
+      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: tc.bgElevated, borderTopColor: tc.border }]}>
+        <Button
+          label={step === 4 ? "Check & submit" : "Continue"}
+          iconRight={step === 4 ? "shield-checkmark" : "arrow-forward"}
+          variant={step === 4 ? "brand" : "primary"}
+          size="lg"
+          fullWidth
+          loading={saving || submitting}
           onPress={handlePrimaryPress}
-          disabled={saving || submitting}
-          style={[styles.cta, (saving || submitting) && { opacity: 0.5 }]}
           testID="wiz-primary"
-        >
-          {saving || submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.ctaText}>
-              {step === 4 ? "Check & Submit" : "Continue"}
-            </Text>
-          )}
-        </Pressable>
+        />
       </View>
 
       {/* Resume prompt */}
-      <Modal visible={showResumePrompt} transparent animationType="fade" onRequestClose={startFresh}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Ionicons name="time-outline" size={28} color={colors.red} />
-            <Text style={styles.modalTitle}>Resume where you left off?</Text>
-            <Text style={styles.modalBody}>
-              You have an unfinished property submission. Would you like to continue or start over?
-            </Text>
-            <View style={{ gap: 8, width: "100%" }}>
-              <Pressable style={styles.cta} onPress={resumeExisting} testID="wiz-resume">
-                <Text style={styles.ctaText}>Resume</Text>
-              </Pressable>
-              <Pressable style={styles.ctaSecondary} onPress={startFresh} testID="wiz-start-fresh">
-                <Text style={styles.ctaSecondaryText}>Start new</Text>
-              </Pressable>
-            </View>
+      <Sheet visible={showResumePrompt} onClose={startFresh} testID="wiz-resume-sheet">
+        <View style={{ alignItems: "center", gap: 8, paddingTop: 4 }}>
+          <View style={[styles.sheetIcon, { backgroundColor: tc.brandSoft }]}>
+            <Ionicons name="time-outline" size={28} color={tc.brand} />
           </View>
+          <AppText variant="h3" align="center">Resume where you left off?</AppText>
+          <AppText variant="bodySm" tone="secondary" align="center" style={{ maxWidth: 300 }}>
+            You have an unfinished property submission. Continue it, or start a fresh one.
+          </AppText>
         </View>
-      </Modal>
+        <View style={{ gap: 8, marginTop: 20 }}>
+          <Button label="Resume draft" iconLeft="play" size="lg" fullWidth onPress={resumeExisting} testID="wiz-resume" />
+          <Button label="Start new" variant="ghost" fullWidth onPress={startFresh} testID="wiz-start-fresh" />
+        </View>
+      </Sheet>
 
       {/* Duplicate decision sheet */}
-      <Modal
+      <Sheet
         visible={duplicateSheet.open}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDuplicateSheet({ open: false })}
+        onClose={() => setDuplicateSheet({ open: false })}
+        title="Is this the same property?"
+        testID="dup-sheet"
       >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { alignItems: "stretch", maxHeight: "88%" }]}>
-            <View style={styles.dupHeader}>
-              <View style={styles.dupWarnBadge}>
-                <Ionicons name="warning" size={16} color="#fff" />
-                <Text style={styles.dupWarnBadgeText}>
-                  {duplicateSheet.result?.action === "high_confidence_duplicate"
-                    ? "High-Confidence Duplicate"
-                    : "Possible Duplicate"}
-                </Text>
-              </View>
-              <Pressable onPress={() => setDuplicateSheet({ open: false })} hitSlop={10}>
-                <Ionicons name="close" size={22} color={colors.textTertiary} />
-              </Pressable>
-            </View>
-            <Text style={styles.modalTitle}>Is this the same property?</Text>
-            <Text style={styles.modalBody}>
-              We found {duplicateSheet.result?.candidates.length ?? 0} existing propert
-              {(duplicateSheet.result?.candidates.length ?? 0) > 1 ? "ies" : "y"} near your pin. Confirm
-              before we create a new AMASS ID.
-            </Text>
+        <View style={{ gap: 10 }}>
+          <Badge
+            label={duplicateSheet.result?.action === "high_confidence_duplicate" ? "High-confidence duplicate" : "Possible duplicate"}
+            tone={duplicateSheet.result?.action === "high_confidence_duplicate" ? "error" : "warning"}
+            icon="warning"
+            size="md"
+          />
+          <AppText variant="bodySm" tone="secondary">
+            We found {duplicateSheet.result?.candidates.length ?? 0} existing propert
+            {(duplicateSheet.result?.candidates.length ?? 0) > 1 ? "ies" : "y"} near your pin. Confirm before we create a new AMASS ID.
+          </AppText>
 
-            <ScrollView style={{ maxHeight: 340 }} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
-              {duplicateSheet.result?.candidates.slice(0, 3).map((c) => (
-                <View key={c.amass_property_id} style={styles.candidateCard}>
-                  <View style={styles.candidateHeader}>
-                    <Text style={styles.candidateId}>{c.amass_property_id}</Text>
-                    <View style={[styles.scoreBadge, c.score >= 80 && { backgroundColor: colors.red }]}>
-                      <Text style={styles.scoreBadgeText}>{c.score}/100</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.candidateAddr}>
-                    {[c.preview.street, c.preview.area, c.preview.lga, c.preview.state]
-                      .filter(Boolean)
-                      .join(", ") || "—"}
-                  </Text>
-                  <Text style={styles.candidateMeta}>
-                    {c.preview.property_type ?? "—"} · {c.distance_meters}m away
-                  </Text>
-                  {c.reasons.slice(0, 3).map((r, i) => (
-                    <View key={i} style={styles.reasonRow}>
-                      <Ionicons name="alert-circle" size={12} color={colors.red} />
-                      <Text style={styles.reasonText}>{r}</Text>
-                    </View>
-                  ))}
-                  <Pressable
-                    style={styles.sameBtn}
-                    onPress={() =>
-                      recordDecision("same_property", { same_as_amass_id: c.amass_property_id })
-                    }
-                    testID={`dup-same-${c.amass_property_id}`}
-                  >
-                    <Ionicons name="link" size={14} color="#fff" />
-                    <Text style={styles.sameBtnText}>Same — attach my listing</Text>
-                  </Pressable>
+          <ScrollView style={{ maxHeight: 340 }} contentContainerStyle={{ gap: 10, paddingVertical: 4 }} showsVerticalScrollIndicator={false}>
+            {duplicateSheet.result?.candidates.slice(0, 3).map((c) => (
+              <View key={c.amass_property_id} style={[styles.candidateCard, { backgroundColor: tc.surfaceAlt, borderColor: tc.border }]}>
+                <View style={styles.candidateHeader}>
+                  <AppText variant="title" tabular>{c.amass_property_id}</AppText>
+                  <Badge label={`${c.score}/100`} tone={c.score >= 80 ? "error" : "warning"} />
                 </View>
-              ))}
-            </ScrollView>
+                <AppText variant="caption" tone="secondary">
+                  {[c.preview.street, c.preview.area, c.preview.lga, c.preview.state].filter(Boolean).join(", ") || "—"}
+                </AppText>
+                <AppText variant="caption" tone="tertiary">
+                  {c.preview.property_type ?? "—"} · {c.distance_meters}m away
+                </AppText>
+                {c.reasons.slice(0, 3).map((r, i) => (
+                  <View key={i} style={styles.reasonRow}>
+                    <Ionicons name="alert-circle" size={12} color={tc.brand} />
+                    <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>{r}</AppText>
+                  </View>
+                ))}
+                <Button
+                  label="Same — attach my listing"
+                  iconLeft="link"
+                  size="sm"
+                  fullWidth
+                  onPress={() => recordDecision("same_property", { same_as_amass_id: c.amass_property_id })}
+                  testID={`dup-same-${c.amass_property_id}`}
+                  style={{ marginTop: 4 }}
+                />
+              </View>
+            ))}
+          </ScrollView>
 
-            <Pressable
-              style={[styles.ctaSecondary, { marginTop: 8 }]}
-              onPress={() =>
-                Alert.prompt
-                  ? Alert.prompt("Why is this different?", "e.g. different building, unit, floor", (text) =>
-                      recordDecision("not_same_property", { reason: text || "different building" })
-                    )
-                  : recordDecision("not_same_property", { reason: "different building" })
-              }
-              testID="dup-not-same"
-            >
-              <Text style={styles.ctaSecondaryText}>None of these — my property is different</Text>
-            </Pressable>
-          </View>
+          <Button
+            label="None of these — my property is different"
+            variant="outline"
+            fullWidth
+            onPress={() => { setDuplicateSheet({ open: false }); setTimeout(() => setDupReasonOpen(true), 240); }}
+            testID="dup-not-same"
+          />
         </View>
-      </Modal>
-    </SafeAreaView>
+      </Sheet>
+
+      {/* "Not the same" reason sheet (replaces iOS-only Alert.prompt) */}
+      <Sheet visible={dupReasonOpen} onClose={() => setDupReasonOpen(false)} title="Why is this different?">
+        <AppText variant="bodySm" tone="secondary" style={{ marginBottom: 12 }}>
+          A short note helps our reviewers — e.g. different building, unit or floor.
+        </AppText>
+        <Input
+          value={dupReason}
+          onChangeText={setDupReason}
+          placeholder="e.g. Different building on the same street"
+          multiline
+          testID="dup-reason-input"
+        />
+        <View style={{ gap: 8, marginTop: 16 }}>
+          <Button
+            label="Confirm — it's a different property"
+            iconLeft="checkmark"
+            size="lg"
+            fullWidth
+            onPress={() => { setDupReasonOpen(false); recordDecision("not_same_property", { reason: dupReason.trim() || "different building" }); }}
+            testID="dup-reason-confirm"
+          />
+          <Button label="Back" variant="ghost" fullWidth onPress={() => { setDupReasonOpen(false); setTimeout(() => setDuplicateSheet((d) => ({ ...d, open: true })), 240); }} />
+        </View>
+      </Sheet>
+
+      {/* Submission success */}
+      <Sheet visible={!!successSheet} onClose={() => router.replace("/agent/representations" as any)} testID="wiz-success">
+        <View style={{ alignItems: "center", gap: 8, paddingTop: 4 }}>
+          <View style={[styles.sheetIcon, { backgroundColor: tc.successSoft }]}>
+            <Ionicons name="checkmark-circle" size={30} color={tc.success} />
+          </View>
+          <AppText variant="h3" align="center">{successSheet?.attached ? "Attached to existing property" : "Listing submitted"}</AppText>
+          <Badge label={successSheet?.amass_property_id ?? ""} tone="inverse" size="md" />
+          <AppText variant="bodySm" tone="secondary" align="center" style={{ maxWidth: 300 }}>
+            A pending representation was created for you. Upload your mandate documents next to get verified.
+          </AppText>
+        </View>
+        <View style={{ gap: 8, marginTop: 20 }}>
+          <Button label="Upload mandate documents" iconLeft="ribbon" variant="brand" size="lg" fullWidth onPress={() => router.replace("/agent/representations" as any)} testID="wiz-success-reps" />
+          <Button label="View property passport" iconLeft="document-text-outline" variant="ghost" fullWidth onPress={() => successSheet && router.replace(`/property-passport/${successSheet.amass_property_id}` as any)} testID="wiz-success-passport" />
+        </View>
+      </Sheet>
+    </Screen>
   );
 }
 
@@ -555,6 +575,10 @@ function StageLocation({
   draft: OnboardingDraft;
   patchDraft: (patch: Partial<OnboardingDraft>) => Promise<void>;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const toast = useToast();
+
   const [locating, setLocating] = useState(false);
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof api.duplicateCheckAdhoc>> | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -622,7 +646,7 @@ function StageLocation({
         },
       });
     } catch (e: any) {
-      Alert.alert("GPS unavailable", e?.message ?? "Try again outdoors.");
+      toast.error("GPS unavailable", e?.message ?? "Try again outdoors.");
     } finally {
       setLocating(false);
     }
@@ -670,7 +694,7 @@ function StageLocation({
         AMASS uses your GPS + address to assign a unique property identity and prevent duplicate listings.
       </Text>
 
-      <Pressable style={styles.gpsBtn} onPress={useMyGps} disabled={locating} testID="loc-use-gps">
+      <Pressable style={styles.gpsBtn} onPress={useMyGps} disabled={locating} testID="loc-use-gps" accessibilityRole="button" accessibilityLabel="Use my GPS location" accessibilityState={{ busy: locating, disabled: locating }}>
         {locating ? (
           <ActivityIndicator color="#fff" />
         ) : (
@@ -787,6 +811,8 @@ function StageLocation({
               style={[styles.chip, on && styles.chipOn]}
               onPress={() => setAddressField("state", s)}
               testID={`state-${s}`}
+              accessibilityRole="button"
+              accessibilityLabel={s}
             >
               <Text style={[styles.chipText, on && { color: "#fff" }]}>{s}</Text>
             </Pressable>
@@ -845,6 +871,9 @@ function StageProperty({
   draft: OnboardingDraft;
   patchDraft: (patch: Partial<OnboardingDraft>) => Promise<void>;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const d = draft.details ?? { property_type: "", amenities: [] };
   const setField = (k: keyof NonNullable<OnboardingDraft["details"]>, v: any) => {
     patchDraft({ details: { ...(d as any), [k]: v } });
@@ -869,6 +898,8 @@ function StageProperty({
               onPress={() => setField("property_type", p)}
               style={[styles.chip, on && styles.chipOn]}
               testID={`ptype-${p}`}
+              accessibilityRole="button"
+              accessibilityLabel={p}
             >
               <Text style={[styles.chipText, on && { color: "#fff" }]}>{p}</Text>
             </Pressable>
@@ -899,6 +930,8 @@ function StageProperty({
               onPress={() => toggleAmenity(a)}
               style={[styles.chip, on && styles.chipOn]}
               testID={`amenity-${a.replace(/\s+/g, "-")}`}
+              accessibilityRole="checkbox"
+              accessibilityLabel={a}
             >
               {on && <Ionicons name="checkmark" size={12} color="#fff" />}
               <Text style={[styles.chipText, on && { color: "#fff" }]}>{a}</Text>
@@ -918,6 +951,9 @@ function StageListing({
   draft: OnboardingDraft;
   patchDraft: (patch: Partial<OnboardingDraft>) => Promise<void>;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const l = draft.listing ?? { listing_type: "buy" as const, price: 0, currency: "NGN" };
   const setField = (k: keyof NonNullable<OnboardingDraft["listing"]>, v: any) => {
     patchDraft({ listing: { ...(l as any), [k]: v } });
@@ -938,6 +974,8 @@ function StageListing({
               onPress={() => setField("listing_type", t.key)}
               style={[styles.gridCard, on && styles.gridCardActive]}
               testID={`ltype-${t.key}`}
+              accessibilityRole="button"
+              accessibilityLabel={t.label}
             >
               <Ionicons name={t.icon} size={20} color={on ? "#fff" : colors.text} />
               <Text style={[styles.gridLabel, on && { color: "#fff" }]}>{t.label}</Text>
@@ -977,6 +1015,8 @@ function StageListing({
               onPress={() => setField("representation_type", r.key)}
               style={[styles.chip, on && styles.chipOn]}
               testID={`rep-${r.key}`}
+              accessibilityRole="button"
+              accessibilityLabel={r.label}
             >
               <Text style={[styles.chipText, on && { color: "#fff" }]}>{r.label}</Text>
             </Pressable>
@@ -1015,6 +1055,9 @@ function StagePhotos({
   draft: OnboardingDraft;
   patchDraft: (patch: Partial<OnboardingDraft>) => Promise<void>;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [picking, setPicking] = useState<null | "library" | "camera">(null);
   const media = draft.media_ids ?? [];
 
@@ -1077,7 +1120,7 @@ function StagePhotos({
       <Text style={styles.sub}>Add 1–12 photos. The first one is the cover.</Text>
 
       <View style={styles.pickerRow}>
-        <Pressable style={styles.pickerBtn} onPress={pickFromLibrary} disabled={!!picking} testID="pick-lib">
+        <Pressable style={styles.pickerBtn} onPress={pickFromLibrary} disabled={!!picking} testID="pick-lib" accessibilityRole="button" accessibilityLabel="Choose photos from gallery">
           {picking === "library" ? <ActivityIndicator /> : <><Ionicons name="images" size={18} color={colors.text} /><Text style={styles.pickerBtnText}>Gallery</Text></>}
         </Pressable>
         <Pressable
@@ -1085,6 +1128,8 @@ function StagePhotos({
           onPress={captureCamera}
           disabled={!!picking || Platform.OS === "web"}
           testID="pick-cam"
+          accessibilityRole="button"
+          accessibilityLabel="Take a photo"
         >
           {picking === "camera" ? <ActivityIndicator /> : <><Ionicons name="camera" size={18} color={colors.text} /><Text style={styles.pickerBtnText}>Camera</Text></>}
         </Pressable>
@@ -1105,7 +1150,7 @@ function StagePhotos({
                   <Text style={styles.coverBadgeText}>COVER</Text>
                 </View>
               )}
-              <Pressable style={styles.removeBtn} onPress={() => removeImage(u)} hitSlop={8}>
+              <Pressable style={styles.removeBtn} onPress={() => removeImage(u)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Remove photo">
                 <Ionicons name="close" size={16} color="#fff" />
               </Pressable>
             </View>
@@ -1118,6 +1163,9 @@ function StagePhotos({
 
 // ─── Stage 5: Review ──────────────────────────────────────────────────────
 function StageReview({ draft }: { draft: OnboardingDraft }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const addr = draft.address;
   const fullAddr = [addr?.house_number, addr?.street, addr?.estate, addr?.area, addr?.lga, addr?.state]
     .filter(Boolean)
@@ -1174,6 +1222,9 @@ function Field({
   style,
   ...rest
 }: React.ComponentProps<typeof TextInput> & { label: string; style?: any }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={[{ gap: 6 }, style]}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -1197,6 +1248,9 @@ function NumField({
   onChange: (v: number | undefined) => void;
   placeholder?: string;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={{ flex: 1, gap: 6 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -1216,6 +1270,9 @@ function NumField({
 }
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.reviewRow}>
       <Text style={styles.reviewLabel}>{label}</Text>
@@ -1225,54 +1282,27 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  stepLbl: { fontSize: 11, fontWeight: "700", color: colors.textTertiary, letterSpacing: 0.4 },
-  stageTitle: { fontSize: 13, fontWeight: "800", color: colors.text, marginTop: 6 },
-  progressBar: {
-    marginTop: 6,
-    width: "80%",
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.surfaceSecondary,
-    overflow: "hidden",
-  },
-  progressFill: { height: "100%", backgroundColor: colors.red, borderRadius: 2 },
 
   stepper: {
     flexDirection: "row",
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
     alignItems: "flex-start",
   },
-  stepperCell: { flex: 1, alignItems: "center", position: "relative" },
+  stepperCell: { flex: 1, alignItems: "center", gap: 5 },
   stepDot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.surfaceSecondary,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
   },
-  stepDotActive: { backgroundColor: colors.ink },
-  stepDotDone: { backgroundColor: colors.emerald },
-  stepDotLbl: { fontSize: 10, color: colors.textTertiary, marginTop: 4 },
-  stepLine: {
-    position: "absolute",
-    top: 12,
-    left: "60%",
-    right: "-40%",
-    height: 2,
-    backgroundColor: colors.border,
-  },
+  sheetIcon: { width: 64, height: 64, borderRadius: 22, alignItems: "center", justifyContent: "center", marginBottom: 4 },
 
   h1: { ...typography.display, fontSize: 24 },
   sub: { ...typography.body, color: colors.textTertiary, lineHeight: 20 },
@@ -1305,7 +1335,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   chipOn: { backgroundColor: colors.ink, borderColor: colors.ink },
   chipText: { fontSize: 12, fontWeight: "600", color: colors.textSecondary },
@@ -1318,7 +1348,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.border,
     gap: 6,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     minHeight: 100,
     justifyContent: "flex-end",
   },
@@ -1360,7 +1390,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: radius.md,
     borderWidth: 1,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   gpsChipDot: { width: 8, height: 8, borderRadius: 4 },
   gpsChipText: { flex: 1, fontSize: 12, fontWeight: "700", color: colors.text },
@@ -1463,7 +1493,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 12,
     left: 12,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: radius.pill,
@@ -1495,92 +1525,14 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: spacing.lg,
-    backgroundColor: "rgba(255,255,255,0.98)",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
   },
-  cta: {
-    height: 56,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  ctaText: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  ctaSecondary: {
-    height: 52,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fff",
-  },
-  ctaSecondaryText: { color: colors.text, fontSize: 14, fontWeight: "800" },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    backgroundColor: "#fff",
-    padding: spacing.xl,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    alignItems: "center",
-    gap: 12,
-  },
-  modalTitle: { ...typography.h2, fontSize: 20, textAlign: "center" },
-  modalBody: { ...typography.body, color: colors.textTertiary, textAlign: "center", lineHeight: 20 },
-  dupHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-  },
-  dupWarnBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.gold,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
-  dupWarnBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
   candidateCard: {
     padding: spacing.md,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
     gap: 6,
   },
   candidateHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  candidateId: { fontSize: 13, fontWeight: "800", color: colors.text },
-  scoreBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    backgroundColor: colors.gold,
-  },
-  scoreBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
-  candidateAddr: { fontSize: 12, color: colors.textSecondary, fontWeight: "600" },
-  candidateMeta: { fontSize: 11, color: colors.textTertiary, fontWeight: "500" },
   reasonRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  reasonText: { flex: 1, fontSize: 11, color: colors.text },
-  sameBtn: {
-    marginTop: 6,
-    height: 40,
-    borderRadius: radius.pill,
-    backgroundColor: colors.red,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  sameBtnText: { color: "#fff", fontSize: 12, fontWeight: "800" },
 });

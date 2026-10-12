@@ -1,21 +1,14 @@
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
-  Switch,
-} from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl, Switch } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Stack, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, EmptyState, IconButton, Screen, ScreenHeader, Sheet, SkeletonRows, useToast } from "@/src/ui";
 
 type SavedSearch = {
   id: string;
@@ -45,17 +38,24 @@ function humanCriteria(c: any): string {
 
 export default function SavedSearchesScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const [rows, setRows] = useState<SavedSearch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<SavedSearch | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
+    setError(false);
     try {
       const list = await api.savedSearches();
       setRows(list);
-    } catch (e: any) {
-      Alert.alert("Failed to load", e?.message ?? "Please try again.");
+    } catch {
+      setError(true);
     }
   }, []);
 
@@ -75,40 +75,30 @@ export default function SavedSearchesScreen() {
 
   const toggleAlerts = async (s: SavedSearch) => {
     Haptics.selectionAsync().catch(() => {});
-    setRows((prev) =>
-      prev.map((p) =>
-        p.id === s.id ? { ...p, alerts_enabled: !p.alerts_enabled } : p
-      )
-    );
+    setRows((prev) => prev.map((p) => (p.id === s.id ? { ...p, alerts_enabled: !p.alerts_enabled } : p)));
     try {
       await api.toggleSavedSearchAlerts(s.id, !s.alerts_enabled);
     } catch (e: any) {
       // revert
-      setRows((prev) =>
-        prev.map((p) =>
-          p.id === s.id ? { ...p, alerts_enabled: s.alerts_enabled } : p
-        )
-      );
-      Alert.alert("Failed", e?.message ?? "Please try again.");
+      setRows((prev) => prev.map((p) => (p.id === s.id ? { ...p, alerts_enabled: s.alerts_enabled } : p)));
+      toast.error("Couldn't update alerts", e?.message ?? "Please try again.");
     }
   };
 
-  const remove = (s: SavedSearch) => {
-    Alert.alert("Delete saved search?", s.name, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.deleteSavedSearch(s.id);
-            setRows((prev) => prev.filter((p) => p.id !== s.id));
-          } catch (e: any) {
-            Alert.alert("Failed", e?.message ?? "Please try again.");
-          }
-        },
-      },
-    ]);
+  const confirmDelete = async () => {
+    const s = toDelete;
+    if (!s) return;
+    setDeleting(true);
+    try {
+      await api.deleteSavedSearch(s.id);
+      setRows((prev) => prev.filter((p) => p.id !== s.id));
+      setToDelete(null);
+      toast.success("Saved search deleted");
+    } catch (e: any) {
+      toast.error("Couldn't delete", e?.message ?? "Please try again.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const runSearch = async (s: SavedSearch) => {
@@ -118,223 +108,83 @@ export default function SavedSearchesScreen() {
       const res = await api.runSavedSearch(s.id);
       setRunning(null);
       if (res.count === 0) {
-        Alert.alert("No matches yet", "We'll notify you as soon as new listings match.");
+        toast.info("No matches yet", "We'll notify you as soon as new listings match.");
         return;
       }
       // Navigate to map with matching bbox / stored criteria — for MVP go to Home
-      router.push({
-        pathname: "/(tabs)",
-        params: { savedSearch: s.id },
-      });
+      router.push({ pathname: "/(tabs)", params: { savedSearch: s.id } });
     } catch (e: any) {
       setRunning(null);
-      Alert.alert("Failed to run", e?.message ?? "Please try again.");
+      toast.error("Couldn't run search", e?.message ?? "Please try again.");
     }
   };
 
   return (
-    <View style={styles.container}>
+    <Screen testID="saved-searches-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn} testID="back-btn">
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Saved Searches</Text>
-        <View style={styles.countPill}>
-          <Text style={styles.countPillText}>{rows.length}</Text>
-        </View>
-      </SafeAreaView>
+      <ScreenHeader title="Saved Searches" subtitle={rows.length ? `${rows.length} saved · alerts when new listings match` : undefined} backTestID="back-btn" />
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={colors.red} /></View>
+        <View style={{ padding: space[4] }}>
+          <SkeletonRows rows={4} />
+        </View>
+      ) : error && rows.length === 0 ? (
+        <EmptyState variant="error" title="Couldn't load saved searches" body="Check your connection and try again." actionLabel="Retry" onAction={() => load()} />
       ) : (
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: 60 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
+        <ScrollView contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: 60 + insets.bottom, flexGrow: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />} showsVerticalScrollIndicator={false}>
           {rows.length === 0 ? (
-            <View style={styles.empty}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="bookmark" size={30} color={colors.textMuted} />
-              </View>
-              <Text style={styles.emptyTitle}>No saved searches yet</Text>
-              <Text style={styles.emptyBody}>
-                Save a filter set from the map or marketplace search and we&apos;ll alert you
-                the moment a new matching listing goes live.
-              </Text>
-              <Pressable style={styles.cta} onPress={() => router.push("/(tabs)")}>
-                <Ionicons name="search" size={16} color="#fff" />
-                <Text style={styles.ctaText}>Start searching</Text>
-              </Pressable>
-            </View>
+            <EmptyState icon="bookmark-outline" title="No saved searches yet" body="Save a filter set from the map or marketplace search and we'll alert you the moment a new matching listing goes live." actionLabel="Start searching" onAction={() => router.push("/(tabs)")} />
           ) : (
             rows.map((s) => (
-              <View key={s.id} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.name} numberOfLines={1}>{s.name}</Text>
-                    <Text style={styles.crit} numberOfLines={2}>{humanCriteria(s.criteria)}</Text>
+              <Card key={s.id} elevation="xs" style={{ gap: 12 }} testID={`saved-search-${s.id}`}>
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <AppText variant="title" numberOfLines={1}>
+                      {s.name}
+                    </AppText>
+                    <AppText variant="caption" tone="secondary" numberOfLines={2}>
+                      {humanCriteria(s.criteria)}
+                    </AppText>
                   </View>
-                  {s.new_matches_since_seen > 0 && (
-                    <View style={styles.newPill}>
-                      <Text style={styles.newPillText}>
-                        {s.new_matches_since_seen} new
-                      </Text>
-                    </View>
-                  )}
+                  {s.new_matches_since_seen > 0 && <Badge label={`${s.new_matches_since_seen} new`} tone="brand" icon="sparkles" />}
                 </View>
 
-                <View style={styles.alertRow}>
-                  <View style={styles.alertLabelWrap}>
-                    <Ionicons
-                      name={s.alerts_enabled ? "notifications" : "notifications-off"}
-                      size={14}
-                      color={s.alerts_enabled ? "#F5B301" : colors.textTertiary}
-                    />
-                    <Text style={styles.alertLabel}>
-                      Alerts {s.alerts_enabled ? "on" : "off"}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={s.alerts_enabled}
-                    onValueChange={() => toggleAlerts(s)}
-                    trackColor={{ true: colors.red, false: colors.border }}
-                    thumbColor="#fff"
-                  />
+                <View style={[styles.alertRow, { backgroundColor: colors.surfaceAlt }]}>
+                  <Ionicons name={s.alerts_enabled ? "notifications" : "notifications-off-outline"} size={16} color={s.alerts_enabled ? colors.massText : colors.textTertiary} />
+                  <AppText variant="bodySm" weight="semibold" style={{ flex: 1 }}>
+                    Alerts {s.alerts_enabled ? "on" : "off"}
+                  </AppText>
+                  <Switch value={s.alerts_enabled} onValueChange={() => toggleAlerts(s)} trackColor={{ true: colors.brand, false: colors.surfaceSunken }} accessibilityLabel={`Alerts for ${s.name}`} testID={`alerts-${s.id}`} />
                 </View>
 
                 <View style={styles.actionsRow}>
-                  <Pressable
-                    onPress={() => runSearch(s)}
-                    style={styles.runBtn}
-                    testID={`run-${s.id}`}
-                  >
-                    {running === s.id ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <>
-                        <Ionicons name="play" size={14} color="#fff" />
-                        <Text style={styles.runBtnText}>Run now</Text>
-                      </>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    onPress={() => remove(s)}
-                    style={styles.deleteBtn}
-                    testID={`delete-${s.id}`}
-                  >
-                    <Ionicons name="trash-outline" size={16} color={colors.red} />
-                  </Pressable>
+                  <Button label="Run now" size="sm" iconLeft="play" loading={running === s.id} onPress={() => runSearch(s)} style={{ flex: 1 }} testID={`run-${s.id}`} />
+                  <IconButton icon="trash-outline" label={`Delete ${s.name}`} color={colors.error} size={36} iconSize={16} onPress={() => setToDelete(s)} testID={`delete-${s.id}`} />
                 </View>
 
-                <Text style={styles.meta}>
-                  {s.last_run_at
-                    ? `Last ran ${new Date(s.last_run_at).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}`
-                    : "Not yet run"}
-                </Text>
-              </View>
+                <AppText variant="micro" tone="tertiary">
+                  {s.last_run_at ? `Last ran ${new Date(s.last_run_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "Not yet run"}
+                </AppText>
+              </Card>
             ))
           )}
         </ScrollView>
       )}
-    </View>
+
+      <Sheet visible={!!toDelete} onClose={() => setToDelete(null)} title="Delete saved search?" testID="delete-search-sheet">
+        <View style={{ gap: space[3] }}>
+          <AppText variant="body" tone="secondary">
+            “{toDelete?.name}” and its alerts will be removed. You can always save it again from the map.
+          </AppText>
+          <Button label="Delete" variant="destructive" size="lg" fullWidth loading={deleting} onPress={confirmDelete} testID="delete-search-confirm" />
+          <Button label="Keep it" variant="ghost" fullWidth onPress={() => setToDelete(null)} />
+        </View>
+      </Sheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center", justifyContent: "center",
-  },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
-  countPill: {
-    minWidth: 32, height: 30, paddingHorizontal: 10,
-    borderRadius: 15, backgroundColor: colors.ink,
-    alignItems: "center", justifyContent: "center",
-  },
-  countPillText: { color: "#fff", fontSize: 12, fontWeight: "900" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-
-  card: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    padding: 16, gap: 10,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    borderWidth: 1, borderColor: colors.border,
-    ...shadows.soft,
-  },
-  cardTop: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
-  name: { fontSize: 15, fontWeight: "800", color: colors.text, letterSpacing: -0.2 },
-  crit: { fontSize: 12, color: colors.textSecondary, marginTop: 3, lineHeight: 17 },
-  newPill: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
-    backgroundColor: colors.red,
-  },
-  newPillText: { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.4 },
-  alertRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-  },
-  alertLabelWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
-  alertLabel: { fontSize: 12, color: colors.text, fontWeight: "700" },
-  actionsRow: { flexDirection: "row", gap: 10, alignItems: "center" },
-  runBtn: {
-    flex: 1, height: 42, borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center", justifyContent: "center",
-    flexDirection: "row", gap: 6,
-  },
-  runBtnText: { color: "#fff", fontSize: 13, fontWeight: "800", letterSpacing: 0.2 },
-  deleteBtn: {
-    width: 42, height: 42, borderRadius: 21,
-    borderWidth: 1, borderColor: colors.border,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: "#fff",
-  },
-  meta: { fontSize: 10, color: colors.textTertiary, fontWeight: "600" },
-
-  empty: {
-    marginTop: 60,
-    marginHorizontal: spacing.xl,
-    alignItems: "center", gap: 8,
-  },
-  emptyIcon: {
-    width: 68, height: 68, borderRadius: 34,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center", justifyContent: "center",
-  },
-  emptyTitle: { fontSize: 17, fontWeight: "800", color: colors.text, marginTop: 8 },
-  emptyBody: {
-    fontSize: 13, color: colors.textSecondary,
-    textAlign: "center", lineHeight: 19,
-  },
-  cta: {
-    marginTop: 12,
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 18, height: 46, borderRadius: 23,
-    backgroundColor: colors.red,
-  },
-  ctaText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  alertRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
+  actionsRow: { flexDirection: "row", alignItems: "center", gap: 10 },
 });

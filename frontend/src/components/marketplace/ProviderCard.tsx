@@ -1,10 +1,12 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable, Linking, Alert } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet, Pressable, Linking } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
-import { colors, radius, shadows, spacing, fontFamily as F, formatNaira } from "@/src/constants/theme";
+import { radius, shadows, spacing, fontFamily as F, formatNaira } from "@/src/constants/theme";
 import type { MarketplaceItem } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { useToast } from "@/src/ui";
 
 export type ProviderCardVariant = "list" | "featured";
 
@@ -23,6 +25,10 @@ export function ProviderCard({
   favorited?: boolean;
   variant?: ProviderCardVariant;
 }) {
+  const colors = useLegacyColors();
+  const toast = useToast();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const trade = item.subcategory || "Service";
   const years = item.provider_years_experience;
   const jobs = item.provider_jobs_completed;
@@ -36,14 +42,14 @@ export function ProviderCard({
   const handleCall = () => {
     Haptics.selectionAsync().catch(() => {});
     const num = digitsOnly(item.seller_phone);
-    if (!num) return Alert.alert("Call", "No phone number available.");
+    if (!num) return toast.info("No phone number", "This provider hasn't added a phone number yet.");
     Linking.openURL(`tel:${num}`).catch(() => {});
   };
   const handleWhatsApp = () => {
     Haptics.selectionAsync().catch(() => {});
     const raw = digitsOnly(item.seller_whatsapp || item.seller_phone);
     const num = raw.replace(/^\+/, "");
-    if (!num) return Alert.alert("WhatsApp", "No WhatsApp number available.");
+    if (!num) return toast.info("No WhatsApp number", "This provider hasn't added WhatsApp yet.");
     const msg = encodeURIComponent(
       `Hi ${item.seller_name || item.vendor}, I found you on AMASS FIXA and would like to book a ${trade.toLowerCase()} service.`
     );
@@ -213,7 +219,8 @@ export function ProviderCard({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,

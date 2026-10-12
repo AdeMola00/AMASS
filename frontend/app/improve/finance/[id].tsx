@@ -1,173 +1,155 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, EmptyState, Screen, ScreenHeader, Section, Skeleton } from "@/src/ui";
+import type { BadgeTone } from "@/src/ui";
 
-const STATUS_COLOR: Record<string, string> = {
-  draft: colors.textTertiary,
-  submitted: "#F5B301",
-  under_review: "#2563EB",
-  approved: "#22C55E",
-  rejected: colors.red,
-  disbursed: "#22C55E",
-  cancelled: colors.textTertiary,
+const STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "neutral",
+  submitted: "warning",
+  under_review: "info",
+  approved: "success",
+  rejected: "error",
+  disbursed: "success",
+  cancelled: "neutral",
 };
 
 export default function FinanceDetail() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [doc, setDoc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!id) return;
-    api.getFinanceApplication(id as string).then(setDoc).finally(() => setLoading(false));
+    setLoading(true);
+    setError(false);
+    try {
+      setDoc(await api.getFinanceApplication(id as string));
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  if (loading) return <View style={styles.center}><ActivityIndicator color={colors.red} /></View>;
-  if (!doc) return <View style={styles.center}><Text>Not found</Text></View>;
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const currentStatus = doc.status;
-  const color = STATUS_COLOR[currentStatus] || colors.textSecondary;
+  const toneColor = (tone: BadgeTone) =>
+    tone === "success" ? colors.success : tone === "warning" ? colors.warning : tone === "info" ? colors.info : tone === "error" ? colors.error : colors.textTertiary;
 
   return (
-    <View style={styles.container}>
+    <Screen testID="finance-detail">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Loan Application</Text>
-        <View style={{ width: 40 }} />
-      </SafeAreaView>
+      <ScreenHeader title="Loan Application" subtitle={doc?.reference ? `Ref ${doc.reference}` : undefined} />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
-        {/* Header block */}
-        <View style={styles.hero}>
-          <View style={[styles.statusPill, { backgroundColor: color + "22" }]}>
-            <View style={[styles.statusDot, { backgroundColor: color }]} />
-            <Text style={[styles.statusText, { color }]}>{currentStatus.replace(/_/g, " ")}</Text>
-          </View>
-          <Text style={styles.product}>{doc.product_name}</Text>
-          <View style={styles.amountRow}>
-            <Text style={styles.amount}>{formatNaira(doc.amount_requested_ngn)}</Text>
-            <Text style={styles.tenor}>{doc.tenor_months} months</Text>
-          </View>
-          {doc.partner_bank_id && (
-            <Text style={styles.bank}>Partner: {doc.partner_bank_id.toUpperCase()}</Text>
-          )}
-          {doc.reference && <Text style={styles.ref}>Ref: {doc.reference}</Text>}
+      {loading ? (
+        <View style={{ padding: space[4], gap: 12 }}>
+          <Skeleton height={170} radius={20} />
+          <Skeleton height={90} radius={20} />
+          <Skeleton height={160} radius={20} />
         </View>
-
-        <Section title="Purpose">
-          <Text style={styles.body}>{doc.purpose}</Text>
-        </Section>
-
-        <Section title="Status Timeline">
-          {(doc.history || []).map((h: any, i: number) => (
-            <View key={i} style={styles.tlRow}>
-              <View style={[styles.tlDot, { backgroundColor: STATUS_COLOR[h.status] || colors.textSecondary }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.tlStatus}>{h.status.replace(/_/g, " ")}</Text>
-                {h.note && <Text style={styles.tlNote}>{h.note}</Text>}
-                <Text style={styles.tlAt}>
-                  {new Date(h.at).toLocaleString(undefined, {
-                    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-                  })}
-                </Text>
+      ) : error || !doc ? (
+        <EmptyState variant={error ? "error" : "empty"} icon="document-text-outline" title={error ? "Couldn't load application" : "Application not found"} body={error ? "Check your connection and try again." : "This loan application may have been removed."} actionLabel={error ? "Retry" : "Go back"} onAction={error ? load : () => router.back()} />
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingBottom: 60 + insets.bottom, gap: space[5] }} showsVerticalScrollIndicator={false}>
+          <Animated.View entering={FadeInDown.duration(260)} style={{ paddingHorizontal: space[4], paddingTop: space[2] }}>
+            <Card elevation="md" style={{ gap: 6 }}>
+              <Badge label={String(doc.status).replace(/_/g, " ")} tone={STATUS_TONE[doc.status] ?? "neutral"} size="md" />
+              <AppText variant="h3" style={{ marginTop: 8 }}>
+                {doc.product_name}
+              </AppText>
+              <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10 }}>
+                <AppText variant="display" tabular>
+                  {formatNaira(doc.amount_requested_ngn)}
+                </AppText>
+                <AppText variant="bodyMedium" tone="tertiary" tabular>
+                  {doc.tenor_months} months
+                </AppText>
               </View>
+              {doc.partner_bank_id ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                  <Ionicons name="business-outline" size={14} color={colors.textSecondary} />
+                  <AppText variant="caption" tone="secondary" weight="bold" uppercase>
+                    Partner · {String(doc.partner_bank_id)}
+                  </AppText>
+                </View>
+              ) : null}
+            </Card>
+          </Animated.View>
+
+          <Section title="Purpose">
+            <Card elevation="xs">
+              <AppText variant="body" tone="secondary">
+                {doc.purpose}
+              </AppText>
+            </Card>
+          </Section>
+
+          <Section title="Status timeline">
+            <Card elevation="xs" style={{ gap: 0 }}>
+              {(doc.history || []).map((h: any, i: number, arr: any[]) => {
+                const tone = STATUS_TONE[h.status] ?? "neutral";
+                const last = i === arr.length - 1;
+                return (
+                  <View key={i} style={styles.tlRow}>
+                    <View style={styles.tlRail}>
+                      <View style={[styles.tlDot, { backgroundColor: toneColor(tone), borderColor: colors.surface }]} />
+                      {!last ? <View style={[styles.tlLine, { backgroundColor: colors.border }]} /> : null}
+                    </View>
+                    <View style={{ flex: 1, paddingBottom: last ? 0 : 16, gap: 2 }}>
+                      <AppText variant="bodyMedium" style={{ textTransform: "capitalize" }}>
+                        {String(h.status).replace(/_/g, " ")}
+                      </AppText>
+                      {h.note ? (
+                        <AppText variant="bodySm" tone="secondary">
+                          {h.note}
+                        </AppText>
+                      ) : null}
+                      <AppText variant="caption" tone="tertiary" tabular>
+                        {new Date(h.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </AppText>
+                    </View>
+                  </View>
+                );
+              })}
+            </Card>
+          </Section>
+
+          {doc.status === "approved" ? (
+            <View style={{ paddingHorizontal: space[4] }}>
+              <Button
+                label="Start renovation project"
+                variant="brand"
+                size="lg"
+                fullWidth
+                iconLeft="construct"
+                onPress={() => router.push(`/improve/project/new?property=${doc.property_id}&inspection=${doc.inspection_id || ""}&finance=${doc.id}` as any)}
+                testID="start-project-btn"
+              />
             </View>
-          ))}
-        </Section>
-
-        {doc.status === "approved" && (
-          <View style={styles.ctaWrap}>
-            <Pressable
-              style={styles.cta}
-              onPress={() =>
-                router.push(
-                  `/improve/project/new?property=${doc.property_id}&inspection=${doc.inspection_id || ""}&finance=${doc.id}` as any
-                )
-              }
-            >
-              <Ionicons name="construct" size={16} color="#fff" />
-              <Text style={styles.ctaText}>Start renovation project</Text>
-            </Pressable>
-          </View>
-        )}
-      </ScrollView>
-    </View>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionBody}>{children}</View>
-    </View>
+          ) : null}
+        </ScrollView>
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.lg, paddingBottom: spacing.md,
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#fff",
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider,
-  },
-  iconBtn: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceSecondary,
-    alignItems: "center", justifyContent: "center",
-  },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
-
-  hero: {
-    margin: spacing.lg, padding: 20, borderRadius: 20,
-    backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border,
-    ...shadows.card, gap: 6,
-  },
-  statusPill: {
-    alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999,
-  },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 10, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" },
-  product: { fontSize: 20, fontWeight: "900", color: colors.text, letterSpacing: -0.4, marginTop: 8 },
-  amountRow: { flexDirection: "row", alignItems: "baseline", gap: 10, marginTop: 4 },
-  amount: { fontSize: 32, fontWeight: "900", color: colors.text, letterSpacing: -1 },
-  tenor: { fontSize: 14, color: colors.textTertiary, fontWeight: "700" },
-  bank: { fontSize: 12, color: colors.textSecondary, fontWeight: "800", marginTop: 6 },
-  ref: { fontSize: 11, color: colors.textTertiary, fontWeight: "600" },
-
-  section: { paddingHorizontal: spacing.lg, marginTop: 8 },
-  sectionTitle: {
-    fontSize: 12, fontWeight: "800", color: colors.text,
-    letterSpacing: 0.3, textTransform: "uppercase", marginBottom: 8, marginTop: 8,
-  },
-  sectionBody: {
-    padding: 14, borderRadius: radius.md,
-    backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border,
-    gap: 12,
-  },
-  body: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
-
-  tlRow: { flexDirection: "row", gap: 10 },
-  tlDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
-  tlStatus: { fontSize: 13, fontWeight: "800", color: colors.text, textTransform: "capitalize" },
-  tlNote: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  tlAt: { fontSize: 10, color: colors.textTertiary, marginTop: 3 },
-
-  ctaWrap: { padding: spacing.lg },
-  cta: {
-    height: 52, borderRadius: radius.pill,
-    backgroundColor: colors.red,
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-  },
-  ctaText: { color: "#fff", fontSize: 14, fontWeight: "900" },
+  tlRow: { flexDirection: "row", gap: 12 },
+  tlRail: { width: 14, alignItems: "center" },
+  tlDot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, marginTop: 4 },
+  tlLine: { flex: 1, width: 2, marginTop: 2, borderRadius: 1 },
 });

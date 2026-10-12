@@ -10,10 +10,12 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../ui/icons";
 import * as Haptics from "expo-haptics";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
 import { propertyTypeColor } from "@/src/components/PropertyMarker";
 import type { Property } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_HGAP = spacing.lg;
@@ -66,6 +68,9 @@ export function MapDockedCard({
   onContact?: (property: Property) => void;
   onDismiss?: () => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const listRef = useRef<FlatList<Property>>(null);
 
   const activeIndex = useMemo(() => {
@@ -174,6 +179,9 @@ function DockedCard({
   onFavorite: () => void;
   onContact?: () => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const cover = item.images?.[0];
   const chip = TXN_CHIP[txnChipFor(item)];
   const typeColor = propertyTypeColor(item.property_type);
@@ -314,7 +322,10 @@ function DockedCard({
   );
 }
 
-function MetaSpec({ icon, value }: { icon: keyof typeof Ionicons.glyphMap; value: string | number }) {
+function MetaSpec({ icon, value }: { icon: IconName; value: string | number }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.spec}>
       <Ionicons name={icon} size={12} color={colors.textSecondary} />
@@ -323,7 +334,8 @@ function MetaSpec({ icon, value }: { icon: keyof typeof Ionicons.glyphMap; value
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: {
     // Owned by parent (positioned absolutely). No `position: absolute` here
     // otherwise the wrapper collapses to zero height on web and the FlatList
@@ -350,7 +362,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: radius.lg,
     overflow: "hidden",
   },
@@ -472,7 +484,7 @@ const styles = StyleSheet.create({
     height: 36,
     paddingHorizontal: 10,
     borderRadius: 18,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },

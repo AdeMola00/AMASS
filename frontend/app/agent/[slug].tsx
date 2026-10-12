@@ -1,31 +1,27 @@
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  ScrollView,
-  Alert,
-  Share,
-  Linking,
-  RefreshControl,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, Share, Linking, RefreshControl } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Avatar, Badge, Button, Card, Chip, EmptyState, IconButton, Screen, ScreenHeader, Section, Skeleton, SkeletonRows, useToast } from "@/src/ui";
 
 type PublicAgent = Awaited<ReturnType<typeof api.publicAgentBySlug>>;
 type Property = Awaited<ReturnType<typeof api.publicAgentListings>>[number];
 
+const WHATSAPP_GREEN = "#25D366";
+
 export default function AgentPublicProfile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const { slug } = useLocalSearchParams<{ slug: string }>();
 
   const [agent, setAgent] = useState<PublicAgent | null>(null);
@@ -35,15 +31,11 @@ export default function AgentPublicProfile() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!slug) return;
     try {
       setError(null);
-      const [a, l, r] = await Promise.all([
-        api.publicAgentBySlug(slug as string),
-        api.publicAgentListings(slug as string).catch(() => []),
-        api.listAgentReviews(slug as string, 10).catch(() => []),
-      ]);
+      const [a, l, r] = await Promise.all([api.publicAgentBySlug(slug as string), api.publicAgentListings(slug as string).catch(() => []), api.listAgentReviews(slug as string, 10).catch(() => [])]);
       setAgent(a);
       setListings(l);
       setReviews(r);
@@ -53,12 +45,11 @@ export default function AgentPublicProfile() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [slug]);
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  }, [load]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -71,9 +62,7 @@ export default function AgentPublicProfile() {
     try {
       await Share.share({
         title: `${agent.full_name} on AMASS`,
-        message: `${agent.full_name}${
-          agent.agency_name ? ` · ${agent.agency_name}` : ""
-        } — ${agent.badge.label} on AMASS. See listings: ${agent.share_url}`,
+        message: `${agent.full_name}${agent.agency_name ? ` · ${agent.agency_name}` : ""} — ${agent.badge.label} on AMASS. See listings: ${agent.share_url}`,
         url: agent.share_url,
       });
       api.recordAgentShare(agent.slug, "native_share", "profile-header").catch(() => {});
@@ -85,169 +74,91 @@ export default function AgentPublicProfile() {
     // Public profile doesn't expose phone number directly; deep-link to
     // WhatsApp with the profile URL so the customer can start a chat via
     // AMASS. When contact info is unlocked we can pre-fill the number.
-    const text = encodeURIComponent(
-      `Hi ${agent.full_name}, I saw your AMASS profile: ${agent.share_url}`
-    );
-    Linking.openURL(`https://wa.me/?text=${text}`).catch(() =>
-      Alert.alert("WhatsApp not available")
-    );
+    const text = encodeURIComponent(`Hi ${agent.full_name}, I saw your AMASS profile: ${agent.share_url}`);
+    Linking.openURL(`https://wa.me/?text=${text}`).catch(() => toast.error("WhatsApp not available", "Install WhatsApp or use in-app chat instead."));
     api.recordAgentShare(agent.slug, "whatsapp", "profile-cta").catch(() => {});
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Screen>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.red} size="large" />
+        <ScreenHeader title="Agent profile" />
+        <View style={{ alignItems: "center", padding: space[4], gap: space[4] }}>
+          <Skeleton width={96} height={96} radius={48} />
+          <Skeleton width={180} height={24} />
+          <Skeleton width={120} height={14} />
+          <SkeletonRows rows={3} style={{ alignSelf: "stretch", marginTop: space[4] }} />
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   if (error || !agent) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Screen>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-            <Ionicons name="chevron-back" size={26} color={colors.ink} />
-          </Pressable>
-        </View>
-        <View style={styles.centered}>
-          <Ionicons name="alert-circle" size={48} color={colors.textMuted} />
-          <Text style={styles.errorTitle}>Agent unavailable</Text>
-          <Text style={styles.errorSub}>{error || "Try again later"}</Text>
-        </View>
-      </SafeAreaView>
+        <ScreenHeader title="Agent profile" />
+        <EmptyState variant="error" title="Agent unavailable" body={error || "Try again later"} actionLabel="Retry" onAction={load} />
+      </Screen>
     );
   }
 
-  const initials = agent.full_name
-    .split(" ")
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const verified = agent.badge?.id ? agent.badge.id !== "registered" : false;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <Screen testID="agent-public-profile">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: colors.bg }}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color={colors.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Agent profile</Text>
-          <Pressable onPress={onShare} style={styles.iconBtn} hitSlop={8}>
-            <Ionicons name="share-outline" size={22} color={colors.ink} />
-          </Pressable>
-        </View>
-      </SafeAreaView>
+      <ScreenHeader title="Agent profile" right={<IconButton icon="share-outline" label="Share profile" onPress={onShare} testID="agent-share-header" />} />
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.red} />
-        }
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 60, gap: space[5] }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View style={styles.hero}>
-          <View style={styles.avatar}>
-            {agent.avatar_url ? (
-              <Image
-                source={{ uri: agent.avatar_url }}
-                style={{ width: 96, height: 96, borderRadius: 48 }}
-              />
-            ) : (
-              <Text style={styles.avatarInitials}>{initials}</Text>
+          <Avatar name={agent.full_name} uri={agent.avatar_url} size={96} verified={verified} />
+          <View style={{ alignItems: "center", gap: 2 }}>
+            <AppText variant="h1" align="center">
+              {agent.full_name}
+            </AppText>
+            {!!agent.agency_name && (
+              <AppText variant="body" tone="secondary" align="center">
+                {agent.agency_name}
+              </AppText>
             )}
           </View>
-          <Text style={styles.name}>{agent.full_name}</Text>
-          {!!agent.agency_name && (
-            <Text style={styles.agency}>{agent.agency_name}</Text>
-          )}
 
           <View style={styles.badgeRow}>
-            <View style={[styles.badge, { backgroundColor: agent.badge.colour }]}>
-              <Ionicons name={agent.badge.icon as any} size={12} color={colors.bg} />
-              <Text style={styles.badgeText}>{agent.badge.label}</Text>
+            <View style={[styles.tierBadge, { backgroundColor: agent.badge.colour }]}>
+              <Ionicons name={agent.badge.icon as any} size={12} color="#fff" />
+              <AppText variant="micro" color="#fff">
+                {agent.badge.label}
+              </AppText>
             </View>
-            {agent.is_founding_agent && (
-              <View style={styles.foundingBadge}>
-                <Ionicons name="star" size={12} color={colors.bg} />
-                <Text style={styles.badgeText}>FOUNDING AGENT</Text>
-              </View>
-            )}
+            {agent.is_founding_agent && <Badge label="Founding agent" tone="mass" icon="star" />}
           </View>
 
           <View style={styles.metaRow}>
-            {(agent.state || agent.lga) && (
-              <View style={styles.metaChip}>
-                <Ionicons name="location" size={12} color={colors.textSecondary} />
-                <Text style={styles.metaText}>
-                  {[agent.lga, agent.state].filter(Boolean).join(", ")}
-                </Text>
-              </View>
-            )}
-            {agent.years_experience > 0 && (
-              <View style={styles.metaChip}>
-                <Ionicons name="briefcase" size={12} color={colors.textSecondary} />
-                <Text style={styles.metaText}>
-                  {agent.years_experience} yrs experience
-                </Text>
-              </View>
-            )}
+            {(agent.state || agent.lga) && <Badge label={[agent.lga, agent.state].filter(Boolean).join(", ")} icon="location" />}
+            {agent.years_experience > 0 && <Badge label={`${agent.years_experience} yrs experience`} icon="briefcase" />}
           </View>
         </View>
 
         {/* Stats */}
-        <View style={styles.statsRow}>
-          <StatCell label="Active" value={agent.active_listings.toString()} />
-          <View style={styles.statDivider} />
-          <StatCell label="Verified" value={agent.verified_listings.toString()} />
-          <View style={styles.statDivider} />
-          <StatCell
-            label="Rating"
-            value={
-              agent.reviews_count > 0
-                ? `${agent.rating.toFixed(1)}★`
-                : "—"
-            }
-            caption={
-              agent.reviews_count > 0 ? `${agent.reviews_count} reviews` : "No reviews yet"
-            }
-          />
-          <View style={styles.statDivider} />
-          <StatCell
-            label="Response"
-            value={
-              agent.response_rate > 0
-                ? `${Math.round(agent.response_rate * 100)}%`
-                : "—"
-            }
-          />
-        </View>
+        <Card elevation="xs" style={{ marginHorizontal: space[4] }} padded={false}>
+          <View style={styles.statsRow}>
+            <StatCell label="Active" value={agent.active_listings.toString()} />
+            <View style={[styles.statDivider, { backgroundColor: colors.divider }]} />
+            <StatCell label="Verified" value={agent.verified_listings.toString()} />
+            <View style={[styles.statDivider, { backgroundColor: colors.divider }]} />
+            <StatCell label="Rating" value={agent.reviews_count > 0 ? `${agent.rating.toFixed(1)}★` : "—"} caption={agent.reviews_count > 0 ? `${agent.reviews_count} reviews` : "No reviews yet"} />
+            <View style={[styles.statDivider, { backgroundColor: colors.divider }]} />
+            <StatCell label="Response" value={agent.response_rate > 0 ? `${Math.round(agent.response_rate * 100)}%` : "—"} />
+          </View>
+        </Card>
 
         {/* CTAs */}
         <View style={styles.ctaRow}>
-          <Pressable
-            style={[styles.ctaBtn, styles.ctaPrimary]}
-            onPress={openWhatsApp}
-            testID="agent-whatsapp"
-          >
-            <Ionicons name="logo-whatsapp" size={18} color={colors.bg} />
-            <Text style={styles.ctaPrimaryText}>Message on WhatsApp</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.ctaBtn, styles.ctaSecondary]}
-            onPress={onShare}
-            testID="agent-share"
-          >
-            <Ionicons name="share-outline" size={18} color={colors.ink} />
-            <Text style={styles.ctaSecondaryText}>Share</Text>
-          </Pressable>
+          <Button label="Message on WhatsApp" iconLeft="logo-whatsapp" style={{ flex: 1, backgroundColor: WHATSAPP_GREEN }} onPress={openWhatsApp} testID="agent-whatsapp" />
+          <Button label="Share" variant="secondary" iconLeft="share-outline" onPress={onShare} testID="agent-share" />
         </View>
 
         {/* Coverage */}
@@ -255,9 +166,7 @@ export default function AgentPublicProfile() {
           <Section title="Areas covered">
             <View style={styles.chipWrap}>
               {agent.areas_of_operation.map((a) => (
-                <View key={a} style={styles.chip}>
-                  <Text style={styles.chipText}>{a}</Text>
-                </View>
+                <Chip key={a} label={a} icon="location-outline" />
               ))}
             </View>
           </Section>
@@ -268,320 +177,111 @@ export default function AgentPublicProfile() {
           <Section title="Specialisation">
             <View style={styles.chipWrap}>
               {agent.specialisations.map((a) => (
-                <View key={a} style={styles.chip}>
-                  <Text style={styles.chipText}>{a}</Text>
-                </View>
+                <Chip key={a} label={a} />
               ))}
             </View>
           </Section>
         )}
 
         {/* Listings */}
-        <Section
-          title={`Active listings (${listings.length})`}
-          action={
-            listings.length > 3
-              ? { label: "View all", onPress: () => router.push(`/agent/${agent.slug}/listings` as any) }
-              : undefined
-          }
-        >
+        <Section title={`Active listings (${listings.length})`} actionLabel={listings.length > 3 ? "View all" : undefined} onAction={listings.length > 3 ? () => router.push(`/agent/${agent.slug}/listings` as any) : undefined}>
           {listings.length === 0 ? (
-            <View style={styles.emptyListings}>
-              <Ionicons name="business-outline" size={32} color={colors.textMuted} />
-              <Text style={styles.emptyText}>No active listings yet</Text>
-            </View>
+            <EmptyState compact icon="business-outline" title="No active listings yet" />
           ) : (
             listings.slice(0, 5).map((p) => (
-              <Pressable
-                key={p.id}
-                onPress={() => router.push(`/property/${p.id}`)}
-                style={styles.listingRow}
-              >
-                <Image
-                  source={{ uri: p.images?.[0] }}
-                  style={{ width: 96, height: 76, borderRadius: 10, backgroundColor: colors.surfaceSecondary }}
-                  contentFit="cover"
-                />
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text numberOfLines={1} style={styles.listingTitle}>
-                    {p.title}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.listingLocation}>
-                    {[p.city, p.state].filter(Boolean).join(", ")}
-                  </Text>
-                  <Text style={styles.listingPrice}>{formatNaira(p.price)}</Text>
+              <Card key={p.id} onPress={() => router.push(`/property/${p.id}`)} elevation="xs" padded={false} testID={`agent-listing-${p.id}`}>
+                <View style={styles.listingRow}>
+                  <Image source={{ uri: p.images?.[0] }} style={[styles.listingImg, { backgroundColor: colors.skeleton }]} contentFit="cover" transition={200} />
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <AppText variant="title" numberOfLines={1}>
+                      {p.title}
+                    </AppText>
+                    <AppText variant="caption" tone="tertiary" numberOfLines={1}>
+                      {[p.city, p.state].filter(Boolean).join(", ")}
+                    </AppText>
+                    <AppText variant="bodyMedium" weight="bold" tabular>
+                      {formatNaira(p.price)}
+                    </AppText>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-              </Pressable>
+              </Card>
             ))
           )}
         </Section>
 
         <ReviewsSection reviews={reviews} />
 
-        <Text style={styles.legal}>
+        <AppText variant="caption" tone="tertiary" align="center">
           AMASS Verified · amass.africa/agent/{agent.slug}
-        </Text>
+        </AppText>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 function ReviewsSection({ reviews }: { reviews: any[] }) {
+  const { colors } = useTheme();
   if (reviews.length === 0) return null;
   return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Customer reviews ({reviews.length})</Text>
-      </View>
+    <Section title={`Customer reviews (${reviews.length})`}>
       {reviews.slice(0, 5).map((r) => (
-        <View key={r.id} style={styles.reviewCard}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View style={styles.reviewAvatar}>
-              {r.reviewer_avatar ? (
-                <Image
-                  source={{ uri: r.reviewer_avatar }}
-                  style={{ width: 32, height: 32, borderRadius: 16 }}
-                />
-              ) : (
-                <Text style={styles.reviewInitials}>
-                  {(r.reviewer_name || "?").slice(0, 2).toUpperCase()}
-                </Text>
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.reviewName}>{r.reviewer_name || "AMASS customer"}</Text>
-              <Text style={styles.reviewMeta}>
-                {"★".repeat(r.rating)}
-                <Text style={{ color: colors.textMuted }}>{"★".repeat(5 - r.rating)}</Text>
-                {"  ·  "}
-                {new Date(r.created_at).toLocaleDateString("en-GB", {
-                  month: "short",
-                  year: "numeric",
-                })}
-              </Text>
+        <Card key={r.id} elevation="xs" style={{ gap: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Avatar name={r.reviewer_name || "?"} uri={r.reviewer_avatar} size={34} tone="soft" />
+            <View style={{ flex: 1, gap: 2 }}>
+              <AppText variant="bodyMedium">{r.reviewer_name || "AMASS customer"}</AppText>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View style={{ flexDirection: "row", gap: 1 }}>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Ionicons key={i} name={i <= r.rating ? "star" : "star-outline"} size={12} color={i <= r.rating ? colors.mass : colors.textMuted} />
+                  ))}
+                </View>
+                <AppText variant="micro" tone="tertiary">
+                  {new Date(r.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}
+                </AppText>
+              </View>
             </View>
           </View>
-          {r.review_text && <Text style={styles.reviewText}>{r.review_text}</Text>}
-        </View>
+          {r.review_text && (
+            <AppText variant="bodySm" tone="secondary">
+              {r.review_text}
+            </AppText>
+          )}
+        </Card>
       ))}
-    </View>
+    </Section>
   );
 }
 
 function StatCell({ label, value, caption }: { label: string; value: string; caption?: string }) {
   return (
-    <View style={styles.statCell}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      {caption && <Text style={styles.statCaption}>{caption}</Text>}
-    </View>
-  );
-}
-
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: { label: string; onPress: () => void };
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {action && (
-          <Pressable onPress={action.onPress}>
-            <Text style={styles.sectionAction}>{action.label}</Text>
-          </Pressable>
-        )}
-      </View>
-      {children}
+    <View style={styles.statCell} accessibilityLabel={`${label}: ${value}`}>
+      <AppText variant="h3" tabular>
+        {value}
+      </AppText>
+      <AppText variant="micro" tone="tertiary" uppercase>
+        {label}
+      </AppText>
+      {caption ? (
+        <AppText variant="micro" tone="muted" numberOfLines={1}>
+          {caption}
+        </AppText>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: { ...typography.h3, color: colors.ink },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl },
-  errorTitle: { ...typography.h3, color: colors.ink, marginTop: spacing.md },
-  errorSub: { ...typography.body, color: colors.textSecondary, marginTop: 4 },
-
-  hero: { alignItems: "center", padding: spacing.xl, gap: 6 },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  avatarInitials: {
-    color: colors.textInverse,
-    fontSize: 32,
-    fontWeight: "700",
-  },
-  name: { ...typography.h2, color: colors.ink },
-  agency: { ...typography.body, color: colors.textSecondary },
-  badgeRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
-    flexWrap: "wrap",
-    justifyContent: "center",
-  },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-  },
-  foundingBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    backgroundColor: colors.red,
-  },
-  badgeText: {
-    color: colors.bg,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.4,
-  },
-  metaRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
-    flexWrap: "wrap",
-    justifyContent: "center",
-  },
-  metaChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  metaText: { color: colors.textSecondary, fontSize: 12 },
-
-  statsRow: {
-    flexDirection: "row",
-    marginHorizontal: spacing.lg,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-    ...shadows.soft,
-  },
-  statCell: { flex: 1, alignItems: "center", gap: 2 },
-  statValue: { fontSize: 20, fontWeight: "800", color: colors.ink },
-  statLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "600" },
-  statCaption: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
-  statDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginHorizontal: 4,
-  },
-
-  ctaRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    padding: spacing.lg,
-  },
-  ctaBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 48,
-    borderRadius: radius.md,
-  },
-  ctaPrimary: { backgroundColor: colors.ink },
-  ctaSecondary: { borderWidth: 1, borderColor: colors.ink, backgroundColor: colors.bg },
-  ctaPrimaryText: { color: colors.bg, fontWeight: "700" },
-  ctaSecondaryText: { color: colors.ink, fontWeight: "700" },
-
-  section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: { ...typography.h3, color: colors.ink },
-  sectionAction: { color: colors.ink, fontSize: 13, fontWeight: "700" },
-
-  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  chipText: { color: colors.text, fontSize: 12, fontWeight: "600" },
-
-  emptyListings: { alignItems: "center", padding: spacing.xl, gap: 6 },
-  emptyText: { color: colors.textMuted, fontSize: 13 },
-
-  listingRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    alignItems: "center",
-    marginBottom: spacing.sm,
-    padding: 6,
-    borderRadius: radius.md,
-    backgroundColor: colors.bg,
-  },
-  listingTitle: { ...typography.bodyBold, color: colors.ink },
-  listingLocation: { color: colors.textSecondary, fontSize: 12 },
-  listingPrice: { color: colors.red, fontWeight: "800", fontSize: 14 },
-
-  legal: {
-    color: colors.textMuted,
-    fontSize: 11,
-    textAlign: "center",
-    marginTop: spacing.md,
-  },
-  reviewCard: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-    gap: 8,
-  },
-  reviewAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reviewInitials: { color: colors.bg, fontSize: 11, fontWeight: "800" },
-  reviewName: { color: colors.ink, fontSize: 13, fontWeight: "700" },
-  reviewMeta: { color: colors.red, fontSize: 12, marginTop: 2 },
-  reviewText: { color: colors.text, fontSize: 13, lineHeight: 19 },
+  hero: { alignItems: "center", gap: space[3], paddingHorizontal: space[4], paddingTop: space[2] },
+  badgeRow: { flexDirection: "row", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" },
+  tierBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, height: 24, borderRadius: radii.pill },
+  metaRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", justifyContent: "center" },
+  statsRow: { flexDirection: "row", alignItems: "stretch", paddingVertical: space[3] },
+  statCell: { flex: 1, alignItems: "center", gap: 2, paddingHorizontal: 4 },
+  statDivider: { width: StyleSheet.hairlineWidth, marginVertical: 4 },
+  ctaRow: { flexDirection: "row", gap: 10, paddingHorizontal: space[4] },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  listingRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 },
+  listingImg: { width: 92, height: 72, borderRadius: radii.sm },
 });

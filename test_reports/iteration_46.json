@@ -1,0 +1,39 @@
+{
+  "summary": "Phase 4 UX quality bar — frontend-only regression at 390x844. All targeted items PASS. Offline/online banner slides in with correct copy & disappears ~3s; app remains usable while offline. Marketplace shows market-loading skeleton on cold load, renders grid, view/sort/segmented controls work; route-blocking /api/marketplace yields market-error EmptyState with Retry that recovers after unblocking. Inbox shows inbox-error EmptyState with Retry when /api/chat/conversations is blocked, and recovers after unblocking. Home 'Lekki' search surfaces save-search-btn → tapping shows 'Search saved' toast with 'View' action that routes to /saved-searches; empty query hides the bookmark (no Alert). submit-property chips expose correct accessibility roles (sp-owner-*/sp-mandate-* = radio; listing-*/ptype-* = button) — 15/15 chips carry proper role attributes. Dark theme (Settings theme-dark) applied cleanly to banners, settings, nav; switching back to theme-light works. Zero native Alert dialogs were triggered across any flow. AdModal code review confirms '…' menu (testID ad-more) wires Not interested/Hide similar/Report to toast.success + close (verified in code; ad delivery not always surfaced per request, saw sponsored ad render once). ProviderCard Call/WhatsApp without phone uses toast.info (verified in code). No red-screen, no page errors; only expected net::ERR_FAILED entries from intentional route interception.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/.screenshots/11_offline.png",
+    "/app/.screenshots/12_online.png",
+    "/app/.screenshots/13_search.png",
+    "/app/.screenshots/14_toast.png",
+    "/app/.screenshots/15_saved_searches.png",
+    "/app/.screenshots/20_market.png",
+    "/app/.screenshots/23_market_error.png",
+    "/app/.screenshots/24_market_recovered.png",
+    "/app/.screenshots/25_inbox_error.png",
+    "/app/.screenshots/26_inbox_recovered.png",
+    "/app/.screenshots/40_submit_property.png",
+    "/app/.screenshots/50_settings_dark.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "OfflineBanner uses accessibilityRole='alert' + accessibilityLiveRegion='polite' — a11y OK. testID switches between 'offline-banner' and 'online-banner' as documented.",
+    "AdModal.feedback() calls toast.success + dismiss (no native Alert). ad-more testID present at /app/frontend/src/components/AdModal.tsx:148.",
+    "ProviderCard: no-phone paths use toast.info (not Alert). Lines 44-52 of ProviderCard.tsx.",
+    "submit-property.tsx chips: listing-*/ptype-*/amenity-* use role=button; sp-owner-yes/no + sp-mandate-yes/no use role=radio. ariaChecked is null because role=button chips rely on visual selection — fine for a11y of button-group chips; if main agent wants precise semantics, consider role='checkbox'/'radio' with aria-checked for multi-select and single-select groups respectively.",
+    "AdModal pointerEvents warning on web-rn is one of the ignorable warnings per request."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100% (all Phase 4 checks passed)"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Demo account demo@amass.africa / amass2026 is already marked is_agent=true and 'Approved', so /become-agent shows the status screen (no ba-* chips) — not a bug. Use a fresh/pending account if you need to verify ba-area-*/ba-spec-*/ba-mandate-* chips. Playwright context.set_offline(True) blocks all nav including page.goto, so set the state only AFTER landing on the screen you want to test or use page.route to abort specific endpoints. Marketplace AdModal depends on live /api/ads/next delivery (5-min cooldown, 3/hour cap) — it may not appear on every run; code is wired correctly via toast.",
+  "rca_of_issue": "N/A — no failures. Only observation: in one run the AdModal did not render on return visit due to ads cooldown — expected per Phase-2 ads engine (5-min cooldown, 3 ads/hour cap)."
+}

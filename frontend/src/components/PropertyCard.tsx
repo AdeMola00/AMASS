@@ -1,15 +1,17 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import type { IconName } from "../ui/icons";
+import { radius, shadows, spacing, typography } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { PriceText } from "@/src/components/PriceText";
 import { HotFlame } from "@/src/components/HotFlame";
 import { TokenIcon } from "@/src/components/TokenIcon";
 import { propertyTypeColor } from "@/src/components/PropertyMarker";
 import type { Property } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export function PropertyCard({
   property,
@@ -24,6 +26,9 @@ export function PropertyCard({
   favorited?: boolean;
   variant?: "large" | "compact" | "floating" | "row";
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const img = property.images?.[0];
   const source = listingSourceMeta(property.listing_source);
   const isHot = (property.views_recent ?? 0) >= 5 || (property.favorites_recent ?? 0) >= 3;
@@ -189,10 +194,13 @@ function Spec({
   value,
   label,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   value: string | number;
   label?: string;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.spec}>
       <Ionicons name={icon} size={13} color={colors.textSecondary} />
@@ -204,7 +212,8 @@ function Spec({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -292,7 +301,7 @@ const styles = StyleSheet.create({
   },
   tokenBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
   soldOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(10,10,10,0.35)",
@@ -318,7 +327,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
     paddingLeft: spacing.md + 4, // leaves room for the property-type accent bar
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.divider,

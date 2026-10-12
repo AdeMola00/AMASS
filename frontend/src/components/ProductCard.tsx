@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
 import type { MarketplaceItem } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 type Size = "sm" | "md" | "lg";
 
@@ -18,6 +19,9 @@ export function ProductCard({
   onAdd?: () => void;
   size?: Size;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const width = size === "sm" ? 148 : size === "lg" ? 220 : 172;
   const imgHeight = size === "sm" ? 140 : size === "lg" ? 200 : 160;
   const discount =
@@ -76,7 +80,8 @@ export function ProductCard({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,

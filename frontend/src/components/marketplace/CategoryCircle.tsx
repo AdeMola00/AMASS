@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
-import { colors } from "@/src/constants/theme";
+
 import type { MarketCategory } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export function CategoryCircle({
   category,
@@ -14,6 +15,9 @@ export function CategoryCircle({
   active?: boolean;
   onPress?: () => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={() => {
@@ -30,7 +34,7 @@ export function CategoryCircle({
           active && styles.circleActive,
         ]}
       >
-        {"emoji" in category && category.emoji ? (
+        {!category.icon && "emoji" in category && category.emoji ? (
           <Text style={styles.emoji}>{category.emoji}</Text>
         ) : (
           <Ionicons name={category.icon as any} size={22} color={active ? "#fff" : category.color} />
@@ -43,7 +47,8 @@ export function CategoryCircle({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   wrap: { width: 76, alignItems: "center", gap: 6 },
   circle: {
     width: 56,

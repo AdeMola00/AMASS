@@ -8,40 +8,34 @@
  * sensitive fields.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Linking,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { RefreshControl, ScrollView, Share, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import QRCode from "react-native-qrcode-svg";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { palette, radii, space } from "@/src/theme/tokens";
+import { AppText, Avatar, Badge, Button, Card, EmptyState, IconButton, Screen, ScreenHeader, SegmentedControl, Skeleton, VerifiedBadge, useToast, type BadgeTone, type IconName } from "@/src/ui";
 import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { PropertyScoreCard } from "@/src/components/PropertyScoreCard";
 import { PropertyTypeChip } from "@/src/components/PropertyTypeChip";
 
 type PassportData = Awaited<ReturnType<typeof api.getPassport>>;
-
-const { width: W } = Dimensions.get("window");
+type Tab = "about" | "listings" | "history";
 
 export default function PropertyPassportScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: W } = useWindowDimensions();
+  const { colors, shadows, isDark } = useTheme();
+  const toast = useToast();
   const params = useLocalSearchParams<{ amass_id?: string }>();
   const amass_id = String(params.amass_id ?? "");
 
@@ -49,7 +43,7 @@ export default function PropertyPassportScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState<"about" | "listings" | "history">("about");
+  const [tab, setTab] = useState<Tab>("about");
   const [showQr, setShowQr] = useState(false);
 
   const load = useCallback(async () => {
@@ -86,35 +80,46 @@ export default function PropertyPassportScreen() {
     if (!data) return;
     await Clipboard.setStringAsync(data.share.passport_url);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    Alert.alert("Copied", "Passport link copied to clipboard.");
-  }, [data]);
+    toast.success("Link copied", "Passport link is on your clipboard.");
+  }, [data, toast]);
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <ActivityIndicator style={{ marginTop: 60 }} color={colors.red} />
-      </SafeAreaView>
+      <Screen testID="passport-screen">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Property Passport" subtitle={amass_id} backTestID="passport-back" />
+        <View style={{ gap: 16 }}>
+          <Skeleton height={280} radius={0} />
+          <View style={{ paddingHorizontal: space[4], gap: 10 }}>
+            <Skeleton height={28} width="60%" />
+            <Skeleton height={16} width="45%" />
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
+              <Skeleton height={30} width={90} radius={radii.pill} />
+              <Skeleton height={30} width={70} radius={radii.pill} />
+              <Skeleton height={30} width={80} radius={radii.pill} />
+            </View>
+            <Skeleton height={150} radius={radii.lg} style={{ marginTop: 8 }} />
+          </View>
+        </View>
+      </Screen>
     );
   }
 
   if (error || !data) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.headerBar}>
-          <Pressable style={styles.iconBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Property Passport</Text>
-          <View style={styles.iconBtn} />
-        </View>
-        <View style={styles.errorBox}>
-          <Ionicons name="alert-circle" size={40} color={colors.red} />
-          <Text style={styles.errorTitle}>{error ?? "Property not found"}</Text>
-          <Text style={styles.errorSub}>
-            The AMASS ID <Text style={{ fontWeight: "800" }}>{amass_id}</Text> could not be resolved.
-          </Text>
-        </View>
-      </SafeAreaView>
+      <Screen testID="passport-screen">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Property Passport" backTestID="passport-back" />
+        <EmptyState
+          variant="error"
+          title={error ?? "Property not found"}
+          body={`The AMASS ID ${amass_id} could not be resolved. It may have been merged into another passport.`}
+          actionLabel="Try again"
+          onAction={() => { setLoading(true); load(); }}
+          secondaryLabel="Go back"
+          onSecondary={() => router.back()}
+        />
+      </Screen>
     );
   }
 
@@ -123,51 +128,44 @@ export default function PropertyPassportScreen() {
   const primaryListing = data.listings[0];
   const priceStr = primaryListing?.price ? formatNaira(primaryListing.price) : null;
   const areaStr = [p.estate, p.area, p.lga, p.state].filter(Boolean).join(", ");
+  const photoW = (W - 2 * space[4] - 8) / 2;
+  const canEnquire = !!data.share.allow_enquiries;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="passport-screen">
-      <View style={styles.headerBar}>
-        <Pressable style={styles.iconBtn} onPress={() => router.back()} testID="passport-back">
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={styles.headerAmassId}>{p.amass_property_id}</Text>
-          <Text style={styles.headerTitle}>Property Passport</Text>
-        </View>
-        <Pressable style={styles.iconBtn} onPress={shareLink} testID="passport-share">
-          <Ionicons name="share-outline" size={22} color={colors.text} />
-        </Pressable>
-      </View>
+    <Screen testID="passport-screen">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader
+        title={p.amass_property_id}
+        subtitle="Property Passport"
+        backTestID="passport-back"
+        right={<IconButton icon="share-outline" label="Share passport" onPress={shareLink} testID="passport-share" />}
+      />
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 140 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} tintColor={colors.red} onRefresh={() => { setRefreshing(true); load(); }} />
-        }
+        contentContainerStyle={{ paddingBottom: canEnquire ? 120 + insets.bottom : 40 + insets.bottom }}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.text} onRefresh={() => { setRefreshing(true); load(); }} />}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero */}
-        <View style={styles.hero}>
+        <View style={[styles.hero, { backgroundColor: colors.surfaceAlt }]}>
           {primaryPhoto ? (
-            <Image source={{ uri: primaryPhoto }} style={styles.heroImg} contentFit="cover" />
+            <Image source={{ uri: primaryPhoto }} style={styles.heroImg} contentFit="cover" transition={300} />
           ) : (
-            <View style={[styles.heroImg, { alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSecondary }]}>
-              <Ionicons name="home" size={48} color={colors.textMuted} />
-              <Text style={{ color: colors.textMuted, marginTop: 8, fontWeight: "700" }}>No photos yet</Text>
+            <View style={[styles.heroImg, { alignItems: "center", justifyContent: "center" }]}>
+              <Ionicons name="home-outline" size={48} color={colors.textMuted} />
+              <AppText variant="caption" tone="muted" style={{ marginTop: 8 }}>No photos yet</AppText>
             </View>
           )}
+          <LinearGradient colors={["transparent", "rgba(0,0,0,0.55)"]} style={styles.heroScrim} pointerEvents="none" />
           <View style={styles.heroOverlay}>
-            {p.has_verified_representation && (
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="shield-checkmark" size={12} color="#fff" />
-                <Text style={styles.verifiedBadgeText}>Verified</Text>
-              </View>
-            )}
+            <View style={{ gap: 6 }}>
+              {p.has_verified_representation ? <VerifiedBadge size="md" /> : null}
+            </View>
             {priceStr && (
-              <View style={styles.priceChip}>
-                <Text style={styles.priceChipText}>{priceStr}</Text>
+              <View style={[styles.priceChip, { backgroundColor: colors.bgElevated }, shadows.md]}>
+                <AppText variant="h3" tabular>{priceStr}</AppText>
                 {primaryListing?.listing_type && (
-                  <Text style={styles.priceChipSub}>{primaryListing.listing_type.toUpperCase()}</Text>
+                  <AppText variant="micro" tone="tertiary" uppercase>{primaryListing.listing_type}</AppText>
                 )}
               </View>
             )}
@@ -176,8 +174,13 @@ export default function PropertyPassportScreen() {
 
         {/* Title block */}
         <View style={styles.section}>
-          <Text style={styles.title}>{p.property_type ?? "Property"}{p.details?.bedrooms ? ` · ${p.details.bedrooms} bed` : ""}</Text>
-          <Text style={styles.area}>{areaStr || "—"}</Text>
+          <AppText variant="h1">
+            {p.property_type ?? "Property"}{p.details?.bedrooms ? ` · ${p.details.bedrooms} bed` : ""}
+          </AppText>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+            <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
+            <AppText variant="body" tone="secondary" style={{ flex: 1 }}>{areaStr || "—"}</AppText>
+          </View>
 
           <View style={styles.factsRow}>
             <PropertyTypeChip type={p.property_type} variant="soft" size="sm" showIcon testID="passport-type-chip" />
@@ -193,24 +196,22 @@ export default function PropertyPassportScreen() {
         <PropertyScoreCard
           amassId={p.amass_property_id}
           propertyType={p.property_type}
-          addressLine={areaStr || p.raw_address}
-          cover={p.photos?.[0] ?? p.media_ids?.[0]}
+          addressLine={areaStr || (p as any).raw_address}
+          cover={p.photos?.[0] ?? (p as any).media_ids?.[0]}
         />
 
         {/* Segmented tabs */}
-        <View style={styles.tabs}>
-          {(["about", "listings", "history"] as const).map((t) => (
-            <Pressable
-              key={t}
-              onPress={() => setTab(t)}
-              style={[styles.tab, tab === t && styles.tabActive]}
-              testID={`passport-tab-${t}`}
-            >
-              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                {t === "about" ? "About" : t === "listings" ? `Listings (${data.listings.length})` : "History"}
-              </Text>
-            </Pressable>
-          ))}
+        <View style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
+          <SegmentedControl<Tab>
+            options={[
+              { value: "about", label: "About", icon: "information-circle-outline" },
+              { value: "listings", label: `Listings (${data.listings.length})`, icon: "pricetag-outline" },
+              { value: "history", label: "History", icon: "time-outline" },
+            ]}
+            value={tab}
+            onChange={setTab}
+            testIDPrefix="passport-tab"
+          />
         </View>
 
         {tab === "about" && (
@@ -219,7 +220,7 @@ export default function PropertyPassportScreen() {
             {p.coordinates?.latitude && p.coordinates?.longitude && (
               <View style={styles.section}>
                 <SectionTitle title="Location" caption={p.coordinates_precision === "exact" ? "Exact location" : "Approximate location shown for privacy"} />
-                <View style={styles.mapWrap}>
+                <View style={[styles.mapWrap, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
                   <MapView
                     style={StyleSheet.absoluteFill}
                     provider={PROVIDER_DEFAULT}
@@ -233,8 +234,8 @@ export default function PropertyPassportScreen() {
                     zoomEnabled={false}
                   >
                     <Marker coordinate={p.coordinates}>
-                      <View style={styles.pinDot}>
-                        <Ionicons name="home" size={14} color="#fff" />
+                      <View style={[styles.pinDot, { backgroundColor: colors.brand, borderColor: colors.bgElevated }]}>
+                        <Ionicons name="home" size={14} color={colors.onBrand} />
                       </View>
                     </Marker>
                   </MapView>
@@ -248,9 +249,9 @@ export default function PropertyPassportScreen() {
                 <SectionTitle title="Features & amenities" />
                 <View style={styles.chipsWrap}>
                   {p.amenities.map((a) => (
-                    <View key={a} style={styles.chip}>
-                      <Ionicons name="checkmark" size={12} color={colors.emerald} />
-                      <Text style={styles.chipText}>{a}</Text>
+                    <View key={a} style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                      <AppText variant="caption" weight="semibold">{a}</AppText>
                     </View>
                   ))}
                 </View>
@@ -261,38 +262,33 @@ export default function PropertyPassportScreen() {
             {data.representatives.length > 0 && (
               <View style={styles.section}>
                 <SectionTitle title="Verified representatives" caption="Mandated agents authorised to market this property" />
-                {data.representatives.map((r) => (
-                  <Pressable
-                    key={r.id}
-                    style={[styles.repCard, shadows.soft]}
-                    onPress={() => r.agent.slug && router.push(`/agent/${r.agent.slug}` as any)}
-                    testID={`rep-${r.id}`}
-                  >
-                    <View style={styles.repAvatar}>
-                      {r.agent.avatar_url ? (
-                        <Image source={{ uri: r.agent.avatar_url }} style={styles.repAvatarImg} contentFit="cover" />
-                      ) : (
-                        <Ionicons name="person" size={22} color={colors.textTertiary} />
-                      )}
-                    </View>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={styles.repName}>{r.agent.full_name ?? "Verified Agent"}</Text>
-                      {r.agent.agency_name && <Text style={styles.repAgency}>{r.agent.agency_name}</Text>}
-                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginTop: 2 }}>
-                        <View style={styles.repBadge}>
-                          <Ionicons name="shield-checkmark" size={10} color="#fff" />
-                          <Text style={styles.repBadgeText}>
-                            {r.representation_type === "owner" ? "OWNER" : (r.representation_type === "agent_mandate" ? "MANDATED AGENT" : r.representation_type.replace(/_/g, " ").toUpperCase())}
-                          </Text>
+                <View style={{ gap: 10 }}>
+                  {data.representatives.map((r) => (
+                    <Card
+                      key={r.id}
+                      elevation="xs"
+                      style={styles.repCard}
+                      onPress={r.agent.slug ? () => router.push(`/agent/${r.agent.slug}` as any) : undefined}
+                      testID={`rep-${r.id}`}
+                    >
+                      <Avatar name={r.agent.full_name ?? "Verified Agent"} uri={r.agent.avatar_url} size={48} verified />
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <AppText variant="title">{r.agent.full_name ?? "Verified Agent"}</AppText>
+                        {r.agent.agency_name ? <AppText variant="caption" tone="tertiary">{r.agent.agency_name}</AppText> : null}
+                        <View style={{ flexDirection: "row", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <Badge
+                            label={r.representation_type === "owner" ? "Owner" : r.representation_type === "agent_mandate" ? "Mandated agent" : r.representation_type.replace(/_/g, " ")}
+                            tone="inverse"
+                            icon="shield-checkmark"
+                            size="xs"
+                          />
+                          {r.mandate_type ? <Badge label={r.mandate_type} tone="neutral" size="xs" /> : null}
                         </View>
-                        {r.mandate_type && (
-                          <Text style={styles.repMeta}>· {r.mandate_type}</Text>
-                        )}
                       </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-                  </Pressable>
-                ))}
+                      {r.agent.slug ? <Ionicons name="chevron-forward" size={18} color={colors.textMuted} /> : null}
+                    </Card>
+                  ))}
+                </View>
               </View>
             )}
 
@@ -302,8 +298,8 @@ export default function PropertyPassportScreen() {
                 <SectionTitle title="Photos" caption={`${p.photos.length} approved`} />
                 <View style={styles.photoGrid}>
                   {p.photos.slice(0, 8).map((u, idx) => (
-                    <View key={`${idx}-${u.slice(0, 20)}`} style={styles.photoWrap}>
-                      <Image source={{ uri: u }} style={styles.photo} contentFit="cover" />
+                    <View key={`${idx}-${u.slice(0, 20)}`} style={[styles.photoWrap, { width: photoW, backgroundColor: colors.surfaceAlt }]}>
+                      <Image source={{ uri: u }} style={styles.photo} contentFit="cover" transition={200} />
                     </View>
                   ))}
                 </View>
@@ -312,28 +308,21 @@ export default function PropertyPassportScreen() {
 
             {/* Share / QR */}
             <View style={styles.section}>
-              <SectionTitle title="Share this passport" caption="Passport URL is stable — even if the agent, price or listing changes" />
+              <SectionTitle title="Share this passport" caption="The passport URL is stable — even if the agent, price or listing changes" />
               <View style={styles.shareRow}>
-                <Pressable style={styles.shareBtn} onPress={shareLink} testID="share-native">
-                  <Ionicons name="share-outline" size={18} color={colors.text} />
-                  <Text style={styles.shareBtnText}>Share</Text>
-                </Pressable>
-                <Pressable style={styles.shareBtn} onPress={copyLink} testID="share-copy">
-                  <Ionicons name="link-outline" size={18} color={colors.text} />
-                  <Text style={styles.shareBtnText}>Copy link</Text>
-                </Pressable>
+                <Button label="Share" iconLeft="share-outline" variant="outline" size="sm" style={{ flex: 1 }} onPress={shareLink} testID="share-native" />
+                <Button label="Copy link" iconLeft="link-outline" variant="outline" size="sm" style={{ flex: 1 }} onPress={copyLink} testID="share-copy" />
                 {data.share.qr_url && (
-                  <Pressable style={styles.shareBtn} onPress={() => setShowQr((v) => !v)} testID="share-qr">
-                    <Ionicons name="qr-code-outline" size={18} color={colors.text} />
-                    <Text style={styles.shareBtnText}>QR</Text>
-                  </Pressable>
+                  <Button label="QR" iconLeft="qr-code-outline" variant={showQr ? "primary" : "outline"} size="sm" style={{ flex: 1 }} onPress={() => setShowQr((v) => !v)} testID="share-qr" />
                 )}
               </View>
               {showQr && (
-                <View style={styles.qrCard}>
-                  <QRCode value={data.share.passport_url} size={180} />
-                  <Text style={styles.qrCaption}>{data.share.passport_url}</Text>
-                </View>
+                <Card elevation="xs" style={styles.qrCard}>
+                  <View style={styles.qrFrame}>
+                    <QRCode value={data.share.passport_url} size={180} color={palette.neutral[1000]} backgroundColor={palette.neutral[0]} />
+                  </View>
+                  <AppText variant="caption" tone="tertiary" align="center" selectable>{data.share.passport_url}</AppText>
+                </Card>
               )}
             </View>
           </>
@@ -343,26 +332,21 @@ export default function PropertyPassportScreen() {
           <View style={styles.section}>
             <SectionTitle title="Current listings" caption="All active listings for this physical property" />
             {data.listings.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Ionicons name="pricetag-outline" size={28} color={colors.textMuted} />
-                <Text style={styles.emptyText}>No active listings right now.</Text>
-              </View>
+              <EmptyState compact icon="pricetag-outline" title="No active listings" body="This property isn't on the market right now." />
             ) : (
-              data.listings.map((l) => (
-                <View key={l.id} style={[styles.listingCard, shadows.soft]}>
-                  <View style={styles.listingTop}>
-                    <View style={styles.listingTypeChip}>
-                      <Text style={styles.listingTypeChipText}>{(l.listing_type ?? "buy").toUpperCase()}</Text>
+              <View style={{ gap: 10 }}>
+                {data.listings.map((l) => (
+                  <Card key={l.id} elevation="xs" style={{ gap: 8 }}>
+                    <View style={styles.listingTop}>
+                      <Badge label={(l.listing_type ?? "buy").toUpperCase()} tone="inverse" />
+                      <StatusPill status={l.listing_status} />
                     </View>
-                    <StatusPill status={l.listing_status} />
-                  </View>
-                  {l.price != null && <Text style={styles.listingPrice}>{formatNaira(l.price)}</Text>}
-                  {l.description && (
-                    <Text style={styles.listingDesc} numberOfLines={3}>{l.description}</Text>
-                  )}
-                  <Text style={styles.listingMeta}>Listed {formatDate(l.created_at)}</Text>
-                </View>
-              ))
+                    {l.price != null && <AppText variant="h2" tabular>{formatNaira(l.price)}</AppText>}
+                    {l.description ? <AppText variant="bodySm" tone="secondary" numberOfLines={3}>{l.description}</AppText> : null}
+                    <AppText variant="caption" tone="tertiary">Listed {formatDate(l.created_at)}</AppText>
+                  </Card>
+                ))}
+              </View>
             )}
           </View>
         )}
@@ -371,19 +355,18 @@ export default function PropertyPassportScreen() {
           <View style={styles.section}>
             <SectionTitle title="Property timeline" caption="Public history for this AMASS ID" />
             {data.timeline.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Ionicons name="time-outline" size={28} color={colors.textMuted} />
-                <Text style={styles.emptyText}>No public events yet.</Text>
-              </View>
+              <EmptyState compact icon="time-outline" title="No public events yet" body="Verification, listing and merge events will appear here." />
             ) : (
-              <View style={styles.timeline}>
+              <View style={{ gap: 2 }}>
                 {data.timeline.map((e, i) => (
                   <View key={i} style={styles.timelineRow}>
-                    <View style={styles.timelineDot} />
-                    {i < data.timeline.length - 1 && <View style={styles.timelineLine} />}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.timelineLabel}>{e.label}</Text>
-                      <Text style={styles.timelineDate}>{formatDate(e.at)}</Text>
+                    <View style={{ alignItems: "center", width: 14 }}>
+                      <View style={[styles.timelineDot, { backgroundColor: i === 0 ? colors.brand : colors.borderStrong }]} />
+                      {i < data.timeline.length - 1 && <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />}
+                    </View>
+                    <View style={{ flex: 1, paddingBottom: 14 }}>
+                      <AppText variant="bodyMedium">{e.label}</AppText>
+                      <AppText variant="caption" tone="tertiary" style={{ marginTop: 2 }}>{formatDate(e.at)}</AppText>
                     </View>
                   </View>
                 ))}
@@ -394,341 +377,100 @@ export default function PropertyPassportScreen() {
       </ScrollView>
 
       {/* Sticky enquiry CTA */}
-      {data.share.allow_enquiries && (
-        <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <Pressable
-            style={styles.enquireBtn}
+      {canEnquire && (
+        <View
+          style={[
+            styles.stickyBar,
+            { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: isDark ? "rgba(13,12,11,0.96)" : "rgba(250,250,249,0.96)", borderTopColor: colors.border },
+          ]}
+        >
+          <Button
+            label="Enquire about this property"
+            iconLeft="chatbubbles"
+            variant="brand"
+            size="lg"
+            fullWidth
             onPress={() => {
               if (data.representatives[0]?.agent?.slug) {
                 router.push(`/agent/${data.representatives[0].agent.slug}` as any);
               } else {
-                Alert.alert("No representative yet", "This property does not have a verified agent yet.");
+                toast.info("No representative yet", "This property doesn't have a verified agent yet.");
               }
             }}
             testID="enquire-btn"
-          >
-            <Ionicons name="chatbubbles" size={18} color="#fff" />
-            <Text style={styles.enquireText}>Enquire about this property</Text>
-          </Pressable>
+          />
         </View>
       )}
-    </SafeAreaView>
+    </Screen>
   );
 }
 
-function Fact({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
+function Fact({ icon, label }: { icon: IconName; label: string }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.fact}>
+    <View style={[styles.fact, { backgroundColor: colors.surfaceAlt }]}>
       <Ionicons name={icon} size={14} color={colors.textSecondary} />
-      <Text style={styles.factText}>{label}</Text>
+      <AppText variant="caption" weight="bold">{label}</AppText>
     </View>
   );
 }
 
 function SectionTitle({ title, caption }: { title: string; caption?: string }) {
   return (
-    <View style={{ marginBottom: 10 }}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {caption && <Text style={styles.sectionCaption}>{caption}</Text>}
+    <View style={{ marginBottom: 12, gap: 2 }}>
+      <AppText variant="h3">{title}</AppText>
+      {caption ? <AppText variant="caption" tone="tertiary">{caption}</AppText> : null}
     </View>
   );
 }
 
 function StatusPill({ status }: { status?: string }) {
   const s = (status ?? "").toUpperCase();
-  const c =
-    s === "ACTIVE" || s === "APPROVED"
-      ? colors.emerald
-      : s === "PENDING_REVIEW"
-      ? colors.gold
-      : s === "SOLD" || s === "RENTED"
-      ? colors.textTertiary
-      : colors.textTertiary;
-  return (
-    <View style={[styles.statusPill, { backgroundColor: c }]}>
-      <Text style={styles.statusPillText}>{s.replace(/_/g, " ")}</Text>
-    </View>
-  );
+  const tone: BadgeTone = s === "ACTIVE" || s === "APPROVED" ? "success" : s === "PENDING_REVIEW" ? "warning" : "neutral";
+  return <Badge label={s.replace(/_/g, " ") || "—"} tone={tone} />;
 }
 
 function formatDate(iso?: string): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   } catch {
     return String(iso).slice(0, 10);
   }
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-
-  headerBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-    backgroundColor: colors.bg,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 12, color: colors.textTertiary, fontWeight: "700" },
-  headerAmassId: { ...typography.h2, fontSize: 15 },
-
-  errorBox: { padding: spacing.xl, alignItems: "center", gap: 8, marginTop: 40 },
-  errorTitle: { ...typography.h2, fontSize: 18 },
-  errorSub: { ...typography.body, color: colors.textTertiary, textAlign: "center" },
-
-  hero: {
-    width: "100%",
-    height: 260,
-    backgroundColor: colors.surfaceSecondary,
-    position: "relative",
-  },
+  hero: { width: "100%", height: 280, position: "relative" },
   heroImg: { width: "100%", height: "100%" },
-  heroOverlay: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: 8,
-  },
-  verifiedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: colors.emerald,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-  },
-  verifiedBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
-  priceChip: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    ...shadows.soft,
-  },
-  priceChipText: { fontSize: 18, fontWeight: "900", color: colors.text },
-  priceChipSub: { fontSize: 10, fontWeight: "800", color: colors.textTertiary, letterSpacing: 0.4 },
+  heroScrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: 140 },
+  heroOverlay: { position: "absolute", left: 16, right: 16, bottom: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", gap: 8 },
+  priceChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radii.md, alignItems: "flex-end" },
 
-  section: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  title: { ...typography.display, fontSize: 24 },
-  area: { ...typography.body, color: colors.textSecondary, fontWeight: "600", marginTop: 4 },
-  factsRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 14 },
-  fact: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
-  factText: { fontSize: 12, fontWeight: "700", color: colors.text },
+  section: { paddingHorizontal: space[4], paddingVertical: space[5] },
+  factsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14, alignItems: "center" },
+  fact: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, height: 30, borderRadius: radii.pill },
 
-  tabs: {
-    flexDirection: "row",
-    marginHorizontal: spacing.xl,
-    marginTop: 10,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: radius.pill,
-    padding: 4,
-  },
-  tab: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: radius.pill },
-  tabActive: { backgroundColor: "#fff", ...shadows.soft },
-  tabText: { fontSize: 12, fontWeight: "700", color: colors.textTertiary },
-  tabTextActive: { color: colors.text, fontWeight: "800" },
-
-  sectionTitle: { ...typography.h2, fontSize: 16 },
-  sectionCaption: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
-
-  mapWrap: {
-    height: 200,
-    borderRadius: radius.md,
-    overflow: "hidden",
-    backgroundColor: colors.surfaceSecondary,
-  },
-  pinDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 3,
-    borderColor: "#fff",
-  },
+  mapWrap: { height: 200, borderRadius: radii.lg, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
+  pinDot: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 3 },
 
   chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "#fff",
-  },
-  chipText: { fontSize: 12, fontWeight: "600", color: colors.text },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 32, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth },
 
-  repCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    marginBottom: 10,
-  },
-  repAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  repAvatarImg: { width: "100%", height: "100%" },
-  repName: { fontSize: 14, fontWeight: "800", color: colors.text },
-  repAgency: { fontSize: 12, color: colors.textTertiary, fontWeight: "600" },
-  repBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: colors.ink,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  repBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800", letterSpacing: 0.4 },
-  repMeta: { fontSize: 11, color: colors.textTertiary, fontWeight: "600" },
+  repCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 },
 
-  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  photoWrap: {
-    width: (W - 2 * 24 - 12) / 2,
-    aspectRatio: 1.3,
-    borderRadius: radius.sm,
-    overflow: "hidden",
-    backgroundColor: colors.surfaceSecondary,
-  },
+  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  photoWrap: { aspectRatio: 1.3, borderRadius: radii.sm, overflow: "hidden" },
   photo: { width: "100%", height: "100%" },
 
   shareRow: { flexDirection: "row", gap: 8 },
-  shareBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    height: 44,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: "#fff",
-  },
-  shareBtnText: { fontSize: 13, fontWeight: "700", color: colors.text },
-  qrCard: {
-    marginTop: 14,
-    padding: 20,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 10,
-  },
-  qrCaption: { fontSize: 10, color: colors.textTertiary, textAlign: "center" },
+  qrCard: { marginTop: 14, alignItems: "center", gap: 12 },
+  qrFrame: { padding: 12, borderRadius: radii.md, backgroundColor: palette.neutral[0] },
 
-  listingCard: {
-    padding: 14,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    marginBottom: 10,
-    gap: 6,
-  },
   listingTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  listingTypeChip: {
-    backgroundColor: colors.ink,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  listingTypeChipText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
-  statusPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  statusPillText: { color: "#fff", fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
-  listingPrice: { fontSize: 20, fontWeight: "900", color: colors.text },
-  listingDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  listingMeta: { fontSize: 11, color: colors.textTertiary, fontWeight: "600" },
 
-  emptyBox: {
-    padding: 24,
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: radius.md,
-  },
-  emptyText: { fontSize: 12, color: colors.textTertiary, fontWeight: "600" },
+  timelineRow: { flexDirection: "row", gap: 12 },
+  timelineDot: { width: 12, height: 12, borderRadius: 6, marginTop: 5 },
+  timelineLine: { flex: 1, width: 2, marginTop: 4, borderRadius: 1 },
 
-  timeline: { gap: 4 },
-  timelineRow: { flexDirection: "row", gap: 12, paddingVertical: 8, position: "relative" },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.red,
-    marginTop: 6,
-  },
-  timelineLine: {
-    position: "absolute",
-    left: 4.5,
-    top: 20,
-    bottom: -8,
-    width: 1,
-    backgroundColor: colors.divider,
-  },
-  timelineLabel: { fontSize: 13, fontWeight: "700", color: colors.text },
-  timelineDate: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
-
-  stickyBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: spacing.lg,
-    backgroundColor: "rgba(255,255,255,0.98)",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  enquireBtn: {
-    height: 52,
-    borderRadius: radius.pill,
-    backgroundColor: colors.red,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  enquireText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  stickyBar: { position: "absolute", left: 0, right: 0, bottom: 0, padding: space[4], borderTopWidth: StyleSheet.hairlineWidth },
 });

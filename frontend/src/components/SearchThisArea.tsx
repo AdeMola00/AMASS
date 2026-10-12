@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, Text, StyleSheet, ActivityIndicator } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, shadows } from "@/src/constants/theme";
+import { shadows } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 /**
  * "Search this area" floating pill — appears after the user pans the map.
@@ -13,6 +14,9 @@ export function SearchThisArea({
   onPress: () => void;
   loading?: boolean;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={onPress}
@@ -30,7 +34,8 @@ export function SearchThisArea({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   pill: {
     flexDirection: "row",
     alignItems: "center",
@@ -38,7 +43,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: colors.text,
+    backgroundColor: colors.ink,
   },
   label: { color: "#fff", fontSize: 13, fontWeight: "700", letterSpacing: -0.2 },
 });

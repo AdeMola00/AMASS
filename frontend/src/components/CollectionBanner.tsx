@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, shadows, spacing } from "@/src/constants/theme";
+import { radius, shadows, spacing } from "@/src/constants/theme";
 import type { Collection } from "@/src/lib/api";
 
 const { width } = Dimensions.get("window");

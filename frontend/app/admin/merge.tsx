@@ -4,29 +4,25 @@
  * continue to resolve to the canonical passport.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, EmptyState, Input, Screen, ScreenHeader, Sheet, Skeleton, useToast } from "@/src/ui";
 
 type Side = "winner" | "loser";
 
 export default function AdminMergeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const { user } = useAuth();
   const params = useLocalSearchParams<{ winner?: string; loser?: string }>();
 
@@ -34,17 +30,20 @@ export default function AdminMergeScreen() {
   const [loser, setLoser] = useState(String(params.loser ?? ""));
   const [compare, setCompare] = useState<{ a: any; b: any } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
   const [merging, setMerging] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [reason, setReason] = useState("");
 
   const load = useCallback(async () => {
     if (!winner || !loser) return;
     setLoading(true);
+    setCompareError(null);
     try {
       const c = await api.adminCompareProperties(winner, loser);
       setCompare(c);
     } catch (e: any) {
-      Alert.alert("Compare failed", e?.message ?? "Try again");
+      setCompareError(e?.message ?? "We couldn't compare these two IDs.");
       setCompare(null);
     } finally {
       setLoading(false);
@@ -57,78 +56,73 @@ export default function AdminMergeScreen() {
 
   const doMerge = async () => {
     if (!compare) return;
-    Alert.alert(
-      "Merge properties?",
-      `Winner: ${winner}\nLoser: ${loser}\n\nAll listings and representations on the loser will move to the winner. Loser's ID will keep working as an alias. This action is written to the immutable audit log.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Merge",
-          style: "destructive",
-          onPress: async () => {
-            setMerging(true);
-            try {
-              const res = await api.adminMergeProperties({
-                winner_amass_id: winner,
-                loser_amass_id: loser,
-                reason: reason || undefined,
-              });
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-              Alert.alert(
-                "Merged",
-                `${res.listings_moved} listing(s) and ${res.reps_moved} representation(s) moved.`,
-                [{ text: "OK", onPress: () => router.replace("/admin/duplicate-queue" as any) }]
-              );
-            } catch (e: any) {
-              Alert.alert("Merge failed", e?.message ?? "Try again");
-            } finally {
-              setMerging(false);
-            }
-          },
-        },
-      ]
-    );
+    setMerging(true);
+    try {
+      const res = await api.adminMergeProperties({
+        winner_amass_id: winner,
+        loser_amass_id: loser,
+        reason: reason || undefined,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setConfirmOpen(false);
+      toast.success("Merged", `${res.listings_moved} listing(s) and ${res.reps_moved} representation(s) moved.`);
+      router.replace("/admin/duplicate-queue" as any);
+    } catch (e: any) {
+      toast.error("Merge failed", e?.message ?? "Try again");
+    } finally {
+      setMerging(false);
+    }
   };
 
   if (!user?.is_admin) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <Header title="Merge" onBack={() => router.back()} />
-        <View style={styles.blocked}>
-          <Ionicons name="lock-closed" size={40} color={colors.red} />
-          <Text style={styles.blockedText}>Admins only</Text>
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Merge" />
+        <EmptyState icon="lock-closed-outline" title="Admins only" body="You need an admin account to merge properties." actionLabel="Go back" onAction={() => router.back()} />
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="admin-merge">
-      <Header title="Merge Properties" onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg, paddingBottom: 40 }}>
-        <View style={styles.searchBox}>
-          <Text style={styles.subLbl}>WINNER (keeps AMASS ID)</Text>
-          <TextInput
-            style={styles.input}
+    <Screen testID="admin-merge">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="Merge properties" subtitle="Winner keeps its AMASS ID" />
+      <ScrollView contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: 40 + insets.bottom }} keyboardShouldPersistTaps="handled">
+        <Card elevation="xs" style={{ gap: 12 }}>
+          <Input
+            label="Winner · keeps AMASS ID"
             value={winner}
             onChangeText={setWinner}
             autoCapitalize="characters"
+            autoCorrect={false}
             placeholder="AMASS-LAG-00000001"
-            placeholderTextColor={colors.textMuted}
+            iconLeft="trophy-outline"
+            testID="merge-winner"
           />
-          <Text style={[styles.subLbl, { marginTop: 8 }]}>LOSER (becomes alias)</Text>
-          <TextInput
-            style={styles.input}
+          <Input
+            label="Loser · becomes alias"
             value={loser}
             onChangeText={setLoser}
             autoCapitalize="characters"
+            autoCorrect={false}
             placeholder="AMASS-LAG-00000005"
-            placeholderTextColor={colors.textMuted}
+            iconLeft="git-branch-outline"
+            testID="merge-loser"
           />
-          <Pressable style={styles.loadBtn} onPress={load} disabled={loading || !winner || !loser}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loadBtnText}>Compare</Text>}
-          </Pressable>
-        </View>
+          <Button label="Compare" iconLeft="git-compare-outline" fullWidth loading={loading} disabled={!winner || !loser} onPress={load} testID="merge-compare" />
+        </Card>
+
+        {loading && !compare ? (
+          <View style={styles.compareGrid}>
+            <Skeleton height={320} radius={radii.lg} style={{ flex: 1 }} />
+            <Skeleton height={320} radius={radii.lg} style={{ flex: 1 }} />
+          </View>
+        ) : null}
+
+        {compareError ? (
+          <EmptyState variant="error" compact title="Compare failed" body={compareError} actionLabel="Retry" onAction={load} />
+        ) : null}
 
         {compare && (
           <>
@@ -137,159 +131,99 @@ export default function AdminMergeScreen() {
               <ComparePane side="loser" data={compare.b} amass={loser} />
             </View>
 
-            <View style={styles.reasonBox}>
-              <Text style={styles.subLbl}>REASON (optional but recommended)</Text>
-              <TextInput
-                style={[styles.input, { minHeight: 60, textAlignVertical: "top", paddingTop: 10 }]}
+            <Card elevation="xs">
+              <Input
+                label="Reason · optional but recommended"
                 value={reason}
                 onChangeText={setReason}
                 multiline
                 placeholder="Why are you merging these two?"
-                placeholderTextColor={colors.textMuted}
+                testID="merge-reason"
               />
+            </Card>
+
+            <View style={[styles.notice, { backgroundColor: colors.warningSoft }]}>
+              <Ionicons name="information-circle" size={18} color={colors.warning} />
+              <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
+                All listings and representations on the loser move to the winner. The loser&apos;s ID keeps resolving as an alias. This is written to the immutable audit log.
+              </AppText>
             </View>
 
-            <Pressable
-              style={[styles.mergeBtn, merging && { opacity: 0.5 }]}
-              disabled={merging}
-              onPress={doMerge}
+            <Button
+              label={`Merge ${loser} into ${winner}`}
+              variant="brand"
+              size="lg"
+              fullWidth
+              iconLeft="git-merge"
+              onPress={() => setConfirmOpen(true)}
               testID="merge-confirm"
-            >
-              {merging ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="git-merge" size={18} color="#fff" />
-                  <Text style={styles.mergeBtnText}>Merge {loser} into {winner}</Text>
-                </>
-              )}
-            </Pressable>
+            />
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+
+      <Sheet visible={confirmOpen} onClose={() => { if (!merging) setConfirmOpen(false); }} title="Merge properties?">
+        <View style={{ gap: 10, marginBottom: 16 }}>
+          <LedgerRow label="Winner" value={winner} tone="success" />
+          <LedgerRow label="Loser" value={loser} tone="brand" />
+          <AppText variant="bodySm" tone="secondary">
+            This can&apos;t be undone from the app. The merge is recorded in the audit log with your admin ID.
+          </AppText>
+        </View>
+        <View style={{ gap: 8 }}>
+          <Button label="Confirm merge" variant="brand" size="lg" fullWidth iconLeft="git-merge" loading={merging} onPress={doMerge} testID="merge-confirm-final" />
+          <Button label="Cancel" variant="ghost" fullWidth onPress={() => setConfirmOpen(false)} />
+        </View>
+      </Sheet>
+    </Screen>
   );
 }
 
-function ComparePane({
-  side,
-  data,
-  amass,
-}: {
-  side: Side;
-  data: any;
-  amass: string;
-}) {
-  const isWinner = side === "winner";
+function LedgerRow({ label, value, tone }: { label: string; value: string; tone: "success" | "brand" }) {
   return (
-    <View style={[styles.pane, { borderColor: isWinner ? colors.emerald : colors.red }]}>
-      <View style={[styles.paneBadge, { backgroundColor: isWinner ? colors.emerald : colors.red }]}>
-        <Text style={styles.paneBadgeText}>{isWinner ? "WINNER" : "LOSER"}</Text>
-      </View>
-      <Text style={styles.paneAmass}>{amass}</Text>
-      <Field lbl="Type" val={data.property_type ?? "—"} />
-      <Field lbl="Address" val={[data.street, data.area, data.lga, data.state].filter(Boolean).join(", ") || "—"} />
-      <Field lbl="Bedrooms" val={String(data.details?.bedrooms ?? "—")} />
-      <Field lbl="Size (sqm)" val={String(data.details?.building_size_sqm ?? "—")} />
-      <Field lbl="Listings" val={String(data.listings_count)} />
-      <Field lbl="Reps" val={String(data.representations_count)} />
-      <Field lbl="Status" val={data.physical_status ?? "—"} />
-      <Field lbl="Aliases" val={(data.aliases || []).join(", ") || "—"} />
+    <View style={styles.ledgerRow}>
+      <Badge label={label} tone={tone} />
+      <AppText variant="bodyMedium" tabular numberOfLines={1} style={{ flex: 1, textAlign: "right" }}>{value}</AppText>
     </View>
+  );
+}
+
+function ComparePane({ side, data, amass }: { side: Side; data: any; amass: string }) {
+  const { colors } = useTheme();
+  const isWinner = side === "winner";
+  const accent = isWinner ? colors.success : colors.brand;
+  return (
+    <Card elevation="xs" style={{ flex: 1, gap: 6, borderWidth: 1.5, borderColor: accent }} padded={false}>
+      <View style={[styles.paneHead, { backgroundColor: isWinner ? colors.successSoft : colors.brandSoft }]}>
+        <Badge label={isWinner ? "Winner" : "Loser"} tone={isWinner ? "success" : "brand"} icon={isWinner ? "trophy" : "git-branch"} />
+        <AppText variant="caption" weight="bold" tabular numberOfLines={1}>{amass}</AppText>
+      </View>
+      <View style={{ padding: 12, gap: 6 }}>
+        <Field lbl="Type" val={data.property_type ?? "—"} />
+        <Field lbl="Address" val={[data.street, data.area, data.lga, data.state].filter(Boolean).join(", ") || "—"} />
+        <Field lbl="Bedrooms" val={String(data.details?.bedrooms ?? "—")} />
+        <Field lbl="Size (sqm)" val={String(data.details?.building_size_sqm ?? "—")} />
+        <Field lbl="Listings" val={String(data.listings_count)} />
+        <Field lbl="Reps" val={String(data.representations_count)} />
+        <Field lbl="Status" val={data.physical_status ?? "—"} />
+        <Field lbl="Aliases" val={(data.aliases || []).join(", ") || "—"} />
+      </View>
+    </Card>
   );
 }
 
 function Field({ lbl, val }: { lbl: string; val: string }) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLbl}>{lbl}</Text>
-      <Text style={styles.fieldVal} numberOfLines={2}>{val}</Text>
-    </View>
-  );
-}
-
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>{title}</Text>
-      <View style={styles.iconBtn} />
+    <View style={{ gap: 2 }}>
+      <AppText variant="micro" tone="tertiary" uppercase>{lbl}</AppText>
+      <AppText variant="caption" numberOfLines={2}>{val}</AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-
-  searchBox: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: "#fff", gap: 6, ...shadows.soft },
-  subLbl: { fontSize: 10, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.6 },
-  input: {
-    minHeight: 46,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 14,
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: "600",
-  },
-  loadBtn: {
-    height: 44,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  loadBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
-
   compareGrid: { flexDirection: "row", gap: 10 },
-  pane: {
-    flex: 1,
-    padding: 12,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    borderWidth: 2,
-    gap: 6,
-    ...shadows.soft,
-  },
-  paneBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    marginBottom: 4,
-  },
-  paneBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
-  paneAmass: { fontSize: 12, fontWeight: "800", color: colors.text, marginBottom: 6 },
-  field: { paddingVertical: 4 },
-  fieldLbl: { fontSize: 9, color: colors.textTertiary, fontWeight: "700", letterSpacing: 0.4 },
-  fieldVal: { fontSize: 12, color: colors.text, fontWeight: "600", marginTop: 2 },
-
-  reasonBox: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: "#fff", gap: 6 },
-
-  mergeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 52,
-    borderRadius: radius.pill,
-    backgroundColor: colors.red,
-  },
-  mergeBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
-
-  blocked: { padding: spacing.xl, alignItems: "center", gap: 10, marginTop: 40 },
-  blockedText: { fontSize: 14, color: colors.text, fontWeight: "700" },
+  paneHead: { padding: 10, gap: 6 },
+  notice: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm },
+  ledgerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
 });

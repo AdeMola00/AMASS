@@ -12,15 +12,19 @@
  *   • Typing indicator (both send + display)
  *   • Presence heartbeat + "last seen" for the other participant
  *   • Image bubbles (media_url render)
+ *
+ *  Design-system pass: themed (light/dark) bubbles, Sheet-based menu/report/block,
+ *  skeleton loading, toast feedback, tap-to-retry on failed sends.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal,
-  Platform, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal,
+  Platform, Pressable, StyleSheet, TextInput, View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -28,11 +32,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography, formatMarkerPrice } from "@/src/constants/theme";
+import { formatMarkerPrice } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { fontFamilies, radii, space } from "@/src/theme/tokens";
+import { AppText, Avatar, Button, IconButton, Input, Screen, Sheet, Skeleton, useToast } from "@/src/ui";
 import { VoiceComposer } from "@/src/components/VoiceComposer";
 import { VoiceBubble } from "@/src/components/VoiceBubble";
 
-type Attachment = { url: string; path?: string; width?: number; height?: number; type?: string };
+type Attachment = { url: string; path?: string; width?: number; height?: number; type?: string; duration_ms?: number };
 type Msg = {
   id: string;
   conversation_id: string;
@@ -85,31 +92,50 @@ function _lastSeenLabel(iso?: string | null): string {
   } catch { return ""; }
 }
 
+function _daySep(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const yest = new Date(now); yest.setDate(now.getDate() - 1);
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (sameDay) return `Today · ${time}`;
+  if (d.toDateString() === yest.toDateString()) return `Yesterday · ${time}`;
+  return `${d.toLocaleDateString([], { day: "numeric", month: "short" })} · ${time}`;
+}
+
 export default function ConversationScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors, shadows, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
   const { conversation_id } = useLocalSearchParams<{ conversation_id: string }>();
   const convId = String(conversation_id);
   const [conv, setConv] = useState<any | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
   const [presence, setPresence] = useState<{ typing: boolean; last_seen?: string | null }>({ typing: false });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const listRef = useRef<FlatList<Msg>>(null);
   const stopPollRef = useRef(false);
   const lastSeenRef = useRef<string>("");
-  const typingStopRef = useRef<NodeJS.Timeout | null>(null);
+  const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
 
   // ─ Load conversation + latest messages ─
   const load = useCallback(async () => {
     if (!convId) return;
+    setLoadError(null);
     try {
       const [c, m] = await Promise.all([
         api.chatGetConversation(convId),
@@ -127,7 +153,7 @@ export default function ConversationScreen() {
       // Flush pending queue
       if (pending.length) flushQueue();
     } catch (e: any) {
-      Alert.alert("Cannot open chat", e?.message ?? "Try again");
+      setLoadError(e?.message ?? "We couldn't open this chat. Please try again.");
     } finally { setLoading(false); }
   }, [convId]);
 
@@ -277,6 +303,28 @@ export default function ConversationScreen() {
     } finally { setSending(false); }
   };
 
+  // ─ Tap-to-retry a failed message (same client_msg_id → idempotent) ─
+  const retry = async (item: Msg) => {
+    if (!item._failed || !item.client_msg_id) return;
+    Haptics.selectionAsync().catch(() => {});
+    setMsgs((prev) => prev.map((m) => (m.client_msg_id === item.client_msg_id ? { ...m, _failed: false, _local: true } : m)));
+    try {
+      const sent = await api.chatSendMessage(convId, {
+        text: item.text, kind: item.kind as any, client_msg_id: item.client_msg_id, attachments: item.attachments,
+      });
+      setMsgs((prev) => prev.map((m) => (m.client_msg_id === item.client_msg_id ? { ...sent, _local: false } : m)));
+      const q = await _getQueue();
+      if (q[convId]) {
+        q[convId] = q[convId].filter((m) => m.client_msg_id !== item.client_msg_id);
+        if (!q[convId].length) delete q[convId];
+        await _setQueue(q);
+      }
+    } catch {
+      setMsgs((prev) => prev.map((m) => (m.client_msg_id === item.client_msg_id ? { ...m, _failed: true, _local: false } : m)));
+      toast.error("Still offline", "We'll keep this message and retry when you're back online.");
+    }
+  };
+
   // ─ Image attachment (Phase 2) ─
   const sendImage = async () => {
     if (uploading || sending) return;
@@ -325,7 +373,7 @@ export default function ConversationScreen() {
         );
       }
     } catch (e: any) {
-      Alert.alert("Upload failed", e?.message ?? "Try again");
+      toast.error("Upload failed", e?.message ?? "Try again");
     } finally { setUploading(false); }
   };
 
@@ -356,9 +404,10 @@ export default function ConversationScreen() {
     }
   };
 
-  const openReport = () => { setMenuOpen(false); setReportOpen(true); };
+  const openReport = () => { setMenuOpen(false); setTimeout(() => setReportOpen(true), 220); };
   const submitReport = async () => {
-    if (!reportReason.trim()) return;
+    if (!reportReason.trim() || reportBusy) return;
+    setReportBusy(true);
     try {
       const other = conv?.participants?.find((p: any) => p.id !== user!.id);
       await api.chatReport({
@@ -367,59 +416,99 @@ export default function ConversationScreen() {
         reason: reportReason.trim(),
       });
       setReportOpen(false); setReportReason("");
-      Alert.alert("Reported", "Our moderation team will review this shortly.");
+      toast.success("Report sent", "Our moderation team will review this shortly.");
     } catch (e: any) {
-      Alert.alert("Report failed", e?.message ?? "Try again");
-    }
+      toast.error("Report failed", e?.message ?? "Try again");
+    } finally { setReportBusy(false); }
   };
 
+  const openBlock = () => { setMenuOpen(false); setTimeout(() => setBlockOpen(true), 220); };
   const doBlock = async () => {
     const other = conv?.participants?.find((p: any) => p.id !== user!.id);
-    if (!other) return;
-    Alert.alert("Block user?", `${other.full_name || other.email} won't be able to message you.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Block", style: "destructive",
-        onPress: async () => {
-          try {
-            await api.chatBlockUser(other.id);
-            Alert.alert("Blocked", "You've blocked this user.", [
-              { text: "OK", onPress: () => router.back() },
-            ]);
-          } catch (e: any) { Alert.alert("Failed", e?.message ?? "Try again"); }
-        },
-      },
-    ]);
-    setMenuOpen(false);
+    if (!other || blockBusy) return;
+    setBlockBusy(true);
+    try {
+      await api.chatBlockUser(other.id);
+      setBlockOpen(false);
+      toast.success("User blocked", `${other.full_name || other.email} can no longer message you.`);
+      router.back();
+    } catch (e: any) {
+      toast.error("Couldn't block", e?.message ?? "Try again");
+    } finally { setBlockBusy(false); }
   };
 
   const other = conv?.participants?.find((p: any) => p.id !== user?.id);
   const property = conv?.property;
+  const otherName = other?.full_name || other?.email || "Chat";
+  const isOnline = presence.typing || (presence.last_seen ? (Date.now() - new Date(presence.last_seen).getTime()) / 1000 < 60 : false);
 
   const headerSubtitle = useMemo(() => {
     if (presence.typing) return "typing…";
     return _lastSeenLabel(presence.last_seen);
   }, [presence.typing, presence.last_seen]);
 
+  const header = (
+    <ChatHeader
+      title={loading ? "Loading…" : otherName}
+      subtitle={loading ? undefined : headerSubtitle}
+      typing={presence.typing}
+      online={isOnline}
+      verified={!!other?.verified}
+      avatarName={loading ? undefined : otherName}
+      onBack={() => (router.canGoBack() ? router.back() : router.replace("/inbox" as any))}
+      onMenu={() => setMenuOpen(true)}
+      onAvatarPress={other?.id && other?.is_agent ? () => router.push(`/agent/${other.id}` as any) : undefined}
+    />
+  );
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <ChatHeader title="Loading…" onBack={() => router.back()} onMenu={() => {}} />
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.red} />
-      </SafeAreaView>
+      <Screen testID="chat-screen">
+        {header}
+        <View style={{ padding: space[4], gap: 14 }} accessibilityLabel="Loading conversation">
+          <Skeleton height={76} radius={radii.lg} />
+          <View style={{ alignItems: "flex-start", gap: 6, marginTop: 8 }}>
+            <Skeleton height={40} width="60%" radius={18} />
+            <Skeleton height={40} width="42%" radius={18} />
+          </View>
+          <View style={{ alignItems: "flex-end", gap: 6 }}>
+            <Skeleton height={40} width="55%" radius={18} />
+          </View>
+          <View style={{ alignItems: "flex-start", gap: 6 }}>
+            <Skeleton height={64} width="70%" radius={18} />
+          </View>
+          <View style={{ alignItems: "flex-end", gap: 6 }}>
+            <Skeleton height={40} width="48%" radius={18} />
+            <Skeleton height={40} width="36%" radius={18} />
+          </View>
+        </View>
+      </Screen>
     );
   }
 
+  if (loadError) {
+    return (
+      <Screen testID="chat-screen">
+        {header}
+        <View style={styles.errorWrap}>
+          <View style={[styles.errorIcon, { backgroundColor: colors.errorSoft }]}>
+            <Ionicons name="chatbubble-ellipses-outline" size={28} color={colors.error} />
+          </View>
+          <AppText variant="h3" align="center">Couldn&apos;t open this chat</AppText>
+          <AppText variant="bodySm" tone="tertiary" align="center" style={{ maxWidth: 280 }}>{loadError}</AppText>
+          <Button label="Try again" iconLeft="refresh" onPress={() => { setLoading(true); load(); }} style={{ marginTop: 8 }} testID="chat-retry" />
+        </View>
+      </Screen>
+    );
+  }
+
+  const mineBg = colors.primary;
+  const mineFg = colors.onPrimary;
+  const mineMuted = isDark ? "rgba(10,10,10,0.55)" : "rgba(255,255,255,0.65)";
+
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="chat-screen">
-      <ChatHeader
-        title={other?.full_name || other?.email || "Chat"}
-        subtitle={headerSubtitle}
-        typing={presence.typing}
-        verified={!!other?.verified}
-        onBack={() => router.back()}
-        onMenu={() => setMenuOpen(true)}
-      />
+    <Screen testID="chat-screen">
+      {header}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -429,36 +518,60 @@ export default function ConversationScreen() {
           ref={listRef}
           data={msgs}
           keyExtractor={(x) => x.id}
-          contentContainerStyle={{ padding: spacing.md, paddingBottom: 20, gap: 6 }}
+          contentContainerStyle={{ padding: space[4], paddingBottom: 20, gap: 6, flexGrow: 1 }}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+          keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             property ? (
               <Pressable
                 onPress={() => router.push(`/property/${property.id}` as any)}
-                style={[styles.propCard, shadows.soft]}
+                style={({ pressed }) => [
+                  styles.propCard,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  shadows.xs,
+                  pressed && { opacity: 0.92 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`View property ${property.title}`}
                 testID="chat-property-card"
               >
-                {property.images?.[0] && (
-                  <Image source={{ uri: property.images[0] }} style={styles.propImg} />
+                {property.images?.[0] ? (
+                  <Image source={{ uri: property.images[0] }} style={[styles.propImg, { backgroundColor: colors.surfaceAlt }]} />
+                ) : (
+                  <View style={[styles.propImg, { backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }]}>
+                    <Ionicons name="home-outline" size={20} color={colors.textMuted} />
+                  </View>
                 )}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.propTitle} numberOfLines={1}>{property.title}</Text>
-                  <Text style={styles.propMeta} numberOfLines={1}>{property.location}</Text>
-                  <Text style={styles.propPrice}>
-                    {formatMarkerPrice(property.price, property.listing_type)}
-                  </Text>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="label" tone="tertiary" uppercase>About this property</AppText>
+                  <AppText variant="title" numberOfLines={1}>{property.title}</AppText>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>{property.location}</AppText>
+                    <AppText variant="caption" weight="bold" tone="brand" tabular>
+                      {formatMarkerPrice(property.price, property.listing_type)}
+                    </AppText>
+                  </View>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
             ) : null
           }
+          ListEmptyComponent={
+            <View style={styles.emptyThread}>
+              <Avatar name={otherName} size={64} verified={!!other?.verified} tone="soft" />
+              <AppText variant="h3" align="center" style={{ marginTop: 12 }}>{otherName}</AppText>
+              <AppText variant="bodySm" tone="tertiary" align="center" style={{ maxWidth: 280 }}>
+                {property ? "Say hello and ask anything about this property — viewings, price, documents." : "This is the start of your conversation. Messages are private between you two."}
+              </AppText>
+            </View>
+          }
           ListFooterComponent={
             presence.typing ? (
-              <View style={[styles.bubbleRow, styles.bubbleRowTheirs, { marginTop: 6 }]}>
-                <View style={[styles.bubble, styles.bubbleTheirs, styles.typingBubble]}>
+              <Animated.View entering={FadeIn.duration(180)} style={[styles.bubbleRow, styles.bubbleRowTheirs, { marginTop: 6 }]}>
+                <View style={[styles.bubble, styles.bubbleTheirs, styles.typingBubble, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <TypingDots />
                 </View>
-              </View>
+              </Animated.View>
             ) : null
           }
           renderItem={({ item, index }) => {
@@ -470,62 +583,69 @@ export default function ConversationScreen() {
             const isAudio = item.kind === "audio" || (att0?.type === "audio");
             const imageUrl = !isAudio ? _absUrl(att0?.url) : undefined;
             const audioUrl = isAudio ? _absUrl(att0?.url) : undefined;
+            const statusLabel = item._failed ? "Failed · tap to retry" : item._local ? "Sending…" : "Sent";
+            const statusIcon = item._failed ? "alert-circle" : item._local ? "time-outline" : "checkmark-done";
+            const status = mine ? (
+              <View style={styles.statusRow}>
+                <Ionicons name={statusIcon} size={11} color={item._failed ? colors.error : mineMuted} />
+                <AppText variant="micro" color={item._failed ? colors.error : mineMuted}>{statusLabel}</AppText>
+              </View>
+            ) : null;
             return (
               <View>
                 {showTs && (
-                  <Text style={styles.tsSep}>
-                    {new Date(item.created_at).toLocaleString()}
-                  </Text>
+                  <AppText variant="micro" tone="muted" align="center" style={styles.tsSep} uppercase>
+                    {_daySep(item.created_at)}
+                  </AppText>
                 )}
                 <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
                   {audioUrl ? (
-                    <View style={{ maxWidth: "78%" }}>
+                    <Pressable onPress={() => retry(item)} disabled={!item._failed} style={{ maxWidth: "78%" }}>
                       <VoiceBubble url={audioUrl} durationMs={att0?.duration_ms} mine={mine} />
                       {mine && (
-                        <Text style={[styles.audioStatus, item._failed && { color: colors.red }]}>
-                          {item._failed ? "· failed" : item._local ? "· sending…" : "· sent"}
-                        </Text>
+                        <View style={[styles.statusRow, { justifyContent: "flex-end", marginRight: 6 }]}>
+                          <Ionicons name={statusIcon} size={11} color={item._failed ? colors.error : colors.textMuted} />
+                          <AppText variant="micro" color={item._failed ? colors.error : colors.textMuted}>{statusLabel}</AppText>
+                        </View>
                       )}
-                    </View>
+                    </Pressable>
                   ) : imageUrl ? (
-                    <Pressable onPress={() => setPreviewUrl(imageUrl)}>
+                    <Pressable
+                      onPress={() => (item._failed ? retry(item) : setPreviewUrl(imageUrl))}
+                      accessibilityRole="imagebutton"
+                      accessibilityLabel={item._failed ? "Failed image, tap to retry" : "Open image"}
+                    >
                       <View
                         style={[
                           styles.imageBubble,
-                          mine && styles.imageBubbleMine,
-                          item._failed && { borderWidth: 1.5, borderColor: colors.red },
+                          { backgroundColor: mine ? mineBg : colors.surface, borderColor: mine ? mineBg : colors.border },
+                          mine ? styles.imageBubbleMine : null,
+                          item._failed && { borderWidth: 1.5, borderColor: colors.error },
                         ]}
                       >
-                        <Image source={{ uri: imageUrl }} style={styles.imageMsg} />
+                        <Image source={{ uri: imageUrl }} style={[styles.imageMsg, { backgroundColor: colors.surfaceAlt }]} />
                         {item.text ? (
-                          <Text style={[styles.imageCaption, mine && { color: "#fff" }]}>{item.text}</Text>
+                          <AppText variant="bodySm" color={mine ? mineFg : colors.text} style={styles.imageCaption}>{item.text}</AppText>
                         ) : null}
-                        {mine && (
-                          <Text style={styles.imageStatus}>
-                            {item._failed ? "· failed" : item._local ? "· sending…" : "· sent"}
-                          </Text>
-                        )}
+                        {status ? <View style={{ paddingHorizontal: 6, paddingBottom: 2 }}>{status}</View> : null}
                       </View>
                     </Pressable>
                   ) : (
-                    <View
+                    <Pressable
+                      onPress={() => retry(item)}
+                      disabled={!item._failed}
                       style={[
                         styles.bubble,
-                        mine ? styles.bubbleMine : styles.bubbleTheirs,
-                        item._failed && { borderWidth: 1.5, borderColor: colors.red },
+                        mine
+                          ? [styles.bubbleMine, { backgroundColor: mineBg }]
+                          : [styles.bubbleTheirs, { backgroundColor: colors.surface, borderColor: colors.border }],
+                        item._failed && { borderWidth: 1.5, borderColor: colors.error },
                       ]}
+                      accessibilityLabel={`${mine ? "You" : otherName}: ${item.text}`}
                     >
-                      <Text style={[styles.bubbleText, mine && { color: "#fff" }]}>{item.text}</Text>
-                      {mine && (
-                        <Text style={styles.bubbleStatus}>
-                          {item._failed
-                            ? "· failed — tap to retry"
-                            : item._local
-                            ? "· sending…"
-                            : "· sent"}
-                        </Text>
-                      )}
-                    </View>
+                      <AppText variant="body" color={mine ? mineFg : colors.text}>{item.text}</AppText>
+                      {status}
+                    </Pressable>
                   )}
                 </View>
               </View>
@@ -533,41 +653,64 @@ export default function ConversationScreen() {
           }}
         />
 
-        <View style={styles.composer}>
+        <View
+          style={[
+            styles.composer,
+            { backgroundColor: colors.bgElevated, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, space[3]) },
+          ]}
+        >
           <Pressable
-            style={[styles.attachBtn, (uploading || sending) && { opacity: 0.4 }]}
+            style={({ pressed }) => [
+              styles.attachBtn,
+              { backgroundColor: colors.surfaceAlt },
+              (uploading || sending) && { opacity: 0.4 },
+              pressed && { opacity: 0.7 },
+            ]}
             onPress={sendImage}
             disabled={uploading || sending}
             testID="chat-attach"
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Attach a photo"
           >
             {uploading ? (
-              <ActivityIndicator color={colors.red} />
+              <ActivityIndicator color={colors.text} />
             ) : (
-              <Ionicons name="image-outline" size={22} color={colors.red} />
+              <Ionicons name="image-outline" size={22} color={colors.text} />
             )}
           </Pressable>
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={handleTextChange}
-            placeholder="Message…"
-            placeholderTextColor={colors.textMuted}
-            multiline
-            maxLength={4000}
-            testID="chat-input"
-          />
+          <View style={[styles.inputWrap, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+            <TextInput
+              style={[styles.input, { color: colors.text, fontFamily: fontFamilies.medium }]}
+              value={text}
+              onChangeText={handleTextChange}
+              placeholder="Message…"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              maxLength={4000}
+              testID="chat-input"
+              accessibilityLabel="Message"
+            />
+          </View>
           {text.trim().length > 0 ? (
             <Pressable
-              style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]}
+              style={({ pressed }) => [
+                styles.sendBtn,
+                { backgroundColor: colors.brand },
+                shadows.brand,
+                (!text.trim() || sending) && { opacity: 0.4 },
+                pressed && { transform: [{ scale: 0.94 }] },
+              ]}
               onPress={send}
               disabled={!text.trim() || sending}
               testID="chat-send"
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
             >
               {sending ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.onBrand} />
               ) : (
-                <Ionicons name="send" size={18} color="#fff" />
+                <Ionicons name="arrow-up" size={20} color={colors.onBrand} />
               )}
             </Pressable>
           ) : (
@@ -576,54 +719,59 @@ export default function ConversationScreen() {
               disabled={sending || uploading}
               onSending={setUploading}
               onUploaded={handleVoiceUploaded}
-              onError={(m) => Alert.alert("Voice note", m)}
+              onError={(m) => toast.error("Voice note", m)}
             />
           )}
         </View>
       </KeyboardAvoidingView>
 
       {/* Overflow menu */}
-      <Modal transparent visible={menuOpen} animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setMenuOpen(false)}>
-          <View style={styles.menuCard}>
-            <Pressable style={styles.menuItem} onPress={openReport}>
-              <Ionicons name="flag" size={16} color={colors.red} />
-              <Text style={styles.menuText}>Report user or message</Text>
-            </Pressable>
-            <Pressable style={styles.menuItem} onPress={doBlock}>
-              <Ionicons name="ban" size={16} color={colors.red} />
-              <Text style={styles.menuText}>Block user</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Report modal */}
-      <Modal transparent visible={reportOpen} animationType="fade" onRequestClose={() => setReportOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.reportCard}>
-            <Text style={styles.reportTitle}>Report user</Text>
-            <Text style={styles.reportSub}>Describe what happened. Our team will review within 24h.</Text>
-            <TextInput
-              value={reportReason}
-              onChangeText={setReportReason}
-              placeholder="Reason…"
-              placeholderTextColor={colors.textMuted}
-              multiline
-              style={styles.reportInput}
-              testID="report-reason"
-            />
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <Pressable style={styles.reportCancel} onPress={() => setReportOpen(false)}>
-                <Text style={styles.reportCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable style={styles.reportSubmit} onPress={submitReport} testID="report-submit">
-                <Text style={styles.reportSubmitText}>Submit</Text>
-              </Pressable>
-            </View>
-          </View>
+      <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} title={otherName} testID="chat-menu-sheet">
+        <View style={{ gap: 4, marginBottom: 4 }}>
+          {property ? (
+            <MenuRow icon="home-outline" label="View property" caption={property.title} onPress={() => { setMenuOpen(false); router.push(`/property/${property.id}` as any); }} testID="menu-view-property" />
+          ) : null}
+          <MenuRow icon="flag-outline" label="Report user or message" caption="Flag harassment, spam or fraud" onPress={openReport} testID="menu-report" />
+          <MenuRow icon="ban-outline" label="Block user" caption="They won't be able to message you" onPress={openBlock} destructive testID="menu-block" />
         </View>
-      </Modal>
+      </Sheet>
+
+      {/* Report sheet */}
+      <Sheet visible={reportOpen} onClose={() => { if (!reportBusy) setReportOpen(false); }} title="Report user" testID="chat-report-sheet">
+        <AppText variant="bodySm" tone="secondary" style={{ marginBottom: 14 }}>
+          Describe what happened. Our team reviews every report within 24 hours and the other person won&apos;t be notified.
+        </AppText>
+        <Input
+          value={reportReason}
+          onChangeText={setReportReason}
+          placeholder="What went wrong?"
+          multiline
+          maxLength={1000}
+          testID="report-reason"
+          label="Reason"
+        />
+        <View style={{ gap: 8, marginTop: 16 }}>
+          <Button label="Submit report" variant="primary" size="lg" fullWidth iconLeft="flag" loading={reportBusy} disabled={!reportReason.trim()} onPress={submitReport} testID="report-submit" />
+          <Button label="Cancel" variant="ghost" fullWidth onPress={() => setReportOpen(false)} testID="report-cancel" />
+        </View>
+      </Sheet>
+
+      {/* Block confirm sheet */}
+      <Sheet visible={blockOpen} onClose={() => { if (!blockBusy) setBlockOpen(false); }} testID="chat-block-sheet">
+        <View style={{ alignItems: "center", gap: 8, paddingTop: 4 }}>
+          <View style={[styles.errorIcon, { backgroundColor: colors.errorSoft }]}>
+            <Ionicons name="ban" size={26} color={colors.error} />
+          </View>
+          <AppText variant="h3" align="center">Block {otherName}?</AppText>
+          <AppText variant="bodySm" tone="secondary" align="center" style={{ maxWidth: 300 }}>
+            They won&apos;t be able to message you and this conversation will close. You can unblock them later from Settings.
+          </AppText>
+        </View>
+        <View style={{ gap: 8, marginTop: 20 }}>
+          <Button label="Block user" variant="destructive" size="lg" fullWidth iconLeft="ban" loading={blockBusy} onPress={doBlock} testID="block-confirm" />
+          <Button label="Keep chatting" variant="ghost" fullWidth onPress={() => setBlockOpen(false)} testID="block-cancel" />
+        </View>
+      </Sheet>
 
       {/* Image preview modal */}
       <Modal
@@ -632,154 +780,144 @@ export default function ConversationScreen() {
         animationType="fade"
         onRequestClose={() => setPreviewUrl(null)}
       >
-        <Pressable style={styles.previewBackdrop} onPress={() => setPreviewUrl(null)}>
+        <Pressable style={styles.previewBackdrop} onPress={() => setPreviewUrl(null)} accessibilityLabel="Close preview" accessibilityRole="button">
           <Image source={{ uri: previewUrl ?? "" }} style={styles.previewImage} resizeMode="contain" />
-          <Pressable style={styles.previewClose} onPress={() => setPreviewUrl(null)} hitSlop={12}>
-            <Ionicons name="close" size={22} color="#fff" />
-          </Pressable>
+          <View style={[styles.previewClose, { top: insets.top + 12 }]}>
+            <IconButton icon="close" label="Close preview" variant="inverse" onPress={() => setPreviewUrl(null)} />
+          </View>
         </Pressable>
       </Modal>
-    </SafeAreaView>
+    </Screen>
+  );
+}
+
+function MenuRow({ icon, label, caption, onPress, destructive, testID }: {
+  icon: any; label: string; caption?: string; onPress: () => void; destructive?: boolean; testID?: string;
+}) {
+  const { colors } = useTheme();
+  const fg = destructive ? colors.error : colors.text;
+  return (
+    <Pressable
+      onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress(); }}
+      accessibilityRole="button"
+      testID={testID}
+      style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: colors.surfaceAlt }]}
+    >
+      <View style={[styles.menuIcon, { backgroundColor: destructive ? colors.errorSoft : colors.surfaceAlt }]}>
+        <Ionicons name={icon} size={18} color={fg} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <AppText variant="bodyMedium" color={fg}>{label}</AppText>
+        {caption ? <AppText variant="caption" tone="tertiary" numberOfLines={1}>{caption}</AppText> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+    </Pressable>
   );
 }
 
 function TypingDots() {
-  const [dot, setDot] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setDot((d) => (d + 1) % 3), 400);
-    return () => clearInterval(t);
-  }, []);
+  const { colors } = useTheme();
   return (
-    <View style={{ flexDirection: "row", gap: 3, paddingVertical: 2 }}>
+    <View style={{ flexDirection: "row", gap: 4, paddingVertical: 3 }} accessibilityLabel="Typing">
       {[0, 1, 2].map((i) => (
-        <View
-          key={i}
-          style={{
-            width: 6, height: 6, borderRadius: 3,
-            backgroundColor: dot === i ? colors.text : colors.textMuted,
-          }}
-        />
+        <Dot key={i} delay={i * 140} color={colors.textSecondary} />
       ))}
     </View>
   );
 }
 
-function ChatHeader({ title, subtitle, typing, verified, onBack, onMenu }: {
-  title: string; subtitle?: string; typing?: boolean;
-  verified?: boolean; onBack: () => void; onMenu: () => void;
+function Dot({ delay, color }: { delay: number; color: string }) {
+  const o = useSharedValue(0.3);
+  useEffect(() => {
+    o.value = withDelay(
+      delay,
+      withRepeat(withSequence(withTiming(1, { duration: 320 }), withTiming(0.3, { duration: 320 })), -1, false)
+    );
+  }, [o, delay]);
+  const style = useAnimatedStyle(() => ({ opacity: o.value, transform: [{ translateY: (o.value - 0.3) * -3 }] }));
+  return <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }, style]} />;
+}
+
+function ChatHeader({ title, subtitle, typing, online, verified, avatarName, onBack, onMenu, onAvatarPress }: {
+  title: string; subtitle?: string; typing?: boolean; online?: boolean;
+  verified?: boolean; avatarName?: string; onBack: () => void; onMenu: () => void; onAvatarPress?: () => void;
 }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <View style={{ flex: 1, alignItems: "center" }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-          {verified && <Ionicons name="checkmark-circle" size={14} color={colors.emerald} />}
+    <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.bg }]}>
+      <IconButton icon="chevron-back" label="Go back" onPress={onBack} testID="header-back" />
+      <Pressable
+        style={styles.headerCenter}
+        onPress={onAvatarPress}
+        disabled={!onAvatarPress}
+        accessibilityRole={onAvatarPress ? "button" : "header"}
+        accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ""}`}
+      >
+        <View>
+          {avatarName ? <Avatar name={avatarName} size={38} /> : <Skeleton width={38} height={38} radius={19} />}
+          {online ? <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.bg }]} /> : null}
         </View>
-        {subtitle ? (
-          <Text style={[styles.headerSubtitle, typing && { color: colors.emerald }]} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-      <Pressable style={styles.iconBtn} onPress={onMenu} testID="chat-menu">
-        <Ionicons name="ellipsis-vertical" size={20} color={colors.text} />
+        <View style={{ flex: 1, gap: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <AppText variant="title" numberOfLines={1} style={{ flexShrink: 1 }}>{title}</AppText>
+            {verified && <Ionicons name="shield-checkmark" size={14} color={colors.success} />}
+          </View>
+          {subtitle ? (
+            <AppText variant="caption" color={typing || online ? colors.success : colors.textTertiary} numberOfLines={1} testID="chat-presence">
+              {subtitle}
+            </AppText>
+          ) : null}
+        </View>
       </Pressable>
+      <IconButton icon="ellipsis-horizontal" label="Conversation options" onPress={onMenu} testID="chat-menu" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider,
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: space[3], paddingVertical: space[2],
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { ...typography.h2, fontSize: 15, maxWidth: 220 },
-  headerSubtitle: { fontSize: 10, fontWeight: "700", color: colors.textTertiary, marginTop: 1, letterSpacing: 0.3 },
+  headerCenter: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
+  onlineDot: { position: "absolute", right: -1, bottom: -1, width: 12, height: 12, borderRadius: 6, borderWidth: 2 },
   propCard: {
-    flexDirection: "row", gap: 10, padding: 10, marginBottom: 8,
-    borderRadius: radius.md, backgroundColor: "#fff", alignItems: "center",
+    flexDirection: "row", gap: 12, padding: 10, marginBottom: 10,
+    borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, alignItems: "center",
   },
-  propImg: { width: 56, height: 56, borderRadius: 8, backgroundColor: colors.surfaceSecondary },
-  propTitle: { fontSize: 13, fontWeight: "800", color: colors.text },
-  propMeta: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
-  propPrice: { fontSize: 13, fontWeight: "900", color: colors.red, marginTop: 2 },
-  tsSep: {
-    textAlign: "center", color: colors.textTertiary,
-    fontSize: 10, fontWeight: "700", marginTop: 12, marginBottom: 4, letterSpacing: 0.3,
-  },
+  propImg: { width: 60, height: 60, borderRadius: radii.sm },
+  emptyThread: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: space[10], gap: 6 },
+  tsSep: { marginTop: space[3], marginBottom: space[1] },
   bubbleRow: { flexDirection: "row" },
   bubbleRowMine: { justifyContent: "flex-end" },
   bubbleRowTheirs: { justifyContent: "flex-start" },
-  bubble: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, maxWidth: "78%" },
-  bubbleMine: { backgroundColor: colors.ink, borderBottomRightRadius: 4 },
-  bubbleTheirs: { backgroundColor: "#fff", borderBottomLeftRadius: 4 },
-  bubbleText: { fontSize: 14, color: colors.text, lineHeight: 20 },
-  bubbleStatus: { fontSize: 9, color: "rgba(255,255,255,0.65)", marginTop: 2, textAlign: "right" },
+  bubble: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, maxWidth: "78%" },
+  bubbleMine: { borderBottomRightRadius: 6 },
+  bubbleTheirs: { borderBottomLeftRadius: 6, borderWidth: StyleSheet.hairlineWidth },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 3, alignSelf: "flex-end" },
   typingBubble: { paddingHorizontal: 14, paddingVertical: 10 },
   imageBubble: {
-    padding: 4, borderRadius: 16,
-    backgroundColor: "#fff",
-    maxWidth: 240,
-    borderBottomLeftRadius: 4,
+    padding: 4, borderRadius: 18, maxWidth: 240,
+    borderBottomLeftRadius: 6, borderWidth: StyleSheet.hairlineWidth,
   },
-  imageBubbleMine: { backgroundColor: colors.ink, borderBottomLeftRadius: 16, borderBottomRightRadius: 4 },
-  imageMsg: {
-    width: 220, height: 220, borderRadius: 12,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  imageCaption: { fontSize: 13, color: colors.text, marginTop: 6, marginHorizontal: 4 },
-  imageStatus: { fontSize: 9, color: "rgba(255,255,255,0.65)", marginTop: 2, marginRight: 6, textAlign: "right" },
-  audioStatus: { fontSize: 9, color: colors.textTertiary, marginTop: 2, marginRight: 6, textAlign: "right" },
+  imageBubbleMine: { borderBottomLeftRadius: 18, borderBottomRightRadius: 6 },
+  imageMsg: { width: 220, height: 220, borderRadius: 14 },
+  imageCaption: { marginTop: 6, marginHorizontal: 6 },
   composer: {
-    flexDirection: "row", alignItems: "flex-end", gap: 6,
-    padding: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider,
-    backgroundColor: "#fff",
+    flexDirection: "row", alignItems: "flex-end", gap: 8,
+    paddingHorizontal: space[3], paddingTop: space[3],
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  attachBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.surfaceSecondary,
-  },
-  input: {
-    flex: 1, minHeight: 40, maxHeight: 120,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: colors.surfaceSecondary, fontSize: 14, color: colors.text,
-  },
-  sendBtn: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.red,
-    alignItems: "center", justifyContent: "center",
-  },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  menuCard: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: spacing.md, gap: 4 },
-  menuItem: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 },
-  menuText: { fontSize: 14, fontWeight: "700", color: colors.text },
-  reportCard: { backgroundColor: "#fff", padding: 20, borderRadius: 20, margin: 20, gap: 10 },
-  reportTitle: { ...typography.h2, fontSize: 16 },
-  reportSub: { fontSize: 12, color: colors.textSecondary },
-  reportInput: {
-    minHeight: 80, borderRadius: 12, backgroundColor: colors.surfaceSecondary,
-    padding: 12, fontSize: 13, color: colors.text, textAlignVertical: "top",
-  },
-  reportCancel: { flex: 1, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 22 },
-  reportCancelText: { fontSize: 14, fontWeight: "700", color: colors.text },
-  reportSubmit: { flex: 1, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 22, backgroundColor: colors.red },
-  reportSubmitText: { fontSize: 14, fontWeight: "800", color: "#fff" },
-  previewBackdrop: {
-    flex: 1, backgroundColor: "rgba(0,0,0,0.92)",
-    alignItems: "center", justifyContent: "center",
-  },
+  attachBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  inputWrap: { flex: 1, minHeight: 44, maxHeight: 130, borderRadius: 22, borderWidth: 1, justifyContent: "center", paddingHorizontal: 16 },
+  input: { fontSize: 15, lineHeight: 20, paddingVertical: Platform.OS === "ios" ? 12 : 10, maxHeight: 120 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  menuItem: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: radii.md, minHeight: 56 },
+  menuIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  errorWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: space[6] },
+  errorIcon: { width: 64, height: 64, borderRadius: 22, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  previewBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.94)", alignItems: "center", justifyContent: "center" },
   previewImage: { width: "100%", height: "80%" },
-  previewClose: {
-    position: "absolute", top: 40, right: 20,
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center", justifyContent: "center",
-  },
+  previewClose: { position: "absolute", right: 16 },
 });

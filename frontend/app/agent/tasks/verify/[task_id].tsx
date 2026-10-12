@@ -3,22 +3,9 @@
  * On-site verification flow: GPS capture → photo → verdict → notes → submit.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Image as RNImage,
-  KeyboardAvoidingView,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Image as RNImage, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
@@ -26,7 +13,9 @@ import * as Haptics from "expo-haptics";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, Input, ProgressBar, Screen, ScreenHeader, Sheet, Skeleton, useToast, type BadgeTone, type IconName } from "@/src/ui";
 
 type Verdict =
   | "PROPERTY_EXISTS"
@@ -36,26 +25,45 @@ type Verdict =
   | "INACCESSIBLE";
 
 type Step = "gps" | "photo" | "verdict" | "review";
+const STEPS: { key: Step; label: string; icon: IconName }[] = [
+  { key: "gps", label: "GPS", icon: "locate" },
+  { key: "photo", label: "Photo", icon: "camera" },
+  { key: "verdict", label: "Verdict", icon: "checkmark-done" },
+  { key: "review", label: "Review", icon: "cloud-upload" },
+];
 
-function gpsTier(accuracy: number | null): { label: string; color: string; hint: string } {
-  if (accuracy == null) return { label: "unknown", color: colors.textMuted, hint: "Waiting for GPS…" };
-  if (accuracy <= 10) return { label: "excellent", color: colors.emerald, hint: "Locked to ±10m." };
-  if (accuracy <= 25) return { label: "warning", color: colors.gold, hint: "Move to open sky for a sharper fix." };
-  if (accuracy <= 50) return { label: "poor", color: colors.red, hint: "Signal is weak — try stepping outside." };
-  return { label: "invalid", color: colors.red, hint: "GPS accuracy too poor to submit." };
+function gpsTier(accuracy: number | null): { label: string; tone: BadgeTone; hint: string } {
+  if (accuracy == null) return { label: "Unknown", tone: "neutral", hint: "Waiting for GPS…" };
+  if (accuracy <= 10) return { label: "Excellent", tone: "success", hint: "Locked to ±10m." };
+  if (accuracy <= 25) return { label: "Good", tone: "warning", hint: "Move to open sky for a sharper fix." };
+  if (accuracy <= 50) return { label: "Poor", tone: "error", hint: "Signal is weak — try stepping outside." };
+  return { label: "Invalid", tone: "error", hint: "GPS accuracy too poor to submit." };
 }
+
+const VERDICTS: { key: Verdict; label: string; hint: string; icon: IconName; tone: BadgeTone }[] = [
+  { key: "PROPERTY_EXISTS", label: "Property exists as described", hint: "Address, type and entrance all match.", icon: "checkmark-circle", tone: "success" },
+  { key: "DIFFERENT_ADDRESS", label: "Different address at pin", hint: "The pin lands on another building.", icon: "swap-horizontal", tone: "warning" },
+  { key: "IS_DUPLICATE", label: "Duplicate of another AMASS property", hint: "You'll enter the matching AMASS ID.", icon: "git-merge", tone: "brand" },
+  { key: "NOT_A_PROPERTY", label: "Not a residential / commercial property", hint: "Empty lot, road, or non-property.", icon: "close-circle", tone: "error" },
+  { key: "INACCESSIBLE", label: "Inaccessible right now", hint: "Gated or unsafe — task reopens for retry.", icon: "hourglass", tone: "neutral" },
+];
 
 export default function VerifyWizardScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   useAuth(); // ensure auth context is loaded
   const { task_id } = useLocalSearchParams<{ task_id: string }>();
 
   const [taskData, setTaskData] = useState<Awaited<ReturnType<typeof api.agentVerificationTask>> | null>(null);
+  const [taskLoading, setTaskLoading] = useState(true);
   const [step, setStep] = useState<Step>("gps");
 
   // GPS state
   const [locBusy, setLocBusy] = useState(false);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number; accuracy: number | null } | null>(null);
+  const [permSheet, setPermSheet] = useState<"location" | "camera" | null>(null);
 
   // Photo state
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
@@ -65,7 +73,9 @@ export default function VerifyWizardScreen() {
   const [verdict, setVerdict] = useState<Verdict>("PROPERTY_EXISTS");
   const [notes, setNotes] = useState("");
   const [dupOfAmassId, setDupOfAmassId] = useState("");
+  const [dupError, setDupError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!task_id) return;
@@ -73,9 +83,11 @@ export default function VerifyWizardScreen() {
       const r = await api.agentVerificationTask(String(task_id));
       setTaskData(r);
     } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Try again");
+      toast.error("Couldn't load task", e?.message ?? "Try again");
+    } finally {
+      setTaskLoading(false);
     }
-  }, [task_id]);
+  }, [task_id, toast]);
 
   useEffect(() => {
     load();
@@ -86,12 +98,8 @@ export default function VerifyWizardScreen() {
     try {
       const perm = await Location.requestForegroundPermissionsAsync();
       if (perm.status !== "granted") {
-        if (!perm.canAskAgain) {
-          Alert.alert("Location required", "Grant precise location in Settings.", [
-            { text: "Not now", style: "cancel" },
-            { text: "Open Settings", onPress: () => Linking.openSettings() },
-          ]);
-        }
+        if (!perm.canAskAgain) setPermSheet("location");
+        else toast.info("Location needed", "Allow precise location to record where you verified this property.");
         return;
       }
       const loc = await Location.getCurrentPositionAsync({
@@ -104,7 +112,7 @@ export default function VerifyWizardScreen() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e: any) {
-      Alert.alert("GPS failed", e?.message ?? "Try again outdoors.");
+      toast.error("GPS failed", e?.message ?? "Try again outdoors.");
     } finally {
       setLocBusy(false);
     }
@@ -116,16 +124,7 @@ export default function VerifyWizardScreen() {
       if (fromCamera) {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
         if (perm.status !== "granted") {
-          if (!perm.canAskAgain) {
-            Alert.alert(
-              "Camera required",
-              "Grant camera access in Settings to attach a photo.",
-              [
-                { text: "Not now", style: "cancel" },
-                { text: "Open Settings", onPress: () => Linking.openSettings() },
-              ]
-            );
-          }
+          if (!perm.canAskAgain) setPermSheet("camera");
           return;
         }
       }
@@ -149,7 +148,8 @@ export default function VerifyWizardScreen() {
   const submit = async () => {
     if (!coords || !task_id) return;
     if (verdict === "IS_DUPLICATE" && !dupOfAmassId.trim()) {
-      Alert.alert("AMASS ID required", "Enter the AMASS ID this property duplicates.");
+      setDupError("Enter the AMASS ID this property duplicates.");
+      setStep("verdict");
       return;
     }
     setSubmitting(true);
@@ -165,15 +165,13 @@ export default function VerifyWizardScreen() {
           verdict === "IS_DUPLICATE" ? dupOfAmassId.trim() : undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        "Submitted",
+      setDone(
         res.task_status === "COMPLETED"
-          ? "Verification recorded. Property status updated."
-          : `Task marked ${res.task_status}.`,
-        [{ text: "Done", onPress: () => router.replace("/agent/tasks" as any) }]
+          ? "Verification recorded. The property's status has been updated."
+          : `Task marked ${res.task_status.replace(/_/g, " ").toLowerCase()}.`
       );
     } catch (e: any) {
-      Alert.alert("Submit failed", e?.message ?? "Try again");
+      toast.error("Submit failed", e?.message ?? "Try again");
     } finally {
       setSubmitting(false);
     }
@@ -181,374 +179,285 @@ export default function VerifyWizardScreen() {
 
   const tier = gpsTier(coords?.accuracy ?? null);
   const canGoNext =
-    (step === "gps" && !!coords && tier.label !== "invalid") ||
+    (step === "gps" && !!coords && tier.label !== "Invalid") ||
     (step === "photo") ||
-    (step === "verdict");
+    (step === "verdict" && (verdict !== "IS_DUPLICATE" || !!dupOfAmassId.trim()));
 
-  const stepIndex = ["gps", "photo", "verdict", "review"].indexOf(step);
+  const stepIndex = STEPS.findIndex((s) => s.key === step);
+  const chosen = VERDICTS.find((v) => v.key === verdict)!;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="verify-wizard">
-      <Header title="On-site Verification" onBack={() => router.back()} />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 14, paddingBottom: 40 }}>
-          {/* Progress dots */}
-          <View style={styles.dotsRow}>
-            {["GPS", "PHOTO", "VERDICT", "REVIEW"].map((label, i) => (
-              <View key={label} style={styles.dotWrap}>
-                <View
-                  style={[
-                    styles.dot,
-                    i <= stepIndex ? { backgroundColor: colors.red } : { backgroundColor: colors.divider },
-                  ]}
-                />
-                <Text style={[styles.dotLabel, i === stepIndex && { color: colors.text }]}>{label}</Text>
-              </View>
-            ))}
+    <Screen testID="verify-wizard">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="On-site verification" subtitle={`Step ${stepIndex + 1} of ${STEPS.length} · ${STEPS[stepIndex].label}`} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={{ padding: space[4], gap: 14, paddingBottom: 40 + insets.bottom }} keyboardShouldPersistTaps="handled">
+          {/* Progress */}
+          <View style={{ gap: 10 }}>
+            <ProgressBar value={(stepIndex + 1) / STEPS.length} tone="brand" />
+            <View style={styles.dotsRow}>
+              {STEPS.map((s, i) => {
+                const reached = i <= stepIndex;
+                const current = i === stepIndex;
+                return (
+                  <View key={s.key} style={styles.dotWrap}>
+                    <View style={[styles.dot, { backgroundColor: reached ? colors.brand : colors.surfaceAlt, borderColor: current ? colors.brand : "transparent" }]}>
+                      <Ionicons name={s.icon} size={13} color={reached ? colors.onBrand : colors.textMuted} />
+                    </View>
+                    <AppText variant="micro" color={current ? colors.text : colors.textTertiary} uppercase>{s.label}</AppText>
+                  </View>
+                );
+              })}
+            </View>
           </View>
 
-          {taskData?.task && (
-            <View style={[styles.propCard, shadows.soft]}>
-              <Text style={styles.propAmass}>{taskData.task.amass_property_id}</Text>
-              <Text style={styles.propAddr} numberOfLines={2}>
-                {taskData.task.raw_address ??
-                  [taskData.task.area, taskData.task.lga, taskData.task.state]
-                    .filter(Boolean)
-                    .join(", ")}
-              </Text>
-            </View>
-          )}
+          {taskLoading ? (
+            <Skeleton height={64} radius={radii.lg} />
+          ) : taskData?.task ? (
+            <Card elevation="xs" style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={[styles.propIcon, { backgroundColor: colors.brandSoft }]}>
+                <Ionicons name="home" size={18} color={colors.brand} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="caption" tone="tertiary" tabular>{taskData.task.amass_property_id}</AppText>
+                <AppText variant="bodyMedium" numberOfLines={2}>
+                  {taskData.task.raw_address ??
+                    [taskData.task.area, taskData.task.lga, taskData.task.state].filter(Boolean).join(", ")}
+                </AppText>
+              </View>
+            </Card>
+          ) : null}
 
           {/* STEP 1: GPS */}
           {step === "gps" && (
-            <View style={[styles.card, shadows.soft]}>
-              <Text style={styles.stepTitle}>1 · Capture your GPS</Text>
-              <Text style={styles.stepSub}>
-                Stand at the property&apos;s front entrance. Best-for-navigation accuracy is required.
-              </Text>
-              <Pressable
-                style={[styles.actionBtn, styles.primary, locBusy && { opacity: 0.6 }]}
+            <Card elevation="xs" style={{ gap: 12 }}>
+              <AppText variant="h3">Capture your GPS</AppText>
+              <AppText variant="bodySm" tone="secondary">
+                Stand at the property&apos;s front entrance. Best-for-navigation accuracy is required so the pin lands on the right gate.
+              </AppText>
+              <Button
+                label={coords ? "Refresh GPS" : "Capture GPS now"}
+                iconLeft="locate"
+                variant="brand"
+                size="lg"
+                fullWidth
+                loading={locBusy}
                 onPress={captureGPS}
-                disabled={locBusy}
                 testID="btn-capture-gps"
-              >
-                {locBusy ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="locate" size={16} color="#fff" />
-                    <Text style={styles.actionText}>
-                      {coords ? "Refresh GPS" : "Capture GPS now"}
-                    </Text>
-                  </>
-                )}
-              </Pressable>
+              />
               {coords && (
-                <>
+                <View style={[styles.gpsBox, { backgroundColor: colors.surfaceAlt }]}>
                   <View style={styles.gpsRow}>
-                    <View style={[styles.gpsTierPill, { backgroundColor: tier.color }]}>
-                      <Ionicons name="navigate" size={11} color="#fff" />
-                      <Text style={styles.gpsTierText}>{tier.label.toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.gpsCoords}>
+                    <Badge label={tier.label} tone={tier.tone} icon="navigate" />
+                    <AppText variant="caption" tabular style={{ flex: 1 }}>
                       {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
-                    </Text>
-                    <Text style={styles.gpsAcc}>±{Math.round(coords.accuracy ?? 0)}m</Text>
+                    </AppText>
+                    <AppText variant="caption" weight="bold" tabular>±{Math.round(coords.accuracy ?? 0)}m</AppText>
                   </View>
-                  <Text style={styles.hint}>{tier.hint}</Text>
-                </>
+                  <AppText variant="caption" tone="tertiary">{tier.hint}</AppText>
+                </View>
               )}
-            </View>
+            </Card>
           )}
 
           {/* STEP 2: Photo */}
           {step === "photo" && (
-            <View style={[styles.card, shadows.soft]}>
-              <Text style={styles.stepTitle}>2 · Attach a proof photo (optional but recommended)</Text>
-              <Text style={styles.stepSub}>
-                A shot of the entrance or nearest identifying feature strengthens the verification.
-              </Text>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <Pressable
-                  style={[styles.actionBtn, styles.secondary, { flex: 1 }, Platform.OS === "web" && { opacity: 0.5 }]}
-                  onPress={() => pickPhoto(true)}
-                  disabled={pickBusy || Platform.OS === "web"}
-                  testID="btn-camera"
-                >
-                  {pickBusy ? (
-                    <ActivityIndicator color={colors.text} />
-                  ) : (
-                    <>
-                      <Ionicons name="camera" size={16} color={colors.text} />
-                      <Text style={[styles.actionText, { color: colors.text }]}>Camera</Text>
-                    </>
-                  )}
-                </Pressable>
-                <Pressable
-                  style={[styles.actionBtn, styles.secondary, { flex: 1 }]}
-                  onPress={() => pickPhoto(false)}
-                  disabled={pickBusy}
-                  testID="btn-gallery"
-                >
-                  <Ionicons name="images" size={16} color={colors.text} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Gallery</Text>
-                </Pressable>
+            <Card elevation="xs" style={{ gap: 12 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <AppText variant="h3" style={{ flex: 1 }}>Attach a proof photo</AppText>
+                <Badge label="Recommended" tone="info" size="xs" />
               </View>
-              {photoDataUrl && (
+              <AppText variant="bodySm" tone="secondary">
+                A shot of the entrance or nearest identifying feature strengthens the verification score.
+              </AppText>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Button
+                  label="Camera"
+                  iconLeft="camera"
+                  variant="secondary"
+                  style={{ flex: 1 }}
+                  loading={pickBusy}
+                  disabled={Platform.OS === "web"}
+                  onPress={() => pickPhoto(true)}
+                  testID="btn-camera"
+                />
+                <Button label="Gallery" iconLeft="images" variant="secondary" style={{ flex: 1 }} disabled={pickBusy} onPress={() => pickPhoto(false)} testID="btn-gallery" />
+              </View>
+              {photoDataUrl ? (
                 <View style={styles.photoWrap}>
-                  <RNImage source={{ uri: photoDataUrl }} style={styles.photoImg} />
-                  <Pressable style={styles.photoRemove} onPress={() => setPhotoDataUrl(null)}>
+                  <RNImage source={{ uri: photoDataUrl }} style={[styles.photoImg, { backgroundColor: colors.surfaceAlt }]} />
+                  <Pressable style={styles.photoRemove} onPress={() => setPhotoDataUrl(null)} accessibilityRole="button" accessibilityLabel="Remove photo" hitSlop={8}>
                     <Ionicons name="close" size={16} color="#fff" />
                   </Pressable>
                 </View>
+              ) : (
+                <View style={[styles.photoEmpty, { borderColor: colors.borderStrong, backgroundColor: colors.surfaceAlt }]}>
+                  <Ionicons name="image-outline" size={26} color={colors.textMuted} />
+                  <AppText variant="caption" tone="tertiary">No photo yet — you can still continue</AppText>
+                </View>
               )}
-            </View>
+            </Card>
           )}
 
           {/* STEP 3: Verdict */}
           {step === "verdict" && (
-            <View style={[styles.card, shadows.soft]}>
-              <Text style={styles.stepTitle}>3 · What did you find?</Text>
-              {(
-                [
-                  { key: "PROPERTY_EXISTS", label: "Property exists as described", icon: "checkmark-circle", color: colors.emerald },
-                  { key: "DIFFERENT_ADDRESS", label: "Different address at pin", icon: "swap-horizontal", color: colors.gold },
-                  { key: "IS_DUPLICATE", label: "Duplicate of another AMASS property", icon: "git-merge", color: colors.red },
-                  { key: "NOT_A_PROPERTY", label: "Not a residential/commercial property", icon: "close-circle", color: colors.red },
-                  { key: "INACCESSIBLE", label: "Inaccessible right now (retry later)", icon: "hourglass", color: colors.textMuted },
-                ] as { key: Verdict; label: string; icon: any; color: string }[]
-              ).map((v) => (
-                <Pressable
-                  key={v.key}
-                  style={[styles.verdictRow, verdict === v.key && styles.verdictRowActive]}
-                  onPress={() => {
-                    setVerdict(v.key);
-                    Haptics.selectionAsync().catch(() => {});
-                  }}
-                  testID={`verdict-${v.key}`}
-                >
-                  <View style={[styles.verdictIcon, { backgroundColor: v.color }]}>
-                    <Ionicons name={v.icon} size={14} color="#fff" />
-                  </View>
-                  <Text style={styles.verdictLabel}>{v.label}</Text>
-                  {verdict === v.key && <Ionicons name="checkmark" size={16} color={colors.red} />}
-                </Pressable>
-              ))}
+            <Card elevation="xs" style={{ gap: 12 }}>
+              <AppText variant="h3">What did you find?</AppText>
+              <View style={{ gap: 8 }}>
+                {VERDICTS.map((v) => {
+                  const on = verdict === v.key;
+                  const fg = { success: colors.success, warning: colors.warning, brand: colors.brand, error: colors.error, neutral: colors.textSecondary }[v.tone as "success" | "warning" | "brand" | "error" | "neutral"];
+                  const bg = { success: colors.successSoft, warning: colors.warningSoft, brand: colors.brandSoft, error: colors.errorSoft, neutral: colors.surfaceAlt }[v.tone as "success" | "warning" | "brand" | "error" | "neutral"];
+                  return (
+                    <Pressable
+                      key={v.key}
+                      style={({ pressed }) => [
+                        styles.verdictRow,
+                        { backgroundColor: on ? bg : colors.surfaceAlt, borderColor: on ? fg : "transparent" },
+                        pressed && { opacity: 0.85 },
+                      ]}
+                      onPress={() => {
+                        setVerdict(v.key);
+                        setDupError(null);
+                        Haptics.selectionAsync().catch(() => {});
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      testID={`verdict-${v.key}`}
+                    >
+                      <View style={[styles.verdictIcon, { backgroundColor: on ? fg : colors.surface }]}>
+                        <Ionicons name={v.icon} size={15} color={on ? "#fff" : fg} />
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <AppText variant="bodyMedium">{v.label}</AppText>
+                        <AppText variant="caption" tone="tertiary">{v.hint}</AppText>
+                      </View>
+                      <Ionicons name={on ? "radio-button-on" : "radio-button-off"} size={20} color={on ? fg : colors.textMuted} />
+                    </Pressable>
+                  );
+                })}
+              </View>
               {verdict === "IS_DUPLICATE" && (
-                <>
-                  <Text style={styles.fieldLbl}>Duplicate of AMASS ID</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={dupOfAmassId}
-                    onChangeText={setDupOfAmassId}
-                    placeholder="AMASS-LAG-00000123"
-                    placeholderTextColor={colors.textMuted}
-                    autoCapitalize="characters"
-                    testID="input-dup-of"
-                  />
-                </>
+                <Input
+                  label="Duplicate of AMASS ID"
+                  value={dupOfAmassId}
+                  onChangeText={(t) => { setDupOfAmassId(t); setDupError(null); }}
+                  placeholder="AMASS-LAG-00000123"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  iconLeft="git-merge-outline"
+                  error={dupError}
+                  testID="input-dup-of"
+                />
               )}
-              <Text style={styles.fieldLbl}>Notes (optional)</Text>
-              <TextInput
-                style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+              <Input
+                label="Notes · optional"
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="e.g. Gate is set back 20m from the road pin"
-                placeholderTextColor={colors.textMuted}
                 multiline
                 testID="input-notes"
               />
-            </View>
+            </Card>
           )}
 
           {/* STEP 4: Review */}
           {step === "review" && (
-            <View style={[styles.card, shadows.soft]}>
-              <Text style={styles.stepTitle}>4 · Review & submit</Text>
-              <ReviewRow label="Verdict" value={verdict.replace(/_/g, " ")} />
+            <Card elevation="xs" style={{ gap: 4 }}>
+              <AppText variant="h3" style={{ marginBottom: 8 }}>Review &amp; submit</AppText>
+              <ReviewRow label="Verdict" value={chosen.label} badge={<Badge label={verdict.replace(/_/g, " ")} tone={chosen.tone} icon={chosen.icon} size="xs" />} />
               {coords && (
                 <ReviewRow
                   label="GPS"
-                  value={`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)} · ±${Math.round(coords.accuracy ?? 0)}m (${tier.label})`}
+                  value={`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)} · ±${Math.round(coords.accuracy ?? 0)}m`}
+                  badge={<Badge label={tier.label} tone={tier.tone} size="xs" />}
                 />
               )}
               <ReviewRow label="Photo" value={photoDataUrl ? "Attached" : "None"} />
-              {notes.trim() && <ReviewRow label="Notes" value={notes} />}
-              {verdict === "IS_DUPLICATE" && (
-                <ReviewRow label="Duplicate of" value={dupOfAmassId || "—"} />
-              )}
-              <Pressable
-                style={[styles.actionBtn, styles.primary, { marginTop: 8 }, submitting && { opacity: 0.6 }]}
+              {notes.trim() ? <ReviewRow label="Notes" value={notes} /> : null}
+              {verdict === "IS_DUPLICATE" && <ReviewRow label="Duplicate of" value={dupOfAmassId || "—"} last />}
+              <Button
+                label="Submit verification"
+                iconLeft="cloud-upload"
+                variant="brand"
+                size="lg"
+                fullWidth
+                loading={submitting}
+                disabled={!coords}
                 onPress={submit}
-                disabled={submitting || !coords}
+                style={{ marginTop: 12 }}
                 testID="btn-submit"
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="cloud-upload" size={16} color="#fff" />
-                    <Text style={styles.actionText}>Submit verification</Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
+              />
+            </Card>
           )}
 
           {/* Nav row */}
           <View style={styles.navRow}>
             {step !== "gps" && (
-              <Pressable
-                style={[styles.actionBtn, styles.secondary, { flex: 1 }]}
-                onPress={() => setStep(["gps", "photo", "verdict"][stepIndex - 1] as Step)}
-              >
-                <Ionicons name="chevron-back" size={16} color={colors.text} />
-                <Text style={[styles.actionText, { color: colors.text }]}>Back</Text>
-              </Pressable>
+              <Button label="Back" iconLeft="chevron-back" variant="secondary" style={{ flex: 1 }} onPress={() => setStep(STEPS[stepIndex - 1].key)} testID="btn-back" />
             )}
             {step !== "review" && (
-              <Pressable
-                style={[styles.actionBtn, styles.primary, { flex: 1 }, !canGoNext && { opacity: 0.5 }]}
-                disabled={!canGoNext}
-                onPress={() => setStep(["photo", "verdict", "review"][stepIndex] as Step)}
-                testID="btn-next"
-              >
-                <Text style={styles.actionText}>Next</Text>
-                <Ionicons name="chevron-forward" size={16} color="#fff" />
-              </Pressable>
+              <Button label="Next" iconRight="chevron-forward" style={{ flex: 1 }} disabled={!canGoNext} onPress={() => setStep(STEPS[stepIndex + 1].key)} testID="btn-next" />
             )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+
+      {/* Permission blocked → Open Settings */}
+      <Sheet visible={!!permSheet} onClose={() => setPermSheet(null)} title={permSheet === "camera" ? "Camera access needed" : "Location access needed"}>
+        <AppText variant="body" tone="secondary" style={{ marginBottom: 16 }}>
+          {permSheet === "camera"
+            ? "To attach a proof photo, allow camera access for AMASS in your device settings."
+            : "To record where you verified this property, allow precise location for AMASS in your device settings."}
+        </AppText>
+        <View style={{ gap: 8 }}>
+          <Button label="Open Settings" iconLeft="settings-outline" size="lg" fullWidth onPress={() => { setPermSheet(null); Linking.openSettings(); }} testID="btn-open-settings" />
+          <Button label="Not now" variant="ghost" fullWidth onPress={() => setPermSheet(null)} />
+        </View>
+      </Sheet>
+
+      {/* Success */}
+      <Sheet visible={!!done} onClose={() => router.replace("/agent/tasks" as any)} testID="verify-success">
+        <View style={{ alignItems: "center", gap: 8, paddingTop: 4 }}>
+          <View style={[styles.doneIcon, { backgroundColor: colors.successSoft }]}>
+            <Ionicons name="checkmark-circle" size={30} color={colors.success} />
+          </View>
+          <AppText variant="h3" align="center">Verification submitted</AppText>
+          <AppText variant="bodySm" tone="secondary" align="center" style={{ maxWidth: 300 }}>{done}</AppText>
+        </View>
+        <Button label="Back to my tasks" size="lg" fullWidth iconLeft="list" onPress={() => router.replace("/agent/tasks" as any)} style={{ marginTop: 20 }} testID="btn-done" />
+      </Sheet>
+    </Screen>
   );
 }
 
-function ReviewRow({ label, value }: { label: string; value: string }) {
+function ReviewRow({ label, value, badge, last }: { label: string; value: string; badge?: React.ReactNode; last?: boolean }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.reviewRow}>
-      <Text style={styles.reviewLbl}>{label}</Text>
-      <Text style={styles.reviewVal} numberOfLines={3}>{value}</Text>
-    </View>
-  );
-}
-
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>{title}</Text>
-      <View style={styles.iconBtn} />
+    <View style={[styles.reviewRow, !last && { borderBottomColor: colors.divider, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+      <AppText variant="label" tone="tertiary" uppercase style={{ width: 84 }}>{label}</AppText>
+      <View style={{ flex: 1, gap: 4 }}>
+        <AppText variant="bodySm" numberOfLines={3}>{value}</AppText>
+        {badge}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-  dotsRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 6 },
-  dotWrap: { alignItems: "center", gap: 4 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  dotLabel: { fontSize: 9, fontWeight: "700", color: colors.textTertiary, letterSpacing: 0.5 },
-  propCard: {
-    padding: 12,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    gap: 4,
-  },
-  propAmass: { fontSize: 12, fontWeight: "800", color: colors.ink, letterSpacing: 0.4 },
-  propAddr: { fontSize: 12, color: colors.textSecondary, fontWeight: "600" },
-  card: { padding: 14, borderRadius: radius.md, backgroundColor: "#fff", gap: 8 },
-  stepTitle: { ...typography.h2, fontSize: 15 },
-  stepSub: { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
-  hint: { fontSize: 11, color: colors.textTertiary, fontStyle: "italic" },
-  gpsRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
-  gpsTierPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  gpsTierText: { color: "#fff", fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
-  gpsCoords: { flex: 1, fontSize: 11, fontWeight: "700", color: colors.text, fontFamily: "monospace" as any },
-  gpsAcc: { fontSize: 11, fontWeight: "700", color: colors.textSecondary },
-  photoWrap: { position: "relative", marginTop: 8 },
-  photoImg: { width: "100%", height: 180, borderRadius: radius.md, backgroundColor: colors.surfaceSecondary },
-  photoRemove: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  verdictRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 12,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    marginTop: 4,
-  },
-  verdictRowActive: { backgroundColor: "#FFEDED", borderWidth: 1.5, borderColor: colors.red },
-  verdictIcon: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  verdictLabel: { flex: 1, fontSize: 12, fontWeight: "700", color: colors.text },
-  fieldLbl: { fontSize: 10, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.4, marginTop: 6 },
-  input: {
-    minHeight: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  reviewRow: {
-    flexDirection: "row",
-    gap: 12,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  reviewLbl: {
-    width: 80,
-    fontSize: 10,
-    fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.4,
-  },
-  reviewVal: { flex: 1, fontSize: 12, fontWeight: "700", color: colors.text },
-  navRow: { flexDirection: "row", gap: 8, marginTop: 4 },
-  actionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    height: 46,
-    borderRadius: radius.pill,
-  },
-  primary: { backgroundColor: colors.red },
-  secondary: { backgroundColor: "#fff", borderWidth: 1.5, borderColor: colors.border },
-  actionText: { color: "#fff", fontSize: 13, fontWeight: "800", letterSpacing: 0.4 },
+  dotsRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 2 },
+  dotWrap: { alignItems: "center", gap: 5, flex: 1 },
+  dot: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  propIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  gpsBox: { padding: 12, borderRadius: radii.sm, gap: 6 },
+  gpsRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  photoWrap: { position: "relative" },
+  photoImg: { width: "100%", height: 200, borderRadius: radii.md },
+  photoEmpty: { height: 120, borderRadius: radii.md, borderWidth: 1.5, borderStyle: "dashed", alignItems: "center", justifyContent: "center", gap: 6 },
+  photoRemove: { position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
+  verdictRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radii.md, borderWidth: 1.5, minHeight: 64 },
+  verdictIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  reviewRow: { flexDirection: "row", gap: 12, paddingVertical: 10, alignItems: "flex-start" },
+  navRow: { flexDirection: "row", gap: 8 },
+  doneIcon: { width: 68, height: 68, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 4 },
 });

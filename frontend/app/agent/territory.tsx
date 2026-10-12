@@ -4,36 +4,25 @@
  * verification tasks in your area surface in your queue.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Ionicons from "@react-native-vector-icons/ionicons";
+import { KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Switch, View } from "react-native";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { space } from "@/src/theme/tokens";
+import { AppText, Button, Card, Chip, Input, Screen, ScreenHeader, SkeletonRows, useToast } from "@/src/ui";
 
-const NIGERIAN_STATES = [
-  "Lagos", "Abuja", "Rivers", "Kano", "Oyo", "Kaduna", "Ogun", "Enugu", "Anambra", "Edo",
-  "Delta", "Cross River", "Akwa Ibom", "Imo", "Abia", "Osun", "Ekiti", "Plateau",
-];
+const NIGERIAN_STATES = ["Lagos", "Abuja", "Rivers", "Kano", "Oyo", "Kaduna", "Ogun", "Enugu", "Anambra", "Edo", "Delta", "Cross River", "Akwa Ibom", "Imo", "Abia", "Osun", "Ekiti", "Plateau"];
 
 export default function AgentTerritoryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const { user } = useAuth();
   const [state, setState] = useState("");
   const [lgasText, setLgasText] = useState("");
@@ -45,6 +34,7 @@ export default function AgentTerritoryScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
+  const [stateError, setStateError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -59,11 +49,11 @@ export default function AgentTerritoryScreen() {
         setActive(t.is_active ?? true);
       }
     } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Try again");
+      toast.error("Couldn't load territory", e?.message ?? "Try again");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (!user) return;
@@ -73,14 +63,25 @@ export default function AgentTerritoryScreen() {
   const captureCenter = async () => {
     setGpsBusy(true);
     try {
-      const perm = await Location.requestForegroundPermissionsAsync();
-      if (perm.status !== "granted") return;
+      const current = await Location.getForegroundPermissionsAsync();
+      let status = current.status;
+      if (status !== "granted") {
+        if (!current.canAskAgain) {
+          toast.show({ kind: "warning", title: "Location is off for AMASS", body: "Enable it in Settings to use your GPS as the base point.", actionLabel: "Open Settings", onAction: () => Linking.openSettings() });
+          return;
+        }
+        status = (await Location.requestForegroundPermissionsAsync()).status;
+        if (status !== "granted") {
+          toast.info("Location not shared", "You can still type the coordinates manually.");
+          return;
+        }
+      }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       setCenterLat(loc.coords.latitude.toFixed(6));
       setCenterLng(loc.coords.longitude.toFixed(6));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e: any) {
-      Alert.alert("GPS failed", e?.message ?? "Try again");
+      toast.error("GPS failed", e?.message ?? "Try again");
     } finally {
       setGpsBusy(false);
     }
@@ -88,7 +89,7 @@ export default function AgentTerritoryScreen() {
 
   const save = async () => {
     if (!state.trim()) {
-      Alert.alert("State required", "Pick the state you cover.");
+      setStateError("Pick the state you cover.");
       return;
     }
     setSaving(true);
@@ -105,216 +106,89 @@ export default function AgentTerritoryScreen() {
         is_active: active,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert("Territory saved", "You'll start receiving matching tasks.", [
-        { text: "Done", onPress: () => router.back() },
-      ]);
+      toast.success("Territory saved", "You'll start receiving matching tasks.");
+      router.back();
     } catch (e: any) {
-      Alert.alert("Save failed", e?.message ?? "Try again");
+      toast.error("Save failed", e?.message ?? "Try again");
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <Header title="Territory" onBack={() => router.back()} />
-        <ActivityIndicator style={{ marginTop: 60 }} color={colors.red} />
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="agent-territory">
-      <Header title="My Territory" onBack={() => router.back()} />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 14, paddingBottom: 60 }}>
-          <View style={[styles.card, shadows.soft]}>
-            <Text style={styles.sectionTitle}>State</Text>
-            <View style={styles.chipsWrap}>
-              {NIGERIAN_STATES.map((s) => (
-                <Pressable
-                  key={s}
-                  style={[styles.stateChip, state === s && styles.stateChipActive]}
-                  onPress={() => {
-                    setState(s);
-                    Haptics.selectionAsync().catch(() => {});
-                  }}
-                  testID={`state-${s}`}
-                >
-                  <Text style={[styles.stateChipText, state === s && { color: "#fff" }]}>{s}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          <View style={[styles.card, shadows.soft]}>
-            <Text style={styles.sectionTitle}>LGAs (comma-separated)</Text>
-            <TextInput
-              style={styles.input}
-              value={lgasText}
-              onChangeText={setLgasText}
-              placeholder="Ikoyi, Victoria Island, Lekki"
-              placeholderTextColor={colors.textMuted}
-              testID="input-lgas"
-            />
-            <Text style={styles.sectionTitle}>Areas (optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={areasText}
-              onChangeText={setAreasText}
-              placeholder="Parkview, Banana Island, Osborne"
-              placeholderTextColor={colors.textMuted}
-              testID="input-areas"
-            />
-          </View>
-
-          <View style={[styles.card, shadows.soft]}>
-            <Text style={styles.sectionTitle}>Radius from your base (optional)</Text>
-            <Text style={styles.hint}>Tasks farther than the radius won&apos;t surface, even inside your LGAs.</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLbl}>Latitude</Text>
-                <TextInput
-                  style={styles.input}
-                  value={centerLat}
-                  onChangeText={setCenterLat}
-                  keyboardType="numeric"
-                  placeholder="6.4400"
-                  placeholderTextColor={colors.textMuted}
-                  testID="input-lat"
-                />
+    <Screen testID="agent-territory">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="My territory" subtitle="Where you verify properties" />
+      {loading ? (
+        <View style={{ padding: space[4] }}>
+          <SkeletonRows rows={4} />
+        </View>
+      ) : (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <ScrollView contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: 60 + insets.bottom }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <Card elevation="xs" style={{ gap: 10 }}>
+              <AppText variant="title">State</AppText>
+              <View style={styles.chipsWrap}>
+                {NIGERIAN_STATES.map((s) => (
+                  <Chip
+                    key={s}
+                    label={s}
+                    selected={state === s}
+                    onPress={() => {
+                      setState(s);
+                      setStateError(null);
+                    }}
+                    testID={`state-${s}`}
+                  />
+                ))}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLbl}>Longitude</Text>
-                <TextInput
-                  style={styles.input}
-                  value={centerLng}
-                  onChangeText={setCenterLng}
-                  keyboardType="numeric"
-                  placeholder="3.4750"
-                  placeholderTextColor={colors.textMuted}
-                  testID="input-lng"
-                />
+              {stateError ? (
+                <AppText variant="caption" tone="error" accessibilityRole="alert">
+                  {stateError}
+                </AppText>
+              ) : null}
+            </Card>
+
+            <Card elevation="xs" style={{ gap: 12 }}>
+              <Input label="LGAs (comma-separated)" value={lgasText} onChangeText={setLgasText} placeholder="Ikoyi, Victoria Island, Lekki" testID="input-lgas" />
+              <Input label="Areas (optional)" value={areasText} onChangeText={setAreasText} placeholder="Parkview, Banana Island, Osborne" testID="input-areas" />
+            </Card>
+
+            <Card elevation="xs" style={{ gap: 12 }}>
+              <View style={{ gap: 2 }}>
+                <AppText variant="title">Radius from your base (optional)</AppText>
+                <AppText variant="caption" tone="secondary">
+                  Tasks farther than the radius won&apos;t surface, even inside your LGAs.
+                </AppText>
               </View>
-            </View>
-            <Pressable
-              style={[styles.actionBtn, styles.secondary]}
-              onPress={captureCenter}
-              disabled={gpsBusy}
-              testID="btn-use-my-gps"
-            >
-              {gpsBusy ? (
-                <ActivityIndicator color={colors.text} />
-              ) : (
-                <>
-                  <Ionicons name="locate" size={14} color={colors.text} />
-                  <Text style={[styles.actionText, { color: colors.text }]}>Use my current GPS</Text>
-                </>
-              )}
-            </Pressable>
-            <Text style={styles.fieldLbl}>Radius (km)</Text>
-            <TextInput
-              style={styles.input}
-              value={radiusKm}
-              onChangeText={setRadiusKm}
-              keyboardType="numeric"
-              placeholder="15"
-              placeholderTextColor={colors.textMuted}
-              testID="input-radius"
-            />
-          </View>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Input containerStyle={{ flex: 1 }} label="Latitude" value={centerLat} onChangeText={setCenterLat} keyboardType="numeric" placeholder="6.4400" testID="input-lat" />
+                <Input containerStyle={{ flex: 1 }} label="Longitude" value={centerLng} onChangeText={setCenterLng} keyboardType="numeric" placeholder="3.4750" testID="input-lng" />
+              </View>
+              <Button label="Use my current GPS" variant="secondary" fullWidth iconLeft="locate" loading={gpsBusy} onPress={captureCenter} testID="btn-use-my-gps" />
+              <Input label="Radius (km)" value={radiusKm} onChangeText={setRadiusKm} keyboardType="numeric" placeholder="15" testID="input-radius" />
+            </Card>
 
-          <View style={[styles.card, shadows.soft, { flexDirection: "row", alignItems: "center" }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>Active</Text>
-              <Text style={styles.hint}>Turn off to pause new task assignments without losing setup.</Text>
-            </View>
-            <Switch value={active} onValueChange={setActive} trackColor={{ true: colors.emerald, false: colors.divider }} />
-          </View>
+            <Card elevation="xs">
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="title">Active</AppText>
+                  <AppText variant="caption" tone="secondary">
+                    Turn off to pause new task assignments without losing setup.
+                  </AppText>
+                </View>
+                <Switch value={active} onValueChange={setActive} trackColor={{ true: colors.success, false: colors.surfaceSunken }} accessibilityLabel="Territory active" testID="switch-active" />
+              </View>
+            </Card>
 
-          <Pressable
-            style={[styles.actionBtn, styles.primary, saving && { opacity: 0.6 }]}
-            onPress={save}
-            disabled={saving}
-            testID="btn-save-territory"
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="save" size={16} color="#fff" />
-                <Text style={styles.actionText}>Save territory</Text>
-              </>
-            )}
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-}
-
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>{title}</Text>
-      <View style={styles.iconBtn} />
-    </View>
+            <Button label="Save territory" size="lg" fullWidth iconLeft="save" loading={saving} onPress={save} testID="btn-save-territory" />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-  card: { padding: 14, borderRadius: radius.md, backgroundColor: "#fff", gap: 8 },
-  sectionTitle: { ...typography.h2, fontSize: 13, letterSpacing: 0.3 },
-  hint: { fontSize: 11, color: colors.textTertiary, fontStyle: "italic" },
-  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
-  stateChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  stateChipActive: { backgroundColor: colors.ink },
-  stateChipText: { fontSize: 11, fontWeight: "800", color: colors.text, letterSpacing: 0.3 },
-  fieldLbl: { fontSize: 10, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.4, marginTop: 6 },
-  input: {
-    minHeight: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-    marginTop: 4,
-  },
-  actionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 46,
-    borderRadius: radius.pill,
-    marginTop: 4,
-  },
-  primary: { backgroundColor: colors.ink },
-  secondary: { backgroundColor: "#fff", borderWidth: 1.5, borderColor: colors.border },
-  actionText: { color: "#fff", fontSize: 13, fontWeight: "800", letterSpacing: 0.4 },
+  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 });

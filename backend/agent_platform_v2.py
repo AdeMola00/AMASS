@@ -29,6 +29,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+# Shared demo logins that must never be hard-deleted through the self-serve flow.
+PROTECTED_DEMO_EMAILS = {"demo@amass.africa"}
+
 
 # ─── Badge tiers ────────────────────────────────────────────────
 # Rules are intentionally lenient at launch to reward early adopters.
@@ -371,6 +374,10 @@ def register_agent_platform_v2_routes(
     @router.post("/account/delete", response_model=AccountDeleteOut)
     async def delete_my_account(user: dict = Depends(require_auth)):
         uid = user["id"]
+        if (user.get("email") or "").lower() in PROTECTED_DEMO_EMAILS:
+            raise HTTPException(
+                403, "The shared demo account can't be deleted. Create your own account to try this."
+            )
         now = datetime.now(timezone.utc)
 
         # Collections to scrub the user's rows from (list is authoritative).

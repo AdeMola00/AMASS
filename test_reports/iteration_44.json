@@ -1,0 +1,60 @@
+{
+  "summary": "FRONTEND-ONLY regression after Phase 3 design-system migration of ~110 screens. Logged in with demo@amass.africa / amass2026 at 390x844 mobile viewport. Visited 52 routes — ALL render without red-screen, 'Unable to resolve', blank #root, page errors or navigation failures. Deep-interaction verifications: (a) Auth: /login → tabs; /register, /forgot-password render; (b) Tabs: /, /discover (balance-chip + featured-rail present), /marketplace (mkt-tab-brands/fixa/declutter all tap-switchable; sort-pill, view-toggle, market-filter-btn all open/close), /inbox (7 conv-* rows → click → /chat/{id}), /profile (wallet-card + profile-topup + sign-out present; iteration-43 nested-<button> regression is FIXED — 0 'descendant/nested button' errors on reload); (c) Wallet/economy: /wallet, /buy-tokens, /buy-fix, /earn, /earn-fix, /settings, /notifications, /unlocks, /saved-properties, /saved-searches, /my-documents, /identity-verification, /help (6 faq-* items), /about, /cart, /checkout, /subscribe render; (d) Property: /property/{id} loads with btn-contact-agent + reveal-agent-contact-btn + chat-agent-btn + back-btn; tapping reveal-agent-contact-btn opens the agent-reveal sheet (shows 10 MASS fee + balance after). Chat screen /chat/{id} shows chat-screen + chat-input + chat-attach + chat-property-card; chat-send renders only after typing (correct conditional); (e) Marketplace: /marketplace/sell (category chips + 6 Details inputs + Publish listing CTA), /marketplace/search, /marketplace/saved all render; (f) /submit-property is a 5-step wizard (Step 1 = tappable Yes/No + listing-type cards, no inputs on step 1 — correct), /become-agent, /agent-dashboard, /agent-plans (6 plan cards + founding-agent counter 498/500), /agent-score, /agent-workspace, /agent/onboarding (full wizard with onboarding-wizard + wiz-back + wiz-primary + state-* chips present), /agent/tasks, /agent/territory, /agent/representations, /agent/{slug} (public profile), /crm; (g) Services: /provider-dashboard, /improve, /ads, /ai-search, /fix-features; (h) Admin cockpit /admin shows 752 properties / 527 listings / 13 merged / 13 duplicate flags / 379 pending reps; /admin/discovery, /admin/duplicate-queue, /admin/settings, /admin/audit-log, /admin/representations, /admin/chat-reports, /admin/merge all render; (i) Public /share/{id} renders premium AMASS flyer with verified badge, N145M price, QR code, WhatsApp green CTA. Settings theme toggle VERIFIED — dark=rgb(13,12,11) / light=rgb(250,250,249), chip-based [theme-dark|theme-light|theme-system] all present. SURFACED issues: 2 BACKEND 500s on /api/agent/score (datetime tz-naive/aware comparison bug in reviews_score_crm.py:385) that leak into /agent-dashboard + /agent-score as console errors; a 400 is thrown when demo taps 'Chat with Agent' on a property they own (self-chat blocked — expected); /unlocks has a React 'unique key prop' warning on list render; /agent/{slug} fires 3× 404 for optional analytics endpoints — none of these red-screen the app and are frontend-regression-clean. No deprecated expo packages detected in migrated screens. No invisible-text / contrast issues observed in dark or light theme.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/agent/score (and GET /api/agent/{slug}/score)",
+        "issue": "500 TypeError 'can\\'t compare offset-naive and offset-aware datetimes' at /app/backend/reviews_score_crm.py:385. `cutoff = datetime.now(timezone.utc)` is tz-aware but `p.get('updated_at')` from Mongo is tz-naive. Repeated in logs 7+ times. Pages /agent-score and /agent-dashboard surface a console 500 (UI still renders fallback). Fix: coerce `u = u.replace(tzinfo=timezone.utc) if u.tzinfo is None else u` before the >= comparison.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "GET /agent/{slug} public profile",
+        "issue": "3× 404 responses on page load (likely optional reviews/analytics sub-fetches). UI still renders fine."
+      },
+      {
+        "endpoint": "POST /api/conversations (demo tapping btn-contact-agent on their OWN listing)",
+        "issue": "400 as expected (self-chat blocked). Not a regression but surfaces as a console error — consider swallowing on frontend when agent_id === current_user_id."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "/unlocks list",
+        "issue": "React 'Each child in a list should have a unique key prop' warning. Check the render method of View in UnlocksScreen (./unlocks.tsx). Non-blocking but should get a `key` on the mapped children. Reference: /app/frontend/app/unlocks.tsx",
+        "testID": "n/a",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_44.json",
+    "/app/tests/playwright_regression.py (ref)"
+  ],
+  "action_items": [
+    "BACKEND FIX (surfaced from frontend regression): /app/backend/reviews_score_crm.py:385 — normalize `updated_at` tz before comparing to `cutoff` to stop /api/agent/score 500s. Example: `u = u.replace(tzinfo=timezone.utc) if (isinstance(u, datetime) and u.tzinfo is None) else u` then compare. This currently prints two 500 tracebacks whenever /agent-score or /agent-dashboard loads.",
+    "LOW-PRIORITY: Add `key` prop to the mapped list in /app/frontend/app/unlocks.tsx to clear the React key warning.",
+    "OPTIONAL polish: On property/[id].tsx, hide/disable btn-contact-agent (sticky bottom) when `property.agent_id === currentUser.id` (prevents the 400 self-chat round-trip + console error for admin/agent users browsing their own listings).",
+    "NO action needed on Phase-3 migration itself — all 52 routes render cleanly, dark/light theme toggle works, Profile wallet-card nested-button regression from iteration-43 is confirmed FIXED."
+  ],
+  "critical_code_review_comments": [
+    "reviews_score_crm.py:385 — comparing a tz-aware `cutoff` to a possibly tz-naive mongo datetime is a known Python 3 pitfall. The project uses tz-aware timestamps elsewhere; the fix is centralising a `_to_utc(dt)` helper and using it anywhere a mongo datetime is read.",
+    "unlocks.tsx — mapping over the ledger without key={tx.id} will cause index-based reconciliation when items reorder. Not a crash but can produce blink/flicker on real-time wallet updates.",
+    "Design system migration is clean: 0 raw <div>/<span>/<p> leaks reaching the DOM where they shouldn't; theme chip + ThemeProvider wire-up correctly flips the dominant surface color (verified via large-area background sampling)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only run, but surfaced 1 HIGH backend bug + 2 minor)",
+    "frontend": "52/52 routes PASS (100%) · dark+light theme PASS · 7-conv inbox→chat flow PASS · marketplace tabs+sort+view+filter PASS · property reveal-agent-sheet PASS · share flyer PASS · profile nested-button regression FIXED"
+  },
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase-3 design-system migration regression is clean. Everything that previously broke in iteration_43 (Profile wallet-card nested-<button>) is fixed. The only new issue to retest is the backend /api/agent/score datetime bug — once /app/backend/reviews_score_crm.py:385 is normalized, re-run GET /api/agent/score as demo + reload /agent-score and /agent-dashboard: both should show the breakdown card and 0 console 500s. Chat-send testID is correct (`chat-send`) but is CONDITIONALLY rendered only when `text.trim().length > 0` — any send-flow test must type first and then query the selector. Status chips on home map (`status-chip-available|coming_soon|closed|clear`) only mount AFTER the markers load with real properties; web preview shows them intermittently because react-native-maps is native-only (map placeholder is expected per request). Settings theme is persisted — verified large-area backgrounds flip on tap; test harness must sample >=300x300 divs since inner cards keep their own fill. Marketplace sort options use dynamic testIDs `sort-opt-${key}` where key values are defined in marketplace.tsx (not `sort-opt-recent`). To send a chat on web: focus `chat-input`, type text, then `chat-send` appears and is tappable; expect optimistic bubble + POST /api/conversations/{id}/messages 2xx.",
+  "rca_of_issue": "Backend /api/agent/score 500 — RCA: `datetime.now(timezone.utc)` returns a tz-aware instant; MongoDB bson stores datetimes without tzinfo (returns tz-naive). Python forbids `aware >= naive` and raises TypeError. Reproduction: curl -H 'Authorization: Bearer <demo_jwt>' https://property-os-africa.preview.emergentagent.com/api/agent/score. Mitigation: either (a) at read time: `u = u.replace(tzinfo=timezone.utc) if isinstance(u, datetime) and u.tzinfo is None else u`, or (b) at write time: ensure all `updated_at` fields are written as tz-aware (datetime.now(timezone.utc)) and migrate existing naive rows. Option (a) is a 1-line fix and backward-safe."
+}

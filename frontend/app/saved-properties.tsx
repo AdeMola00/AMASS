@@ -1,19 +1,25 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, FlatList, RefreshControl } from "react-native";
-import Ionicons from "@react-native-vector-icons/ionicons";
+import { View, FlatList, RefreshControl, useWindowDimensions } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { api, Property } from "@/src/lib/api";
-import { PropertyCard } from "@/src/components/PropertyCard";
-import { colors, radius, spacing } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { space } from "@/src/theme/tokens";
+import { AppText, EmptyState, Screen, ScreenHeader, SkeletonCard, useToast } from "@/src/ui";
+import { ListingCard } from "@/src/components/ListingCard";
 
 export default function SavedProperties() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const toast = useToast();
+  const { width } = useWindowDimensions();
   const [items, setItems] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
+
+  const twoCol = width >= 700;
+  const cardW = twoCol ? (Math.min(width, 1100) - space[4] * 2 - space[3]) / 2 : width - space[4] * 2;
 
   const load = useCallback(async () => {
     setError(false);
@@ -39,86 +45,62 @@ export default function SavedProperties() {
     setRefreshing(false);
   };
 
-  const onUnsave = async (p: Property) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setItems((prev) => prev.filter((x) => x.id !== p.id)); // optimistic
-    try {
-      await api.toggleFavorite(p.id);
-    } catch {
-      load(); // revert on failure
-    }
+  // ListingCard already toggles the favourite on the server; here we only
+  // remove the card from the list (optimistic) and offer an undo.
+  const onToggle = (id: string, next: boolean) => {
+    if (next) return;
+    const removed = items.find((x) => x.id === id);
+    setItems((prev) => prev.filter((x) => x.id !== id));
+    toast.show({
+      kind: "info",
+      title: "Removed from saved",
+      body: removed?.title,
+      actionLabel: "Undo",
+      onAction: async () => {
+        Haptics.selectionAsync().catch(() => {});
+        try {
+          await api.toggleFavorite(id);
+        } catch {}
+        load();
+      },
+    });
   };
 
   return (
-    <View style={styles.container}>
+    <Screen testID="saved-properties-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn} testID="saved-back">
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Saved Properties</Text>
-        <View style={{ width: 40 }} />
-      </SafeAreaView>
+      <ScreenHeader title="Saved Properties" subtitle={items.length ? `${items.length} saved` : "Your favourites, in one place"} testID="saved-header" />
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={colors.red} /></View>
+        <View style={{ padding: space[4], gap: space[3] }}>
+          <SkeletonCard imageHeight={168} />
+          <SkeletonCard imageHeight={168} />
+        </View>
       ) : error ? (
-        <View style={styles.empty}>
-          <View style={styles.emptyIcon}><Ionicons name="cloud-offline-outline" size={30} color={colors.textMuted} /></View>
-          <Text style={styles.emptyTitle}>Couldn&apos;t load your saved properties</Text>
-          <Text style={styles.emptyBody}>Check your connection and try again.</Text>
-          <Pressable style={styles.cta} onPress={() => { setLoading(true); load().finally(() => setLoading(false)); }} testID="saved-retry">
-            <Text style={styles.ctaText}>Retry</Text>
-          </Pressable>
-        </View>
+        <EmptyState variant="error" title="Couldn't load your saved properties" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load().finally(() => setLoading(false)); }} testID="saved-retry" />
       ) : items.length === 0 ? (
-        <View style={styles.empty}>
-          <View style={styles.emptyIcon}><Ionicons name="heart-outline" size={30} color={colors.textMuted} /></View>
-          <Text style={styles.emptyTitle}>No saved properties yet</Text>
-          <Text style={styles.emptyBody}>Tap the heart on any listing to save it here for quick access.</Text>
-          <Pressable style={styles.cta} onPress={() => router.replace("/(tabs)")} testID="saved-explore">
-            <Text style={styles.ctaText}>Explore properties</Text>
-          </Pressable>
-        </View>
+        <EmptyState icon="heart-outline" title="No saved properties yet" body="Tap the heart on any listing to save it here for quick access." actionLabel="Explore properties" onAction={() => router.replace("/(tabs)")} testID="saved-explore" />
       ) : (
         <FlatList
+          key={twoCol ? "2" : "1"}
           data={items}
+          numColumns={twoCol ? 2 : 1}
+          columnWrapperStyle={twoCol ? { gap: space[3] } : undefined}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: 120 }}
+          contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.red} />}
-          renderItem={({ item }) => (
-            <PropertyCard
-              property={item}
-              variant="row"
-              favorited
-              onFavorite={() => onUnsave(item)}
-              onPress={() => router.push(`/property/${item.id}`)}
-            />
-          )}
+          initialNumToRender={6}
+          windowSize={5}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
+          renderItem={({ item }) => <ListingCard property={item} width={cardW} saved onToggleSave={onToggle} testID={`saved-card-${item.id}`} />}
+          ListFooterComponent={
+            <AppText variant="caption" tone="muted" align="center" style={{ marginTop: space[3] }}>
+              Saved properties sync across your devices.
+            </AppText>
+          }
         />
       )}
-    </View>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: colors.bg,
-  },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xxl, gap: 10 },
-  emptyIcon: { width: 68, height: 68, borderRadius: 34, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
-  emptyTitle: { fontSize: 17, fontWeight: "800", color: colors.text, textAlign: "center" },
-  emptyBody: { fontSize: 13, color: colors.textTertiary, textAlign: "center", lineHeight: 19 },
-  cta: { marginTop: 8, paddingHorizontal: 22, height: 46, borderRadius: radius.pill, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
-  ctaText: { color: "#fff", fontSize: 14, fontWeight: "800" },
-});

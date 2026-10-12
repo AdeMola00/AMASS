@@ -1,36 +1,37 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  FlatList,
-  TextInput,
-  ActivityIndicator,
-  ScrollView,
-  Modal,
-  Switch,
-} from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { View, StyleSheet, Pressable, FlatList, TextInput, ScrollView, Switch } from "react-native";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 
 import { api, MarketplaceItem } from "@/src/lib/api";
 import { useCart } from "@/src/contexts/cart";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { fontFamilies, radii, space } from "@/src/theme/tokens";
+import { AppText, Button, Chip, EmptyState, IconButton, Input, Screen, Sheet, SkeletonCard, useToast } from "@/src/ui";
 import { ProductCard } from "@/src/components/ProductCard";
 
 type Sort = "relevance" | "price_asc" | "price_desc" | "rating" | "newest";
+
+const SORTS: [Sort, string][] = [
+  ["relevance", "Relevance"],
+  ["price_asc", "Price ↑"],
+  ["price_desc", "Price ↓"],
+  ["rating", "Top rated"],
+];
 
 export default function MarketplaceList() {
   const params = useLocalSearchParams<{ q?: string; category?: string; subcategory?: string; title?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const { count, add } = useCart();
 
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [query, setQuery] = useState<string>(params.q ?? "");
   const [sort, setSort] = useState<Sort>("relevance");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -46,6 +47,7 @@ export default function MarketplaceList() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
       const req: Record<string, any> = {};
       if (query.trim()) req.q = query.trim();
@@ -55,10 +57,10 @@ export default function MarketplaceList() {
       if (filters.onSaleOnly) req.on_sale = true;
       if (filters.minPrice) req.min_price = parseInt(filters.minPrice, 10);
       if (filters.maxPrice) req.max_price = parseInt(filters.maxPrice, 10);
-      const list = await api.marketplace(req);
-      setItems(list);
+      setItems(await api.marketplace(req));
     } catch {
       setItems([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -83,22 +85,18 @@ export default function MarketplaceList() {
   }, [items, sort]);
 
   const activeFilterCount =
-    (filters.verifiedOnly ? 1 : 0) +
-    (filters.onSaleOnly ? 1 : 0) +
-    (filters.minPrice ? 1 : 0) +
-    (filters.maxPrice ? 1 : 0) +
-    (filters.category ? 1 : 0) +
-    (filters.subcategory ? 1 : 0);
+    (filters.verifiedOnly ? 1 : 0) + (filters.onSaleOnly ? 1 : 0) + (filters.minPrice ? 1 : 0) + (filters.maxPrice ? 1 : 0) + (filters.category ? 1 : 0) + (filters.subcategory ? 1 : 0);
 
   const heading = params.title || (filters.subcategory ?? filters.category ?? "All products");
 
+  const clearFilters = () => setFilters({ category: undefined, subcategory: undefined, verifiedOnly: false, onSaleOnly: false, minPrice: "", maxPrice: "" });
+
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="marketplace-list-screen">
+    <Screen testID="marketplace-list-screen">
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn} testID="mlist-back">
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <View style={styles.searchBar}>
+        <IconButton icon="chevron-back" label="Go back" size={40} onPress={() => router.back()} testID="mlist-back" />
+        <View style={[styles.searchBar, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
           <Ionicons name="search" size={16} color={colors.textSecondary} />
           <TextInput
             value={query}
@@ -107,380 +105,170 @@ export default function MarketplaceList() {
             returnKeyType="search"
             placeholder="Search"
             placeholderTextColor={colors.textMuted}
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
+            accessibilityLabel="Search products"
             testID="mlist-search"
           />
-          {!!query && (
-            <Pressable onPress={() => setQuery("")}>
+          {query ? (
+            <Pressable onPress={() => setQuery("")} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
               <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
             </Pressable>
-          )}
+          ) : null}
         </View>
-        <Pressable onPress={() => router.push("/cart")} style={styles.iconBtn} testID="mlist-cart">
-          <Ionicons name="bag-outline" size={22} color={colors.text} />
-          {count > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{count}</Text>
-            </View>
-          )}
-        </Pressable>
+        <IconButton icon="bag-outline" label="Cart" size={40} badge={count} onPress={() => router.push("/cart")} testID="mlist-cart" />
       </View>
 
       <View style={styles.titleRow}>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={styles.h1}>{heading}</Text>
-          <Text style={styles.count}>
-            {loading ? "Loading…" : `${sorted.length} results`}
-          </Text>
+          <AppText variant="h2" numberOfLines={1} style={{ textTransform: "capitalize" }}>
+            {heading}
+          </AppText>
+          <AppText variant="caption" tone="tertiary" tabular>
+            {loading ? "Loading…" : `${sorted.length} result${sorted.length === 1 ? "" : "s"}`}
+          </AppText>
         </View>
-        <Pressable
-          onPress={() => setFilterOpen(true)}
-          style={styles.filterBtn}
-          testID="open-filter"
-        >
-          <Ionicons name="options-outline" size={16} color={colors.text} />
-          <Text style={styles.filterBtnText}>Filter</Text>
-          {activeFilterCount > 0 && (
-            <View style={styles.filterDot}>
-              <Text style={styles.filterDotText}>{activeFilterCount}</Text>
-            </View>
-          )}
-        </Pressable>
+        <Chip label="Filter" icon="options-outline" count={activeFilterCount || undefined} selected={activeFilterCount > 0} onPress={() => setFilterOpen(true)} testID="open-filter" />
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.sortRow}
-        style={{ flexGrow: 0 }}
-      >
-        {(
-          [
-            ["relevance", "Relevance"],
-            ["price_asc", "Price ↑"],
-            ["price_desc", "Price ↓"],
-            ["rating", "Top rated"],
-          ] as [Sort, string][]
-        ).map(([k, label]) => (
-          <Pressable
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow} style={{ flexGrow: 0 }}>
+        {SORTS.map(([k, label]) => (
+          <Chip
             key={k}
+            label={label}
+            selected={sort === k}
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
               setSort(k);
             }}
-            style={[styles.sortChip, sort === k && styles.sortChipActive]}
             testID={`sort-${k}`}
-          >
-            <Text style={[styles.sortText, sort === k && styles.sortTextActive]}>{label}</Text>
-          </Pressable>
+          />
         ))}
       </ScrollView>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.red} />
+        <View style={{ paddingHorizontal: space[4], paddingTop: 8, gap: 12 }}>
+          <View style={styles.gridRow}>
+            <SkeletonCard imageHeight={150} style={{ flex: 1 }} />
+            <SkeletonCard imageHeight={150} style={{ flex: 1 }} />
+          </View>
+          <View style={styles.gridRow}>
+            <SkeletonCard imageHeight={150} style={{ flex: 1 }} />
+            <SkeletonCard imageHeight={150} style={{ flex: 1 }} />
+          </View>
+        </View>
+      ) : error ? (
+        <EmptyState variant="error" title="Couldn't load products" body="Check your connection and try again." actionLabel="Retry" onAction={load} />
       ) : (
         <FlatList
           data={sorted}
           keyExtractor={(p) => p.id}
           numColumns={2}
-          columnWrapperStyle={{ gap: 12, paddingHorizontal: spacing.xl }}
-          contentContainerStyle={{ gap: 12, paddingBottom: 40 + insets.bottom, paddingTop: 8 }}
+          columnWrapperStyle={{ gap: 12, paddingHorizontal: space[4] }}
+          contentContainerStyle={{ gap: 12, paddingBottom: 40 + insets.bottom, paddingTop: 8, flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <ProductCard
               item={item}
               size="md"
               onPress={() => router.push(`/marketplace/${item.id}` as any)}
-              onAdd={() => add(item.id, 1)}
+              onAdd={() => {
+                add(item.id, 1);
+                toast.success("Added to cart", item.name);
+              }}
             />
           )}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="search-outline" size={44} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>No results</Text>
-              <Text style={styles.emptySub}>Try a different search or clear filters.</Text>
-            </View>
+            <EmptyState
+              icon="search-outline"
+              title="No results"
+              body="Try a different search or clear your filters."
+              actionLabel={activeFilterCount > 0 ? "Clear filters" : undefined}
+              onAction={activeFilterCount > 0 ? clearFilters : undefined}
+              testID="mlist-empty"
+            />
           }
         />
       )}
 
-      {/* Filter modal */}
-      <Modal
-        visible={filterOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setFilterOpen(false)}
-      >
-        <Pressable style={styles.scrim} onPress={() => setFilterOpen(false)} />
-        <View style={[styles.filterSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.filterHeader}>
-            <Text style={styles.filterTitle}>Filters</Text>
-            <Pressable onPress={() => setFilterOpen(false)} style={styles.iconBtn}>
-              <Ionicons name="close" size={22} color={colors.text} />
-            </Pressable>
+      {/* Filter sheet */}
+      <Sheet visible={filterOpen} onClose={() => setFilterOpen(false)} title="Filters" testID="filter-sheet">
+        <ScrollView contentContainerStyle={{ gap: space[5], paddingBottom: 8 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <View style={{ gap: 10 }}>
+            <AppText variant="label" tone="tertiary" uppercase>
+              Category
+            </AppText>
+            <View style={styles.chipWrap}>
+              {[
+                { key: "home", label: "Home", icon: "home-outline" as const },
+                { key: "construction", label: "Construction", icon: "construct-outline" as const },
+                { key: "services", label: "Services", icon: "briefcase-outline" as const },
+              ].map((c) => {
+                const on = filters.category === c.key;
+                return <Chip key={c.key} label={c.label} icon={c.icon} selected={on} onPress={() => setFilters((f) => ({ ...f, category: on ? undefined : c.key }))} testID={`filter-cat-${c.key}`} />;
+              })}
+            </View>
           </View>
 
-          <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}>
-            <View style={{ gap: 8 }}>
-              <Text style={styles.filterLabel}>Category</Text>
-              <View style={styles.chipWrap}>
-                {[
-                  { key: "home", label: "Home" },
-                  { key: "construction", label: "Construction" },
-                  { key: "services", label: "Services" },
-                ].map((c) => {
-                  const on = filters.category === c.key;
-                  return (
-                    <Pressable
-                      key={c.key}
-                      onPress={() => setFilters((f) => ({ ...f, category: on ? undefined : c.key }))}
-                      style={[styles.chip, on && styles.chipOn]}
-                      testID={`filter-cat-${c.key}`}
-                    >
-                      <Text style={[styles.chipText, on && { color: "#fff" }]}>{c.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={{ gap: 8 }}>
-              <Text style={styles.filterLabel}>Price range (₦)</Text>
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                <TextInput
-                  value={filters.minPrice}
-                  onChangeText={(t) => setFilters((f) => ({ ...f, minPrice: t.replace(/[^\d]/g, "") }))}
-                  placeholder="Min"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="numeric"
-                  style={styles.rangeInput}
-                  testID="filter-min"
-                />
-                <TextInput
-                  value={filters.maxPrice}
-                  onChangeText={(t) => setFilters((f) => ({ ...f, maxPrice: t.replace(/[^\d]/g, "") }))}
-                  placeholder="Max"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="numeric"
-                  style={styles.rangeInput}
-                  testID="filter-max"
-                />
-              </View>
-            </View>
-
-            <View style={styles.toggleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.toggleTitle}>Verified sellers only</Text>
-                <Text style={styles.toggleSub}>Show only AMASS-verified vendors</Text>
-              </View>
-              <Switch
-                value={filters.verifiedOnly}
-                onValueChange={(v) => setFilters((f) => ({ ...f, verifiedOnly: v }))}
+          <View style={{ gap: 10 }}>
+            <AppText variant="label" tone="tertiary" uppercase>
+              Price range (₦)
+            </AppText>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Input
+                value={filters.minPrice}
+                onChangeText={(t) => setFilters((f) => ({ ...f, minPrice: t.replace(/[^\d]/g, "") }))}
+                placeholder="Min"
+                keyboardType="numeric"
+                containerStyle={{ flex: 1 }}
+                testID="filter-min"
+              />
+              <Input
+                value={filters.maxPrice}
+                onChangeText={(t) => setFilters((f) => ({ ...f, maxPrice: t.replace(/[^\d]/g, "") }))}
+                placeholder="Max"
+                keyboardType="numeric"
+                containerStyle={{ flex: 1 }}
+                testID="filter-max"
               />
             </View>
-            <View style={styles.toggleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.toggleTitle}>On sale</Text>
-                <Text style={styles.toggleSub}>Discounted items only</Text>
-              </View>
-              <Switch
-                value={filters.onSaleOnly}
-                onValueChange={(v) => setFilters((f) => ({ ...f, onSaleOnly: v }))}
-              />
-            </View>
-          </ScrollView>
-
-          <View style={styles.filterFooter}>
-            <Pressable
-              onPress={() =>
-                setFilters({
-                  category: undefined,
-                  subcategory: undefined,
-                  verifiedOnly: false,
-                  onSaleOnly: false,
-                  minPrice: "",
-                  maxPrice: "",
-                })
-              }
-              style={styles.clearBtn}
-              testID="filter-clear"
-            >
-              <Text style={styles.clearBtnText}>Clear all</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setFilterOpen(false)}
-              style={styles.applyBtn}
-              testID="filter-apply"
-            >
-              <Text style={styles.applyBtnText}>Show results</Text>
-            </Pressable>
           </View>
+
+          <ToggleRow title="Verified sellers only" sub="Show only AMASS-verified vendors" value={filters.verifiedOnly} onChange={(v) => setFilters((f) => ({ ...f, verifiedOnly: v }))} />
+          <ToggleRow title="On sale" sub="Discounted items only" value={filters.onSaleOnly} onChange={(v) => setFilters((f) => ({ ...f, onSaleOnly: v }))} />
+        </ScrollView>
+
+        <View style={styles.filterFooter}>
+          <Button label="Clear all" variant="secondary" size="lg" onPress={clearFilters} testID="filter-clear" />
+          <Button label="Show results" size="lg" onPress={() => setFilterOpen(false)} testID="filter-apply" style={{ flex: 1 }} />
         </View>
-      </Modal>
-    </SafeAreaView>
+      </Sheet>
+    </Screen>
+  );
+}
+
+function ToggleRow({ title, sub, value, onChange }: { title: string; sub: string; value: boolean; onChange: (v: boolean) => void }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.toggleRow}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <AppText variant="bodyMedium">{title}</AppText>
+        <AppText variant="caption" tone="tertiary">
+          {sub}
+        </AppText>
+      </View>
+      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.primary, false: colors.surfaceSunken }} thumbColor="#FFFFFF" accessibilityLabel={title} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  badge: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 4,
-    borderRadius: 9,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  searchBar: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    height: 40,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 12,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: colors.text, fontWeight: "500" },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-  },
-  h1: { ...typography.h1, fontSize: 24 },
-  count: { ...typography.caption, color: colors.textTertiary },
-  filterBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    height: 40,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "#fff",
-  },
-  filterBtnText: { fontSize: 13, fontWeight: "700", color: colors.text },
-  filterDot: {
-    minWidth: 20,
-    height: 20,
-    paddingHorizontal: 4,
-    borderRadius: 10,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 4,
-  },
-  filterDotText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  sortRow: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, gap: 8 },
-  sortChip: {
-    height: 32,
-    paddingHorizontal: 12,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  sortChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  sortText: { fontSize: 12, fontWeight: "700", color: colors.textSecondary },
-  sortTextActive: { color: "#fff" },
-  empty: { alignItems: "center", padding: 40, gap: 8 },
-  emptyTitle: { ...typography.h3, marginTop: 8 },
-  emptySub: { ...typography.body, color: colors.textTertiary },
-  scrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
-  filterSheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: "80%",
-  },
-  filterHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  filterTitle: { ...typography.h2, fontSize: 20 },
-  filterLabel: { fontSize: 12, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.6, textTransform: "uppercase" },
-  chipWrap: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  chip: {
-    height: 40,
-    paddingHorizontal: 14,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  chipOn: { backgroundColor: colors.ink, borderColor: colors.ink },
-  chipText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
-  rangeInput: {
-    flex: 1,
-    height: 48,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: spacing.lg,
-    fontSize: 14,
-    color: colors.text,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  toggleTitle: { fontSize: 14, fontWeight: "600" },
-  toggleSub: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
-  filterFooter: {
-    flexDirection: "row",
-    gap: 10,
-    padding: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  clearBtn: {
-    height: 52,
-    paddingHorizontal: 20,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  clearBtnText: { color: colors.text, fontWeight: "700", fontSize: 14 },
-  applyBtn: {
-    flex: 1,
-    height: 52,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  applyBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  header: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space[4], paddingVertical: space[2] },
+  searchBar: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, height: 42, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: fontFamilies.medium, height: "100%", paddingVertical: 0 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[3] },
+  sortRow: { paddingHorizontal: space[4], gap: 8, paddingBottom: 8 },
+  gridRow: { flexDirection: "row", gap: 12 },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48 },
+  filterFooter: { flexDirection: "row", gap: 10, marginTop: 16 },
 });

@@ -5,40 +5,40 @@
  *   • Compare → Merge (opens the merge screen with prefilled winner/loser)
  */
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, EmptyState, Screen, ScreenHeader, Sheet, SkeletonCard, useToast } from "@/src/ui";
 
 type QueueItem = Awaited<ReturnType<typeof api.adminDuplicateQueue>>["items"][number];
 
 export default function AdminDuplicateQueue() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const { user } = useAuth();
   const [items, setItems] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [clearTarget, setClearTarget] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
 
   const load = useCallback(async () => {
+    setError(false);
     try {
       const r = await api.adminDuplicateQueue();
       setItems(r.items);
-    } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Try again");
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -53,221 +53,150 @@ export default function AdminDuplicateQueue() {
     load();
   }, [user, load]);
 
-  const clear = async (amass_id: string) => {
-    Alert.alert("Clear from queue?", "Confirm the property is genuinely a separate physical property.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Clear",
-        onPress: async () => {
-          try {
-            await api.adminResolveDupReview(amass_id, { action: "clear" });
-            load();
-          } catch (e: any) {
-            Alert.alert("Failed", e?.message ?? "Try again");
-          }
-        },
-      },
-    ]);
+  const confirmClear = async () => {
+    if (!clearTarget) return;
+    setClearing(true);
+    try {
+      await api.adminResolveDupReview(clearTarget, { action: "clear" });
+      setItems((prev) => prev.filter((i) => i.property.amass_property_id !== clearTarget));
+      setClearTarget(null);
+      toast.success("Cleared from queue", "Marked as a separate physical property.");
+    } catch (e: any) {
+      toast.error("Couldn't clear", e?.message ?? "Try again");
+    } finally {
+      setClearing(false);
+    }
   };
 
   if (!user?.is_admin) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <Header title="Duplicate Queue" onBack={() => router.back()} />
-        <View style={styles.blocked}>
-          <Ionicons name="lock-closed" size={40} color={colors.red} />
-          <Text style={styles.blockedText}>Admins only</Text>
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Duplicate Queue" />
+        <EmptyState icon="lock-closed-outline" title="Admins only" body="You need an admin account to review duplicates." actionLabel="Go back" onAction={() => router.back()} />
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="admin-dup-queue">
-      <Header title="Duplicate Queue" onBack={() => router.back()} />
+    <Screen testID="admin-dup-queue">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="Duplicate Queue" subtitle={items.length ? `${items.length} to review` : undefined} />
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 60 }} color={colors.red} />
+        <View style={{ padding: space[4], gap: 14 }}>
+          <SkeletonCard imageHeight={0} />
+          <SkeletonCard imageHeight={0} />
+        </View>
+      ) : error ? (
+        <EmptyState variant="error" title="Couldn't load the queue" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load(); }} />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(i) => i.property.amass_property_id}
-          contentContainerStyle={{ padding: spacing.xl, gap: 14, paddingBottom: 60 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.red} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="checkmark-done-circle" size={44} color={colors.emerald} />
-              <Text style={styles.emptyTitle}>Queue is empty</Text>
-              <Text style={styles.emptySub}>No properties need duplicate review right now.</Text>
-            </View>
-          }
+          contentContainerStyle={{ padding: space[4], gap: 14, paddingBottom: 60 + insets.bottom }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.text} />}
+          ListEmptyComponent={<EmptyState variant="success" title="Queue is empty" body="No properties need duplicate review right now." />}
           renderItem={({ item }) => (
-            <View style={[styles.card, shadows.soft]}>
+            <Card elevation="xs" style={{ gap: 12 }}>
               {/* Flagged property */}
               <View style={styles.propRow}>
-                <View style={styles.thumb}>
+                <View style={[styles.thumb, { backgroundColor: colors.surfaceAlt }]}>
                   {item.property.cover ? (
-                    <Image source={{ uri: item.property.cover }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                    <Image source={{ uri: item.property.cover }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={200} />
                   ) : (
-                    <Ionicons name="home" size={22} color={colors.textMuted} />
+                    <Ionicons name="home-outline" size={22} color={colors.textMuted} />
                   )}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={styles.amassId}>{item.property.amass_property_id}</Text>
-                    <View style={styles.pill}>
-                      <Text style={styles.pillText}>SCORE {item.property.duplicate_score_at_creation ?? "?"}</Text>
-                    </View>
+                <View style={{ flex: 1, gap: 3 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <AppText variant="title" tabular>{item.property.amass_property_id}</AppText>
+                    <Badge label={`Score ${item.property.duplicate_score_at_creation ?? "?"}`} tone="brand" icon="git-compare" />
                   </View>
-                  <Text style={styles.addr}>
+                  <AppText variant="caption" tone="secondary" numberOfLines={2}>
                     {[item.property.street, item.property.area, item.property.lga, item.property.state].filter(Boolean).join(", ")}
-                  </Text>
-                  <Text style={styles.reason} numberOfLines={2}>{item.property.review_reason}</Text>
+                  </AppText>
+                  {item.property.review_reason ? (
+                    <AppText variant="caption" tone="tertiary" numberOfLines={2} style={{ fontStyle: "italic" }}>
+                      {item.property.review_reason}
+                    </AppText>
+                  ) : null}
                 </View>
               </View>
 
               {/* Candidates */}
               {item.candidates.length > 0 && (
-                <>
-                  <Text style={styles.candLbl}>NEAREST NEIGHBOURS</Text>
+                <View style={{ gap: 8 }}>
+                  <AppText variant="label" tone="tertiary" uppercase>Nearest neighbours</AppText>
                   {item.candidates.map((c) => (
-                    <View key={c.amass_property_id} style={styles.candRow}>
-                      <Ionicons name="location" size={14} color={colors.red} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.candId}>{c.amass_property_id}</Text>
-                        <Text style={styles.candAddr}>
-                          {[c.street, c.area, c.lga, c.state].filter(Boolean).join(", ")}
-                        </Text>
+                    <View key={c.amass_property_id} style={[styles.candRow, { backgroundColor: colors.surfaceAlt }]}>
+                      <View style={[styles.candIcon, { backgroundColor: colors.brandSoft }]}>
+                        <Ionicons name="location" size={14} color={colors.brand} />
                       </View>
-                      <Pressable
-                        style={styles.compareBtn}
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <AppText variant="caption" weight="bold" tabular>{c.amass_property_id}</AppText>
+                        <AppText variant="caption" tone="tertiary" numberOfLines={1}>
+                          {[c.street, c.area, (c as any).lga, c.state].filter(Boolean).join(", ")}
+                        </AppText>
+                      </View>
+                      <Button
+                        label="Compare"
+                        size="sm"
+                        variant="primary"
                         onPress={() =>
                           router.push(
                             `/admin/merge?winner=${encodeURIComponent(c.amass_property_id)}&loser=${encodeURIComponent(item.property.amass_property_id)}` as any
                           )
                         }
                         testID={`compare-${c.amass_property_id}`}
-                      >
-                        <Text style={styles.compareBtnText}>Compare</Text>
-                      </Pressable>
+                      />
                     </View>
                   ))}
-                </>
+                </View>
               )}
 
               {/* Actions */}
               <View style={styles.actions}>
-                <Pressable
-                  style={[styles.actionBtn, styles.actionClear]}
-                  onPress={() => clear(item.property.amass_property_id)}
+                <Button
+                  label="Clear"
+                  variant="outline"
+                  size="sm"
+                  iconLeft="checkmark-circle-outline"
+                  style={{ flex: 1 }}
+                  onPress={() => setClearTarget(item.property.amass_property_id)}
                   testID={`clear-${item.property.amass_property_id}`}
-                >
-                  <Ionicons name="checkmark-circle-outline" size={16} color={colors.text} />
-                  <Text style={styles.actionText}>Clear</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.actionBtn, styles.actionView]}
+                />
+                <Button
+                  label="View passport"
+                  variant="primary"
+                  size="sm"
+                  iconLeft="eye-outline"
+                  style={{ flex: 1 }}
                   onPress={() => router.push(`/property-passport/${item.property.amass_property_id}` as any)}
                   testID={`view-${item.property.amass_property_id}`}
-                >
-                  <Ionicons name="eye-outline" size={16} color="#fff" />
-                  <Text style={[styles.actionText, { color: "#fff" }]}>View Passport</Text>
-                </Pressable>
+                />
               </View>
-            </View>
+            </Card>
           )}
         />
       )}
-    </SafeAreaView>
-  );
-}
 
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>{title}</Text>
-      <View style={styles.iconBtn} />
-    </View>
+      <Sheet visible={!!clearTarget} onClose={() => { if (!clearing) setClearTarget(null); }} title="Clear from queue?">
+        <AppText variant="body" tone="secondary" style={{ marginBottom: 16 }}>
+          Confirm <AppText variant="bodyMedium" tabular>{clearTarget}</AppText> is genuinely a separate physical property. It will leave the review queue.
+        </AppText>
+        <View style={{ gap: 8 }}>
+          <Button label="Yes, it's separate" size="lg" fullWidth iconLeft="checkmark-circle" loading={clearing} onPress={confirmClear} testID="clear-confirm" />
+          <Button label="Cancel" variant="ghost" fullWidth onPress={() => setClearTarget(null)} />
+        </View>
+      </Sheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-  card: { padding: 14, borderRadius: radius.md, backgroundColor: "#fff", gap: 10 },
   propRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
-  thumb: {
-    width: 60,
-    height: 60,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  amassId: { fontSize: 13, fontWeight: "800", color: colors.text },
-  pill: {
-    backgroundColor: colors.red,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  pillText: { color: "#fff", fontSize: 9, fontWeight: "800", letterSpacing: 0.4 },
-  addr: { fontSize: 12, color: colors.textSecondary, fontWeight: "600", marginTop: 2 },
-  reason: { fontSize: 11, color: colors.textTertiary, fontStyle: "italic", marginTop: 4 },
-  candLbl: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.6,
-    marginTop: 4,
-  },
-  candRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 10,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  candId: { fontSize: 12, fontWeight: "700", color: colors.text },
-  candAddr: { fontSize: 11, color: colors.textTertiary },
-  compareBtn: {
-    paddingHorizontal: 12,
-    height: 32,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  compareBtnText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
-  actions: { flexDirection: "row", gap: 8, marginTop: 4 },
-  actionBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    height: 40,
-    borderRadius: radius.pill,
-  },
-  actionClear: { backgroundColor: "#fff", borderWidth: 1.5, borderColor: colors.border },
-  actionView: { backgroundColor: colors.ink },
-  actionText: { fontSize: 12, fontWeight: "800", color: colors.text },
-  empty: { padding: spacing.xl, alignItems: "center", gap: 8, marginTop: 60 },
-  emptyTitle: { ...typography.h2, fontSize: 18 },
-  emptySub: { fontSize: 13, color: colors.textTertiary, textAlign: "center" },
-  blocked: { padding: spacing.xl, alignItems: "center", gap: 10, marginTop: 40 },
-  blockedText: { fontSize: 14, color: colors.text, fontWeight: "700" },
+  thumb: { width: 64, height: 64, borderRadius: radii.sm, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  candRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: radii.sm },
+  candIcon: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  actions: { flexDirection: "row", gap: 8 },
 });

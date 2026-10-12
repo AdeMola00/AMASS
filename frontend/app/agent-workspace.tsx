@@ -1,24 +1,18 @@
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
-} from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Stack, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { RoleGate } from "@/src/components/RoleGate";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, EmptyState, Input, ListRow, RowGroup, Screen, ScreenHeader, Section, Sheet, SkeletonRows, StatTile, useToast, type BadgeTone } from "@/src/ui";
 
 type Referral = {
   id: string;
@@ -35,29 +29,37 @@ type Referral = {
   created_at: string;
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: "#F5B301",
-  approved: "#2563EB",
-  paid: "#22C55E",
-  cancelled: colors.textTertiary,
+const STATUS_TONE: Record<Referral["commission_status"], BadgeTone> = {
+  pending: "mass",
+  approved: "info",
+  paid: "success",
+  cancelled: "neutral",
 };
 
 export default function AgentWorkspace() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const toast = useToast();
   const { user } = useAuth();
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [qualifying, setQualifying] = useState<Referral | null>(null);
+  const [dealValue, setDealValue] = useState("");
+  const [payingOut, setPayingOut] = useState<Referral | null>(null);
 
   const load = useCallback(async () => {
+    setError(false);
     try {
       const [r, s] = await Promise.all([api.myAgentReferrals(), api.agentSummary()]);
       setReferrals(r as Referral[]);
       setSummary(s);
-    } catch (e: any) {
-      Alert.alert("Failed to load", e?.message ?? "Please try again.");
+    } catch {
+      setError(true);
     }
   }, []);
 
@@ -79,352 +81,230 @@ export default function AgentWorkspace() {
     setRefreshing(false);
   };
 
-  const qualify = (r: Referral) => {
-    Alert.prompt?.(
-      "Qualify referral",
-      "Enter the deal value (₦) to compute commission.",
-      (val) => doQualify(r, val),
-      "plain-text",
-      "",
-      "numeric"
-    ) ??
-      // Android fallback
-      Alert.alert(
-        "Qualify referral",
-        "Deal value is set to ₦20,000,000 in this simplified flow. In prod, use a proper input.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Qualify (₦20M)", onPress: () => doQualify(r, "20000000") },
-        ]
-      );
-  };
-
-  const doQualify = async (r: Referral, valStr?: string) => {
-    if (!valStr) return;
-    const value = Number(String(valStr).replace(/,/g, ""));
-    if (!value) return;
+  const doQualify = async () => {
+    const r = qualifying;
+    if (!r) return;
+    const value = Number(String(dealValue).replace(/[^\d.]/g, ""));
+    if (!value) {
+      toast.error("Enter the deal value", "We need the agreed deal value (₦) to compute your commission.");
+      return;
+    }
     setBusy(r.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
       const res = await api.qualifyReferral(r.id, `manual_${Date.now()}`, value);
-      Alert.alert("Qualified", `Commission approved: ${formatNaira(res.commission_amount_ngn)}`);
+      setQualifying(null);
+      setDealValue("");
+      toast.success("Referral qualified", `Commission approved: ${formatNaira(res.commission_amount_ngn)}`);
       await load();
     } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Please try again.");
+      toast.error("Couldn't qualify referral", e?.message ?? "Please try again.");
     } finally {
       setBusy(null);
     }
   };
 
-  const payout = (r: Referral) => {
-    Alert.alert(
-      "Payout commission",
-      `Pay out ${formatNaira(r.commission_amount_ngn || 0)} — pick a method:`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "MASS wallet", onPress: () => doPayout(r, "wallet") },
-        { text: "Bank transfer", onPress: () => doPayout(r, "bank") },
-      ]
-    );
-  };
-
-  const doPayout = async (r: Referral, method: "wallet" | "bank") => {
+  const doPayout = async (method: "wallet" | "bank") => {
+    const r = payingOut;
+    if (!r) return;
     setBusy(r.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       const res = await api.payoutReferral(r.id, method);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        "Payout sent",
-        method === "wallet"
-          ? `+${res.credited_mass ?? 0} MASS credited to your wallet.`
-          : `Bank transfer initiated. Ref: ${res.reference}`
-      );
+      setPayingOut(null);
+      toast.success("Payout sent", method === "wallet" ? `+${res.credited_mass ?? 0} MASS credited to your wallet.` : `Bank transfer initiated · Ref ${res.reference}`);
       await load();
     } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Please try again.");
+      toast.error("Payout failed", e?.message ?? "Please try again.");
     } finally {
       setBusy(null);
     }
   };
 
+  if (!user?.is_agent) {
+    return (
+      <RoleGate
+        headerTitle="Agent Workspace"
+        title="For verified AMASS agents"
+        message="The Agent Workspace tracks your referrals, commissions and payouts. Become a verified agent to unlock it — it only takes a couple of minutes."
+        icon="briefcase"
+        bullets={["Track referral commissions", "Request payouts to wallet or bank", "Grow your verified reputation"]}
+        ctaLabel="Become an agent"
+        onCta={() => router.push("/become-agent")}
+        secondaryLabel="Maybe later"
+      />
+    );
+  }
+
+  const qualifyPreview = (() => {
+    const v = Number(String(dealValue).replace(/[^\d.]/g, ""));
+    const rate = qualifying?.commission_rate ?? 0.02;
+    return v ? formatNaira(Math.round(v * rate)) : null;
+  })();
+
   return (
-    <View style={styles.container}>
+    <Screen testID="agent-workspace-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      {!user?.is_agent ? (
-        <RoleGate
-          headerTitle="Agent Workspace"
-          title="For verified AMASS agents"
-          message="The Agent Workspace tracks your referrals, commissions and payouts. Become a verified agent to unlock it — it only takes a couple of minutes."
-          icon="briefcase"
-          bullets={["Track referral commissions", "Request payouts to wallet or bank", "Grow your verified reputation"]}
-          ctaLabel="Become an agent"
-          onCta={() => router.push("/become-agent")}
-          secondaryLabel="Maybe later"
-        />
-      ) : (
-        <>
-          <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color="#fff" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Agent Workspace</Text>
-        <View style={{ width: 40 }} />
-      </SafeAreaView>
+      <ScreenHeader title="Agent Workspace" subtitle="Referrals · Commissions · Payouts" />
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={colors.red} /></View>
+        <View style={{ padding: space[4], gap: space[4] }}>
+          <View style={[styles.hero, { backgroundColor: colors.skeleton, height: 140 }]} />
+          <SkeletonRows rows={3} />
+        </View>
+      ) : error && !summary ? (
+        <EmptyState variant="error" title="Couldn't load your workspace" body="Check your connection and try again." actionLabel="Retry" onAction={() => load()} />
       ) : (
         <ScrollView
-          contentContainerStyle={{ paddingBottom: 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+          contentContainerStyle={{ paddingBottom: 40 + insets.bottom, gap: space[5] }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
+          showsVerticalScrollIndicator={false}
         >
-          {/* Summary hero */}
-          <LinearGradient colors={["#0A0A0A", "#1F1F1F"]} style={styles.hero}>
-            <Text style={styles.heroLabel}>PAID LIFETIME</Text>
-            <Text style={styles.heroValue}>{formatNaira(summary?.paid_ngn ?? 0)}</Text>
-            <View style={styles.pendingRow}>
-              <Ionicons name="hourglass" size={12} color="#F5B301" />
-              <Text style={styles.pendingText}>
-                {formatNaira(summary?.pending_payout_ngn ?? 0)} pending payout
-              </Text>
-            </View>
-          </LinearGradient>
+          <View style={{ paddingHorizontal: space[4], gap: space[3] }}>
+            <LinearGradient colors={isDark ? ["#1F1D1A", "#141210"] : ["#1A1816", "#0A0A0A"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="workspace-hero">
+              <AppText variant="label" color="rgba(255,255,255,0.6)" uppercase>
+                Paid lifetime
+              </AppText>
+              <AppText variant="display" color="#fff" tabular numberOfLines={1} adjustsFontSizeToFit>
+                {formatNaira(summary?.paid_ngn ?? 0)}
+              </AppText>
+              <View style={styles.heroPill}>
+                <Ionicons name="hourglass" size={12} color={colors.mass} />
+                <AppText variant="caption" color="#fff" tabular>
+                  {formatNaira(summary?.pending_payout_ngn ?? 0)} pending payout
+                </AppText>
+              </View>
+            </LinearGradient>
 
-          {/* KPI row */}
-          <View style={styles.kpiRow}>
-            <Kpi label="Referrals" value={summary?.total_referrals ?? 0} icon="people" />
-            <Kpi label="Approved" value={summary?.approved_count ?? 0} icon="thumbs-up" color="#2563EB" />
-            <Kpi label="Paid" value={summary?.paid_count ?? 0} icon="checkmark-circle" color="#22C55E" />
+            <View style={styles.kpiRow}>
+              <StatTile icon="people" value={summary?.total_referrals ?? 0} label="Referrals" />
+              <StatTile icon="thumbs-up" tone="info" value={summary?.approved_count ?? 0} label="Approved" />
+              <StatTile icon="checkmark-circle" tone="success" value={summary?.paid_count ?? 0} label="Paid" />
+            </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Referrals</Text>
-          {referrals.length === 0 ? (
-            <View style={styles.empty}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="people-outline" size={30} color={colors.textMuted} />
-              </View>
-              <Text style={styles.emptyTitle}>No referrals yet</Text>
-              <Text style={styles.emptyBody}>
-                Log a referral from any property detail to start tracking commissions.
-              </Text>
-            </View>
-          ) : (
-            referrals.map((r) => (
-              <ReferralCard
-                key={r.id}
-                r={r}
-                busy={busy === r.id}
-                onQualify={() => qualify(r)}
-                onPayout={() => payout(r)}
-              />
-            ))
-          )}
+          <Section title="Referrals" caption={referrals.length ? `${referrals.length} tracked` : undefined}>
+            {referrals.length === 0 ? (
+              <EmptyState compact icon="people-outline" title="No referrals yet" body="Log a referral from any property detail to start tracking commissions." />
+            ) : (
+              referrals.map((r) => (
+                <ReferralCard
+                  key={r.id}
+                  r={r}
+                  busy={busy === r.id}
+                  onQualify={() => {
+                    setDealValue("");
+                    setQualifying(r);
+                  }}
+                  onPayout={() => setPayingOut(r)}
+                />
+              ))
+            )}
+          </Section>
         </ScrollView>
       )}
-        </>
-      )}
-    </View>
+
+      {/* Qualify sheet */}
+      <Sheet visible={!!qualifying} onClose={() => setQualifying(null)} title="Qualify referral" testID="qualify-sheet">
+        <View style={{ gap: space[3] }}>
+          <AppText variant="bodySm" tone="secondary">
+            Enter the agreed deal value to compute the commission for {qualifying?.client_name ?? "this client"}.
+          </AppText>
+          <Input
+            label="Deal value (₦)"
+            placeholder="e.g. 20,000,000"
+            keyboardType="numeric"
+            value={dealValue}
+            onChangeText={setDealValue}
+            iconLeft="cash-outline"
+            helper={qualifyPreview ? `Commission at ${((qualifying?.commission_rate ?? 0.02) * 100).toFixed(1)}% ≈ ${qualifyPreview}` : undefined}
+            testID="deal-value-input"
+            autoFocus
+          />
+          <Button label="Qualify referral" size="lg" fullWidth iconLeft="checkmark-done" loading={busy === qualifying?.id} onPress={doQualify} testID="qualify-submit" />
+        </View>
+      </Sheet>
+
+      {/* Payout sheet */}
+      <Sheet visible={!!payingOut} onClose={() => setPayingOut(null)} title="Payout commission" testID="payout-sheet">
+        <View style={{ gap: space[3] }}>
+          <AppText variant="bodySm" tone="secondary">
+            Pay out {formatNaira(payingOut?.commission_amount_ngn || 0)} — choose where it should go.
+          </AppText>
+          <RowGroup>
+            <ListRow icon="wallet" iconTone="mass" label="MASS wallet" caption="Instant · credited as MASS tokens" onPress={() => doPayout("wallet")} disabled={!!busy} testID="payout-wallet" />
+            <ListRow icon="business" iconTone="info" label="Bank transfer" caption="1–2 business days · to your registered account" onPress={() => doPayout("bank")} disabled={!!busy} last testID="payout-bank" />
+          </RowGroup>
+        </View>
+      </Sheet>
+    </Screen>
   );
 }
 
-function Kpi({
-  label,
-  value,
-  icon,
-  color,
-}: {
-  label: string;
-  value: number;
-  icon: keyof typeof Ionicons.glyphMap;
-  color?: string;
-}) {
-  return (
-    <View style={styles.kpi}>
-      <Ionicons name={icon} size={16} color={color ?? colors.text} />
-      <Text style={styles.kpiValue}>{value}</Text>
-      <Text style={styles.kpiLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function ReferralCard({
-  r,
-  busy,
-  onQualify,
-  onPayout,
-}: {
-  r: Referral;
-  busy: boolean;
-  onQualify: () => void;
-  onPayout: () => void;
-}) {
-  const color = STATUS_COLOR[r.commission_status] || colors.textSecondary;
+function ReferralCard({ r, busy, onQualify, onPayout }: { r: Referral; busy: boolean; onQualify: () => void; onPayout: () => void }) {
+  const { colors } = useTheme();
   const rate = (r.commission_rate ?? 0.02) * 100;
   return (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        {r.property_snapshot?.images?.[0] && (
-          <Image source={{ uri: r.property_snapshot.images[0] }} style={styles.propImg} contentFit="cover" />
+    <Card elevation="xs" style={{ gap: 12 }} testID={`referral-${r.id}`}>
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        {r.property_snapshot?.images?.[0] ? (
+          <Image source={{ uri: r.property_snapshot.images[0] }} style={[styles.propImg, { backgroundColor: colors.skeleton }]} contentFit="cover" />
+        ) : (
+          <View style={[styles.propImg, { backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }]}>
+            <Ionicons name="business" size={20} color={colors.textMuted} />
+          </View>
         )}
-        <View style={{ flex: 1 }}>
-          <Text style={styles.propTitle} numberOfLines={1}>{r.property_snapshot?.title ?? "Property"}</Text>
-          <Text style={styles.clientLine} numberOfLines={1}>
-            {r.client_name ?? "—"}{r.client_phone ? ` · ${r.client_phone}` : ""}
-          </Text>
-          <View style={styles.chipRow}>
-            {r.product_id && (
-              <View style={styles.productChip}>
-                <Text style={styles.productChipText}>
-                  {r.product_id.replace(/_/g, " ")}
-                </Text>
-              </View>
-            )}
-            <View style={[styles.statusChip, { backgroundColor: color + "22" }]}>
-              <View style={[styles.statusDot, { backgroundColor: color }]} />
-              <Text style={[styles.statusText, { color }]}>{r.commission_status}</Text>
-            </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <AppText variant="title" numberOfLines={1}>
+            {r.property_snapshot?.title ?? "Property"}
+          </AppText>
+          <AppText variant="caption" tone="secondary" numberOfLines={1}>
+            {r.client_name ?? "—"}
+            {r.client_phone ? ` · ${r.client_phone}` : ""}
+          </AppText>
+          <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+            {r.product_id ? <Badge label={r.product_id.replace(/_/g, " ")} size="xs" /> : null}
+            <Badge label={r.commission_status} tone={STATUS_TONE[r.commission_status] ?? "neutral"} size="xs" />
           </View>
         </View>
       </View>
 
-      <View style={styles.moneyRow}>
-        <View>
-          <Text style={styles.moneyLabel}>Commission ({rate.toFixed(1)}%)</Text>
-          <Text style={styles.moneyValue}>
+      <View style={[styles.moneyRow, { backgroundColor: colors.surfaceAlt }]}>
+        <View style={{ gap: 2 }}>
+          <AppText variant="label" tone="tertiary" uppercase>
+            Commission ({rate.toFixed(1)}%)
+          </AppText>
+          <AppText variant="h3" tabular>
             {r.commission_amount_ngn ? formatNaira(r.commission_amount_ngn) : "—"}
-          </Text>
+          </AppText>
         </View>
-        {r.payout_reference && (
-          <Text style={styles.ref}>Ref: {r.payout_reference.slice(-8)}</Text>
-        )}
+        {r.payout_reference ? (
+          <AppText variant="micro" tone="tertiary">
+            Ref {r.payout_reference.slice(-8)}
+          </AppText>
+        ) : null}
       </View>
 
-      {r.commission_status === "pending" && (
-        <Pressable onPress={onQualify} disabled={busy} style={[styles.action, styles.actionSecondary]}>
-          {busy ? (
-            <ActivityIndicator size="small" color={colors.text} />
-          ) : (
-            <>
-              <Ionicons name="checkmark-done" size={14} color={colors.text} />
-              <Text style={[styles.actionText, { color: colors.text }]}>Qualify with deal value</Text>
-            </>
-          )}
-        </Pressable>
-      )}
-      {r.commission_status === "approved" && (
-        <Pressable onPress={onPayout} disabled={busy} style={[styles.action, { backgroundColor: "#22C55E" }]}>
-          {busy ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="cash" size={14} color="#fff" />
-              <Text style={styles.actionText}>Payout {formatNaira(r.commission_amount_ngn ?? 0)}</Text>
-            </>
-          )}
-        </Pressable>
-      )}
+      {r.commission_status === "pending" && <Button label="Qualify with deal value" variant="secondary" fullWidth iconLeft="checkmark-done" loading={busy} onPress={onQualify} testID={`qualify-${r.id}`} />}
+      {r.commission_status === "approved" && <Button label={`Payout ${formatNaira(r.commission_amount_ngn ?? 0)}`} variant="fix" fullWidth iconLeft="cash" loading={busy} onPress={onPayout} testID={`payout-${r.id}`} />}
       {r.commission_status === "paid" && (
-        <View style={styles.paidBanner}>
-          <Ionicons name="shield-checkmark" size={14} color="#15803D" />
-          <Text style={styles.paidText}>
+        <View style={[styles.paidBanner, { backgroundColor: colors.successSoft }]}>
+          <Ionicons name="shield-checkmark" size={14} color={colors.success} />
+          <AppText variant="caption" color={colors.success}>
             Paid via {r.payout_method === "wallet" ? "MASS wallet" : "bank transfer"}
-          </Text>
+          </AppText>
         </View>
       )}
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  header: {
-    paddingHorizontal: spacing.lg, paddingBottom: spacing.md,
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#0A0A0A",
-  },
-  iconBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    alignItems: "center", justifyContent: "center",
-  },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: "#fff", letterSpacing: -0.3 },
-
-  hero: { margin: spacing.lg, padding: 20, borderRadius: 20 },
-  heroLabel: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
-  heroValue: { color: "#fff", fontSize: 34, fontWeight: "900", letterSpacing: -1.2, marginTop: 4, includeFontPadding: false },
-  pendingRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8 },
-  pendingText: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "700" },
-
-  kpiRow: { flexDirection: "row", gap: 10, paddingHorizontal: spacing.lg },
-  kpi: {
-    flex: 1, padding: 12, borderRadius: radius.md,
-    backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border,
-    ...shadows.soft, gap: 3, alignItems: "flex-start",
-  },
-  kpiValue: { fontSize: 20, fontWeight: "900", color: colors.text, letterSpacing: -0.5 },
-  kpiLabel: { fontSize: 10, color: colors.textTertiary, fontWeight: "700", letterSpacing: 0.4 },
-
-  sectionTitle: {
-    marginHorizontal: spacing.lg, marginTop: 24, marginBottom: 10,
-    fontSize: 12, fontWeight: "800", color: colors.text,
-    letterSpacing: 0.3, textTransform: "uppercase",
-  },
-
-  card: {
-    marginHorizontal: spacing.lg, marginBottom: 10,
-    padding: 14, borderRadius: radius.md,
-    backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border,
-    ...shadows.soft, gap: 10,
-  },
-  cardTop: { flexDirection: "row", gap: 10 },
-  propImg: { width: 50, height: 50, borderRadius: 10, backgroundColor: colors.surfaceSecondary },
-  propTitle: { fontSize: 14, fontWeight: "800", color: colors.text },
-  clientLine: { fontSize: 12, color: colors.textSecondary, marginTop: 3 },
-  chipRow: { flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap" },
-  productChip: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  productChipText: { fontSize: 10, fontWeight: "800", color: colors.text, textTransform: "capitalize" },
-  statusChip: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
-  },
-  statusDot: { width: 5, height: 5, borderRadius: 2.5 },
-  statusText: { fontSize: 10, fontWeight: "900", letterSpacing: 0.4, textTransform: "uppercase" },
-
-  moneyRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end",
-    paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider,
-  },
-  moneyLabel: { fontSize: 10, color: colors.textTertiary, fontWeight: "800", letterSpacing: 0.3 },
-  moneyValue: { fontSize: 18, fontWeight: "900", color: colors.text, letterSpacing: -0.4, marginTop: 2 },
-  ref: { fontSize: 10, color: colors.textTertiary, fontWeight: "700" },
-
-  action: {
-    height: 42, borderRadius: radius.pill,
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-  },
-  actionSecondary: {
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  actionText: { color: "#fff", fontSize: 13, fontWeight: "800" },
-
-  paidBanner: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
-    padding: 10, borderRadius: radius.md,
-    backgroundColor: "rgba(34,197,94,0.1)",
-  },
-  paidText: { color: "#15803D", fontSize: 11, fontWeight: "800" },
-
-  empty: { alignItems: "center", padding: 40, gap: 8 },
-  emptyIcon: {
-    width: 68, height: 68, borderRadius: 34, backgroundColor: colors.surfaceSecondary,
-    alignItems: "center", justifyContent: "center",
-  },
-  emptyTitle: { fontSize: 16, fontWeight: "800", color: colors.text, marginTop: 4 },
-  emptyBody: { fontSize: 13, color: colors.textSecondary, textAlign: "center", lineHeight: 19 },
+  hero: { borderRadius: radii.xl, padding: space[5], gap: 6, overflow: "hidden" },
+  heroPill: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 10, height: 28, borderRadius: radii.pill, backgroundColor: "rgba(255,255,255,0.12)", marginTop: 8 },
+  kpiRow: { flexDirection: "row", gap: space[3] },
+  propImg: { width: 64, height: 64, borderRadius: radii.sm },
+  moneyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, borderRadius: radii.sm },
+  paidBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: radii.sm },
 });

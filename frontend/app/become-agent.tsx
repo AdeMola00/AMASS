@@ -1,16 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
   TextInput,
-  ActivityIndicator,
   ScrollView,
 } from "react-native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
@@ -19,7 +18,10 @@ import * as ImagePicker from "expo-image-picker";
 import { api, AgentPublic } from "@/src/lib/api";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { Button, ProgressBar, Screen, ScreenHeader, Skeleton } from "@/src/ui";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 type Step = 0 | 1 | 2 | 3;
 
@@ -36,8 +38,12 @@ const SPECIALISATIONS = [
 ];
 
 export default function BecomeAgent() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors: tc } = useTheme();
   const { user } = useAuth();
 
   const [step, setStep] = useState<Step>(0);
@@ -161,9 +167,16 @@ export default function BecomeAgent() {
 
   if (checking) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={{ marginTop: 60 }} color={colors.red} />
-      </SafeAreaView>
+      <Screen testID="become-agent-loading">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Become an agent" />
+        <View style={{ padding: spacing.xl, gap: 14 }}>
+          <Skeleton height={120} radius={radius.lg} />
+          <Skeleton height={20} width="55%" />
+          <Skeleton height={14} width="80%" />
+          <Skeleton height={200} radius={radius.lg} style={{ marginTop: 8 }} />
+        </View>
+      </Screen>
     );
   }
 
@@ -216,14 +229,9 @@ export default function BecomeAgent() {
           : 2;
 
     return (
-      <SafeAreaView style={styles.container} edges={["top"]} testID="become-agent-status">
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
-          </Pressable>
-          <Text style={styles.hdr}>Your agent status</Text>
-          <View style={styles.iconBtn} />
-        </View>
+      <Screen testID="become-agent-status">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Your agent status" subtitle={meta.label} />
 
         <ScrollView contentContainerStyle={styles.statusWrap} showsVerticalScrollIndicator={false}>
           <View style={[styles.statusIcon, { backgroundColor: badgeColor }]}>
@@ -271,70 +279,42 @@ export default function BecomeAgent() {
             <LevelRow n={3} active={existing.verification_level >= 3} label="Verified Mandated Agent" caption="Reviewed & approved by AMASS" />
           </View>
 
-          <Pressable
-            style={[styles.editBtn, existing.status === "rejected" && { borderColor: colors.red }]}
-            onPress={editApplication}
-            testID="edit-application-btn"
-          >
-            <Ionicons name="create-outline" size={16} color={colors.text} />
-            <Text style={styles.editBtnText}>
-              {existing.status === "rejected" ? "Update & resubmit" : "Edit application"}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.plansBtn}
-            onPress={() => router.push("/agent/onboarding" as any)}
-            testID="start-onboarding-btn"
-          >
-            <Ionicons name="add-circle" size={16} color={colors.bg} />
-            <Text style={styles.plansBtnText}>List a property (new wizard)</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.publicBtn}
-            onPress={() => router.push("/agent/representations" as any)}
-            testID="my-reps-btn"
-          >
-            <Ionicons name="ribbon-outline" size={16} color={colors.ink} />
-            <Text style={styles.publicBtnText}>My representations</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.editBtn}
-            onPress={() => router.push("/agent-plans")}
-            testID="see-plans-btn"
-          >
-            <Ionicons name="pricetags" size={16} color={colors.text} />
-            <Text style={styles.editBtnText}>See plans & upgrade</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.publicBtn}
-            onPress={() => router.push(`/agent/${existing.user_id}` as any)}
-            testID="view-public-profile-btn"
-          >
-            <Ionicons name="globe-outline" size={16} color={colors.ink} />
-            <Text style={styles.publicBtnText}>View my public profile</Text>
-          </Pressable>
+          <View style={{ gap: 10, alignSelf: "stretch" }}>
+            {existing.status === "approved" ? (
+              <Button label="List a property" iconLeft="add-circle" variant="brand" size="lg" fullWidth onPress={() => router.push("/agent/onboarding" as any)} testID="start-onboarding-btn" />
+            ) : (
+              <Button
+                label={existing.status === "rejected" ? "Update & resubmit" : "Edit application"}
+                iconLeft="create-outline"
+                variant={existing.status === "rejected" ? "brand" : "primary"}
+                size="lg"
+                fullWidth
+                onPress={editApplication}
+                testID="edit-application-btn"
+              />
+            )}
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Button label="My representations" iconLeft="ribbon-outline" variant="secondary" style={{ flex: 1 }} onPress={() => router.push("/agent/representations" as any)} testID="my-reps-btn" />
+              <Button label="Plans & upgrade" iconLeft="pricetags-outline" variant="secondary" style={{ flex: 1 }} onPress={() => router.push("/agent-plans")} testID="see-plans-btn" />
+            </View>
+            {existing.status === "approved" ? (
+              <Button label="Edit application" iconLeft="create-outline" variant="ghost" fullWidth onPress={editApplication} testID="edit-application-btn" />
+            ) : (
+              <Button label="List a property" iconLeft="add-circle-outline" variant="ghost" fullWidth onPress={() => router.push("/agent/onboarding" as any)} testID="start-onboarding-btn" />
+            )}
+            <Button label="View my public profile" iconLeft="globe-outline" variant="ghost" fullWidth onPress={() => router.push(`/agent/${existing.user_id}` as any)} testID="view-public-profile-btn" />
+          </View>
         </ScrollView>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="become-agent-screen">
-      <View style={styles.header}>
-        <Pressable onPress={back} style={styles.iconBtn} testID="ba-back">
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={styles.stepLbl}>Step {step + 1} of 4</Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${((step + 1) / 4) * 100}%` }]} />
-          </View>
-        </View>
-        <View style={styles.iconBtn} />
+    <Screen testID="become-agent-screen">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="Become an agent" subtitle={`Step ${step + 1} of 4`} onBack={back} backTestID="ba-back" />
+      <View style={{ paddingHorizontal: spacing.xl, paddingBottom: 4 }}>
+        <ProgressBar value={(step + 1) / 4} tone="brand" height={4} />
       </View>
 
       <KeyboardAwareScrollView
@@ -380,7 +360,7 @@ export default function BecomeAgent() {
               {NIGERIAN_STATES.map((s) => {
                 const on = state === s;
                 return (
-                  <Pressable key={s} onPress={() => setStateVal(s)} style={[styles.chip, on && styles.chipOn]} testID={`ba-state-${s}`}>
+                  <Pressable key={s} onPress={() => setStateVal(s)} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={s} style={[styles.chip, on && styles.chipOn]} testID={`ba-state-${s}`}>
                     <Text style={[styles.chipText, on && { color: "#fff" }]}>{s}</Text>
                   </Pressable>
                 );
@@ -405,6 +385,9 @@ export default function BecomeAgent() {
                     onPress={() => toggle(areas, a, setAreas)}
                     style={[styles.chip, on && styles.chipOn]}
                     testID={`ba-area-${a.replace(/\s+/g, "-")}`}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: areas.includes(a) }}
+                    accessibilityLabel={a}
                   >
                     {on && <Ionicons name="checkmark" size={13} color="#fff" />}
                     <Text style={[styles.chipText, on && { color: "#fff" }]}>{a}</Text>
@@ -423,6 +406,9 @@ export default function BecomeAgent() {
                     onPress={() => toggle(specs, s, setSpecs)}
                     style={[styles.chip, on && styles.chipOn]}
                     testID={`ba-spec-${s.replace(/\s+/g, "-")}`}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: specs.includes(s) }}
+                    accessibilityLabel={s}
                   >
                     {on && <Ionicons name="checkmark" size={13} color="#fff" />}
                     <Text style={[styles.chipText, on && { color: "#fff" }]}>{s}</Text>
@@ -449,6 +435,8 @@ export default function BecomeAgent() {
                   onPress={() => setHasMandateAuthority(true)}
                   style={[styles.mandateOpt, hasMandateAuthority && styles.mandateOptOn]}
                   testID="ba-mandate-yes"
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: hasMandateAuthority }}
                 >
                   <Ionicons name="checkmark-circle" size={20} color={hasMandateAuthority ? "#fff" : colors.emerald} />
                   <Text style={[styles.mandateOptText, hasMandateAuthority && { color: "#fff" }]}>Yes</Text>
@@ -457,6 +445,8 @@ export default function BecomeAgent() {
                   onPress={() => setHasMandateAuthority(false)}
                   style={[styles.mandateOpt, !hasMandateAuthority && styles.mandateOptNo]}
                   testID="ba-mandate-no"
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: !hasMandateAuthority }}
                 >
                   <Ionicons name="close-circle" size={20} color={!hasMandateAuthority ? "#fff" : colors.textTertiary} />
                   <Text style={[styles.mandateOptText, !hasMandateAuthority && { color: "#fff" }]}>No</Text>
@@ -487,21 +477,20 @@ export default function BecomeAgent() {
         )}
       </KeyboardAwareScrollView>
 
-      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <Pressable
+      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: tc.bgElevated, borderTopColor: tc.border }]}>
+        <Button
+          label={step === 3 ? "Submit application" : "Continue"}
+          iconRight={step === 3 ? "paper-plane" : "arrow-forward"}
+          variant={step === 3 ? "brand" : "primary"}
+          size="lg"
+          fullWidth
+          loading={submitting}
+          disabled={!canNext()}
           onPress={step === 3 ? submit : next}
-          disabled={!canNext() || submitting}
-          style={[styles.cta, (!canNext() || submitting) && { opacity: 0.4 }]}
           testID="ba-next"
-        >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.ctaText}>{step === 3 ? "Submit application" : "Continue"}</Text>
-          )}
-        </Pressable>
+        />
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -511,6 +500,9 @@ function Field({
   testID,
   ...rest
 }: React.ComponentProps<typeof TextInput> & { label: string; testID?: string; style?: any }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={[{ gap: 6 }, style]}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -535,8 +527,11 @@ function UploadCard({
   onPick: () => void;
   testID?: string;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
-    <Pressable onPress={onPick} style={[styles.uploadCard, uri && { padding: 0 }]} testID={testID}>
+    <Pressable onPress={onPick} style={[styles.uploadCard, uri && { padding: 0 }]} testID={testID} accessibilityRole="button" accessibilityLabel={uri ? "Replace uploaded document" : "Upload document"}>
       {uri ? (
         <Image source={{ uri }} style={styles.uploadImg} contentFit="cover" />
       ) : (
@@ -550,6 +545,9 @@ function UploadCard({
 }
 
 function StatRow({ label, value }: { label: string; value: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.statRow}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -559,6 +557,9 @@ function StatRow({ label, value }: { label: string; value: string }) {
 }
 
 function LevelRow({ n, active, label, caption }: { n: number; active: boolean; label: string; caption: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.lvlRow}>
       <View style={[styles.lvlN, active && styles.lvlNOn]}>
@@ -586,6 +587,9 @@ function TrackerStep({
   active?: boolean;
   warn?: boolean;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const bg = warn && active ? colors.red : done ? colors.emerald : colors.surfaceSecondary;
   const fg = done || (warn && active) ? "#fff" : colors.textTertiary;
   return (
@@ -606,20 +610,9 @@ function TrackerStep({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  hdr: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 18 },
-  stepLbl: { fontSize: 12, fontWeight: "700", color: colors.textTertiary, letterSpacing: 0.4 },
-  progressBar: { marginTop: 6, width: "80%", height: 4, borderRadius: 2, backgroundColor: colors.surfaceSecondary, overflow: "hidden" },
-  progressFill: { height: "100%", backgroundColor: colors.red, borderRadius: 2 },
   h1: { ...typography.display, fontSize: 26 },
   sub: { ...typography.body, color: colors.textTertiary, lineHeight: 21 },
   subheader: { fontSize: 12, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 6 },
@@ -664,7 +657,7 @@ const styles = StyleSheet.create({
   },
   chipOn: { backgroundColor: colors.ink, borderColor: colors.ink },
   chipText: { fontSize: 12, fontWeight: "600", color: colors.textSecondary },
-  mandateBox: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: "#fff", gap: 12 },
+  mandateBox: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.surface, gap: 12 },
   mandateQ: { fontSize: 14, fontWeight: "700", color: colors.text, lineHeight: 20 },
   mandateOpts: { flexDirection: "row", gap: 10 },
   mandateOpt: {
@@ -677,7 +670,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1.5,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   mandateOptOn: { backgroundColor: colors.emerald, borderColor: colors.emerald },
   mandateOptNo: { backgroundColor: colors.textTertiary, borderColor: colors.textTertiary },
@@ -708,18 +701,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: spacing.lg,
-    backgroundColor: "rgba(255,255,255,0.98)",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
   },
-  cta: {
-    height: 56,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaText: { color: "#fff", fontSize: 16, fontWeight: "800" },
 
   // Status view
   statusWrap: { padding: spacing.xl, gap: spacing.md, alignItems: "center", paddingBottom: spacing.xxl },
@@ -758,7 +741,7 @@ const styles = StyleSheet.create({
   },
   statusTitle: { ...typography.h1, fontSize: 24, marginTop: 8, textAlign: "center" },
   statusSub: { ...typography.body, color: colors.textTertiary, textAlign: "center" },
-  card: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: "#fff", width: "100%", gap: 2, marginTop: spacing.md },
+  card: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.surface, width: "100%", gap: 2, marginTop: spacing.md },
   levelsCard: { width: "100%", gap: 10, marginTop: spacing.md },
   lvlRow: {
     flexDirection: "row",
@@ -766,7 +749,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     ...shadows.soft,
   },
   lvlN: {
@@ -781,39 +764,4 @@ const styles = StyleSheet.create({
   lvlNText: { fontSize: 14, fontWeight: "800", color: colors.textTertiary },
   lvlLabel: { fontSize: 13, fontWeight: "700", color: colors.text },
   lvlCaption: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
-  editBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 18,
-    height: 44,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    marginTop: spacing.lg,
-  },
-  editBtnText: { fontSize: 13, fontWeight: "800", color: colors.text },
-  plansBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 20,
-    height: 46,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    marginTop: spacing.md,
-  },
-  plansBtnText: { fontSize: 14, fontWeight: "800", color: colors.bg },
-  publicBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 20,
-    height: 44,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.ink,
-    marginTop: spacing.sm,
-  },
-  publicBtnText: { fontSize: 13, fontWeight: "800", color: colors.ink },
 });

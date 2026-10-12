@@ -1,12 +1,14 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, spacing } from "@/src/constants/theme";
+import type { IconName } from "../ui/icons";
+import { radius } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export type CategoryDef = {
   key: string;
   label: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   color: string;
   category?: string;
   subcategory?: string;
@@ -19,6 +21,9 @@ export function CategoryTile({
   cat: CategoryDef;
   onPress?: () => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable onPress={onPress} style={styles.wrap} testID={`category-${cat.key}`}>
       <View style={[styles.icon, { backgroundColor: cat.color + "18" }]}>
@@ -31,7 +36,8 @@ export function CategoryTile({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   wrap: {
     alignItems: "center",
     width: 76,

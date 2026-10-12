@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+import { View, StyleSheet } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter } from "expo-router";
 
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { AppText, Card, ProgressBar, Skeleton } from "@/src/ui";
 
 type Score = Awaited<ReturnType<typeof api.agentScore>>;
 
@@ -14,6 +15,7 @@ type Score = Awaited<ReturnType<typeof api.agentScore>>;
  */
 export function AgentScoreCard() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [data, setData] = useState<Score | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,79 +34,48 @@ export function AgentScoreCard() {
 
   if (loading) {
     return (
-      <View style={[styles.card, { alignItems: "center", justifyContent: "center", height: 96 }]}>
-        <ActivityIndicator color={colors.ink} />
-      </View>
+      <Card elevation="xs">
+        <View style={styles.row}>
+          <Skeleton width={64} height={64} radius={32} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <Skeleton width="40%" height={18} />
+            <Skeleton width="85%" height={12} />
+          </View>
+        </View>
+      </Card>
     );
   }
 
   if (!data) return null;
 
   const dominant = [...data.factors].sort((a, b) => a.weighted - b.weighted)[0];
+  const tone = data.score >= 70 ? "success" : data.score >= 40 ? "primary" : "brand";
 
   return (
-    <Pressable
-      onPress={() => router.push("/agent-score")}
-      style={styles.card}
-      testID="agent-score-card"
-    >
+    <Card onPress={() => router.push("/agent-score")} testID="agent-score-card" elevation="xs" style={{ gap: 12 }}>
       <View style={styles.row}>
-        <View style={styles.scoreCircle}>
-          <Text style={styles.scoreValue}>{data.score}</Text>
-          <Text style={styles.scoreOutOf}>/100</Text>
+        <View style={[styles.scoreCircle, { backgroundColor: colors.surfaceInverse }]}>
+          <AppText variant="h2" tabular color={colors.textInverse}>
+            {data.score}
+          </AppText>
+          <AppText variant="micro" color={colors.textMuted}>
+            /100
+          </AppText>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.tier}>{data.tier}</Text>
-          <Text style={styles.subtitle} numberOfLines={2}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="h3">{data.tier}</AppText>
+          <AppText variant="caption" tone="secondary" numberOfLines={2}>
             {dominant?.hint || "Keep listing and responding to grow your score."}
-          </Text>
+          </AppText>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </View>
-      <View style={styles.barTrack}>
-        <View
-          style={[
-            styles.barFill,
-            {
-              width: `${Math.min(100, data.score)}%`,
-              backgroundColor:
-                data.score >= 70 ? colors.success : data.score >= 40 ? colors.ink : colors.red,
-            },
-          ]}
-        />
-      </View>
-    </Pressable>
+      <ProgressBar value={Math.min(100, data.score) / 100} tone={tone} />
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.bg,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 12,
-    ...shadows.soft,
-  },
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
-  scoreCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scoreValue: { color: colors.bg, fontSize: 24, fontWeight: "800" },
-  scoreOutOf: { color: colors.textMuted, fontSize: 10 },
-  tier: { ...typography.h3, color: colors.ink },
-  subtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 2, lineHeight: 16 },
-  barTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.surfaceSecondary,
-    overflow: "hidden",
-  },
-  barFill: { height: 6, borderRadius: 3 },
+  scoreCircle: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
 });

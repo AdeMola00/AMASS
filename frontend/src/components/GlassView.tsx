@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, StyleSheet, ViewStyle, StyleProp, Platform } from "react-native";
 import { BlurView } from "expo-blur";
-import { colors, radius, shadows } from "@/src/constants/theme";
+import { radius, shadows } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 /**
  * Glassmorphic surface for floating chrome (search bars, filter rows, etc.)
@@ -20,6 +21,9 @@ export function GlassView({
   tint?: "light" | "dark" | "default";
   radius?: number;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const inner = <View style={{ borderRadius: r, overflow: "hidden" }}>{children}</View>;
   return (
     <View style={[styles.wrap, { borderRadius: r }, shadows.card, style]}>
@@ -51,7 +55,8 @@ export function GlassView({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   wrap: {
     overflow: "hidden",
     backgroundColor: colors.surface,

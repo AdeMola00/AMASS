@@ -1,19 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  Alert,
-  Share as RNShare,
-  Linking,
-  Platform,
-} from "react-native";
+import { View, StyleSheet, ScrollView, Linking, Share as RNShare } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
@@ -22,34 +11,57 @@ import ViewShot, { captureRef } from "react-native-view-shot";
 import QRCode from "react-native-qrcode-svg";
 
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { fontFamilies, palette, radii, space } from "@/src/theme/tokens";
+import { AppText, Button, EmptyState, Screen, ScreenHeader, Skeleton, useToast, type IconName } from "@/src/ui";
 
 type Bundle = Awaited<ReturnType<typeof api.propertyShareBundle>>;
+
+/** The flyer is captured to PNG and shared outside the app, so it keeps a
+ *  fixed, print-safe palette regardless of the user's light/dark theme. */
+const FLYER = {
+  bg: palette.neutral[0],
+  ink: palette.neutral[1000],
+  red: palette.red[500],
+  muted: palette.neutral[400],
+  secondary: palette.neutral[600],
+  surface: palette.neutral[100],
+  border: palette.neutral[200],
+};
+const WHATSAPP_GREEN = "#25D366"; // third-party brand colour
 
 export default function ShareProperty() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [bundle, setBundle] = useState<Bundle | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [busyChannel, setBusyChannel] = useState<string | null>(null);
 
-  const flyerRef = useRef<ViewShot>(null);
+  const flyerRef = useRef<any>(null);
+
+  const load = async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const b = await api.propertyShareBundle(id as string);
+      setBundle(b);
+    } catch (e: any) {
+      setError(e?.message ?? "We couldn't prepare the share kit for this property.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!id) return;
-    (async () => {
-      try {
-        setLoading(true);
-        const b = await api.propertyShareBundle(id as string);
-        setBundle(b);
-      } catch (e: any) {
-        Alert.alert("Could not load share info", e?.message ?? "Try again");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const track = (channel: any) => {
@@ -68,7 +80,7 @@ export default function ShareProperty() {
       await Linking.openURL(canNative ? native : bundle.whatsapp_url);
       track("whatsapp");
     } catch {
-      Alert.alert("WhatsApp not available", "Try the Share option instead.");
+      toast.error("WhatsApp not available", "Try the Share option instead.");
     } finally {
       setBusyChannel(null);
     }
@@ -81,7 +93,7 @@ export default function ShareProperty() {
     track("copy_link");
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setBusyChannel(null);
-    Alert.alert("Link copied", bundle.share_url);
+    toast.success("Link copied", bundle.share_url);
   };
 
   const onNativeShare = async () => {
@@ -106,7 +118,7 @@ export default function ShareProperty() {
       const uri = await captureRef(flyerRef, { format: "png", quality: 1 });
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert("Not available", "Saving the flyer is only available in the AMASS app.");
+        toast.info("Not available here", "Saving the flyer is only available in the AMASS app.");
         return;
       }
       await Sharing.shareAsync(uri, {
@@ -117,7 +129,7 @@ export default function ShareProperty() {
       track("flyer");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e: any) {
-      Alert.alert("Could not save flyer", e?.message ?? "Try again");
+      toast.error("Couldn't save flyer", e?.message ?? "Try again");
     } finally {
       setBusyChannel(null);
     }
@@ -136,30 +148,39 @@ export default function ShareProperty() {
         });
         track("flyer");
       } else {
-        Alert.alert("Sharing unavailable on this device");
+        toast.info("Sharing unavailable on this device");
       }
     } catch (e: any) {
-      Alert.alert("Could not share flyer", e?.message ?? "Try again");
+      toast.error("Couldn't share flyer", e?.message ?? "Try again");
     } finally {
       setBusyChannel(null);
     }
   };
 
-  if (loading || !bundle) {
+  if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Screen testID="share-screen">
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-            <Ionicons name="chevron-back" size={26} color={colors.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Share property</Text>
-          <View style={styles.iconBtn} />
+        <ScreenHeader title="Share property" />
+        <View style={{ padding: space[4], gap: 14 }}>
+          <Skeleton height={420} radius={radii.lg} />
+          <Skeleton height={54} radius={radii.pill} />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Skeleton height={48} radius={radii.pill} style={{ flex: 1 }} />
+            <Skeleton height={48} radius={radii.pill} style={{ flex: 1 }} />
+          </View>
         </View>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={colors.red} size="large" />
-        </View>
-      </SafeAreaView>
+      </Screen>
+    );
+  }
+
+  if (error || !bundle) {
+    return (
+      <Screen testID="share-screen">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Share property" />
+        <EmptyState variant="error" title="Couldn't load share kit" body={error ?? "Please try again."} actionLabel="Retry" onAction={load} secondaryLabel="Go back" onSecondary={() => router.back()} />
+      </Screen>
     );
   }
 
@@ -168,37 +189,25 @@ export default function ShareProperty() {
   const cover = (p.images && p.images[0]) || undefined;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bgAlt }}>
+    <Screen testID="share-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: colors.bg }}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color={colors.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Share property</Text>
-          <View style={styles.iconBtn} />
-        </View>
-      </SafeAreaView>
+      <ScreenHeader title="Share property" subtitle="Flyer · WhatsApp · link" />
 
       <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40 }}
+        contentContainerStyle={{ padding: space[4], paddingBottom: insets.bottom + 40, gap: space[5] }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Flyer preview (captured to PNG on save/share) */}
-        <ViewShot
-          ref={flyerRef}
-          options={{ format: "png", quality: 1 }}
-          style={styles.flyer}
-        >
+        {/* Flyer preview (captured to PNG on save/share) — fixed palette */}
+        <ViewShot ref={flyerRef} options={{ format: "png", quality: 1 }} style={styles.flyer}>
           <View style={styles.flyerBrandBar}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.flyerBrand}>AMASS</Text>
-              <Text style={styles.flyerTagline}>Africa's Property Intelligence</Text>
+              <AppText style={styles.flyerBrand} color={FLYER.bg}>AMASS</AppText>
+              <AppText variant="micro" color={FLYER.muted}>Africa&apos;s Property Intelligence</AppText>
             </View>
             {p.verified && (
               <View style={styles.flyerVerified}>
-                <Ionicons name="shield-checkmark" size={12} color={colors.bg} />
-                <Text style={styles.flyerVerifiedText}>VERIFIED</Text>
+                <Ionicons name="shield-checkmark" size={12} color={FLYER.bg} />
+                <AppText variant="micro" color={FLYER.bg} uppercase>Verified</AppText>
               </View>
             )}
           </View>
@@ -207,350 +216,111 @@ export default function ShareProperty() {
             <Image source={{ uri: cover }} style={styles.flyerImage} contentFit="cover" />
           ) : (
             <View style={[styles.flyerImage, styles.flyerImageFallback]}>
-              <Ionicons name="business" size={40} color={colors.textMuted} />
+              <Ionicons name="business" size={40} color={FLYER.muted} />
             </View>
           )}
 
           <View style={styles.flyerBody}>
-            <Text style={styles.flyerListingType}>
+            <AppText variant="label" color={FLYER.red} uppercase>
               {(p.listing_type || "").toUpperCase()} · {p.property_type?.toUpperCase()}
-            </Text>
-            <Text style={styles.flyerTitle} numberOfLines={2}>
-              {p.title}
-            </Text>
-            <Text style={styles.flyerLocation}>
-              📍 {[p.city, p.state].filter(Boolean).join(", ") || p.location}
-            </Text>
+            </AppText>
+            <AppText variant="h2" color={FLYER.ink} numberOfLines={2}>{p.title}</AppText>
+            <AppText variant="bodySm" color={FLYER.secondary}>
+              {[p.city, p.state].filter(Boolean).join(", ") || p.location}
+            </AppText>
 
             <View style={styles.flyerSpecsRow}>
-              {p.bedrooms ? (
-                <FlyerSpec icon="bed" value={`${p.bedrooms} bed`} />
-              ) : null}
-              {p.bathrooms ? (
-                <FlyerSpec icon="water" value={`${p.bathrooms} bath`} />
-              ) : null}
-              {p.size_sqm ? (
-                <FlyerSpec icon="expand" value={`${p.size_sqm} sqm`} />
-              ) : null}
+              {p.bedrooms ? <FlyerSpec icon="bed" value={`${p.bedrooms} bed`} /> : null}
+              {p.bathrooms ? <FlyerSpec icon="water" value={`${p.bathrooms} bath`} /> : null}
+              {p.size_sqm ? <FlyerSpec icon="expand" value={`${p.size_sqm} sqm`} /> : null}
             </View>
 
-            <Text style={styles.flyerPrice}>{formatNaira(p.price || 0)}</Text>
+            <AppText variant="h1" color={FLYER.ink} tabular style={{ marginTop: 8 }}>{formatNaira(p.price || 0)}</AppText>
 
             <View style={styles.flyerFooter}>
               <View style={{ flex: 1 }}>
                 {a?.full_name && (
                   <>
-                    <Text style={styles.flyerFooterLabel}>Listed by</Text>
-                    <Text style={styles.flyerFooterAgent}>{a.full_name}</Text>
-                    {a.badge?.label && (
-                      <Text style={styles.flyerFooterBadge}>{a.badge.label}</Text>
-                    )}
+                    <AppText variant="micro" color={FLYER.muted} uppercase>Listed by</AppText>
+                    <AppText variant="title" color={FLYER.ink} style={{ marginTop: 2 }}>{a.full_name}</AppText>
+                    {a.badge?.label && <AppText variant="caption" color={FLYER.red}>{a.badge.label}</AppText>}
                   </>
                 )}
-                <Text style={styles.flyerFooterDomain}>
+                <AppText variant="caption" color={FLYER.secondary} style={{ marginTop: 4 }}>
                   amass.africa/property/{p.id.slice(0, 8)}…
-                </Text>
+                </AppText>
               </View>
               <View style={styles.flyerQR}>
-                <QRCode
-                  value={bundle.share_url}
-                  size={78}
-                  color={colors.ink}
-                  backgroundColor={colors.bg}
-                />
-                <Text style={styles.flyerQRLabel}>SCAN</Text>
+                <QRCode value={bundle.share_url} size={78} color={FLYER.ink} backgroundColor={FLYER.bg} />
+                <AppText variant="micro" color={FLYER.muted} style={{ marginTop: 4 }}>SCAN</AppText>
               </View>
             </View>
           </View>
         </ViewShot>
 
         {/* Actions */}
-        <View style={styles.actions}>
-          <PrimaryAction
-            icon="logo-whatsapp"
+        <View style={{ gap: 10 }}>
+          <Button
             label="Send on WhatsApp"
+            iconLeft="logo-whatsapp"
+            size="lg"
+            fullWidth
+            loading={busyChannel === "whatsapp"}
             onPress={onWhatsApp}
-            busy={busyChannel === "whatsapp"}
+            style={{ backgroundColor: WHATSAPP_GREEN }}
+            testID="share-whatsapp"
           />
-
           <View style={styles.actionRow}>
-            <ActionButton
-              icon="download-outline"
-              label="Save flyer"
-              onPress={onSaveFlyer}
-              busy={busyChannel === "flyer_save"}
-            />
-            <ActionButton
-              icon="share-outline"
-              label="Share flyer"
-              onPress={onShareFlyer}
-              busy={busyChannel === "flyer_share"}
-            />
+            <Button label="Save flyer" iconLeft="download-outline" variant="outline" style={{ flex: 1 }} loading={busyChannel === "flyer_save"} onPress={onSaveFlyer} testID="share-save-flyer" />
+            <Button label="Share flyer" iconLeft="image-outline" variant="outline" style={{ flex: 1 }} loading={busyChannel === "flyer_share"} onPress={onShareFlyer} testID="share-flyer" />
           </View>
-
           <View style={styles.actionRow}>
-            <ActionButton
-              icon="copy-outline"
-              label="Copy link"
-              onPress={onCopyLink}
-              busy={busyChannel === "copy"}
-            />
-            <ActionButton
-              icon="paper-plane-outline"
-              label="More options"
-              onPress={onNativeShare}
-              busy={busyChannel === "native"}
-            />
+            <Button label="Copy link" iconLeft="copy-outline" variant="secondary" style={{ flex: 1 }} loading={busyChannel === "copy"} onPress={onCopyLink} testID="share-copy" />
+            <Button label="More options" iconLeft="paper-plane-outline" variant="secondary" style={{ flex: 1 }} loading={busyChannel === "native"} onPress={onNativeShare} testID="share-more" />
           </View>
         </View>
 
-        <Text style={styles.legal}>
-          Sharing on AMASS keeps buyers on the verified property page. Each
-          share is tracked to give you performance analytics on your listing.
-        </Text>
+        <View style={[styles.note, { backgroundColor: colors.surfaceAlt }]}>
+          <Ionicons name="analytics-outline" size={16} color={colors.textSecondary} />
+          <AppText variant="caption" tone="tertiary" style={{ flex: 1 }}>
+            Sharing on AMASS keeps buyers on the verified property page. Every share is tracked so you get performance analytics on your listing.
+          </AppText>
+        </View>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
-function FlyerSpec({ icon, value }: { icon: any; value: string }) {
+function FlyerSpec({ icon, value }: { icon: IconName; value: string }) {
   return (
     <View style={styles.flyerSpec}>
-      <Ionicons name={icon} size={12} color={colors.ink} />
-      <Text style={styles.flyerSpecText}>{value}</Text>
+      <Ionicons name={icon} size={12} color={FLYER.ink} />
+      <AppText variant="caption" weight="bold" color={FLYER.ink}>{value}</AppText>
     </View>
-  );
-}
-
-function PrimaryAction({
-  icon,
-  label,
-  onPress,
-  busy,
-}: {
-  icon: any;
-  label: string;
-  onPress: () => void;
-  busy?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={busy}
-      style={({ pressed }) => [
-        styles.primaryAction,
-        pressed && { opacity: 0.85 },
-        busy && { opacity: 0.6 },
-      ]}
-    >
-      {busy ? (
-        <ActivityIndicator color={colors.bg} />
-      ) : (
-        <>
-          <Ionicons name={icon} size={20} color={colors.bg} />
-          <Text style={styles.primaryActionText}>{label}</Text>
-        </>
-      )}
-    </Pressable>
-  );
-}
-
-function ActionButton({
-  icon,
-  label,
-  onPress,
-  busy,
-}: {
-  icon: any;
-  label: string;
-  onPress: () => void;
-  busy?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={busy}
-      style={({ pressed }) => [
-        styles.action,
-        pressed && { opacity: 0.85 },
-        busy && { opacity: 0.6 },
-      ]}
-    >
-      {busy ? (
-        <ActivityIndicator color={colors.ink} />
-      ) : (
-        <>
-          <Ionicons name={icon} size={18} color={colors.ink} />
-          <Text style={styles.actionText}>{label}</Text>
-        </>
-      )}
-    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: { ...typography.h3, color: colors.ink },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-
-  // Flyer preview
+  // Flyer preview (fixed palette — exported as an image)
   flyer: {
-    backgroundColor: colors.bg,
-    borderRadius: radius.lg,
+    backgroundColor: FLYER.bg,
+    borderRadius: radii.lg,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-    marginBottom: spacing.xl,
+    borderColor: FLYER.border,
   },
-  flyerBrandBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: spacing.md,
-    backgroundColor: colors.ink,
-  },
-  flyerBrand: {
-    color: colors.bg,
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: 3,
-  },
-  flyerTagline: { color: colors.textMuted, fontSize: 10, marginTop: 1 },
-  flyerVerified: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: colors.red,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  flyerVerifiedText: {
-    color: colors.bg,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-  },
-  flyerImage: {
-    width: "100%",
-    aspectRatio: 4 / 3,
-    backgroundColor: colors.surfaceSecondary,
-  },
+  flyerBrandBar: { flexDirection: "row", alignItems: "center", padding: space[4], backgroundColor: FLYER.ink },
+  flyerBrand: { fontSize: 22, lineHeight: 26, letterSpacing: 3, fontFamily: fontFamilies.extrabold },
+  flyerVerified: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: FLYER.red, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.pill },
+  flyerImage: { width: "100%", aspectRatio: 4 / 3, backgroundColor: FLYER.surface },
   flyerImageFallback: { alignItems: "center", justifyContent: "center" },
-  flyerBody: { padding: spacing.lg, gap: 6 },
-  flyerListingType: {
-    color: colors.red,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
-  },
-  flyerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: colors.ink,
-    lineHeight: 26,
-  },
-  flyerLocation: { color: colors.textSecondary, fontSize: 13 },
-  flyerSpecsRow: { flexDirection: "row", gap: 8, marginTop: 6 },
-  flyerSpec: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  flyerSpecText: { color: colors.ink, fontSize: 12, fontWeight: "700" },
-  flyerPrice: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: colors.ink,
-    marginTop: 8,
-  },
-  flyerFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-    gap: spacing.md,
-  },
-  flyerFooterLabel: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  flyerFooterAgent: {
-    color: colors.ink,
-    fontSize: 14,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  flyerFooterBadge: { color: colors.red, fontSize: 11, fontWeight: "700", marginTop: 1 },
-  flyerFooterDomain: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 4,
-  },
-  flyerQR: {
-    alignItems: "center",
-    padding: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-  },
-  flyerQRLabel: {
-    color: colors.textMuted,
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginTop: 4,
-  },
+  flyerBody: { padding: space[5], gap: 6 },
+  flyerSpecsRow: { flexDirection: "row", gap: 8, marginTop: 6, flexWrap: "wrap" },
+  flyerSpec: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill, backgroundColor: FLYER.surface },
+  flyerFooter: { flexDirection: "row", alignItems: "center", marginTop: space[4], paddingTop: space[4], borderTopWidth: 1, borderTopColor: FLYER.border, gap: space[4] },
+  flyerQR: { alignItems: "center", padding: 6, borderWidth: 1, borderColor: FLYER.border, borderRadius: radii.md, backgroundColor: FLYER.bg },
 
   // Actions
-  actions: { gap: spacing.sm },
-  primaryAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    backgroundColor: "#25D366", // WhatsApp brand green
-    height: 54,
-    borderRadius: radius.md,
-    ...shadows.soft,
-  },
-  primaryActionText: { color: colors.bg, fontSize: 16, fontWeight: "800" },
-  actionRow: { flexDirection: "row", gap: spacing.sm },
-  action: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 48,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.ink,
-    backgroundColor: colors.bg,
-  },
-  actionText: { color: colors.ink, fontSize: 14, fontWeight: "700" },
-  legal: {
-    color: colors.textMuted,
-    fontSize: 11,
-    textAlign: "center",
-    marginTop: spacing.xl,
-    lineHeight: 16,
-    paddingHorizontal: Platform.OS === "web" ? 0 : spacing.md,
-  },
+  actionRow: { flexDirection: "row", gap: 10 },
+  note: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm },
 });

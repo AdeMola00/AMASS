@@ -1,46 +1,59 @@
 import React, { useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Dimensions,
-  FlatList,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-} from "react-native";
+import { View, StyleSheet, Pressable, FlatList, NativeSyntheticEvent, NativeScrollEvent, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import Animated, { useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { AmassLogo } from "@/src/components/AmassLogo";
-import { colors, radius, spacing, typography } from "@/src/constants/theme";
+import { palette, motion, radii, space } from "@/src/theme/tokens";
+import { AppText, type IconName } from "@/src/ui";
 
-const { width, height } = Dimensions.get("window");
+type Slide = {
+  image: string;
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  bullets?: { icon: IconName; label: string; color: string }[];
+};
 
-const SLIDES = [
+const SLIDES: Slide[] = [
   {
-    image:
-      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1400&q=85",
-    title: "Discover extraordinary\nproperties across Africa",
-    subtitle: "A curated map of verified homes, land and investments — from Lekki to Abuja.",
+    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1400&q=85",
+    eyebrow: "Discover",
+    title: "Find your next place from the sky",
+    subtitle: "Browse a satellite map of verified homes, land and investments — from Lekki to Abuja.",
   },
   {
-    image:
-      "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=1400&q=85",
-    title: "Verified ownership.\nZero surprises.",
-    subtitle: "Every listing is title-checked so you can buy, rent or lease with confidence.",
+    image: "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=1400&q=85",
+    eyebrow: "Trust",
+    title: "Verified listings. Zero surprises.",
+    subtitle: "Agents are vetted and listings are checked on-site, so you can buy, rent or lease with confidence.",
   },
   {
-    image:
-      "https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1400&q=85",
-    title: "AI-powered insights.\nFor smarter decisions.",
-    subtitle: "Ask AMASS anything — from rental yields in Ikoyi to duplexes under ₦150M.",
+    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1400&q=85",
+    eyebrow: "Your wallet",
+    title: "Two tokens. One simple wallet.",
+    subtitle: "Pay small, clearly-disclosed fees with tokens — you always see the cost and your balance before confirming.",
+    bullets: [
+      { icon: "home", label: "MASS unlocks property details and verified agent contacts", color: palette.gold[500] },
+      { icon: "construct", label: "FIX pays for FIXA home services and provider boosts", color: palette.green[500] },
+      { icon: "gift", label: "Earn both with daily bonuses, tasks and referrals", color: "#FFFFFF" },
+    ],
+  },
+  {
+    image: "https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1400&q=85",
+    eyebrow: "Everything around the home",
+    title: "Services, brands and AI insights",
+    subtitle: "Ask AMASS anything — then book inspections, declutter, renovate or shop from trusted brands.",
   },
 ];
 
 export default function Onboarding() {
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
   const listRef = useRef<FlatList>(null);
 
@@ -49,12 +62,10 @@ export default function Onboarding() {
     if (i !== index) setIndex(i);
   };
 
+  const finish = () => router.replace("/(auth)/login");
   const next = () => {
-    if (index < SLIDES.length - 1) {
-      listRef.current?.scrollToIndex({ index: index + 1, animated: true });
-    } else {
-      router.replace("/(auth)/login");
-    }
+    if (index < SLIDES.length - 1) listRef.current?.scrollToIndex({ index: index + 1, animated: true });
+    else finish();
   };
 
   return (
@@ -69,118 +80,106 @@ export default function Onboarding() {
         showsHorizontalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        renderItem={({ item }) => (
+        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        renderItem={({ item }: { item: Slide }) => (
           <View style={{ width, height }}>
-            <Image source={{ uri: item.image }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            <View style={styles.scrim} />
-            <SafeAreaView style={styles.content} edges={["top", "bottom"]}>
+            <Image source={{ uri: item.image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} />
+            <LinearGradient colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.88)"]} locations={[0, 0.45, 1]} style={StyleSheet.absoluteFill} />
+            <View style={[styles.content, { paddingTop: insets.top + space[3], paddingBottom: 190 + insets.bottom }]}>
               <View style={styles.topRow}>
-                <AmassLogo size="md" showWordmark={false} />
-                <Pressable onPress={() => router.replace("/(auth)/login")} hitSlop={12}>
-                  <Text style={styles.skip}>Skip</Text>
+                <View style={styles.logoBadge}>
+                  <AmassLogo size="md" showWordmark={false} />
+                </View>
+                <Pressable onPress={finish} hitSlop={12} accessibilityRole="button" accessibilityLabel="Skip onboarding" testID="onboarding-skip" style={styles.skip}>
+                  <AppText variant="caption" weight="bold" color="#fff">
+                    Skip
+                  </AppText>
                 </Pressable>
               </View>
               <View style={{ flex: 1 }} />
               <View style={styles.bottom}>
-                <Text style={styles.title}>{item.title}</Text>
-                <Text style={styles.subtitle}>{item.subtitle}</Text>
+                <View style={styles.eyebrow}>
+                  <View style={styles.eyebrowDot} />
+                  <AppText variant="label" color="rgba(255,255,255,0.8)" uppercase>
+                    {item.eyebrow}
+                  </AppText>
+                </View>
+                <AppText variant="display" color="#fff" style={{ fontSize: 34, lineHeight: 38 }}>
+                  {item.title}
+                </AppText>
+                <AppText variant="body" color="rgba(255,255,255,0.8)">
+                  {item.subtitle}
+                </AppText>
+                {item.bullets ? (
+                  <View style={styles.bullets}>
+                    {item.bullets.map((b) => (
+                      <View key={b.label} style={styles.bullet}>
+                        <View style={[styles.bulletIcon, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
+                          <Ionicons name={b.icon} size={14} color={b.color} />
+                        </View>
+                        <AppText variant="bodySm" color="rgba(255,255,255,0.9)" style={{ flex: 1 }}>
+                          {b.label}
+                        </AppText>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
-            </SafeAreaView>
+            </View>
           </View>
         )}
       />
-      <SafeAreaView edges={["bottom"]} style={styles.footer} pointerEvents="box-none">
-        <View style={styles.dots}>
+
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]} pointerEvents="box-none">
+        <View style={styles.dots} accessibilityLabel={`Step ${index + 1} of ${SLIDES.length}`}>
           {SLIDES.map((_, i) => (
-            <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
+            <Dot key={i} active={i === index} />
           ))}
         </View>
-        <Pressable style={styles.cta} onPress={next} testID="onboarding-next">
-          <Text style={styles.ctaText}>
-            {index === SLIDES.length - 1 ? "Get Started" : "Continue"}
-          </Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" />
+        <Pressable
+          onPress={next}
+          accessibilityRole="button"
+          accessibilityLabel={index === SLIDES.length - 1 ? "Get started" : "Continue"}
+          testID="onboarding-next"
+          style={({ pressed }) => [styles.cta, pressed && { transform: [{ scale: 0.98 }] }]}
+        >
+          <AppText variant="title" color="#0A0A0A">
+            {index === SLIDES.length - 1 ? "Get started" : "Continue"}
+          </AppText>
+          <Ionicons name="arrow-forward" size={18} color="#0A0A0A" />
         </Pressable>
-      </SafeAreaView>
+        <Pressable onPress={finish} hitSlop={8} accessibilityRole="button" testID="onboarding-signin" style={{ alignSelf: "center", paddingVertical: 10 }}>
+          <AppText variant="caption" color="rgba(255,255,255,0.7)">
+            Already have an account? <AppText variant="caption" weight="bold" color="#fff">Sign in</AppText>
+          </AppText>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
+function Dot({ active }: { active: boolean }) {
+  const anim = useAnimatedStyle(() => ({
+    width: withSpring(active ? 24 : 8, motion.spring),
+    opacity: withSpring(active ? 1 : 0.45, motion.spring),
+  }));
+  return <Animated.View style={[styles.dot, anim]} />;
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-  content: {
-    flex: 1,
-    padding: spacing.xl,
-  },
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  skip: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 15,
-  },
-  bottom: {
-    gap: spacing.md,
-    marginBottom: 150,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#fff",
-    letterSpacing: -0.8,
-    lineHeight: 40,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "rgba(255,255,255,0.85)",
-    lineHeight: 24,
-  },
-  footer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: spacing.xl,
-    gap: spacing.lg,
-  },
-  dots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.4)",
-  },
-  dotActive: {
-    backgroundColor: "#fff",
-    width: 24,
-  },
-  cta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 56,
-    backgroundColor: colors.emerald,
-    borderRadius: radius.pill,
-  },
-  ctaText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
-    letterSpacing: -0.2,
-  },
+  container: { flex: 1, backgroundColor: "#000" },
+  content: { flex: 1, paddingHorizontal: space[6] },
+  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  logoBadge: { backgroundColor: "rgba(255,255,255,0.92)", borderRadius: radii.md, paddingHorizontal: 10, paddingVertical: 6 },
+  skip: { backgroundColor: "rgba(255,255,255,0.14)", paddingHorizontal: 14, height: 36, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
+  bottom: { gap: 12 },
+  eyebrow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  eyebrowDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: palette.red[500] },
+  bullets: { gap: 10, marginTop: 6 },
+  bullet: { flexDirection: "row", alignItems: "center", gap: 10 },
+  bulletIcon: { width: 28, height: 28, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  footer: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space[6], gap: 14 },
+  dots: { flexDirection: "row", gap: 6, justifyContent: "center" },
+  cta: { height: 56, borderRadius: radii.pill, backgroundColor: "#fff", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  dot: { height: 8, borderRadius: 4, backgroundColor: "#fff" },
 });

@@ -19,7 +19,8 @@ import Svg, { Path } from "react-native-svg";
 import { storage } from "@/src/utils/storage";
 import { AUTH_STORAGE_KEY, api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radius } from "@/src/constants/theme";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -37,10 +38,11 @@ function extractSessionId(url?: string | null): string | null {
 
 export function GoogleSignInButton({ onError }: { onError?: (msg: string) => void }) {
   const router = useRouter();
+  const theme = useTheme();
   const { refresh } = useAuth() as any;  // refresh is optional; fallback below
   const [busy, setBusy] = useState(false);
   const consumedRef = useRef<Set<string>>(new Set());
-  const linkListenerRef = useRef<Linking.EventSubscription | null>(null);
+  const linkListenerRef = useRef<{ remove: () => void } | null>(null);
   const capturedUrlRef = useRef<string | null>(null);
 
   // Web: parse session_id on mount from URL, exchange with backend
@@ -154,18 +156,18 @@ export function GoogleSignInButton({ onError }: { onError?: (msg: string) => voi
   return (
     <Pressable
       onPress={start}
-      style={[styles.btn, busy && { opacity: 0.7 }]}
+      style={[styles.btn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderStrong }, busy && { opacity: 0.7 }]}
       disabled={busy}
       testID="google-signin"
       accessibilityRole="button"
       accessibilityLabel="Continue with Google"
     >
       {busy ? (
-        <ActivityIndicator color={colors.text} />
+        <ActivityIndicator color={theme.colors.text} />
       ) : (
         <View style={styles.row}>
           <GoogleGlyph />
-          <Text style={styles.label}>Continue with Google</Text>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Continue with Google</Text>
         </View>
       )}
     </Pressable>
@@ -187,13 +189,11 @@ const styles = StyleSheet.create({
   btn: {
     height: 52,
     borderRadius: radius.pill,
-    backgroundColor: "#fff",
     borderWidth: 1.5,
-    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
   },
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
-  label: { fontSize: 15, fontWeight: "700", color: colors.text, letterSpacing: 0.2 },
+  label: { fontSize: 15, fontWeight: "700", letterSpacing: 0.2 },
 });

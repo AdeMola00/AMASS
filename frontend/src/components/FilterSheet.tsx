@@ -1,9 +1,11 @@
 import React, { useCallback, useMemo, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../ui/icons";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
-import { colors, radius, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { radius, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export type FilterState = {
   listingType?: "buy" | "rent" | "shortlet" | "land" | "commercial";
@@ -23,7 +25,7 @@ export type FilterSheetRef = {
   close: () => void;
 };
 
-const LISTING_TYPES: { key: NonNullable<FilterState["listingType"]>; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const LISTING_TYPES: { key: NonNullable<FilterState["listingType"]>; label: string; icon: IconName }[] = [
   { key: "buy", label: "Buy", icon: "key-outline" },
   { key: "rent", label: "Rent", icon: "home-outline" },
   { key: "shortlet", label: "Short Let", icon: "bed-outline" },
@@ -52,6 +54,9 @@ export const FilterSheet = forwardRef<
     onApply: (state: FilterState) => void;
   }
 >(({ value, onApply }, ref) => {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const sheetRef = useRef<BottomSheetModal>(null);
   const [draft, setDraft] = useState<FilterState>(value);
 
@@ -281,6 +286,9 @@ export const FilterSheet = forwardRef<
 FilterSheet.displayName = "FilterSheet";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -289,8 +297,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-const styles = StyleSheet.create({
-  sheetBg: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+  sheetBg: { backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28 },
   handle: { backgroundColor: colors.borderStrong, width: 40 },
   container: { flex: 1, paddingHorizontal: spacing.xl },
   header: {
@@ -320,7 +329,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   countChip: {
     minWidth: 54,
@@ -331,11 +340,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   chipActive: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
   },
   chipText: { fontSize: 13, fontWeight: "700", color: colors.textSecondary },
   chipTextActive: { color: "#fff" },

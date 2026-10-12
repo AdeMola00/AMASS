@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,15 +7,17 @@ import {
   Pressable,
   Dimensions,
   Animated,
-  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../ui/icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { api } from "@/src/lib/api";
-import { colors, radius, spacing } from "@/src/constants/theme";
+import { radius, spacing } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { useToast } from "@/src/ui";
 
 const { height } = Dimensions.get("window");
 const SKIP_AFTER_MS = 3000;
@@ -38,6 +40,10 @@ export function AdModal({
   onClose: () => void;
   context?: string;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const toast = useToast();
+
   const router = useRouter();
   const [skipReady, setSkipReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -99,13 +105,11 @@ export function AdModal({
     try {
       await api.trackAd(ad.id, event, context);
     } catch {}
-    Alert.alert(
+    toast.success(
       event === "report" ? "Thanks for reporting" : "Got it",
-      event === "report"
-        ? "We'll review this ad within 24 hours."
-        : "You'll see fewer ads like this.",
-      [{ text: "OK", onPress: onClose }]
+      event === "report" ? "We'll review this ad within 24 hours." : "You'll see fewer ads like this."
     );
+    onClose();
   };
 
   return (
@@ -208,11 +212,14 @@ function MenuItem({
   onPress,
   tone,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   tone?: "red";
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const color = tone === "red" ? colors.red : colors.text;
   return (
     <Pressable style={styles.menuItem} onPress={onPress}>
@@ -222,7 +229,8 @@ function MenuItem({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.75)",
@@ -269,7 +277,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 60,
     right: 16,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     paddingVertical: 6,
     minWidth: 200,

@@ -1,29 +1,27 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  ScrollView,
-  ActivityIndicator,
-  FlatList,
-} from "react-native";
+import { View, StyleSheet, Pressable, TextInput, ScrollView, FlatList } from "react-native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter, Stack } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import Animated, { FadeIn } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 
 import { api, MarketplaceItem, SearchSuggestions } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
-import { colors, radius, spacing, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { fontFamilies, radii, space } from "@/src/theme/tokens";
+import { AppText, Chip, EmptyState, IconButton, Screen, SkeletonCard } from "@/src/ui";
+import type { IconName } from "@/src/ui";
 import { ClassifiedCard } from "@/src/components/marketplace/ClassifiedCard";
 
 const RECENTS_KEY = "amass_market_recents";
 
 export default function MarketSearch() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const inputRef = useRef<TextInput>(null);
 
   const [q, setQ] = useState("");
@@ -40,8 +38,7 @@ export default function MarketSearch() {
       if (Array.isArray(r)) setRecents(r);
       // fetch cold-start suggestions
       try {
-        const s = await api.marketplaceSuggestions("");
-        setSuggest(s);
+        setSuggest(await api.marketplaceSuggestions(""));
       } catch {}
     })();
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -51,8 +48,7 @@ export default function MarketSearch() {
     if (debRef.current) clearTimeout(debRef.current);
     debRef.current = setTimeout(async () => {
       try {
-        const s = await api.marketplaceSuggestions(query);
-        setSuggest(s);
+        setSuggest(await api.marketplaceSuggestions(query));
       } catch {}
     }, 220);
   }, []);
@@ -60,11 +56,7 @@ export default function MarketSearch() {
   const onChangeText = (t: string) => {
     setQ(t);
     setResults(null);
-    if (t.trim().length === 0) {
-      runSuggest("");
-    } else {
-      runSuggest(t);
-    }
+    runSuggest(t.trim().length === 0 ? "" : t);
   };
 
   const submitSearch = async (raw?: string) => {
@@ -95,12 +87,11 @@ export default function MarketSearch() {
   if (results) for (let i = 0; i < results.length; i += 2) gridRows.push(results.slice(i, i + 2));
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <Screen testID="market-search-screen">
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.searchHeader}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} testID="search-back">
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <View style={styles.searchBar}>
+        <IconButton icon="chevron-back" label="Go back" onPress={() => router.back()} testID="search-back" size={40} />
+        <View style={[styles.searchBar, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
           <Ionicons name="search" size={17} color={colors.textSecondary} />
           <TextInput
             ref={inputRef}
@@ -109,51 +100,58 @@ export default function MarketSearch() {
             onSubmitEditing={() => submitSearch()}
             placeholder="Search phones, cars, homes…"
             placeholderTextColor={colors.textMuted}
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             returnKeyType="search"
+            accessibilityLabel="Search the market"
             testID="search-input"
           />
-          {q.length > 0 && (
-            <Pressable onPress={() => { setQ(""); setResults(null); runSuggest(""); }} hitSlop={8}>
-              <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
+          {q.length > 0 ? (
+            <Pressable
+              onPress={() => {
+                setQ("");
+                setResults(null);
+                runSuggest("");
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
             </Pressable>
-          )}
+          ) : null}
         </View>
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.red} />
+        <View style={{ padding: space[4], gap: 12 }}>
+          <View style={styles.gridRow}>
+            <SkeletonCard imageHeight={140} style={{ flex: 1 }} />
+            <SkeletonCard imageHeight={140} style={{ flex: 1 }} />
+          </View>
+          <View style={styles.gridRow}>
+            <SkeletonCard imageHeight={140} style={{ flex: 1 }} />
+            <SkeletonCard imageHeight={140} style={{ flex: 1 }} />
+          </View>
         </View>
       ) : results !== null ? (
         results.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="search" size={30} color={colors.textMuted} />
-            </View>
-            <Text style={styles.emptyTitle}>No results for "{q}"</Text>
-            <Text style={styles.emptyBody}>Try a different spelling, category or brand.</Text>
-          </View>
+          <EmptyState icon="search-outline" title={`No results for “${q}”`} body="Try a different spelling, category or brand." actionLabel="Clear search" onAction={() => { setQ(""); setResults(null); runSuggest(""); }} testID="search-empty" />
         ) : (
           <FlatList
             data={gridRows}
             keyExtractor={(_, i) => `row-${i}`}
-            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 40, gap: 12, paddingTop: 12 }}
+            contentContainerStyle={{ paddingHorizontal: space[4], paddingBottom: 40 + insets.bottom, gap: 12, paddingTop: 8 }}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
-              <Text style={styles.resultsHead}>
+              <AppText variant="caption" tone="secondary" weight="semibold" tabular style={{ marginBottom: 2 }}>
                 {results.length} result{results.length === 1 ? "" : "s"}
-              </Text>
+              </AppText>
             }
             renderItem={({ item: row }) => (
               <View style={styles.gridRow}>
                 {row.map((it) => (
-                  <ClassifiedCard
-                    key={it.id}
-                    item={it}
-                    variant="grid"
-                    onPress={() => router.push(`/marketplace/${it.id}` as any)}
-                  />
+                  <ClassifiedCard key={it.id} item={it} variant="grid" onPress={() => router.push(`/marketplace/${it.id}` as any)} />
                 ))}
                 {row.length === 1 && <View style={{ flex: 1 }} />}
               </View>
@@ -161,171 +159,108 @@ export default function MarketSearch() {
           />
         )
       ) : (
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 + insets.bottom }} showsVerticalScrollIndicator={false}>
           {/* Item matches (from suggestions) */}
-          {suggest?.items && suggest.items.length > 0 && (
+          {suggest?.items && suggest.items.length > 0 ? (
             <Block title="Matches">
-              {suggest.items.map((it) => (
-                <Pressable
-                  key={it.id}
-                  style={styles.suggestItem}
-                  onPress={() => router.push(`/marketplace/${it.id}` as any)}
-                >
-                  <Image source={{ uri: it.image }} style={styles.suggestThumb} contentFit="cover" transition={150} />
-                  <View style={{ flex: 1 }}>
-                    <Text numberOfLines={2} style={styles.suggestTitle}>{it.name}</Text>
-                    <Text style={styles.suggestPrice}>{formatNaira(it.price)}{it.city ? ` · ${it.city}` : ""}</Text>
-                  </View>
-                  <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
-                </Pressable>
-              ))}
-            </Block>
-          )}
-
-          {/* Recent searches */}
-          {recents.length > 0 && q.length === 0 && (
-            <Block
-              title="Recent"
-              action={<Pressable onPress={clearRecents}><Text style={styles.linkText}>Clear</Text></Pressable>}
-            >
-              <View style={styles.chipsWrap}>
-                {recents.map((r) => (
-                  <SuggestChip key={r} label={r} icon="time-outline" onPress={() => submitSearch(r)} />
+              <View style={[styles.matchGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {suggest.items.map((it, i) => (
+                  <Pressable
+                    key={it.id}
+                    style={({ pressed }) => [
+                      styles.suggestItem,
+                      i < suggest.items.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+                      pressed && { backgroundColor: colors.surfaceAlt },
+                    ]}
+                    onPress={() => router.push(`/marketplace/${it.id}` as any)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${it.name}, ${formatNaira(it.price)}`}
+                  >
+                    <Image source={{ uri: it.image }} style={[styles.suggestThumb, { backgroundColor: colors.skeleton }]} contentFit="cover" transition={150} />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <AppText variant="bodySm" weight="medium" numberOfLines={2}>
+                        {it.name}
+                      </AppText>
+                      <AppText variant="caption" tone="tertiary" tabular>
+                        {formatNaira(it.price)}
+                        {it.city ? ` · ${it.city}` : ""}
+                      </AppText>
+                    </View>
+                    <Ionicons name="arrow-forward" size={16} color={colors.textMuted} />
+                  </Pressable>
                 ))}
               </View>
             </Block>
-          )}
+          ) : null}
 
-          {/* Trending */}
-          {suggest?.trending && suggest.trending.length > 0 && (
+          {recents.length > 0 && q.length === 0 ? (
+            <Block title="Recent" actionLabel="Clear" onAction={clearRecents}>
+              <ChipWrap items={recents} icon="time-outline" onPress={submitSearch} />
+            </Block>
+          ) : null}
+
+          {suggest?.trending && suggest.trending.length > 0 ? (
             <Block title="Trending">
-              <View style={styles.chipsWrap}>
-                {suggest.trending.map((t) => (
-                  <SuggestChip key={t} label={t} icon="trending-up" onPress={() => submitSearch(t)} />
-                ))}
-              </View>
+              <ChipWrap items={suggest.trending} icon="trending-up" onPress={submitSearch} />
             </Block>
-          )}
+          ) : null}
 
-          {/* Popular brands */}
-          {suggest?.brands && suggest.brands.length > 0 && (
+          {suggest?.brands && suggest.brands.length > 0 ? (
             <Block title="Popular brands">
-              <View style={styles.chipsWrap}>
-                {suggest.brands.map((b) => (
-                  <SuggestChip key={b} label={b} icon="ribbon-outline" onPress={() => submitSearch(b)} />
-                ))}
-              </View>
+              <ChipWrap items={suggest.brands} icon="ribbon-outline" onPress={submitSearch} />
             </Block>
-          )}
+          ) : null}
 
-          {/* Categories */}
-          {suggest?.categories && suggest.categories.length > 0 && (
+          {suggest?.categories && suggest.categories.length > 0 ? (
             <Block title="Browse categories">
-              <View style={styles.chipsWrap}>
-                {suggest.categories.map((c) => (
-                  <SuggestChip key={c} label={c} icon="apps-outline" onPress={() => submitSearch(c)} />
-                ))}
-              </View>
+              <ChipWrap items={suggest.categories} icon="apps-outline" onPress={submitSearch} />
             </Block>
-          )}
+          ) : null}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </Screen>
   );
 }
 
-function Block({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Block({ title, actionLabel, onAction, children }: { title: string; actionLabel?: string; onAction?: () => void; children: React.ReactNode }) {
   return (
-    <View style={styles.block}>
+    <Animated.View entering={FadeIn.duration(200)} style={styles.block}>
       <View style={styles.blockHead}>
-        <Text style={styles.blockTitle}>{title}</Text>
-        {action}
+        <AppText variant="label" tone="tertiary" uppercase>
+          {title}
+        </AppText>
+        {actionLabel && onAction ? (
+          <Pressable onPress={onAction} hitSlop={8} accessibilityRole="button">
+            <AppText variant="caption" weight="bold" tone="brand">
+              {actionLabel}
+            </AppText>
+          </Pressable>
+        ) : null}
       </View>
       {children}
+    </Animated.View>
+  );
+}
+
+function ChipWrap({ items, icon, onPress }: { items: string[]; icon: IconName; onPress: (v: string) => void }) {
+  return (
+    <View style={styles.chipsWrap}>
+      {items.map((label) => (
+        <Chip key={label} label={label} icon={icon} onPress={() => onPress(label)} />
+      ))}
     </View>
   );
 }
 
-function SuggestChip({ label, icon, onPress }: { label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={styles.chip}>
-      <Ionicons name={icon} size={13} color={colors.textSecondary} />
-      <Text style={styles.chipText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  searchHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 10,
-    paddingTop: 4,
-  },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.surfaceSecondary,
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    height: 44,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 14,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: colors.text, fontWeight: "500" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  block: { paddingHorizontal: spacing.lg, paddingTop: 14 },
-  blockHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  blockTitle: { fontSize: 12, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.6, textTransform: "uppercase" },
-  linkText: { fontSize: 12, fontWeight: "800", color: colors.red },
-
+  searchHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space[4], paddingVertical: space[2] },
+  searchBar: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, height: 46, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14 },
+  searchInput: { flex: 1, fontSize: 15, fontFamily: fontFamilies.medium, height: "100%", paddingVertical: 0 },
+  block: { paddingHorizontal: space[4], paddingTop: space[4] },
+  blockHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingHorizontal: 4 },
   chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    height: 34,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chipText: { fontSize: 12, fontWeight: "700", color: colors.text },
-
-  suggestItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  suggestThumb: { width: 46, height: 46, borderRadius: 8, backgroundColor: colors.surfaceSecondary },
-  suggestTitle: { fontSize: 13, fontWeight: "600", color: colors.text, lineHeight: 17 },
-  suggestPrice: { fontSize: 11, color: colors.textTertiary, fontWeight: "700", marginTop: 2 },
-
-  resultsHead: { fontSize: 13, fontWeight: "700", color: colors.textSecondary, marginBottom: 4 },
+  matchGroup: { borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  suggestItem: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 12, minHeight: 60 },
+  suggestThumb: { width: 46, height: 46, borderRadius: radii.xs },
   gridRow: { flexDirection: "row", gap: 12 },
-
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xxl, gap: 8 },
-  emptyIcon: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center", justifyContent: "center",
-  },
-  emptyTitle: { fontSize: 16, fontWeight: "800", color: colors.text, textAlign: "center" },
-  emptyBody: { fontSize: 13, color: colors.textTertiary, textAlign: "center", lineHeight: 18 },
 });

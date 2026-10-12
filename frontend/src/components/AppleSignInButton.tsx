@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   wrap: { position: "relative" },
   button: { width: "100%", height: 52 },
   busy: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.4)",

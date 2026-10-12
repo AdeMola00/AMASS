@@ -31,13 +31,17 @@ import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { PropertyTypeChip } from "@/src/components/PropertyTypeChip";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 type Review = Awaited<ReturnType<typeof api.adminCandidateReview>>;
 type Match = Review["matches"][number];
 type PendingAction = { action: "MERGE" | "MARK_RELATED" | "KEEP_SEPARATE"; target?: Match };
 
 export default function DuplicateReviewScreen() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const router = useRouter();
   const { user } = useAuth();
   const { candidate_id } = useLocalSearchParams<{ candidate_id: string }>();
@@ -475,6 +479,9 @@ export default function DuplicateReviewScreen() {
 }
 
 function Header({ title, onBack }: { title: string; onBack: () => void }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.header}>
       <Pressable style={styles.iconBtn} onPress={onBack} testID="btn-back">
@@ -487,6 +494,9 @@ function Header({ title, onBack }: { title: string; onBack: () => void }) {
 }
 
 function MetaChip({ icon, label }: { icon: any; label: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.metaChip}>
       <Ionicons name={icon} size={11} color={colors.textSecondary} />
@@ -496,6 +506,9 @@ function MetaChip({ icon, label }: { icon: any; label: string }) {
 }
 
 function LegendItem({ color, label }: { color: string; label: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.legendItem}>
       <View style={[styles.legendDot, { backgroundColor: color }]} />
@@ -504,7 +517,8 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: "row",
@@ -516,7 +530,7 @@ const styles = StyleSheet.create({
   },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-  card: { padding: 14, borderRadius: radius.md, backgroundColor: "#fff", gap: 8 },
+  card: { padding: 14, borderRadius: radius.md, backgroundColor: colors.surface, gap: 8 },
   banner: {
     flexDirection: "row",
     gap: 10,
@@ -601,7 +615,7 @@ const styles = StyleSheet.create({
   },
   reasonText: { fontSize: 10, fontWeight: "700", color: colors.text },
   mapWrap: { height: 220, backgroundColor: colors.surfaceSecondary },
-  mapLegend: { flexDirection: "row", padding: 10, gap: 14, backgroundColor: "#fff" },
+  mapLegend: { flexDirection: "row", padding: 10, gap: 14, backgroundColor: colors.surface },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontSize: 11, fontWeight: "700", color: colors.textSecondary },
@@ -628,8 +642,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   mergeBtn: { backgroundColor: colors.red },
-  relatedBtn: { backgroundColor: "#fff", borderWidth: 1.5, borderColor: colors.border },
-  viewBtn: { backgroundColor: "#fff", borderWidth: 1.5, borderColor: colors.border, flex: 0, width: 48 },
+  relatedBtn: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border },
+  viewBtn: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, flex: 0, width: 48 },
   actionBtnText: { color: "#fff", fontSize: 12, fontWeight: "800", letterSpacing: 0.3 },
   keepSeparateBtn: {
     flexDirection: "row",
@@ -638,7 +652,7 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 46,
     borderRadius: radius.pill,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.border,
     marginTop: 6,
@@ -649,7 +663,7 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12,
     borderRadius: radius.md,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     ...shadows.soft,
   },
   historyDot: {
@@ -679,7 +693,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     padding: spacing.xl,
     borderRadius: radius.lg,
     gap: 10,

@@ -1,26 +1,25 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  TextInput,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import * as Haptics from "expo-haptics";
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Button, Chip, EmptyState, Input, Screen, ScreenHeader, Sheet, Skeleton, useToast } from "@/src/ui";
 
 export default function FinanceApply() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors, shadows } = useTheme();
+  const toast = useToast();
   const { propertyId, inspection } = useLocalSearchParams<{ propertyId: string; inspection?: string }>();
   const [products, setProducts] = useState<any[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [productId, setProductId] = useState<string>("renovation_loan");
   const [bankId, setBankId] = useState<string>("access");
   const [amount, setAmount] = useState("");
@@ -28,17 +27,29 @@ export default function FinanceApply() {
   const [purpose, setPurpose] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
   useEffect(() => {
-    api.improveCatalog().then((c) => {
-      setProducts(c.finance_products);
-      setBanks(c.partner_banks);
-    });
+    api
+      .improveCatalog()
+      .then((c) => {
+        setProducts(c.finance_products);
+        setBanks(c.partner_banks);
+      })
+      .catch(() => toast.error("Couldn't load loan products", "Pull down to retry."))
+      .finally(() => setLoadingCatalog(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const amountNumber = Number(amount.replace(/,/g, "")) || 0;
+  const amountError = touched && !amountNumber ? "Enter the amount you'd like to borrow." : null;
+  const purposeError = touched && !purpose.trim() ? "Briefly describe how the funds will be used." : null;
+
   const submit = async () => {
-    if (!amount.trim() || !purpose.trim()) {
-      Alert.alert("Missing details", "Please enter loan amount and purpose.");
+    setTouched(true);
+    if (!amountNumber || !purpose.trim()) {
+      toast.error("Missing details", "Please enter the loan amount and purpose.");
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -49,290 +60,174 @@ export default function FinanceApply() {
         inspection_id: inspection as string | undefined,
         product_id: productId,
         partner_bank_id: bankId,
-        amount_requested_ngn: Number(amount.replace(/,/g, "")),
+        amount_requested_ngn: amountNumber,
         tenor_months: tenor,
         purpose: purpose.trim(),
         contact_phone: phone.trim() || undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        "Application submitted",
-        "AMASS will route your application to the partner bank and keep you updated.",
-        [{ text: "View", onPress: () => router.replace(`/improve/finance/${res.id}` as any) }]
-      );
+      setCreatedId(res.id);
     } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Please try again.");
+      toast.error("Couldn't submit application", e?.message ?? "Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const activeBank = banks.find((b) => b.id === bankId);
+  const activeProduct = products.find((p) => p.id === productId);
 
   return (
-    <View style={styles.container}>
+    <Screen testID="finance-apply">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Apply for Financing</Text>
-        <View style={{ width: 40 }} />
-      </SafeAreaView>
+      <ScreenHeader title="Apply for Financing" subtitle="Partner banks · AMASS facilitates" />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 160 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.notice}>
-          <Ionicons name="information-circle" size={14} color="#2563EB" />
-          <Text style={styles.noticeText}>
+      <KeyboardAwareScrollView contentContainerStyle={{ padding: space[4], gap: space[5], paddingBottom: 140 + insets.bottom }} keyboardShouldPersistTaps="handled" bottomOffset={120} showsVerticalScrollIndicator={false}>
+        <View style={[styles.notice, { backgroundColor: colors.infoSoft }]}>
+          <Ionicons name="information-circle" size={16} color={colors.info} />
+          <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
             AMASS is a facilitator. Partner banks make the final credit decision.
-          </Text>
+          </AppText>
         </View>
 
-        <SectionTitle>Loan product</SectionTitle>
-        <View style={{ paddingHorizontal: spacing.lg, gap: 8 }}>
-          {products.map((p) => {
-            const active = productId === p.id;
-            return (
-              <Pressable
-                key={p.id}
-                onPress={() => setProductId(p.id)}
-                style={[styles.optionCard, active && styles.optionCardActive]}
-                testID={`product-${p.id}`}
-              >
-                <View style={styles.optionRadio}>
-                  {active && <View style={styles.optionRadioDot} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.optionTitle}>{p.name}</Text>
-                  <Text style={styles.optionSub}>{p.description}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <SectionTitle>Partner bank</SectionTitle>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bankRow}>
-          {banks.map((b) => {
-            const active = bankId === b.id;
-            return (
-              <Pressable
-                key={b.id}
-                onPress={() => setBankId(b.id)}
-                style={[styles.bankChip, active && styles.bankChipActive]}
-                testID={`bank-${b.id}`}
-              >
-                <View style={[styles.bankLogo, active && { backgroundColor: "#fff" }]}>
-                  <Text style={[styles.bankLogoText, active && { color: colors.ink }]}>
-                    {b.name.slice(0, 2).toUpperCase()}
-                  </Text>
-                </View>
-                <Text style={[styles.bankName, active && { color: "#fff" }]}>{b.name}</Text>
-                <Text style={[styles.bankRate, active && { color: "rgba(255,255,255,0.8)" }]}>
-                  {b.rate_apr_range[0]}%–{b.rate_apr_range[1]}% APR
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        <SectionTitle>Loan amount (₦)</SectionTitle>
-        <TextInput
-          value={amount}
-          onChangeText={setAmount}
-          placeholder="e.g. 15,000,000"
-          placeholderTextColor={colors.textTertiary}
-          keyboardType="numeric"
-          style={styles.input}
-          testID="loan-amount"
-        />
-        {amount && (
-          <Text style={styles.amountHint}>
-            {formatNaira(Number(amount.replace(/,/g, "")) || 0)}
-          </Text>
-        )}
-
-        <SectionTitle>Tenor (months)</SectionTitle>
-        <View style={styles.tenorRow}>
-          {[12, 24, 36, 48].map((t) => {
-            const active = tenor === t;
-            const disabled = activeBank ? t > activeBank.max_tenor_months : false;
-            return (
-              <Pressable
-                key={t}
-                onPress={() => !disabled && setTenor(t)}
-                disabled={disabled}
-                style={[
-                  styles.tenorChip,
-                  active && styles.tenorChipActive,
-                  disabled && { opacity: 0.4 },
-                ]}
-              >
-                <Text style={[styles.tenorText, active && { color: "#fff" }]}>{t}m</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <SectionTitle>Purpose</SectionTitle>
-        <TextInput
-          value={purpose}
-          onChangeText={setPurpose}
-          placeholder="Briefly describe how the funds will be used"
-          placeholderTextColor={colors.textTertiary}
-          multiline
-          style={[styles.input, styles.inputMulti]}
-        />
-
-        <SectionTitle>Contact phone (optional)</SectionTitle>
-        <TextInput
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="+2348012345678"
-          placeholderTextColor={colors.textTertiary}
-          keyboardType="phone-pad"
-          style={styles.input}
-        />
-
-        {inspection && (
-          <View style={styles.attachRow}>
-            <Ionicons name="clipboard" size={14} color="#22C55E" />
-            <Text style={styles.attachText}>
-              Attached: inspection report — improves your approval chances.
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <Pressable
-          onPress={submit}
-          disabled={submitting}
-          style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
-          testID="submit-finance"
-        >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
+        <View style={{ gap: 10 }}>
+          <AppText variant="caption" tone="secondary" style={{ marginLeft: 2 }}>
+            Loan product
+          </AppText>
+          {loadingCatalog ? (
             <>
-              <Ionicons name="cash" size={16} color="#fff" />
-              <Text style={styles.submitText}>Submit Application</Text>
+              <Skeleton height={64} radius={radii.lg} />
+              <Skeleton height={64} radius={radii.lg} />
             </>
+          ) : (
+            products.map((p) => {
+              const active = productId === p.id;
+              return (
+                <Pressable
+                  key={p.id}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setProductId(p.id);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${p.name}: ${p.description}`}
+                  style={[styles.option, { backgroundColor: colors.surface, borderColor: active ? colors.primary : colors.border, borderWidth: active ? 2 : StyleSheet.hairlineWidth }, active && shadows.sm]}
+                  testID={`product-${p.id}`}
+                >
+                  <View style={[styles.radio, { borderColor: active ? colors.primary : colors.borderStrong, backgroundColor: active ? colors.primary : "transparent" }]}>
+                    {active ? <Ionicons name="checkmark" size={13} color={colors.onPrimary} /> : null}
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <AppText variant="bodyMedium">{p.name}</AppText>
+                    <AppText variant="caption" tone="tertiary">
+                      {p.description}
+                    </AppText>
+                  </View>
+                </Pressable>
+              );
+            })
           )}
-        </Pressable>
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <AppText variant="caption" tone="secondary" style={{ marginLeft: 2 }}>
+            Partner bank
+          </AppText>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {banks.map((b) => {
+              const active = bankId === b.id;
+              return (
+                <Pressable
+                  key={b.id}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setBankId(b.id);
+                    if (tenor > b.max_tenor_months) setTenor(b.max_tenor_months);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${b.name}, ${b.rate_apr_range[0]} to ${b.rate_apr_range[1]} percent APR`}
+                  style={[styles.bank, { backgroundColor: active ? colors.surfaceInverse : colors.surface, borderColor: active ? colors.surfaceInverse : colors.border }, active && shadows.sm]}
+                  testID={`bank-${b.id}`}
+                >
+                  <View style={[styles.bankLogo, { backgroundColor: active ? colors.surface : colors.surfaceInverse }]}>
+                    <AppText variant="micro" color={active ? colors.text : colors.textInverse}>
+                      {b.name.slice(0, 2).toUpperCase()}
+                    </AppText>
+                  </View>
+                  <AppText variant="bodyMedium" color={active ? colors.textInverse : colors.text} style={{ marginTop: 8 }} numberOfLines={1}>
+                    {b.name}
+                  </AppText>
+                  <AppText variant="micro" color={active ? "rgba(255,255,255,0.75)" : colors.textTertiary} tabular>
+                    {b.rate_apr_range[0]}%–{b.rate_apr_range[1]}% APR
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <Input label="Loan amount (₦)" value={amount} onChangeText={setAmount} placeholder="e.g. 15,000,000" keyboardType="numeric" iconLeft="cash-outline" helper={amountNumber ? `≈ ${formatNaira(amountNumber)}` : undefined} error={amountError} testID="loan-amount" />
+
+        <View style={{ gap: 10 }}>
+          <AppText variant="caption" tone="secondary" style={{ marginLeft: 2 }}>
+            Tenor
+          </AppText>
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            {[12, 24, 36, 48].map((t) => {
+              const disabled = activeBank ? t > activeBank.max_tenor_months : false;
+              return <Chip key={t} label={`${t} months`} selected={tenor === t} onPress={() => !disabled && setTenor(t)} style={disabled ? { opacity: 0.4 } : undefined} testID={`tenor-${t}`} />;
+            })}
+          </View>
+          {activeBank ? (
+            <AppText variant="caption" tone="tertiary">
+              {activeBank.name} offers up to {activeBank.max_tenor_months} months.
+            </AppText>
+          ) : null}
+        </View>
+
+        <Input label="Purpose" value={purpose} onChangeText={setPurpose} placeholder="Briefly describe how the funds will be used" multiline error={purposeError} testID="loan-purpose" />
+
+        <Input label="Contact phone (optional)" value={phone} onChangeText={setPhone} placeholder="+2348012345678" keyboardType="phone-pad" iconLeft="call-outline" testID="loan-phone" />
+
+        {inspection ? (
+          <View style={[styles.notice, { backgroundColor: colors.successSoft }]}>
+            <Ionicons name="clipboard" size={16} color={colors.success} />
+            <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
+              Inspection report attached — this improves your approval chances.
+            </AppText>
+          </View>
+        ) : null}
+      </KeyboardAwareScrollView>
+
+      <View style={[styles.footer, { backgroundColor: colors.bgElevated, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + 4 }, shadows.lg]}>
+        {amountNumber ? (
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <AppText variant="caption" tone="tertiary">
+              {activeProduct?.name ?? "Loan"} · {tenor} months{activeBank ? ` · ${activeBank.name}` : ""}
+            </AppText>
+            <AppText variant="title" tabular>
+              {formatNaira(amountNumber)}
+            </AppText>
+          </View>
+        ) : null}
+        <Button label="Submit application" size="lg" fullWidth iconLeft="cash" loading={submitting} onPress={submit} testID="submit-finance" />
       </View>
-    </View>
+
+      <Sheet visible={!!createdId} onClose={() => createdId && router.replace(`/improve/finance/${createdId}` as any)} testID="finance-success">
+        <EmptyState variant="success" compact title="Application submitted" body="AMASS will route your application to the partner bank and keep you updated." style={{ paddingBottom: 8 }} />
+        <Button label="View application" size="lg" fullWidth iconRight="arrow-forward" onPress={() => createdId && router.replace(`/improve/finance/${createdId}` as any)} testID="finance-success-view" />
+      </Sheet>
+    </Screen>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.sectionTitle}>{children}</Text>;
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.lg, paddingBottom: spacing.md,
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#fff",
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider,
-  },
-  iconBtn: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceSecondary,
-    alignItems: "center", justifyContent: "center",
-  },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
-
-  notice: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    marginHorizontal: spacing.lg, marginTop: spacing.md, padding: 10, borderRadius: radius.md,
-    backgroundColor: "rgba(37,99,235,0.08)",
-    borderWidth: 1, borderColor: "rgba(37,99,235,0.2)",
-  },
-  noticeText: { flex: 1, fontSize: 11, color: "#1E40AF", fontWeight: "700" },
-
-  sectionTitle: {
-    marginHorizontal: spacing.lg, marginTop: 20, marginBottom: 8,
-    fontSize: 12, fontWeight: "800", color: colors.text,
-    letterSpacing: 0.3, textTransform: "uppercase",
-  },
-
-  optionCard: {
-    flexDirection: "row", gap: 12, alignItems: "center",
-    padding: 14, borderRadius: radius.md,
-    borderWidth: 1.5, borderColor: colors.border,
-    backgroundColor: "#fff",
-  },
-  optionCardActive: { borderColor: colors.text, ...shadows.soft },
-  optionRadio: {
-    width: 20, height: 20, borderRadius: 10,
-    borderWidth: 2, borderColor: colors.border,
-    alignItems: "center", justifyContent: "center",
-  },
-  optionRadioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.text },
-  optionTitle: { fontSize: 14, fontWeight: "800", color: colors.text },
-  optionSub: { fontSize: 11, color: colors.textTertiary, marginTop: 3 },
-
-  bankRow: { gap: 8, paddingHorizontal: spacing.lg },
-  bankChip: {
-    padding: 12, minWidth: 140, borderRadius: radius.md,
-    borderWidth: 1.5, borderColor: colors.border,
-    backgroundColor: "#fff", gap: 4,
-  },
-  bankChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  bankLogo: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
-  },
-  bankLogoText: { color: "#fff", fontSize: 11, fontWeight: "900" },
-  bankName: { fontSize: 13, fontWeight: "800", color: colors.text, marginTop: 6 },
-  bankRate: { fontSize: 10, color: colors.textTertiary, fontWeight: "600" },
-
-  input: {
-    marginHorizontal: spacing.lg,
-    borderWidth: 1, borderColor: colors.border,
-    backgroundColor: "#fff", borderRadius: radius.md,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: colors.text,
-  },
-  inputMulti: { minHeight: 84, textAlignVertical: "top" },
-  amountHint: {
-    marginHorizontal: spacing.lg, marginTop: 6,
-    fontSize: 11, color: colors.textTertiary, fontWeight: "700",
-  },
-
-  tenorRow: {
-    flexDirection: "row", gap: 8,
-    paddingHorizontal: spacing.lg,
-  },
-  tenorChip: {
-    flex: 1, height: 42, borderRadius: 21,
-    borderWidth: 1, borderColor: colors.border,
-    backgroundColor: "#fff",
-    alignItems: "center", justifyContent: "center",
-  },
-  tenorChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  tenorText: { fontSize: 13, fontWeight: "800", color: colors.text },
-
-  attachRow: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    marginHorizontal: spacing.lg, marginTop: 16, padding: 10, borderRadius: radius.md,
-    backgroundColor: "rgba(34,197,94,0.08)",
-    borderWidth: 1, borderColor: "rgba(34,197,94,0.2)",
-  },
-  attachText: { flex: 1, fontSize: 11, color: "#15803D", fontWeight: "700" },
-
-  footer: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: 34,
-    backgroundColor: "#fff",
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
-  },
-  submitBtn: {
-    height: 54, borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center", justifyContent: "center",
-    flexDirection: "row", gap: 8,
-  },
-  submitText: { color: "#fff", fontSize: 15, fontWeight: "900", letterSpacing: 0.2 },
+  notice: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm },
+  option: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radii.lg, minHeight: 64 },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  bank: { padding: 12, minWidth: 148, borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, gap: 2 },
+  bankLogo: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  footer: { position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: space[4], paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
 });

@@ -8,16 +8,17 @@
  * The collapsed chip is always visible while browsing and shows the three
  * status colours inline; tapping it opens the full key.
  */
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, shadows } from "@/src/constants/theme";
+import { radius, shadows } from "@/src/constants/theme";
 import {
   STATUS_META,
   STATUS_LEGEND,
   LISTING_TYPE_META,
   LISTING_TYPE_LEGEND,
 } from "@/src/components/PropertyMarker";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export function MapLegend({
   style,
@@ -34,6 +35,9 @@ export function MapLegend({
   onToggleKind?: (k: any) => void;
   onClear?: () => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [open, setOpen] = useState(false);
   const interactive = !!(onToggleStatus || onToggleKind);
   const activeCount = (selectedStatuses?.size ?? 0) + (selectedKinds?.size ?? 0);
@@ -165,7 +169,8 @@ export function MapLegend({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -173,7 +178,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.divider,
   },
@@ -191,9 +196,9 @@ const styles = StyleSheet.create({
     maxWidth: 340,
     padding: 18,
     borderRadius: radius.lg,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     gap: 8,
-    ...shadows.medium,
+    ...shadows.card,
   },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
   title: { fontSize: 17, fontWeight: "900", color: colors.text },
@@ -220,7 +225,7 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2.5,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },

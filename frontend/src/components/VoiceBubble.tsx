@@ -6,11 +6,12 @@
  * the player instance stable across re-renders.
  */
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View, ActivityIndicator } from "react-native";
+import { Pressable, StyleSheet, View, ActivityIndicator } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { createAudioPlayer, type AudioPlayer } from "expo-audio";
 
-import { colors } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { AppText } from "@/src/ui/Text";
 
 type Props = {
   url: string;
@@ -31,7 +32,7 @@ export function VoiceBubble({ url, durationMs, mine }: Props) {
   const [posMs, setPosMs] = useState(0);
   const [totalMs, setTotalMs] = useState(durationMs ?? 0);
   const playerRef = useRef<AudioPlayer | null>(null);
-  const tickRef = useRef<NodeJS.Timeout | null>(null);
+  const tickRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (tickRef.current) clearInterval(tickRef.current);
@@ -89,29 +90,43 @@ export function VoiceBubble({ url, durationMs, mine }: Props) {
   const total = totalMs || durationMs || 1;
   const progress = Math.min(1, Math.max(0, posMs / total));
   const remaining = totalMs ? Math.max(0, totalMs - posMs) : (durationMs ?? 0);
+  const { colors, isDark } = useTheme();
+  const fg = mine ? colors.onPrimary : colors.text;
+  const accent = mine ? colors.onPrimary : colors.brand;
+  const muted = mine ? (isDark ? "rgba(10,10,10,0.55)" : "rgba(255,255,255,0.7)") : colors.textTertiary;
 
   return (
-    <View style={[styles.wrap, mine ? styles.wrapMine : styles.wrapTheirs]}>
-      <Pressable onPress={toggle} style={[styles.playBtn, mine && styles.playBtnMine]} hitSlop={6}>
+    <View
+      style={[
+        styles.wrap,
+        mine
+          ? [styles.wrapMine, { backgroundColor: colors.primary }]
+          : [styles.wrapTheirs, { backgroundColor: colors.surface, borderColor: colors.border }],
+      ]}
+      accessibilityLabel={`Voice note, ${_fmt(remaining)}`}
+    >
+      <Pressable
+        onPress={toggle}
+        style={[styles.playBtn, { backgroundColor: mine ? (isDark ? "rgba(10,10,10,0.1)" : "rgba(255,255,255,0.16)") : colors.brandSoft }]}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={playing ? "Pause voice note" : "Play voice note"}
+      >
         {loading ? (
-          <ActivityIndicator color={mine ? "#fff" : colors.red} size="small" />
+          <ActivityIndicator color={accent} size="small" />
         ) : (
-          <Ionicons
-            name={playing ? "pause" : "play"}
-            size={16}
-            color={mine ? "#fff" : colors.red}
-          />
+          <Ionicons name={playing ? "pause" : "play"} size={16} color={accent} />
         )}
       </Pressable>
-      <View style={{ flex: 1, gap: 4 }}>
-        <View style={styles.track}>
-          <View style={[styles.trackFill, mine ? styles.trackFillMine : null, { width: `${progress * 100}%` }]} />
+      <View style={{ flex: 1, gap: 5 }}>
+        <View style={[styles.track, { backgroundColor: mine ? (isDark ? "rgba(10,10,10,0.15)" : "rgba(255,255,255,0.25)") : colors.surfaceSunken }]}>
+          <View style={[styles.trackFill, { backgroundColor: accent, width: `${progress * 100}%` }]} />
         </View>
-        <Text style={[styles.dur, mine && { color: "rgba(255,255,255,0.85)" }]}>
+        <AppText variant="micro" color={muted} tabular>
           {playing ? _fmt(posMs) : _fmt(remaining)}
-        </Text>
+        </AppText>
       </View>
-      <Ionicons name="mic" size={12} color={mine ? "rgba(255,255,255,0.5)" : colors.textTertiary} />
+      <Ionicons name="mic" size={12} color={muted} />
     </View>
   );
 }
@@ -120,21 +135,14 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: "row", alignItems: "center", gap: 10,
     paddingHorizontal: 10, paddingVertical: 8,
-    borderRadius: 16, minWidth: 200, maxWidth: 260,
+    borderRadius: 18, minWidth: 200, maxWidth: 260,
   },
-  wrapMine: { backgroundColor: colors.ink, borderBottomRightRadius: 4 },
-  wrapTheirs: { backgroundColor: "#fff", borderBottomLeftRadius: 4 },
+  wrapMine: { borderBottomRightRadius: 6 },
+  wrapTheirs: { borderBottomLeftRadius: 6, borderWidth: StyleSheet.hairlineWidth },
   playBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: "rgba(225,29,72,0.12)",
+    width: 34, height: 34, borderRadius: 17,
     alignItems: "center", justifyContent: "center",
   },
-  playBtnMine: { backgroundColor: "rgba(255,255,255,0.15)" },
-  track: {
-    height: 3, borderRadius: 2, backgroundColor: colors.divider,
-    overflow: "hidden",
-  },
-  trackFill: { height: "100%", backgroundColor: colors.red },
-  trackFillMine: { backgroundColor: "#fff" },
-  dur: { fontSize: 10, fontWeight: "700", color: colors.textTertiary },
+  track: { height: 3, borderRadius: 2, overflow: "hidden" },
+  trackFill: { height: "100%" },
 });

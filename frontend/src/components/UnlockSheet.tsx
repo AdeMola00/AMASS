@@ -1,10 +1,12 @@
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+import { View, StyleSheet } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { colors, radius, spacing, formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Button } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 import { useWallet } from "@/src/contexts/wallet";
 
@@ -24,6 +26,7 @@ export const UnlockSheet = forwardRef<
 >(({ onSuccess }, ref) => {
   const sheetRef = useRef<BottomSheetModal>(null);
   const router = useRouter();
+  const { colors } = useTheme();
   const { wallet, accessProperty, revealAgent } = useWallet();
 
   const [propertyId, setPropertyId] = useState<string>("");
@@ -45,7 +48,7 @@ export const UnlockSheet = forwardRef<
     close: () => sheetRef.current?.dismiss(),
   }));
 
-  const snapPoints = useMemo(() => ["62%"], []);
+  const snapPoints = useMemo(() => ["66%"], []);
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -103,127 +106,124 @@ export const UnlockSheet = forwardRef<
     );
   };
 
+  const lines = isAgent
+    ? ["Agent's direct phone number", "Agent's email address"]
+    : ["Exact address & map pin", "All property photos", "Full specs, amenities & AI insights"];
+
   return (
     <BottomSheetModal
       ref={sheetRef}
       snapPoints={snapPoints}
       backdropComponent={renderBackdrop}
-      backgroundStyle={styles.sheetBg}
-      handleIndicatorStyle={styles.handle}
+      backgroundStyle={[styles.sheetBg, { backgroundColor: colors.bgElevated }]}
+      handleIndicatorStyle={{ backgroundColor: colors.borderStrong, width: 40 }}
       enableDynamicSizing={false}
     >
       <BottomSheetView style={styles.container}>
         <View style={styles.headerRow}>
-          <View style={styles.iconWrap}>
-            {isAgent ? (
-              <Ionicons name="call" size={30} color="#7A5B00" />
-            ) : (
-              <TokenIcon size={44} animated />
-            )}
+          <View style={[styles.iconWrap, { backgroundColor: colors.massSoft, borderColor: colors.mass }]}>
+            {isAgent ? <Ionicons name="call" size={30} color={colors.massText} /> : <TokenIcon size={44} animated />}
           </View>
         </View>
 
-        <Text style={styles.title}>
+        <AppText variant="h2" align="center">
           {isAgent ? "Reveal agent contact" : "Unlock property details"}
-        </Text>
-        <Text style={styles.subtitle} numberOfLines={2}>
+        </AppText>
+        <AppText variant="bodySm" tone="tertiary" align="center" numberOfLines={2} style={{ marginTop: 4, marginBottom: space[4] }}>
           {propertyTitle}
-        </Text>
+        </AppText>
 
-        <View style={styles.whatBlock}>
-          <Text style={styles.whatTitle}>
+        <View style={[styles.block, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+          <AppText variant="label" tone="secondary" uppercase>
             {isAgent ? "This reveals" : "This unlocks"}
-          </Text>
-          {(isAgent
-            ? ["Agent's direct phone number", "Agent's email address"]
-            : ["Exact address & map pin", "All property photos", "Full specs, amenities & AI insights"]
-          ).map((line) => (
-            <View key={line} style={styles.whatRow}>
-              <Ionicons name="checkmark-circle" size={15} color={colors.emerald} />
-              <Text style={styles.whatText}>{line}</Text>
+          </AppText>
+          {lines.map((line) => (
+            <View key={line} style={styles.row}>
+              <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+              <AppText variant="bodySm" weight="medium" style={{ flex: 1 }}>
+                {line}
+              </AppText>
             </View>
           ))}
         </View>
 
-        <View style={styles.costBlock}>
+        <View style={[styles.block, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, marginBottom: 0, gap: 10 }]}>
           <View style={styles.costRow}>
-            <Text style={styles.costLabel}>
+            <AppText variant="bodySm" tone="secondary" weight="medium">
               {isAgent ? "Agent contact fee" : "Access fee"}
-            </Text>
-            <View style={styles.costPill}>
+            </AppText>
+            <View style={[styles.costPill, { backgroundColor: colors.massSoft, borderColor: colors.mass }]}>
               <TokenIcon size={16} />
-              <Text style={styles.costPillText}>{tokenCost} MASS</Text>
+              <AppText variant="caption" weight="bold" color={colors.massText} tabular>
+                {tokenCost} MASS
+              </AppText>
             </View>
           </View>
           <View style={styles.costRow}>
-            <Text style={styles.costLabel}>You currently have</Text>
-            <View style={[styles.costPill, { backgroundColor: colors.surfaceSecondary }]}>
+            <AppText variant="bodySm" tone="secondary" weight="medium">
+              You currently have
+            </AppText>
+            <View style={[styles.costPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <TokenIcon size={16} />
-              <Text style={[styles.costPillText, { color: colors.text }]}>
+              <AppText variant="caption" weight="bold" tabular>
                 {balance} MASS
-              </Text>
+              </AppText>
             </View>
+          </View>
+          <View style={[styles.costRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 10 }]}>
+            <AppText variant="bodySm" weight="bold">
+              Balance after
+            </AppText>
+            <AppText variant="bodyMedium" weight="bold" color={canAfford ? colors.text : colors.error} tabular testID="unlock-balance-after">
+              {Math.max(0, balance - tokenCost)} MASS
+            </AppText>
           </View>
         </View>
 
         {!canAfford && (
-          <View style={styles.shortfallCard}>
-            <Ionicons name="alert-circle" size={16} color={colors.red} />
-            <Text style={styles.shortfallText}>
+          <View style={[styles.shortfallCard, { backgroundColor: colors.errorSoft }]} accessibilityRole="alert">
+            <Ionicons name="alert-circle" size={16} color={colors.error} />
+            <AppText variant="caption" style={{ flex: 1 }}>
               You need{" "}
-              <Text style={styles.shortfallBold}>{shortfall} more MASS</Text> to continue.
-            </Text>
+              <AppText variant="caption" weight="bold" tone="error">
+                {shortfall} more MASS
+              </AppText>{" "}
+              to continue.
+            </AppText>
           </View>
         )}
 
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && (
+          <AppText variant="caption" tone="error" style={{ marginTop: 8 }} accessibilityRole="alert">
+            {error}
+          </AppText>
+        )}
 
         <View style={styles.actions}>
           {canAfford ? (
-            <Pressable
-              style={[styles.primaryBtn, processing && { opacity: 0.7 }]}
+            <Button
+              label={isAgent ? `Reveal for ${tokenCost} MASS` : `Unlock for ${tokenCost} MASS`}
+              variant="brand"
+              size="lg"
+              fullWidth
+              loading={processing}
               onPress={handleUnlock}
-              disabled={processing}
               testID="unlock-confirm-btn"
-            >
-              {processing ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <TokenIcon size={18} tone="white" />
-                  <Text style={styles.primaryText}>
-                    {isAgent ? `Reveal for ${tokenCost} MASS` : `Unlock for ${tokenCost} MASS`}
-                  </Text>
-                </>
-              )}
-            </Pressable>
+            />
           ) : (
-            <Pressable
-              style={styles.primaryBtn}
-              onPress={gotoTopUp}
-              testID="buy-tokens-cta"
-            >
-              <Ionicons name="add-circle" size={18} color="#fff" />
-              <Text style={styles.primaryText}>Top up & continue</Text>
-            </Pressable>
+            <Button label="Top up & continue" variant="brand" size="lg" fullWidth iconLeft="add-circle" onPress={gotoTopUp} testID="buy-tokens-cta" />
           )}
           <View style={styles.secondaryRow}>
-            <Pressable style={styles.secondaryBtn} onPress={() => goto("/subscribe")}>
-              <Ionicons name="star" size={14} color={colors.text} />
-              <Text style={styles.secondaryText}>Subscribe</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryBtn} onPress={() => goto("/wallet")}>
-              <Ionicons name="wallet-outline" size={14} color={colors.text} />
-              <Text style={styles.secondaryText}>Earn MASS</Text>
-            </Pressable>
+            <Button label="Subscribe" variant="outline" size="sm" iconLeft="star" onPress={() => goto("/subscribe")} style={{ flex: 1 }} />
+            <Button label="Earn MASS" variant="outline" size="sm" iconLeft="wallet-outline" onPress={() => goto("/wallet")} style={{ flex: 1 }} />
           </View>
         </View>
 
-        <Text style={styles.footnote}>
+        <AppText variant="micro" tone="tertiary" align="center" style={{ marginTop: space[3] }}>
           {isAgent
             ? "You're only charged if the contact is delivered — otherwise your MASS is refunded automatically."
             : "Pay once — this property stays unlocked in your library."}
-        </Text>
+        </AppText>
       </BottomSheetView>
     </BottomSheetModal>
   );
@@ -232,106 +232,43 @@ export const UnlockSheet = forwardRef<
 UnlockSheet.displayName = "UnlockSheet";
 
 const styles = StyleSheet.create({
-  sheetBg: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28 },
-  handle: { backgroundColor: colors.borderStrong, width: 40 },
-  container: { flex: 1, padding: spacing.xl },
-  headerRow: { alignItems: "center", marginBottom: spacing.md },
+  sheetBg: { borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+  container: { flex: 1, padding: space[5] },
+  headerRow: { alignItems: "center", marginBottom: space[3] },
   iconWrap: {
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: "#FFF7DB",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#F5B301",
   },
-  title: { fontSize: 22, fontWeight: "800", color: colors.text, textAlign: "center", letterSpacing: -0.5 },
-  subtitle: {
-    fontSize: 13,
-    color: colors.textTertiary,
-    textAlign: "center",
-    marginTop: 4,
-    marginBottom: spacing.lg,
-  },
-  costBlock: {
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "#FAFAFA",
-    gap: 10,
-  },
-  whatBlock: {
-    borderRadius: radius.md,
-    padding: spacing.md,
-    backgroundColor: "#FAFAFA",
-    borderWidth: 1,
-    borderColor: colors.border,
+  block: {
+    borderRadius: radii.md,
+    padding: space[3],
+    borderWidth: StyleSheet.hairlineWidth,
     gap: 8,
-    marginBottom: spacing.md,
+    marginBottom: space[3],
   },
-  whatTitle: { fontSize: 12, fontWeight: "800", color: colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.4 },
-  whatRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  whatText: { flex: 1, fontSize: 13, color: colors.text, fontWeight: "600" },
+  row: { flexDirection: "row", alignItems: "center", gap: 8 },
   costRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  costLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: "600" },
   costPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#FFF7DB",
+    borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: "#F5B301",
   },
-  costPillText: { fontSize: 13, fontWeight: "800", color: "#7A5B00" },
   shortfallCard: {
     flexDirection: "row",
     gap: 8,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: "#FFF1F2",
-    borderWidth: 1,
-    borderColor: "#FECDD3",
-    marginTop: spacing.md,
+    padding: space[3],
+    borderRadius: radii.md,
+    marginTop: space[3],
     alignItems: "flex-start",
   },
-  shortfallText: { flex: 1, fontSize: 12, color: colors.text, lineHeight: 17 },
-  shortfallBold: { fontWeight: "800", color: colors.red },
-  error: { color: colors.red, fontSize: 12, marginTop: 8 },
-  actions: { marginTop: spacing.lg, gap: 10 },
-  primaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 54,
-    borderRadius: radius.pill,
-    backgroundColor: colors.red,
-  },
-  primaryText: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
+  actions: { marginTop: space[4], gap: 10 },
   secondaryRow: { flexDirection: "row", gap: 10 },
-  secondaryBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    height: 46,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "#fff",
-  },
-  secondaryText: { fontSize: 13, fontWeight: "800", color: colors.text },
-  footnote: {
-    fontSize: 11,
-    color: colors.textTertiary,
-    textAlign: "center",
-    marginTop: spacing.md,
-    lineHeight: 15,
-  },
 });

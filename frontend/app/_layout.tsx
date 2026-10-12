@@ -17,6 +17,9 @@ import "@/src/lib/global-font";
 import { AuthProvider } from "@/src/contexts/auth";
 import { CartProvider } from "@/src/contexts/cart";
 import { WalletProvider } from "@/src/contexts/wallet";
+import { ThemeProvider, useTheme } from "@/src/theme";
+import { ToastProvider } from "@/src/ui/Toast";
+import { OfflineBanner } from "@/src/ui/OfflineBanner";
 
 LogBox.ignoreAllLogs(true);
 SplashScreen.preventAutoHideAsync();
@@ -117,24 +120,38 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <KeyboardProvider>
-          <BottomSheetModalProvider>
-            <AuthProvider>
-              <WalletProvider>
-                <CartProvider>
-                  <StatusBar barStyle="dark-content" />
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: "#FFFFFF" },
-                      animation: "fade",
-                    }}
-                  />
-                </CartProvider>
-              </WalletProvider>
-            </AuthProvider>
-          </BottomSheetModalProvider>
+          <ThemeProvider>
+            <BottomSheetModalProvider>
+              <AuthProvider>
+                <WalletProvider>
+                  <CartProvider>
+                    <ToastProvider>
+                      <ThemedStack />
+                    </ToastProvider>
+                  </CartProvider>
+                </WalletProvider>
+              </AuthProvider>
+            </BottomSheetModalProvider>
+          </ThemeProvider>
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+function ThemedStack() {
+  const { colors, isDark } = useTheme();
+  return (
+    <>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.bg} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+          animation: "fade",
+        }}
+      />
+      <OfflineBanner />
+    </>
   );
 }

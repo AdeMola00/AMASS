@@ -1,56 +1,61 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter, Stack } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { api, SubscriptionPlan } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, EmptyState, Screen, ScreenHeader, Sheet, Skeleton, useToast } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 export default function SubscribeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors, shadows } = useTheme();
+  const toast = useToast();
   const { wallet, subscribe, refresh } = useWallet();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [done, setDone] = useState<{ name: string; credited: number } | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const list = await api.listPlans();
+      setPlans(list);
+      // Pre-select "professional" as the sweet spot
+      const pro = list.find((p) => p.id === "professional");
+      setSelected(pro?.id ?? list[0]?.id ?? null);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    api
-      .listPlans()
-      .then((list) => {
-        setPlans(list);
-        // Pre-select "professional" as the sweet spot
-        const pro = list.find((p) => p.id === "professional");
-        if (pro) setSelected(pro.id);
-        else if (list[0]) setSelected(list[0].id);
-      })
-      .finally(() => setLoading(false));
+    load();
   }, []);
 
   const currentSub = wallet?.subscription;
   const activePlanId = currentSub?.plan_id;
+  const plan = plans.find((p) => p.id === selected);
 
   const handleSubscribe = async () => {
-    if (!selected) return;
-    const plan = plans.find((p) => p.id === selected);
     if (!plan) return;
     if (plan.id === "enterprise") {
-      Alert.alert(
-        "Enterprise Plan",
-        "Our team will get in touch to build a custom package for you.",
-        [{ text: "OK" }]
-      );
+      toast.info("Enterprise plan", "Our team will get in touch to build a custom package for you.");
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -58,287 +63,187 @@ export default function SubscribeScreen() {
     try {
       const res = await subscribe(plan.id);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        "Subscribed!",
-        `Welcome to ${plan.name}. ${res.credited} tokens credited to your wallet.`,
-        [{ text: "Great!", onPress: () => router.replace("/wallet") }]
-      );
+      setDone({ name: plan.name, credited: res.credited });
     } catch (e: any) {
-      Alert.alert("Subscription failed", e?.message ?? "Please try again.");
+      toast.error("Subscription failed", e?.message ?? "Please try again.");
     } finally {
       setProcessing(false);
     }
   };
 
   const cancel = async () => {
-    Alert.alert(
-      "Cancel subscription?",
-      "You'll keep your remaining tokens but won't be charged next month.",
-      [
-        { text: "Keep it", style: "cancel" },
-        {
-          text: "Cancel",
-          style: "destructive",
-          onPress: async () => {
-            await api.cancelSubscription();
-            await refresh();
-          },
-        },
-      ]
-    );
+    setCancelling(true);
+    try {
+      await api.cancelTokenSubscription();
+      await refresh();
+      setConfirmCancel(false);
+      toast.success("Subscription cancelled", "You keep your remaining tokens.");
+    } catch (e: any) {
+      toast.error("Couldn't cancel", e?.message ?? "Please try again.");
+    } finally {
+      setCancelling(false);
+    }
   };
 
+  const ctaHeight = 120 + insets.bottom;
+
   return (
-    <View style={styles.container}>
+    <Screen testID="subscribe-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>AMASS Premium</Text>
-        <View style={{ width: 40 }} />
-      </SafeAreaView>
+      <ScreenHeader title="AMASS Premium" />
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.red} />
+        <View style={{ padding: space[4], gap: 12 }}>
+          <Skeleton height={120} radius={radii.xl} />
+          <Skeleton height={190} radius={radii.lg} />
+          <Skeleton height={190} radius={radii.lg} />
         </View>
+      ) : error ? (
+        <EmptyState variant="error" title="Couldn't load plans" body="Check your connection and try again." actionLabel="Retry" onAction={load} />
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 200 }}>
-          <View style={styles.hero}>
-            <TokenIcon size={72} animated />
-            <Text style={styles.heroTitle}>Unlock more with less</Text>
-            <Text style={styles.heroBody}>
-              Get monthly tokens delivered automatically. Unused tokens roll over for 90 days.
-              Cancel anytime.
-            </Text>
-          </View>
+        <ScrollView contentContainerStyle={{ paddingBottom: ctaHeight + 40 }} showsVerticalScrollIndicator={false}>
+          <Animated.View entering={FadeInDown.duration(260)} style={styles.hero}>
+            <TokenIcon size={64} animated />
+            <AppText variant="h1" align="center" style={{ marginTop: 8 }}>
+              Unlock more with less
+            </AppText>
+            <AppText variant="bodySm" tone="secondary" align="center" style={{ maxWidth: 320 }}>
+              Monthly MASS delivered automatically. Unused tokens roll over for 90 days. Cancel anytime.
+            </AppText>
+          </Animated.View>
 
-          <View style={styles.plans}>
+          <View style={{ padding: space[4], gap: 12 }}>
             {plans.map((p, i) => {
               const isSelected = selected === p.id;
               const isActive = activePlanId === p.id;
               const isPopular = p.id === "professional";
               const isEnterprise = p.id === "enterprise";
+              const border = isSelected ? colors.primary : isActive ? colors.success : isPopular ? colors.premium : colors.border;
               return (
-                <Pressable
-                  key={p.id}
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setSelected(p.id);
-                  }}
-                  style={[
-                    styles.planCard,
-                    isSelected && styles.planCardSelected,
-                    isPopular && styles.planCardPopular,
-                    isActive && styles.planCardActive,
-                  ]}
-                  testID={`plan-${p.id}`}
-                >
-                  {isPopular && !isActive && (
-                    <View style={styles.popularBadge}>
-                      <Ionicons name="star" size={10} color="#fff" />
-                      <Text style={styles.popularText}>MOST POPULAR</Text>
-                    </View>
-                  )}
-                  {isActive && (
-                    <View style={[styles.popularBadge, { backgroundColor: "#059669" }]}>
-                      <Ionicons name="checkmark" size={10} color="#fff" />
-                      <Text style={styles.popularText}>YOUR PLAN</Text>
-                    </View>
-                  )}
-                  <View style={styles.planTop}>
-                    <View>
-                      <Text style={styles.planName}>{p.name}</Text>
-                      {!isEnterprise ? (
-                        <View style={styles.priceRow}>
-                          <Text style={styles.planPrice}>{formatNaira(p.price_ngn)}</Text>
-                          <Text style={styles.planMonth}>/ month</Text>
+                <Animated.View key={p.id} entering={FadeInDown.delay(60 + i * 50).duration(240)}>
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setSelected(p.id);
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={`${p.name} plan${isEnterprise ? "" : `, ${formatNaira(p.price_ngn)} per month`}`}
+                    testID={`plan-${p.id}`}
+                    style={({ pressed }) => [
+                      styles.plan,
+                      { backgroundColor: isActive ? colors.successSoft : colors.surface, borderColor: border, borderWidth: isSelected ? 2 : 1 },
+                      isSelected && shadows.md,
+                      pressed && { opacity: 0.94 },
+                    ]}
+                  >
+                    {(isPopular && !isActive) || isActive ? (
+                      <View style={styles.badgeWrap}>
+                        <Badge label={isActive ? "Your plan" : "Most popular"} tone={isActive ? "success" : "premium"} icon={isActive ? "checkmark" : "star"} />
+                      </View>
+                    ) : null}
+                    <View style={styles.planTop}>
+                      <View style={{ flex: 1 }}>
+                        <AppText variant="h3">{p.name}</AppText>
+                        {!isEnterprise ? (
+                          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4, marginTop: 4 }}>
+                            <AppText variant="h1" tabular>
+                              {formatNaira(p.price_ngn)}
+                            </AppText>
+                            <AppText variant="caption" tone="tertiary" style={{ marginBottom: 5 }}>
+                              / month
+                            </AppText>
+                          </View>
+                        ) : (
+                          <AppText variant="h1" style={{ marginTop: 4 }}>
+                            Custom
+                          </AppText>
+                        )}
+                      </View>
+                      <View style={styles.rightCol}>
+                        {!isEnterprise ? (
+                          <View style={[styles.tokenPill, { backgroundColor: colors.massSoft }]}>
+                            <TokenIcon size={14} />
+                            <AppText variant="caption" weight="bold" color={colors.massText} tabular>
+                              {p.monthly_tokens.toLocaleString()} / mo
+                            </AppText>
+                          </View>
+                        ) : null}
+                        <View
+                          style={[
+                            styles.radio,
+                            { borderColor: isSelected ? colors.primary : colors.borderStrong, backgroundColor: isSelected ? colors.primary : "transparent" },
+                          ]}
+                        >
+                          {isSelected ? <Ionicons name="checkmark" size={13} color={colors.onPrimary} /> : null}
                         </View>
-                      ) : (
-                        <Text style={styles.planPrice}>Custom</Text>
-                      )}
+                      </View>
                     </View>
-                    {!isEnterprise && (
-                      <View style={styles.tokenPill}>
-                        <TokenIcon size={16} />
-                        <Text style={styles.tokenPillText}>
-                          {p.monthly_tokens.toLocaleString()}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.perks}>
-                    {p.perks.map((perk) => (
-                      <View key={perk} style={styles.perk}>
-                        <Ionicons name="checkmark-circle" size={16} color={colors.text} />
-                        <Text style={styles.perkText}>{perk}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </Pressable>
+                    <View style={{ gap: 8 }}>
+                      {p.perks.map((perk) => (
+                        <View key={perk} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                          <AppText variant="bodySm" tone="secondary" style={{ flex: 1 }}>
+                            {perk}
+                          </AppText>
+                        </View>
+                      ))}
+                    </View>
+                  </Pressable>
+                </Animated.View>
               );
             })}
-          </View>
 
-          {currentSub && currentSub.plan_id && (
-            <Pressable onPress={cancel} style={styles.cancelBtn}>
-              <Text style={styles.cancelText}>Cancel subscription</Text>
-            </Pressable>
-          )}
+            {currentSub?.plan_id ? (
+              <Button label="Cancel subscription" variant="ghost" size="md" onPress={() => setConfirmCancel(true)} testID="cancel-subscription-btn" style={{ alignSelf: "center" }} />
+            ) : null}
+          </View>
         </ScrollView>
       )}
 
-      {selected && (
-        <View style={styles.stickyCta}>
-          <Pressable
-            style={[styles.stickyBtn, processing && { opacity: 0.6 }]}
+      {plan && !loading && !error ? (
+        <View style={[styles.sticky, { backgroundColor: colors.bgElevated, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + 4 }, shadows.lg]}>
+          <Button
+            label={plan.id === "enterprise" ? "Contact sales" : activePlanId === plan.id ? "Current plan" : `Subscribe to ${plan.name}`}
+            size="lg"
+            fullWidth
+            iconLeft={plan.id === "enterprise" ? "chatbubbles" : "star"}
+            loading={processing}
+            disabled={activePlanId === plan.id}
             onPress={handleSubscribe}
-            disabled={processing}
             testID="confirm-subscribe-btn"
-          >
-            {processing ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="star" size={16} color="#fff" />
-                <Text style={styles.stickyBtnText}>
-                  {selected === "enterprise"
-                    ? "Contact Sales"
-                    : `Subscribe to ${plans.find((p) => p.id === selected)?.name}`}
-                </Text>
-              </>
-            )}
-          </Pressable>
-          <Text style={styles.legal}>
-            Cancel anytime. Payment via Paystack or Flutterwave. (Test mode)
-          </Text>
+          />
+          <AppText variant="caption" tone="tertiary" align="center">
+            Cancel anytime · Paystack or Flutterwave · Test mode
+          </AppText>
         </View>
-      )}
-    </View>
+      ) : null}
+
+      <Sheet visible={confirmCancel} onClose={() => setConfirmCancel(false)} title="Cancel subscription?" testID="cancel-subscription-sheet">
+        <AppText variant="body" tone="secondary">
+          You&apos;ll keep your remaining tokens but won&apos;t be charged next month.
+        </AppText>
+        <View style={{ gap: 8, marginTop: 20 }}>
+          <Button label="Yes, cancel" variant="destructive" size="lg" fullWidth loading={cancelling} onPress={cancel} testID="cancel-subscription-confirm" />
+          <Button label="Keep it" variant="ghost" fullWidth onPress={() => setConfirmCancel(false)} />
+        </View>
+      </Sheet>
+
+      <Sheet visible={!!done} onClose={() => router.replace("/wallet")} testID="subscribe-success">
+        <EmptyState variant="success" compact title={`Welcome to ${done?.name ?? ""}`} body={`${done?.credited ?? 0} MASS credited to your wallet.`} style={{ paddingBottom: 8 }} />
+        <Button label="Go to wallet" size="lg" fullWidth iconRight="arrow-forward" onPress={() => router.replace("/wallet")} />
+      </Sheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  hero: {
-    alignItems: "center",
-    padding: spacing.xl,
-    gap: 10,
-  },
-  heroTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: colors.text,
-    letterSpacing: -0.5,
-    textAlign: "center",
-  },
-  heroBody: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 19,
-    paddingHorizontal: spacing.md,
-  },
-  plans: { padding: spacing.lg, gap: 12 },
-  planCard: {
-    padding: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    gap: 12,
-    position: "relative",
-  },
-  planCardSelected: {
-    borderColor: colors.red,
-    borderWidth: 2,
-    ...shadows.card,
-  },
-  planCardPopular: { borderColor: "#8B5CF6" },
-  planCardActive: { borderColor: "#059669", backgroundColor: "#F0FDF4" },
-  popularBadge: {
-    position: "absolute",
-    top: -10,
-    left: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "#8B5CF6",
-    zIndex: 5,
-  },
-  popularText: { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
-  planTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  planName: { fontSize: 20, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
-  priceRow: { flexDirection: "row", alignItems: "flex-end", gap: 4, marginTop: 4 },
-  planPrice: { fontSize: 28, fontWeight: "900", color: colors.text, letterSpacing: -1 },
-  planMonth: { fontSize: 12, color: colors.textTertiary, fontWeight: "600", marginBottom: 6 },
-  tokenPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#FFF7DB",
-    borderWidth: 1,
-    borderColor: "#F5B301",
-  },
-  tokenPillText: { fontSize: 13, fontWeight: "800", color: "#7A5B00" },
-  perks: { gap: 8 },
-  perk: { flexDirection: "row", alignItems: "center", gap: 8 },
-  perkText: { fontSize: 13, color: colors.textSecondary, fontWeight: "600" },
-  cancelBtn: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    padding: spacing.md,
-    alignItems: "center",
-  },
-  cancelText: { color: colors.red, fontSize: 13, fontWeight: "700" },
-  stickyCta: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.lg,
-    paddingBottom: 34,
-    backgroundColor: "#fff",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    gap: 8,
-  },
-  stickyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 54,
-    borderRadius: radius.pill,
-    backgroundColor: colors.red,
-  },
-  stickyBtnText: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
-  legal: { fontSize: 11, color: colors.textTertiary, textAlign: "center" },
+  hero: { alignItems: "center", paddingHorizontal: space[6], paddingTop: space[4], gap: 8 },
+  plan: { padding: space[5], borderRadius: radii.xl, gap: 14 },
+  badgeWrap: { position: "absolute", top: -11, left: 18, zIndex: 5 },
+  planTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  rightCol: { alignItems: "flex-end", gap: 10 },
+  tokenPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 28, borderRadius: radii.pill },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  sticky: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space[4], paddingTop: 12, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
 });

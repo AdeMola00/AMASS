@@ -1,47 +1,24 @@
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  Modal,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, Pressable, RefreshControl, KeyboardAvoidingView, Platform, Modal } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter, Stack } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Card, Chip, EmptyState, IconButton, Input, Screen, ScreenHeader, SkeletonRows, useToast, type BadgeTone, type IconName } from "@/src/ui";
 
-const STATUS_META: Record<
-  string,
-  { label: string; colour: string; bg: string; icon: any }
-> = {
-  new: { label: "New", colour: "#0369A1", bg: "#E0F2FE", icon: "sparkles" },
-  contacted: { label: "Contacted", colour: "#7C3AED", bg: "#EDE9FE", icon: "call" },
-  inspection_scheduled: {
-    label: "Inspection",
-    colour: "#F59E0B",
-    bg: "#FEF3C7",
-    icon: "calendar",
-  },
-  negotiating: {
-    label: "Negotiating",
-    colour: "#DB2777",
-    bg: "#FCE7F3",
-    icon: "chatbubbles",
-  },
-  won: { label: "Won", colour: "#059669", bg: "#D1FAE5", icon: "trophy" },
-  lost: { label: "Lost", colour: "#71717A", bg: "#F4F4F5", icon: "close-circle" },
+const STATUS_META: Record<string, { label: string; tone: BadgeTone; icon: IconName }> = {
+  new: { label: "New", tone: "info", icon: "sparkles" },
+  contacted: { label: "Contacted", tone: "premium", icon: "call" },
+  inspection_scheduled: { label: "Inspection", tone: "mass", icon: "calendar" },
+  negotiating: { label: "Negotiating", tone: "brand", icon: "chatbubbles" },
+  won: { label: "Won", tone: "success", icon: "trophy" },
+  lost: { label: "Lost", tone: "neutral", icon: "close-circle" },
 };
 
 const FILTERS: { id: string | undefined; label: string }[] = [
@@ -75,43 +52,44 @@ type Lead = {
 export default function CRMScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const toast = useToast();
   const [filter, setFilter] = useState<string | undefined>("open");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Lead | null>(null);
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    setError(false);
     try {
       const list = await api.crmListLeads(filter);
       setLeads(list as Lead[]);
-    } catch (e: any) {
-      Alert.alert("Could not load leads", e?.message ?? "Try again");
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [filter]);
 
   useEffect(() => {
+    setLoading(true);
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, [load]);
 
   const setLeadStatus = async (lead: Lead, status: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
       await api.crmUpdateLead(lead.id, { status });
-      setSelected((prev) =>
-        prev && prev.id === lead.id ? { ...prev, status, crm_status: status } : prev
-      );
-      setLeads((prev) =>
-        prev.map((l) => (l.id === lead.id ? { ...l, status, crm_status: status } : l))
-      );
+      setSelected((prev) => (prev && prev.id === lead.id ? { ...prev, status, crm_status: status } : prev));
+      setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, status, crm_status: status } : l)));
+      toast.success(`Marked as ${STATUS_META[status]?.label ?? status}`);
     } catch (e: any) {
-      Alert.alert("Could not update status", e?.message ?? "Try again");
+      toast.error("Couldn't update status", e?.message ?? "Try again");
     }
   };
 
@@ -120,62 +98,36 @@ export default function CRMScreen() {
     setSavingNote(true);
     try {
       const res = await api.crmAddNote(selected.id, noteText.trim());
-      setSelected((prev) =>
-        prev
-          ? {
-              ...prev,
-              crm_notes: [...(prev.crm_notes || []), res.note],
-              last_contact_at: res.note.created_at,
-            }
-          : prev
-      );
+      setSelected((prev) => (prev ? { ...prev, crm_notes: [...(prev.crm_notes || []), res.note], last_contact_at: res.note.created_at } : prev));
       setNoteText("");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e: any) {
-      Alert.alert("Could not save note", e?.message ?? "Try again");
+      toast.error("Couldn't save note", e?.message ?? "Try again");
     } finally {
       setSavingNote(false);
     }
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bgAlt }}>
+    <Screen testID="crm-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: colors.bg }}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color={colors.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Leads CRM</Text>
-          <View style={styles.iconBtn} />
-        </View>
+      <ScreenHeader title="Leads CRM" subtitle={leads.length ? `${leads.length} in view` : "Pipeline"} />
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersRow}
-        >
-          {FILTERS.map((f) => (
-            <Pressable
-              key={f.label}
-              onPress={() => setFilter(f.id)}
-              style={[styles.filterChip, filter === f.id && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterText, filter === f.id && styles.filterTextActive]}>
-                {f.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow} style={{ flexGrow: 0 }}>
+        {FILTERS.map((f) => (
+          <Chip key={f.label} label={f.label} selected={filter === f.id} onPress={() => setFilter(f.id)} testID={`crm-filter-${f.id ?? "all"}`} />
+        ))}
+      </ScrollView>
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={colors.red} size="large" />
+        <View style={{ padding: space[4] }}>
+          <SkeletonRows rows={5} />
         </View>
+      ) : error ? (
+        <EmptyState variant="error" title="Couldn't load leads" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load(); }} />
       ) : (
         <ScrollView
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40, gap: spacing.md }}
+          contentContainerStyle={{ padding: space[4], paddingBottom: insets.bottom + 40, gap: space[3] }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -183,58 +135,45 @@ export default function CRMScreen() {
                 setRefreshing(true);
                 load();
               }}
-              tintColor={colors.red}
+              tintColor={colors.text}
             />
           }
+          showsVerticalScrollIndicator={false}
         >
           {leads.length === 0 ? (
-            <View style={styles.empty}>
-              <Ionicons name="people-outline" size={40} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>No leads in this bucket yet</Text>
-              <Text style={styles.emptySub}>
-                Unlocked leads and inspection requests will appear here so you can track every
-                deal.
-              </Text>
-            </View>
+            <EmptyState icon="people-outline" title="No leads in this bucket yet" body="Unlocked leads and inspection requests will appear here so you can track every deal." testID="crm-empty" />
           ) : (
             leads.map((l) => {
               const meta = STATUS_META[l.status || "new"] || STATUS_META.new;
               return (
-                <Pressable
-                  key={l.id}
-                  onPress={() => setSelected(l)}
-                  style={({ pressed }) => [styles.leadCard, pressed && { opacity: 0.9 }]}
-                >
-                  <View style={{ flexDirection: "row", gap: 10 }}>
+                <Card key={l.id} onPress={() => setSelected(l)} elevation="xs" testID={`crm-lead-${l.id}`}>
+                  <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
                     {l.property_image ? (
-                      <Image source={{ uri: l.property_image }} style={styles.leadImage} />
+                      <Image source={{ uri: l.property_image }} style={[styles.leadImage, { backgroundColor: colors.skeleton }]} />
                     ) : (
-                      <View style={[styles.leadImage, styles.leadImageFallback]}>
+                      <View style={[styles.leadImage, { backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }]}>
                         <Ionicons name="business" size={20} color={colors.textMuted} />
                       </View>
                     )}
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, gap: 3 }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Text style={styles.leadName} numberOfLines={1}>
+                        <AppText variant="title" numberOfLines={1} style={{ flexShrink: 1 }}>
                           {l.contact_name || "AMASS Buyer"}
-                        </Text>
-                        <View style={[styles.statusPill, { backgroundColor: meta.bg }]}>
-                          <Ionicons name={meta.icon} size={10} color={meta.colour} />
-                          <Text style={[styles.statusText, { color: meta.colour }]}>
-                            {meta.label}
-                          </Text>
-                        </View>
+                        </AppText>
+                        <Badge label={meta.label} tone={meta.tone} icon={meta.icon} size="xs" />
                       </View>
-                      <Text style={styles.leadProperty} numberOfLines={1}>
+                      <AppText variant="caption" tone="secondary" numberOfLines={1}>
                         {l.property_title || "Property"}
-                      </Text>
-                      <Text style={styles.leadPrice}>
-                        {l.property_price ? formatNaira(l.property_price) : ""}
-                      </Text>
+                      </AppText>
+                      {l.property_price ? (
+                        <AppText variant="bodyMedium" weight="bold" tabular>
+                          {formatNaira(l.property_price)}
+                        </AppText>
+                      ) : null}
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                   </View>
-                </Pressable>
+                </Card>
               );
             })
           )}
@@ -242,249 +181,109 @@ export default function CRMScreen() {
       )}
 
       {/* Detail sheet */}
-      <Modal
-        visible={!!selected}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setSelected(null)}
-      >
-        <KeyboardAvoidingView
-          style={{ flex: 1, backgroundColor: colors.bg }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <View style={styles.sheetHeader}>
-            <Pressable onPress={() => setSelected(null)} style={styles.iconBtn} hitSlop={8}>
-              <Ionicons name="close" size={26} color={colors.ink} />
-            </Pressable>
-            <Text style={styles.headerTitle}>Lead details</Text>
-            <View style={styles.iconBtn} />
+      <Modal visible={!!selected} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelected(null)}>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={[styles.sheetHeader, { paddingTop: Platform.OS === "ios" ? space[3] : insets.top + space[2], borderBottomColor: colors.divider }]}>
+            <IconButton icon="close" label="Close" onPress={() => setSelected(null)} testID="crm-detail-close" />
+            <AppText variant="title">Lead details</AppText>
+            <View style={{ width: 44 }} />
           </View>
 
           {selected && (
-            <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
+            <ScrollView contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
               {selected.property_title && (
-                <Pressable
-                  style={styles.propertyChip}
-                  onPress={() => selected.property_id && router.push(`/property/${selected.property_id}`)}
-                >
-                  {selected.property_image && (
-                    <Image source={{ uri: selected.property_image }} style={styles.propertyThumb} />
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.leadProperty}>{selected.property_title}</Text>
-                    {selected.property_price ? (
-                      <Text style={styles.leadPrice}>{formatNaira(selected.property_price)}</Text>
-                    ) : null}
+                <Card onPress={() => selected.property_id && router.push(`/property/${selected.property_id}`)} elevation="xs" testID="crm-detail-property">
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    {selected.property_image ? <Image source={{ uri: selected.property_image }} style={[styles.propertyThumb, { backgroundColor: colors.skeleton }]} /> : null}
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <AppText variant="title" numberOfLines={2}>
+                        {selected.property_title}
+                      </AppText>
+                      {selected.property_price ? (
+                        <AppText variant="bodyMedium" weight="bold" tabular>
+                          {formatNaira(selected.property_price)}
+                        </AppText>
+                      ) : null}
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-                </Pressable>
+                </Card>
               )}
 
-              <Text style={styles.sectionTitle}>Status</Text>
-              <View style={styles.statusGrid}>
-                {Object.entries(STATUS_META).map(([id, meta]) => {
-                  const active = selected.status === id;
-                  return (
-                    <Pressable
-                      key={id}
-                      onPress={() => setLeadStatus(selected, id)}
-                      style={[
-                        styles.statusBtn,
-                        { backgroundColor: active ? meta.bg : colors.bg },
-                        active && { borderColor: meta.colour, borderWidth: 2 },
-                      ]}
-                    >
-                      <Ionicons name={meta.icon} size={14} color={meta.colour} />
-                      <Text style={[styles.statusBtnText, { color: meta.colour }]}>
-                        {meta.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+              {(selected.contact_phone || selected.contact_email) && (
+                <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                  {selected.contact_phone ? <Badge label={selected.contact_phone} icon="call" size="md" /> : null}
+                  {selected.contact_email ? <Badge label={selected.contact_email} icon="mail" size="md" /> : null}
+                </View>
+              )}
+
+              <View style={{ gap: space[2] }}>
+                <AppText variant="label" tone="tertiary" uppercase>
+                  Status
+                </AppText>
+                <View style={styles.statusGrid}>
+                  {Object.entries(STATUS_META).map(([id, meta]) => {
+                    const active = selected.status === id;
+                    return (
+                      <Pressable
+                        key={id}
+                        onPress={() => setLeadStatus(selected, id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        testID={`crm-status-${id}`}
+                        style={({ pressed }) => [
+                          styles.statusBtn,
+                          { backgroundColor: active ? colors.surfaceInverse : colors.surface, borderColor: active ? colors.surfaceInverse : colors.border },
+                          pressed && { opacity: 0.85 },
+                        ]}
+                      >
+                        <Ionicons name={meta.icon} size={14} color={active ? colors.textInverse : colors.textSecondary} />
+                        <AppText variant="caption" weight="bold" color={active ? colors.textInverse : colors.text}>
+                          {meta.label}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
 
-              <Text style={styles.sectionTitle}>Notes</Text>
-              {(selected.crm_notes || []).length === 0 && (
-                <Text style={styles.emptySub}>
-                  Add follow-up notes to keep your team in sync.
-                </Text>
-              )}
-              {(selected.crm_notes || []).map((n) => (
-                <View key={n.id} style={styles.noteRow}>
-                  <Text style={styles.noteText}>{n.text}</Text>
-                  <Text style={styles.noteMeta}>
-                    {n.author_name || "You"} ·{" "}
-                    {new Date(n.created_at).toLocaleString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                </View>
-              ))}
+              <View style={{ gap: space[2] }}>
+                <AppText variant="label" tone="tertiary" uppercase>
+                  Notes
+                </AppText>
+                {(selected.crm_notes || []).length === 0 && (
+                  <AppText variant="bodySm" tone="tertiary">
+                    Add follow-up notes to keep your team in sync.
+                  </AppText>
+                )}
+                {(selected.crm_notes || []).map((n) => (
+                  <View key={n.id} style={[styles.noteRow, { backgroundColor: colors.surfaceAlt }]}>
+                    <AppText variant="body">{n.text}</AppText>
+                    <AppText variant="micro" tone="tertiary">
+                      {n.author_name || "You"} · {new Date(n.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </AppText>
+                  </View>
+                ))}
 
-              <View style={styles.noteInputRow}>
-                <TextInput
-                  value={noteText}
-                  onChangeText={setNoteText}
-                  placeholder="Add a note or follow-up…"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.noteInput}
-                  multiline
-                />
-                <Pressable
-                  onPress={addNote}
-                  disabled={!noteText.trim() || savingNote}
-                  style={[styles.noteBtn, (!noteText.trim() || savingNote) && { opacity: 0.5 }]}
-                >
-                  {savingNote ? (
-                    <ActivityIndicator color={colors.bg} />
-                  ) : (
-                    <Ionicons name="send" size={18} color={colors.bg} />
-                  )}
-                </Pressable>
+                <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
+                  <Input containerStyle={{ flex: 1 }} value={noteText} onChangeText={setNoteText} placeholder="Add a note or follow-up…" multiline testID="crm-note-input" />
+                  <IconButton icon="send" variant="primary" label="Save note" size={50} onPress={addNote} disabled={!noteText.trim() || savingNote} testID="crm-note-send" />
+                </View>
               </View>
             </ScrollView>
           )}
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: { ...typography.h3, color: colors.ink },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-
-  filtersRow: { gap: 6, padding: spacing.md, paddingTop: spacing.sm },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  filterChipActive: { backgroundColor: colors.ink },
-  filterText: { color: colors.text, fontSize: 12, fontWeight: "700" },
-  filterTextActive: { color: colors.bg },
-
-  empty: { alignItems: "center", padding: spacing.xl, gap: 8 },
-  emptyTitle: { ...typography.h3, color: colors.ink },
-  emptySub: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: "center",
-    paddingHorizontal: spacing.md,
-  },
-
-  leadCard: {
-    backgroundColor: colors.bg,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.soft,
-  },
-  leadImage: { width: 60, height: 60, borderRadius: 10, backgroundColor: colors.surfaceSecondary },
-  leadImageFallback: { alignItems: "center", justifyContent: "center" },
-  leadName: { ...typography.bodyBold, color: colors.ink, flex: 1 },
-  leadProperty: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-  leadPrice: { color: colors.ink, fontSize: 14, fontWeight: "800", marginTop: 4 },
-  statusPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  statusText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
-
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  propertyChip: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  propertyThumb: { width: 48, height: 48, borderRadius: 8 },
-
-  sectionTitle: {
-    color: colors.ink,
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    marginTop: spacing.sm,
-  },
+  filtersRow: { gap: 8, paddingHorizontal: space[4], paddingBottom: space[3] },
+  leadImage: { width: 56, height: 56, borderRadius: radii.sm },
+  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space[3], paddingBottom: space[2], borderBottomWidth: StyleSheet.hairlineWidth },
+  propertyThumb: { width: 56, height: 56, borderRadius: radii.sm },
   statusGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  statusBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  statusBtnText: { fontSize: 12, fontWeight: "800" },
-
-  noteRow: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    gap: 4,
-  },
-  noteText: { color: colors.text, fontSize: 13, lineHeight: 18 },
-  noteMeta: { color: colors.textMuted, fontSize: 11 },
-
-  noteInputRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-    marginTop: spacing.sm,
-  },
-  noteInput: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
-    color: colors.ink,
-    fontSize: 14,
-    backgroundColor: colors.bg,
-  },
-  noteBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  statusBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, height: 40, borderRadius: radii.pill, borderWidth: 1.5 },
+  noteRow: { padding: 12, borderRadius: radii.sm, gap: 4 },
 });

@@ -382,8 +382,11 @@ def register_phase4_routes(
         recent = 0
         for p in listings:
             u = p.get("updated_at")
-            if u and isinstance(u, datetime) and u >= cutoff:
-                recent += 1
+            if u and isinstance(u, datetime):
+                if u.tzinfo is None:
+                    u = u.replace(tzinfo=timezone.utc)
+                if u >= cutoff:
+                    recent += 1
 
         vlvl = int(agent_doc.get("verification_level", 1) or 1)
         has_photo = bool(agent_doc.get("avatar_url"))

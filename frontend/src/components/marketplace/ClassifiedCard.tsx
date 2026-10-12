@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, shadows, spacing, fontFamily as F, formatNaira } from "@/src/constants/theme";
+import { radius, shadows, spacing, fontFamily as F, formatNaira } from "@/src/constants/theme";
 import type { MarketplaceItem } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -39,6 +40,9 @@ export function ClassifiedCard({
   favorited?: boolean;
   gridPad?: number;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   if (variant === "list") return <ListRow item={item} onPress={onPress} onFavorite={onFavorite} favorited={favorited} />;
   if (variant === "featured") return <FeaturedCard item={item} onPress={onPress} onFavorite={onFavorite} favorited={favorited} />;
 
@@ -105,6 +109,9 @@ function ListRow({
   onFavorite?: () => void;
   favorited?: boolean;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable onPress={onPress} style={styles.rowCard} testID={`market-item-${item.id}`}>
       <View style={styles.rowImageWrap}>
@@ -153,6 +160,9 @@ function FeaturedCard({
   onFavorite?: () => void;
   favorited?: boolean;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable onPress={onPress} style={styles.featuredCard} testID={`market-featured-${item.id}`}>
       <Image source={{ uri: item.image }} style={styles.featuredImage} contentFit="cover" transition={200} />
@@ -180,6 +190,9 @@ function FeaturedCard({
 }
 
 function Badge({ label, color, textColor = "#fff" }: { label: string; color: string; textColor?: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={[styles.badge, { backgroundColor: color }]}>
       <Text style={[styles.badgeText, { color: textColor }]}>{label}</Text>
@@ -188,6 +201,9 @@ function Badge({ label, color, textColor = "#fff" }: { label: string; color: str
 }
 
 function MiniChip({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "success" | "ink" | "purple" }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const bg =
     tone === "success" ? "rgba(34,197,94,0.10)"
     : tone === "ink" ? "rgba(10,10,10,0.07)"
@@ -214,7 +230,8 @@ function formatCondition(c?: string): string {
   return c;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   // Grid
   gridCard: {
     backgroundColor: colors.surface,
@@ -237,7 +254,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceInverse,
+    backgroundColor: colors.ink,
   },
   pricePillText: { color: "#fff", fontSize: 13, fontFamily: F.bold, letterSpacing: -0.2 },
   badgeStack: { position: "absolute", top: 8, left: 8, flexDirection: "row", gap: 4 },
@@ -304,7 +321,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSecondary,
     ...shadows.soft,
   },
-  featuredImage: { ...StyleSheet.absoluteFillObject },
+  featuredImage: { ...StyleSheet.absoluteFill },
   featuredScrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: "70%" },
   featuredTop: {
     position: "absolute",

@@ -1,184 +1,112 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { useRouter, Stack } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Stack } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AnimatedNumber, AppText, Badge, Card, EmptyState, ProgressBar, Screen, ScreenHeader, Skeleton, SkeletonRows } from "@/src/ui";
 
 type Score = Awaited<ReturnType<typeof api.agentScore>>;
 
 export default function AgentScoreScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const [data, setData] = useState<Score | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const s = await api.agentScore();
-        setData(s);
-      } catch (e: any) {
-        Alert.alert("Could not load your score", e?.message ?? "Try again");
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const s = await api.agentScore();
+      setData(s);
+    } catch (e: any) {
+      setError(e?.message ?? "Try again");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (loading || !data) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-            <Ionicons name="chevron-back" size={26} color={colors.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Agent Score</Text>
-          <View style={styles.iconBtn} />
-        </View>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={colors.red} size="large" />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const tierTone = (score: number) => (score >= 85 ? "premium" : score >= 70 ? "success" : score >= 50 ? "info" : "neutral");
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bgAlt }}>
+    <Screen testID="agent-score-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: colors.bg }}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color={colors.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Agent Score</Text>
-          <View style={styles.iconBtn} />
-        </View>
-      </SafeAreaView>
+      <ScreenHeader title="Agent Score" subtitle="Transparent · updates in real time" />
 
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40 }}>
-        <View style={styles.hero}>
-          <View style={styles.scoreRing}>
-            <Text style={styles.scoreValue}>{data.score}</Text>
-            <Text style={styles.scoreOutOf}>/ 100</Text>
+      {loading ? (
+        <View style={{ padding: space[4], gap: space[5], alignItems: "center" }}>
+          <Skeleton width={140} height={140} radius={70} />
+          <Skeleton width={120} height={22} />
+          <SkeletonRows rows={4} style={{ alignSelf: "stretch" }} />
+        </View>
+      ) : error || !data ? (
+        <EmptyState variant="error" title="Couldn't load your score" body={error ?? "Please try again."} actionLabel="Retry" onAction={load} />
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: space[4], paddingBottom: insets.bottom + 40, gap: space[4] }} showsVerticalScrollIndicator={false}>
+          <View style={styles.hero}>
+            <View style={[styles.scoreRing, { backgroundColor: colors.surfaceInverse }]} accessibilityLabel={`Score ${data.score} out of 100`}>
+              <AnimatedNumber value={data.score} variant="display" color={colors.textInverse} testID="score-value" />
+              <AppText variant="caption" color={colors.textMuted}>
+                out of 100
+              </AppText>
+            </View>
+            <Badge label={data.tier} tone={tierTone(data.score)} size="md" icon="ribbon" testID="score-tier" />
+            <AppText variant="bodySm" tone="secondary" align="center" style={{ maxWidth: 320 }}>
+              Your AMASS score is recalculated from real activity — no shortcuts. Improve the factors below to grow it.
+            </AppText>
           </View>
-          <Text style={styles.tier}>{data.tier}</Text>
-          <Text style={styles.subtitle}>
-            Your AMASS score is recalculated from real activity — no shortcuts. Improve the factors
-            below to grow it.
-          </Text>
-        </View>
 
-        <View style={{ gap: spacing.md }}>
-          {data.factors.map((f) => {
-            const pct = Math.max(0, Math.min(100, f.value));
-            const barColour =
-              pct >= 70 ? colors.success : pct >= 40 ? colors.ink : colors.red;
-            return (
-              <View key={f.id} style={styles.factor}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={styles.factorLabel}>{f.label}</Text>
-                  <View style={styles.weightPill}>
-                    <Text style={styles.weightText}>Weight {f.weight}</Text>
+          <View style={{ gap: space[3] }}>
+            {data.factors.map((f) => {
+              const pct = Math.max(0, Math.min(100, f.value));
+              const tone = pct >= 70 ? "success" : pct >= 40 ? "primary" : "brand";
+              return (
+                <Card key={f.id} elevation="xs" style={{ gap: 10 }} testID={`factor-${f.id}`}>
+                  <View style={styles.factorHead}>
+                    <AppText variant="title" style={{ flex: 1 }}>
+                      {f.label}
+                    </AppText>
+                    <Badge label={`Weight ${f.weight}`} size="xs" />
                   </View>
-                </View>
-                <View style={styles.factorRow}>
-                  <View style={styles.factorBarTrack}>
-                    <View style={[styles.factorBarFill, { width: `${pct}%`, backgroundColor: barColour }]} />
+                  <View style={styles.factorRow}>
+                    <ProgressBar value={pct / 100} tone={tone} style={{ flex: 1 }} />
+                    <AppText variant="bodyMedium" weight="bold" tabular style={{ width: 32, textAlign: "right" }}>
+                      {pct}
+                    </AppText>
                   </View>
-                  <Text style={styles.factorValue}>{pct}</Text>
-                </View>
-                <Text style={styles.factorHint}>{f.hint}</Text>
-              </View>
-            );
-          })}
-        </View>
+                  <AppText variant="caption" tone="secondary">
+                    {f.hint}
+                  </AppText>
+                </Card>
+              );
+            })}
+          </View>
 
-        <View style={styles.helpCard}>
-          <Ionicons name="information-circle" size={18} color={colors.ink} />
-          <Text style={styles.helpText}>
-            Your score updates in real time. Public agent profiles show your badge tier but not the
-            numeric score.
-          </Text>
-        </View>
-      </ScrollView>
-    </View>
+          <View style={[styles.helpCard, { backgroundColor: colors.infoSoft }]}>
+            <Ionicons name="information-circle" size={18} color={colors.info} />
+            <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
+              Public agent profiles show your badge tier but not the numeric score.
+            </AppText>
+          </View>
+        </ScrollView>
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: { ...typography.h3, color: colors.ink },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-
-  hero: { alignItems: "center", padding: spacing.xl, gap: 12 },
-  scoreRing: {
-    width: 132,
-    height: 132,
-    borderRadius: 66,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadows.card,
-  },
-  scoreValue: { color: colors.bg, fontSize: 48, fontWeight: "900" },
-  scoreOutOf: { color: colors.textMuted, fontSize: 12, marginTop: -6 },
-  tier: { ...typography.h2, color: colors.ink },
-  subtitle: {
-    textAlign: "center",
-    color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-    paddingHorizontal: spacing.md,
-  },
-
-  factor: {
-    backgroundColor: colors.bg,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 8,
-    ...shadows.soft,
-  },
-  factorLabel: { ...typography.bodyBold, color: colors.ink },
-  weightPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  weightText: { color: colors.textSecondary, fontSize: 10, fontWeight: "700" },
-  factorRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  factorBarTrack: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.surfaceSecondary,
-    overflow: "hidden",
-  },
-  factorBarFill: { height: 6, borderRadius: 3 },
-  factorValue: { fontSize: 13, fontWeight: "800", color: colors.ink, width: 30, textAlign: "right" },
-  factorHint: { color: colors.textSecondary, fontSize: 12, lineHeight: 16 },
-
-  helpCard: {
-    flexDirection: "row",
-    gap: 8,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceSecondary,
-    marginTop: spacing.xl,
-  },
-  helpText: { color: colors.text, fontSize: 12, flex: 1, lineHeight: 17 },
+  hero: { alignItems: "center", paddingVertical: space[4], gap: 12 },
+  scoreRing: { width: 140, height: 140, borderRadius: 70, alignItems: "center", justifyContent: "center" },
+  factorHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  factorRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  helpCard: { flexDirection: "row", gap: 10, padding: space[3], borderRadius: radii.md, alignItems: "center" },
 });

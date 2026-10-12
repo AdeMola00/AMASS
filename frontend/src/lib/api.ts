@@ -380,7 +380,7 @@ export const api = {
     cells?: number;
   }) => {
     const qs = Object.entries(params)
-      .filter(([, v]) => v !== undefined && v !== null && v !== "")
+      .filter(([, v]) => v !== undefined && v !== null && String(v) !== "")
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
       .join("&");
     return req<{ cells: { lat: number; lng: number; count: number; weight: number }[]; metric: string }>(
@@ -638,13 +638,13 @@ export const api = {
       body: JSON.stringify({ bundle_id, provider }),
     }),
   listPlans: () => req<SubscriptionPlan[]>("/subscriptions/plans"),
-  mySubscription: () => req<any>("/subscriptions/me"),
+  myTokenSubscription: () => req<any>("/subscriptions/me"),
   subscribe: (plan_id: string, provider: "paystack" | "flutterwave" | "bank_transfer" | "card" | "mock" = "mock") =>
     req<{ ok: boolean; subscription: any; credited: number; balance: number }>(
       "/subscriptions/subscribe",
       { method: "POST", body: JSON.stringify({ plan_id, provider }) }
     ),
-  cancelSubscription: () =>
+  cancelTokenSubscription: () =>
     req<{ ok: boolean; cancelled: number }>("/subscriptions/cancel", { method: "POST" }),
   unlockProperty: (property_id: string) =>
     req<{

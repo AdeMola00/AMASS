@@ -1,17 +1,11 @@
-import React, {
-  forwardRef,
-  useCallback,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, TextInput, Alert } from "react-native";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { api, MarketplaceItem } from "@/src/lib/api";
-import { colors, radius, spacing, formatNaira } from "@/src/constants/theme";
+import { radius, spacing, formatNaira } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export type MakeOfferSheetRef = {
   open: (item: MarketplaceItem) => void;
@@ -19,6 +13,9 @@ export type MakeOfferSheetRef = {
 };
 
 export const MakeOfferSheet = forwardRef<MakeOfferSheetRef, object>((_, ref) => {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const sheetRef = useRef<BottomSheetModal>(null);
   const [item, setItem] = useState<MarketplaceItem | null>(null);
   const [amount, setAmount] = useState<number | undefined>();
@@ -156,8 +153,9 @@ export const MakeOfferSheet = forwardRef<MakeOfferSheetRef, object>((_, ref) => 
 
 MakeOfferSheet.displayName = "MakeOfferSheet";
 
-const styles = StyleSheet.create({
-  sheetBg: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+  sheetBg: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   handle: { backgroundColor: colors.borderStrong, width: 44, height: 5 },
   wrap: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: 8 },
   title: { fontSize: 20, fontWeight: "800", color: colors.text, letterSpacing: -0.3, marginBottom: 4 },

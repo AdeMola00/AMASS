@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { View, Text, StyleSheet, Animated, ViewStyle } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, fonts, shadows } from "@/src/constants/theme";
+import { fonts, shadows } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 /**
  * AMASS Token coin — used as the visual currency indicator throughout the app.
@@ -18,6 +19,9 @@ export function TokenIcon({
   tone?: "gold" | "white" | "red";
   style?: ViewStyle;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const scale = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (!animated) return;
@@ -79,6 +83,9 @@ export function TokenBalanceChip({
   onPress?: () => void;
   variant?: "light" | "dark";
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const isDark = variant === "dark";
   return (
     <View
@@ -103,7 +110,8 @@ export function TokenBalanceChip({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   coin: {
     borderWidth: 1.5,
     alignItems: "center",
@@ -130,7 +138,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipLight: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderColor: colors.border,
   },
   chipDark: {

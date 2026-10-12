@@ -1,15 +1,18 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
-import { Tabs } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, Pressable, Platform, LayoutChangeEvent, AppState } from "react-native";
+import { Tabs, Redirect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, shadows } from "@/src/constants/theme";
-import { Redirect } from "expo-router";
+import { api } from "@/src/lib/api";
+import { useTheme } from "@/src/theme";
+import { motion } from "@/src/theme/tokens";
+import { AppText } from "@/src/ui";
 
-type IconName = keyof typeof Ionicons.glyphMap;
+import type { IconName } from "@/src/ui/icons";
 
 export default function TabsLayout() {
   const { user, loading } = useAuth();
@@ -17,10 +20,7 @@ export default function TabsLayout() {
   if (!user) return <Redirect href="/(auth)/login" />;
 
   return (
-    <Tabs
-      screenOptions={{ headerShown: false }}
-      tabBar={(props) => <FloatingBottomBar {...props} />}
-    >
+    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <FloatingBottomBar {...props} />}>
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="discover" options={{ title: "Discover" }} />
       <Tabs.Screen name="marketplace" options={{ title: "Market" }} />
@@ -30,29 +30,67 @@ export default function TabsLayout() {
   );
 }
 
+function useUnreadCount(active: boolean) {
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      api
+        .chatUnreadCount()
+        .then((r) => alive && setUnread(r.unread_count ?? 0))
+        .catch(() => {});
+    load();
+    const id = setInterval(load, 30000);
+    const sub = AppState.addEventListener("change", (s) => s === "active" && load());
+    return () => {
+      alive = false;
+      clearInterval(id);
+      sub.remove();
+    };
+  }, [active]);
+  return unread;
+}
+
 function FloatingBottomBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { colors, shadows, isDark } = useTheme();
   const bottomInset = Math.max(insets.bottom, 12);
+  const [barW, setBarW] = useState(0);
+  const count = state.routes.length;
+  const tabW = barW > 0 ? (barW - 16) / count : 0;
+  const x = useSharedValue(0);
+  const unread = useUnreadCount(state.index === 3);
+
+  useEffect(() => {
+    x.value = withSpring(state.index * tabW, motion.spring);
+  }, [state.index, tabW, x]);
+  const pill = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
 
   return (
-    <View
-      style={[styles.container, { bottom: bottomInset }]}
-      pointerEvents="box-none"
-      testID="floating-bottom-nav"
-    >
-      <View style={[styles.barShadow, shadows.floating]}>
-        {Platform.OS === "ios" ? (
-          <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.98)" }]} />
-        )}
-        <View style={styles.bar}>
+    <View style={[styles.container, { bottom: bottomInset }]} pointerEvents="box-none" testID="floating-bottom-nav">
+      <View
+        style={[
+          styles.barShadow,
+          shadows.lg,
+          { backgroundColor: colors.tabBar, borderColor: isDark ? colors.tabBarBorder : "rgba(255,255,255,0.7)" },
+        ]}
+        onLayout={(e: LayoutChangeEvent) => setBarW(e.nativeEvent.layout.width)}
+      >
+        {Platform.OS === "ios" ? <BlurView intensity={80} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : null}
+        <View style={styles.bar} accessibilityRole="tablist">
+          {tabW > 0 ? (
+            <Animated.View pointerEvents="none" style={[styles.pill, { width: tabW, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(10,10,10,0.05)" }, pill]} />
+          ) : null}
           {state.routes.map((r: any, i: number) => (
             <TabButton
               key={r.key}
               route={r}
               active={state.index === i}
-              onPress={() => navigation.navigate(r.name)}
+              badge={r.name === "messages" ? unread : 0}
+              onPress={() => {
+                const event = navigation.emit({ type: "tabPress", target: r.key, canPreventDefault: true });
+                if (!event.defaultPrevented) navigation.navigate(r.name);
+              }}
             />
           ))}
         </View>
@@ -61,91 +99,78 @@ function FloatingBottomBar({ state, navigation }: any) {
   );
 }
 
-function TabButton({ route, active, onPress }: any) {
+function TabButton({ route, active, onPress, badge }: any) {
+  const { colors } = useTheme();
   const cfg = tabConfig(route.name);
+  const scale = useSharedValue(1);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <Pressable
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});
+        scale.value = withSpring(1.12, motion.spring, () => {
+          scale.value = withSpring(1, motion.spring);
+        });
         onPress();
       }}
       style={styles.tab}
       testID={`tab-${route.name}`}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={`${cfg.label} tab${badge ? `, ${badge} unread` : ""}`}
     >
-      {active && <View style={styles.activeIndicator} />}
-      <Ionicons
-        name={active ? cfg.iconActive : cfg.icon}
-        size={22}
-        color={active ? colors.text : colors.textTertiary}
-      />
-      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{cfg.label}</Text>
+      <Animated.View style={[styles.iconWrap, anim]}>
+        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={23} color={active ? colors.text : colors.textTertiary} />
+        {badge > 0 ? (
+          <View style={[styles.badge, { backgroundColor: colors.brand, borderColor: colors.tabBar }]}>
+            <AppText variant="micro" color="#fff" tabular>
+              {badge > 99 ? "99+" : badge}
+            </AppText>
+          </View>
+        ) : null}
+      </Animated.View>
+      <AppText variant="micro" weight={active ? "extrabold" : "semibold"} color={active ? colors.text : colors.textTertiary} style={styles.tabLabel}>
+        {cfg.label}
+      </AppText>
     </Pressable>
   );
 }
 
-function tabConfig(routeName: string) {
+function tabConfig(routeName: string): { label: string; icon: IconName; iconActive: IconName } {
   switch (routeName) {
     case "index":
-      return { label: "Home", icon: "map-outline" as IconName, iconActive: "map" as IconName };
+      return { label: "Home", icon: "map-outline", iconActive: "map" };
     case "discover":
-      return { label: "Discover", icon: "compass-outline" as IconName, iconActive: "compass" as IconName };
+      return { label: "Discover", icon: "compass-outline", iconActive: "compass" };
     case "marketplace":
-      return { label: "Market", icon: "grid-outline" as IconName, iconActive: "grid" as IconName };
+      return { label: "Market", icon: "grid-outline", iconActive: "grid" };
     case "messages":
-      return { label: "Inbox", icon: "chatbubbles-outline" as IconName, iconActive: "chatbubbles" as IconName };
+      return { label: "Inbox", icon: "chatbubbles-outline", iconActive: "chatbubbles" };
     case "profile":
-      return { label: "Profile", icon: "person-outline" as IconName, iconActive: "person" as IconName };
+      return { label: "Profile", icon: "person-outline", iconActive: "person" };
     default:
-      return { label: "", icon: "ellipse-outline" as IconName, iconActive: "ellipse" as IconName };
+      return { label: "", icon: "ellipse-outline", iconActive: "ellipse" };
   }
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { position: "absolute", left: 12, right: 12, alignItems: "center" },
+  barShadow: { borderRadius: 32, overflow: "hidden", width: "100%", maxWidth: 560, borderWidth: 1 },
+  bar: { flexDirection: "row", height: 66, alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8, position: "relative" },
+  pill: { position: "absolute", left: 8, top: 7, bottom: 7, borderRadius: 24 },
+  tab: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3, height: "100%" },
+  iconWrap: { width: 28, height: 26, alignItems: "center", justifyContent: "center" },
+  tabLabel: { letterSpacing: 0, fontSize: 11, lineHeight: 13 },
+  badge: {
     position: "absolute",
-    left: 12,
-    right: 12,
-    alignItems: "center",
-  },
-  barShadow: {
-    borderRadius: 32,
-    overflow: "hidden",
-    width: "100%",
-    backgroundColor: "rgba(255,255,255,0.85)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.6)",
-  },
-  bar: {
-    flexDirection: "row",
-    height: 68,
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 8,
-  },
-  tab: {
-    flex: 1,
+    top: -4,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
-    height: "100%",
-    position: "relative",
-  },
-  activeIndicator: {
-    position: "absolute",
-    top: 8,
-    width: 26,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.red,
-  },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.textTertiary,
-    letterSpacing: -0.1,
-  },
-  tabLabelActive: {
-    color: colors.text,
-    fontWeight: "800",
   },
 });

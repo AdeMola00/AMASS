@@ -1,25 +1,36 @@
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  RefreshControl,
-  FlatList,
-  Modal,
-  Alert,
-} from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, RefreshControl, FlatList } from "react-native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { api, Property } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { useWallet } from "@/src/contexts/wallet";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import {
+  AppText,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  IconButton,
+  ProgressBar,
+  Screen,
+  ScreenHeader,
+  SegmentedControl,
+  Sheet,
+  SkeletonCard,
+  SkeletonRows,
+  StatTile,
+  useToast,
+  type BadgeTone,
+  type IconName,
+} from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 import { AgentScoreCard } from "@/src/components/AgentScoreCard";
 
@@ -61,8 +72,19 @@ type ListingAnalytics = {
   favorites: number;
 };
 
+const STATUS_TONE: Record<string, BadgeTone> = {
+  sold: "error",
+  premium: "premium",
+  verified: "success",
+  coming_soon: "mass",
+  available: "info",
+  archived: "neutral",
+};
+
 export default function AgentDashboard() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("overview");
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
@@ -70,6 +92,7 @@ export default function AgentDashboard() {
   const [analytics, setAnalytics] = useState<ListingAnalytics[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [boostProperty, setBoostProperty] = useState<Property | null>(null);
   const [quota, setQuota] = useState<{
@@ -82,6 +105,7 @@ export default function AgentDashboard() {
   } | null>(null);
 
   const load = useCallback(async () => {
+    setError(false);
     try {
       const [d, l, a, ld, q] = await Promise.all([
         api.agentDashboard(),
@@ -96,7 +120,7 @@ export default function AgentDashboard() {
       setLeads(ld);
       setQuota(q);
     } catch {
-      /* ignore */
+      setError(true);
     }
   }, []);
 
@@ -115,352 +139,269 @@ export default function AgentDashboard() {
     setTab(t);
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="agent-dashboard-screen">
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn} testID="dashboard-back">
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Agent Dashboard</Text>
-          <Text style={styles.headerSub}>Welcome back, {user?.full_name?.split(" ")[0] || "Agent"}</Text>
-        </View>
-        <Pressable
-          onPress={() => router.push("/agent/onboarding" as any)}
-          style={styles.newBtn}
-          testID="dashboard-new-listing"
-        >
-          <Ionicons name="add" size={22} color="#fff" />
-        </Pressable>
-      </View>
+  const goNew = () => router.push("/agent/onboarding" as any);
+  const unreadLeads = leads.filter((l) => l.unread).length;
+  const bottomPad = 120 + insets.bottom;
+  const refresh = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />;
 
-      <View style={styles.segmented}>
-        {(["overview", "listings", "leads"] as Tab[]).map((t) => (
-          <Pressable
-            key={t}
-            style={[styles.segment, tab === t && styles.segmentActive]}
-            onPress={() => switchTab(t)}
-            testID={`dash-tab-${t}`}
-          >
-            <Text style={[styles.segmentText, tab === t && styles.segmentTextActive]}>
-              {t === "overview" ? "Overview" : t === "listings" ? `Listings (${listings.length})` : `Leads (${leads.filter((l) => l.unread).length})`}
-            </Text>
-          </Pressable>
-        ))}
+  return (
+    <Screen testID="agent-dashboard-screen">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader
+        title="Agent Dashboard"
+        subtitle={`Welcome back, ${user?.full_name?.split(" ")[0] || "Agent"}`}
+        backTestID="dashboard-back"
+        right={<IconButton icon="add" variant="primary" label="New listing" onPress={goNew} testID="dashboard-new-listing" />}
+      />
+
+      <View style={{ paddingHorizontal: space[4], paddingBottom: space[3] }}>
+        <SegmentedControl<Tab>
+          value={tab}
+          onChange={switchTab}
+          testIDPrefix="dash-tab"
+          options={[
+            { value: "overview", label: "Overview" },
+            { value: "listings", label: `Listings (${listings.length})` },
+            { value: "leads", label: `Leads (${unreadLeads})` },
+          ]}
+        />
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.red} />
+        <View style={{ padding: space[4], gap: space[4] }}>
+          <SkeletonCard imageHeight={120} />
+          <SkeletonRows rows={4} />
+        </View>
+      ) : error && !dashboard ? (
+        <EmptyState variant="error" title="Couldn't load your dashboard" body="Check your connection and try again." actionLabel="Retry" onAction={() => load()} testID="dashboard-error" />
       ) : tab === "overview" ? (
-        <ScrollView
-          contentContainerStyle={{ padding: spacing.xl, paddingBottom: 140, gap: spacing.lg }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.red} />}
-          showsVerticalScrollIndicator={false}
-        >
-          <Overview dashboard={dashboard} onNew={() => router.push("/agent/onboarding" as any)} />
+        <ScrollView contentContainerStyle={{ padding: space[4], paddingBottom: bottomPad, gap: space[4] }} refreshControl={refresh} showsVerticalScrollIndicator={false}>
+          <Overview dashboard={dashboard} onNew={goNew} isDark={isDark} />
 
           <AgentScoreCard />
 
           {/* Phase D-5: Verification Task Queue entry */}
-          <Pressable
-            onPress={() => router.push("/agent/tasks" as any)}
-            style={styles.tasksCard}
-            testID="agent-tasks-entry"
-          >
-            <View style={styles.tasksIcon}>
-              <Ionicons name="checkmark-done" size={18} color="#fff" />
+          <Card onPress={() => router.push("/agent/tasks" as any)} testID="agent-tasks-entry" elevation="xs">
+            <View style={styles.rowCenter}>
+              <View style={[styles.roundIcon, { backgroundColor: colors.brand }]}>
+                <Ionicons name="checkmark-done" size={18} color={colors.onBrand} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="title">Verification tasks</AppText>
+                <AppText variant="caption" tone="secondary">
+                  Pick up open leads in your territory and verify them on-site.
+                </AppText>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.tasksTitle}>Verification Tasks</Text>
-              <Text style={styles.tasksSub}>Pick up open leads in your territory and verify them on-site.</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-          </Pressable>
+          </Card>
 
           {quota && (
-            <Pressable
+            <Card
               onPress={() => router.push("/agent-plans")}
-              style={[
-                styles.quotaCard,
-                quota.at_limit && styles.quotaCardWarn,
-              ]}
               testID="agent-quota-card"
+              elevation="xs"
+              style={[{ gap: 12 }, quota.at_limit && { borderColor: colors.brand, backgroundColor: colors.brandSoft }]}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <View style={styles.quotaBadge}>
-                  <Ionicons name="business" size={14} color={colors.bg} />
+              <View style={styles.rowCenter}>
+                <View style={[styles.roundIcon, { backgroundColor: quota.at_limit ? colors.brand : colors.surfaceInverse }]}>
+                  <Ionicons name="business" size={14} color={quota.at_limit ? colors.onBrand : colors.textInverse} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.quotaTitle}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="title" tabular>
                     {quota.plan_name} plan · {quota.active_listings}/{quota.listing_limit} listings
-                  </Text>
-                  <Text style={styles.quotaSub}>
-                    {quota.at_limit
-                      ? "You've reached your plan limit — tap to upgrade."
-                      : `${quota.remaining} listing slots available.`}
-                  </Text>
+                  </AppText>
+                  <AppText variant="caption" tone="secondary">
+                    {quota.at_limit ? "You've reached your plan limit — tap to upgrade." : `${quota.remaining} listing slots available.`}
+                  </AppText>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
               </View>
-              <View style={styles.quotaBarTrack}>
-                <View
-                  style={[
-                    styles.quotaBarFill,
-                    {
-                      width: `${Math.min(
-                        100,
-                        (quota.active_listings / Math.max(1, quota.listing_limit)) * 100
-                      )}%`,
-                      backgroundColor: quota.at_limit ? colors.red : colors.ink,
-                    },
-                  ]}
-                />
-              </View>
-            </Pressable>
+              <ProgressBar value={quota.active_listings / Math.max(1, quota.listing_limit)} tone={quota.at_limit ? "brand" : "primary"} />
+            </Card>
           )}
 
           {dashboard?.recent && dashboard.recent.length > 0 && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Recent listings</Text>
-                <Pressable onPress={() => setTab("listings")}>
-                  <Text style={styles.link}>View all</Text>
+            <View style={{ gap: space[3] }}>
+              <View style={styles.sectionHead}>
+                <AppText variant="h3">Recent listings</AppText>
+                <Pressable onPress={() => setTab("listings")} hitSlop={8} accessibilityRole="button" style={styles.sectionAction}>
+                  <AppText variant="caption" weight="bold">
+                    View all
+                  </AppText>
+                  <Ionicons name="chevron-forward" size={14} color={colors.text} />
                 </Pressable>
               </View>
               {dashboard.recent.slice(0, 3).map((p) => {
                 const a = analytics.find((x) => x.property_id === p.id);
-                return (
-                  <ListingRow
-                    key={p.id}
-                    property={p}
-                    views={a?.views ?? 0}
-                    favorites={a?.favorites ?? 0}
-                    onPress={() => router.push(`/property/${p.id}`)}
-                  />
-                );
+                return <ListingRow key={p.id} property={p} views={a?.views ?? 0} favorites={a?.favorites ?? 0} onPress={() => router.push(`/property/${p.id}`)} />;
               })}
-            </>
+            </View>
           )}
         </ScrollView>
       ) : tab === "listings" ? (
         <FlatList
           data={listings}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={{ padding: spacing.xl, paddingBottom: 140, gap: spacing.md }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.red} />}
+          contentContainerStyle={{ padding: space[4], paddingBottom: bottomPad, gap: space[3] }}
+          refreshControl={refresh}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const a = analytics.find((x) => x.property_id === item.id);
-            return (
-              <ListingRow
-                property={item}
-                views={a?.views ?? 0}
-                favorites={a?.favorites ?? 0}
-                onPress={() => router.push(`/property/${item.id}`)}
-                onBoost={() => setBoostProperty(item)}
-              />
-            );
+            return <ListingRow property={item} views={a?.views ?? 0} favorites={a?.favorites ?? 0} onPress={() => router.push(`/property/${item.id}`)} onBoost={() => setBoostProperty(item)} />;
           }}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="business-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>No listings yet</Text>
-              <Text style={styles.emptySub}>Publish your first property to start receiving leads.</Text>
-              <Pressable style={styles.emptyBtn} onPress={() => router.push("/agent/onboarding" as any)} testID="empty-new-listing">
-                <Ionicons name="add" size={18} color="#fff" />
-                <Text style={styles.emptyBtnText}>New Listing</Text>
-              </Pressable>
-            </View>
+            <EmptyState icon="business-outline" title="No listings yet" body="Publish your first property to start receiving leads." actionLabel="New listing" onAction={goNew} testID="empty-new-listing" />
           }
         />
       ) : (
         <FlatList
           data={leads}
           keyExtractor={(l) => l.id}
-          contentContainerStyle={{ padding: spacing.xl, paddingBottom: 140, gap: spacing.md }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.red} />}
+          contentContainerStyle={{ padding: space[4], paddingBottom: bottomPad, gap: space[3] }}
+          refreshControl={refresh}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => <LeadRow lead={item} />}
           ListHeaderComponent={
-            <Pressable
-              onPress={() => router.push("/crm")}
-              style={styles.crmCta}
-              testID="open-crm-cta"
-            >
-              <View style={styles.crmIcon}>
-                <Ionicons name="briefcase" size={16} color={colors.bg} />
+            <Card onPress={() => router.push("/crm")} testID="open-crm-cta" elevation="xs" style={{ marginBottom: space[1] }}>
+              <View style={styles.rowCenter}>
+                <View style={[styles.roundIcon, { backgroundColor: colors.surfaceInverse }]}>
+                  <Ionicons name="briefcase" size={16} color={colors.textInverse} />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="title">Open the full Leads CRM</AppText>
+                  <AppText variant="caption" tone="secondary">
+                    Track status, notes and follow-ups for every conversation.
+                  </AppText>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.crmTitle}>Open the full Leads CRM</Text>
-                <Text style={styles.crmSub}>
-                  Track status, notes and follow-ups for every conversation.
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-            </Pressable>
+            </Card>
           }
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="people-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>No leads yet</Text>
-              <Text style={styles.emptySub}>Publish a listing to start receiving inquiries.</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState icon="people-outline" title="No leads yet" body="Publish a listing to start receiving inquiries." />}
         />
       )}
-      <BoostSheet
-        property={boostProperty}
-        onClose={() => setBoostProperty(null)}
-        onSuccess={load}
-      />
-    </SafeAreaView>
+      <BoostSheet property={boostProperty} onClose={() => setBoostProperty(null)} onSuccess={load} />
+    </Screen>
   );
 }
 
-function Overview({ dashboard, onNew }: { dashboard: Dashboard | null; onNew: () => void }) {
+function Overview({ dashboard, onNew, isDark }: { dashboard: Dashboard | null; onNew: () => void; isDark: boolean }) {
+  const { colors } = useTheme();
   const s = dashboard?.stats;
   return (
-    <View style={{ gap: spacing.lg }}>
-      <View style={[styles.heroCard, shadows.card]}>
-        <Text style={styles.heroLabel}>PORTFOLIO VALUE</Text>
-        <Text style={styles.heroValue}>{s ? formatNaira(s.total_value) : "—"}</Text>
+    <View style={{ gap: space[4] }}>
+      <LinearGradient colors={isDark ? ["#1F1D1A", "#141210"] : ["#1A1816", "#0A0A0A"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="portfolio-hero">
+        <AppText variant="label" color="rgba(255,255,255,0.6)" uppercase>
+          Portfolio value
+        </AppText>
+        <AppText variant="display" color="#fff" tabular numberOfLines={1} adjustsFontSizeToFit>
+          {s ? formatNaira(s.total_value) : "—"}
+        </AppText>
         <View style={styles.heroFooter}>
           <View style={styles.heroPill}>
             <Ionicons name="business" size={12} color="#fff" />
-            <Text style={styles.heroPillText}>{s?.active ?? 0} active</Text>
+            <AppText variant="caption" color="#fff" tabular>
+              {s?.active ?? 0} active
+            </AppText>
           </View>
           <View style={styles.heroPill}>
-            <Ionicons name="shield-checkmark" size={12} color="#fff" />
-            <Text style={styles.heroPillText}>{s?.verified ?? 0} verified</Text>
+            <Ionicons name="shield-checkmark" size={12} color={colors.fix} />
+            <AppText variant="caption" color="#fff" tabular>
+              {s?.verified ?? 0} verified
+            </AppText>
           </View>
         </View>
+      </LinearGradient>
+
+      <View style={styles.statsRow}>
+        <StatTile icon="eye" tone="info" value={s?.views_30d ?? 0} label="Views · 30d" animate />
+        <StatTile icon="heart" tone="brand" value={s?.favorites_30d ?? 0} label="Saves · 30d" animate />
+      </View>
+      <View style={styles.statsRow}>
+        <StatTile icon="business" tone="default" value={s?.active ?? 0} label="Active listings" />
+        <StatTile icon="shield-checkmark" tone="success" value={s?.verified ?? 0} label="Verified" />
       </View>
 
-      <View style={styles.statsGrid}>
-        <StatBlock label="Views · 30d" value={s?.views_30d ?? 0} icon="eye" color={colors.info} />
-        <StatBlock label="Favorites · 30d" value={s?.favorites_30d ?? 0} icon="heart" color={colors.red} />
-        <StatBlock label="Active" value={s?.active ?? 0} icon="business" color={colors.ink} />
-        <StatBlock label="Verified" value={s?.verified ?? 0} icon="shield-checkmark" color={colors.success} />
-      </View>
-
-      <Pressable style={[styles.actionCard, shadows.soft]} onPress={onNew} testID="quick-new-listing">
-        <View style={styles.actionIcon}>
-          <Ionicons name="add" size={22} color="#fff" />
+      <Card onPress={onNew} testID="quick-new-listing" elevation="sm">
+        <View style={styles.rowCenter}>
+          <View style={[styles.roundIcon, { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brand }]}>
+            <Ionicons name="add" size={22} color={colors.onBrand} />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <AppText variant="title">List a new property</AppText>
+            <AppText variant="caption" tone="secondary">
+              5-minute guided flow with GPS verification
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.actionTitle}>List a new property</Text>
-          <Text style={styles.actionSub}>5-minute guided flow</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-      </Pressable>
+      </Card>
     </View>
   );
 }
 
-function StatBlock({
-  label,
-  value,
-  icon,
-  color,
-}: {
-  label: string;
-  value: number;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-}) {
+function ListingRow({ property, views, favorites, onPress, onBoost }: { property: Property; views: number; favorites: number; onPress: () => void; onBoost?: () => void }) {
+  const { colors } = useTheme();
+  const status = property.status || "available";
   return (
-    <View style={[styles.statBlock, shadows.soft]}>
-      <View style={[styles.statBlockIcon, { backgroundColor: color + "20" }]}>
-        <Ionicons name={icon} size={16} color={color} />
-      </View>
-      <Text style={styles.statBlockValue}>{value.toLocaleString()}</Text>
-      <Text style={styles.statBlockLabel}>{label}</Text>
+    <View style={styles.listingWrap}>
+      <Card onPress={onPress} testID={`listing-${property.id}`} elevation="xs" padded={false} style={{ flex: 1 }}>
+        <View style={styles.listing}>
+          <Image source={{ uri: property.images?.[0] }} style={[styles.listingImg, { backgroundColor: colors.skeleton }]} contentFit="cover" transition={200} />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Badge label={status.replace("_", " ")} tone={STATUS_TONE[status] ?? "neutral"} size="xs" />
+            <AppText variant="title" numberOfLines={1}>
+              {property.title}
+            </AppText>
+            <AppText variant="caption" tone="tertiary" numberOfLines={1}>
+              {property.location}
+            </AppText>
+            <View style={styles.listingFooter}>
+              <AppText variant="bodyMedium" tabular weight="bold" style={{ flex: 1 }} numberOfLines={1}>
+                {formatNaira(property.price)}
+              </AppText>
+              <View style={[styles.metricPill, { backgroundColor: colors.surfaceAlt }]}>
+                <Ionicons name="eye" size={11} color={colors.textSecondary} />
+                <AppText variant="micro" tone="secondary" tabular>
+                  {views}
+                </AppText>
+              </View>
+              <View style={[styles.metricPill, { backgroundColor: colors.surfaceAlt }]}>
+                <Ionicons name="heart" size={11} color={colors.brand} />
+                <AppText variant="micro" tone="secondary" tabular>
+                  {favorites}
+                </AppText>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Card>
+      {onBoost ? (
+        <Pressable
+          onPress={onBoost}
+          style={({ pressed }) => [styles.boostBtn, { backgroundColor: colors.surfaceInverse }, pressed && { opacity: 0.85 }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Boost ${property.title}`}
+          testID={`boost-${property.id}`}
+        >
+          <Ionicons name="rocket" size={14} color={colors.textInverse} />
+          <AppText variant="micro" color={colors.textInverse}>
+            Boost
+          </AppText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
-function ListingRow({
-  property,
-  views,
-  favorites,
-  onPress,
-  onBoost,
-}: {
-  property: Property;
-  views: number;
-  favorites: number;
-  onPress: () => void;
-  onBoost?: () => void;
-}) {
-  const statusColor =
-    property.status === "sold"
-      ? colors.red
-      : property.status === "premium"
-        ? "#8B5CF6"
-        : property.status === "verified"
-          ? colors.ink
-          : property.status === "coming_soon"
-            ? colors.gold
-            : colors.success;
-  return (
-    <Pressable style={[styles.listing, shadows.soft]} onPress={onPress} testID={`listing-${property.id}`}>
-      <Image
-        source={{ uri: property.images?.[0] }}
-        style={styles.listingImg}
-        contentFit="cover"
-      />
-      <View style={{ flex: 1, gap: 4 }}>
-        <View style={[styles.statusChip, { backgroundColor: statusColor + "20" }]}>
-          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {property.status.replace("_", " ")}
-          </Text>
-        </View>
-        <Text numberOfLines={1} style={styles.listingTitle}>
-          {property.title}
-        </Text>
-        <Text numberOfLines={1} style={styles.listingLoc}>
-          {property.location}
-        </Text>
-        <View style={styles.listingFooter}>
-          <Text style={styles.listingPrice}>{formatNaira(property.price)}</Text>
-          <View style={styles.metricPill}>
-            <Ionicons name="eye" size={11} color={colors.textSecondary} />
-            <Text style={styles.metricPillText}>{views}</Text>
-          </View>
-          <View style={styles.metricPill}>
-            <Ionicons name="heart" size={11} color={colors.red} />
-            <Text style={styles.metricPillText}>{favorites}</Text>
-          </View>
-          {onBoost && (
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation();
-                onBoost();
-              }}
-              style={styles.boostChip}
-              testID={`boost-${property.id}`}
-            >
-              <Ionicons name="rocket" size={11} color="#fff" />
-              <Text style={styles.boostChipText}>Boost</Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
+const TIER_ICON: Record<string, IconName> = { promote: "trending-up", feature: "star", boost: "rocket" };
 
-function BoostSheet({
-  property,
-  onClose,
-  onSuccess,
-}: {
-  property: Property | null;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const { wallet, refresh } = useWallet();
+function BoostSheet({ property, onClose, onSuccess }: { property: Property | null; onClose: () => void; onSuccess: () => void }) {
+  const { colors } = useTheme();
+  const toast = useToast();
+  const router = useRouter();
+  const { mass, refresh } = useWallet();
   const [tiers, setTiers] = useState<Record<string, any>>({});
   const [selectedTier, setSelectedTier] = useState<"promote" | "feature" | "boost">("promote");
   const [busy, setBusy] = useState(false);
@@ -471,472 +412,155 @@ function BoostSheet({
     }
   }, [property]);
 
-  if (!property) return null;
-
-  const balance = wallet?.spendable ?? 0;
+  const balance = mass?.spendable ?? 0;
   const cost = tiers[selectedTier]?.tokens ?? 0;
   const canAfford = balance >= cost;
 
   const submit = async () => {
-    if (!canAfford) return;
+    if (!canAfford || !property) return;
     setBusy(true);
     try {
       await api.promoteListing(property.id, selectedTier);
       await refresh();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        "Boosted!",
-        `${tiers[selectedTier]?.label} is now active on this listing for ${tiers[selectedTier]?.days} days.`,
-        [{ text: "OK", onPress: () => { onClose(); onSuccess(); } }]
-      );
+      toast.success("Boost activated", `${tiers[selectedTier]?.label} is live on this listing for ${tiers[selectedTier]?.days} days.`);
+      onClose();
+      onSuccess();
     } catch (e: any) {
-      Alert.alert("Could not boost", e?.message ?? "Please try again.");
+      toast.error("Couldn't boost listing", e?.message ?? "Please try again.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Modal visible={!!property} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={boostStyles.backdrop} onPress={onClose}>
-        <Pressable style={boostStyles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={boostStyles.handle} />
-          <Text style={boostStyles.title}>Boost your listing</Text>
-          <Text style={boostStyles.body} numberOfLines={2}>
-            {property.title}
-          </Text>
-          <View style={boostStyles.balanceRow}>
-            <TokenIcon size={16} />
-            <Text style={boostStyles.balanceText}>Balance: {balance} tokens</Text>
+    <Sheet visible={!!property} onClose={onClose} title="Boost your listing" testID="boost-sheet">
+      <View style={{ gap: space[3] }}>
+        <AppText variant="bodySm" tone="secondary" numberOfLines={2}>
+          {property?.title}
+        </AppText>
+        <View style={[styles.balanceRow, { backgroundColor: colors.massSoft }]}>
+          <TokenIcon size={16} />
+          <AppText variant="caption" tone="mass" tabular weight="bold">
+            Balance: {balance.toLocaleString()} MASS
+          </AppText>
+        </View>
+
+        <View style={styles.tiersRow}>
+          {(["promote", "feature", "boost"] as const).map((k) => {
+            const t = tiers[k];
+            if (!t) return null;
+            const active = selectedTier === k;
+            return (
+              <Pressable
+                key={k}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setSelectedTier(k);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={[styles.tier, { backgroundColor: active ? colors.surfaceInverse : colors.surface, borderColor: active ? colors.surfaceInverse : colors.border }]}
+                testID={`boost-tier-${k}`}
+              >
+                <Ionicons name={TIER_ICON[k]} size={20} color={active ? colors.textInverse : colors.text} />
+                <AppText variant="caption" weight="bold" color={active ? colors.textInverse : colors.text}>
+                  {t.label}
+                </AppText>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                  <TokenIcon size={10} />
+                  <AppText variant="bodyMedium" weight="bold" tabular color={active ? colors.textInverse : colors.text}>
+                    {t.tokens}
+                  </AppText>
+                </View>
+                <AppText variant="micro" color={active ? "rgba(255,255,255,0.7)" : colors.textTertiary}>
+                  {t.days} days
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {tiers[selectedTier]?.perk ? (
+          <View style={[styles.perk, { backgroundColor: colors.surfaceAlt }]}>
+            <Ionicons name="sparkles" size={14} color={colors.massText} />
+            <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
+              {tiers[selectedTier].perk}
+            </AppText>
           </View>
+        ) : null}
 
-          <View style={boostStyles.tiersRow}>
-            {(["promote", "feature", "boost"] as const).map((k) => {
-              const t = tiers[k];
-              if (!t) return null;
-              const active = selectedTier === k;
-              return (
-                <Pressable
-                  key={k}
-                  onPress={() => setSelectedTier(k)}
-                  style={[boostStyles.tier, active && boostStyles.tierActive]}
-                  testID={`boost-tier-${k}`}
-                >
-                  <Ionicons
-                    name={k === "boost" ? "rocket" : k === "feature" ? "star" : "trending-up"}
-                    size={20}
-                    color={active ? "#fff" : colors.text}
-                  />
-                  <Text style={[boostStyles.tierName, active && { color: "#fff" }]}>
-                    {t.label}
-                  </Text>
-                  <View style={boostStyles.tierCost}>
-                    <TokenIcon size={10} />
-                    <Text style={[boostStyles.tierCostText, active && { color: "#fff" }]}>
-                      {t.tokens}
-                    </Text>
-                  </View>
-                  <Text style={[boostStyles.tierDays, active && { color: "rgba(255,255,255,0.7)" }]}>
-                    {t.days} days
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {selectedTier && tiers[selectedTier] && (
-            <Text style={boostStyles.perk}>{tiers[selectedTier].perk}</Text>
-          )}
-
-          <Pressable
-            onPress={submit}
-            style={[boostStyles.cta, (!canAfford || busy) && { opacity: 0.5 }]}
-            disabled={!canAfford || busy}
-            testID="boost-submit"
-          >
-            {busy ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="rocket" size={16} color="#fff" />
-                <Text style={boostStyles.ctaText}>
-                  {canAfford ? `Activate for ${cost} tokens` : `Need ${cost - balance} more tokens`}
-                </Text>
-              </>
-            )}
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        <Button
+          label={canAfford ? `Activate for ${cost} MASS` : `Need ${cost - balance} more MASS`}
+          variant="brand"
+          size="lg"
+          fullWidth
+          iconLeft="rocket"
+          loading={busy}
+          disabled={!canAfford || !cost}
+          onPress={submit}
+          testID="boost-submit"
+        />
+        {!canAfford && cost > 0 ? <Button label="Top up MASS" variant="mass" fullWidth onPress={() => router.push("/buy-tokens")} iconLeft="add" /> : null}
+      </View>
+    </Sheet>
   );
 }
 
-const boostStyles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: 40,
-    gap: 12,
-  },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, alignSelf: "center" },
-  title: { fontSize: 22, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
-  body: { fontSize: 13, color: colors.textSecondary },
-  balanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  balanceText: { fontSize: 12, fontWeight: "800", color: colors.text },
-  tiersRow: { flexDirection: "row", gap: 8, marginTop: 6 },
-  tier: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    gap: 4,
-  },
-  tierActive: { backgroundColor: colors.text, borderColor: colors.text },
-  tierName: { fontSize: 12, fontWeight: "800", color: colors.text, marginTop: 4 },
-  tierCost: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 4 },
-  tierCostText: { fontSize: 13, fontWeight: "900", color: colors.text },
-  tierDays: { fontSize: 10, color: colors.textTertiary, fontWeight: "700" },
-  perk: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontStyle: "italic",
-    backgroundColor: colors.surfaceSecondary,
-    padding: 10,
-    borderRadius: 12,
-  },
-  cta: {
-    height: 54,
-    borderRadius: 999,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 6,
-  },
-  ctaText: { color: "#fff", fontSize: 15, fontWeight: "800" },
-});
+const CHANNEL_ICON: Record<Lead["channel"], IconName> = { chat: "chatbubble", call: "call", email: "mail" };
 
 function LeadRow({ lead }: { lead: Lead }) {
-  const channelIcon: Record<Lead["channel"], keyof typeof Ionicons.glyphMap> = {
-    chat: "chatbubble",
-    call: "call",
-    email: "mail",
-  };
+  const { colors } = useTheme();
+  const router = useRouter();
   return (
-    <View style={[styles.lead, shadows.soft]} testID={`lead-${lead.id}`}>
-      <View style={{ position: "relative" }}>
-        <Image source={{ uri: lead.avatar }} style={styles.leadAvatar} />
-        <View style={styles.leadChannel}>
-          <Ionicons name={channelIcon[lead.channel]} size={10} color="#fff" />
+    <Card elevation="xs" testID={`lead-${lead.id}`} onPress={() => lead.property_id && router.push(`/property/${lead.property_id}`)}>
+      <View style={styles.rowCenter}>
+        <View>
+          <Image source={{ uri: lead.avatar }} style={[styles.leadAvatar, { backgroundColor: colors.skeleton }]} />
+          <View style={[styles.leadChannel, { backgroundColor: colors.surfaceInverse, borderColor: colors.surface }]}>
+            <Ionicons name={CHANNEL_ICON[lead.channel]} size={10} color={colors.textInverse} />
+          </View>
         </View>
-      </View>
-      <View style={{ flex: 1, gap: 4 }}>
-        <View style={styles.leadHeader}>
-          <Text style={styles.leadName}>{lead.name}</Text>
-          {lead.unread && <View style={styles.unreadDot} />}
+        <View style={{ flex: 1, gap: 2 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <AppText variant="title" numberOfLines={1} style={{ flexShrink: 1 }}>
+              {lead.name}
+            </AppText>
+            {lead.unread ? <View style={[styles.unreadDot, { backgroundColor: colors.brand }]} accessibilityLabel="Unread" /> : null}
+          </View>
+          <AppText variant="caption" tone="tertiary" numberOfLines={1}>
+            on: {lead.property_title}
+          </AppText>
+          <AppText variant="bodySm" tone="secondary" numberOfLines={2}>
+            {lead.message}
+          </AppText>
         </View>
-        <Text numberOfLines={1} style={styles.leadProp}>
-          on: {lead.property_title}
-        </Text>
-        <Text numberOfLines={2} style={styles.leadMsg}>
-          {lead.message}
-        </Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       </View>
-      <Pressable style={styles.leadReply}>
-        <Ionicons name="arrow-forward" size={16} color={colors.text} />
-      </Pressable>
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  tasksCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.soft,
-  },
-  tasksIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.red,
-  },
-  tasksTitle: { ...typography.bodyBold, color: colors.ink },
-  tasksSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  quotaCard: {
-    backgroundColor: colors.bg,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 12,
-    ...shadows.soft,
-  },
-  quotaCardWarn: { borderColor: colors.red, backgroundColor: colors.redSurface },
-  quotaBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.ink,
-  },
-  quotaTitle: { ...typography.bodyBold, color: colors.ink },
-  quotaSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  quotaBarTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.surfaceSecondary,
-    overflow: "hidden",
-  },
-  quotaBarFill: { height: 6, borderRadius: 3 },
-  crmCta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-    ...shadows.soft,
-  },
-  crmIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  crmTitle: { ...typography.bodyBold, color: colors.ink },
-  crmSub: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { ...typography.h2, fontSize: 22 },
-  headerSub: { ...typography.caption, color: colors.textTertiary },
-  newBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadows.soft,
-  },
-  segmented: {
-    flexDirection: "row",
-    marginHorizontal: spacing.xl,
-    padding: 4,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  segment: {
-    flex: 1,
-    height: 38,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  segmentActive: { backgroundColor: colors.ink },
-  segmentText: { fontSize: 12, fontWeight: "700", color: colors.textSecondary },
-  segmentTextActive: { color: "#fff" },
-  heroCard: {
-    borderRadius: radius.lg,
-    backgroundColor: colors.ink,
-    padding: spacing.xl,
-    gap: 6,
-  },
-  heroLabel: { fontSize: 10, color: "rgba(255,255,255,0.6)", letterSpacing: 1, fontWeight: "700" },
-  heroValue: { fontSize: 34, color: "#fff", fontWeight: "800", letterSpacing: -1 },
+  rowCenter: { flexDirection: "row", alignItems: "center", gap: 12 },
+  roundIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionAction: { flexDirection: "row", alignItems: "center", gap: 2, paddingVertical: 4 },
+  hero: { borderRadius: radii.xl, padding: space[5], gap: 6, overflow: "hidden" },
   heroFooter: { flexDirection: "row", gap: 8, marginTop: 8 },
-  heroPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.15)",
-  },
-  heroPillText: { color: "#fff", fontSize: 11, fontWeight: "700" },
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  statBlock: {
-    width: "47%",
-    flexGrow: 1,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    gap: 6,
-  },
-  statBlockIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statBlockValue: { fontSize: 22, fontWeight: "800", color: colors.text },
-  statBlockLabel: { fontSize: 12, color: colors.textTertiary, fontWeight: "600" },
-  actionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-  },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionTitle: { ...typography.body, fontWeight: "700" },
-  actionSub: { ...typography.caption, color: colors.textTertiary },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: spacing.md,
-  },
-  sectionTitle: { ...typography.h2, fontSize: 18 },
-  link: { color: colors.red, fontSize: 13, fontWeight: "700" },
-  listing: {
-    flexDirection: "row",
-    gap: 12,
-    padding: 12,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-  },
-  listingImg: { width: 84, height: 84, borderRadius: 12, backgroundColor: colors.surfaceSecondary },
-  statusChip: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 10, fontWeight: "800", textTransform: "capitalize", letterSpacing: 0.4 },
-  listingTitle: { fontSize: 14, fontWeight: "700", color: colors.text },
-  listingLoc: { fontSize: 12, color: colors.textTertiary },
-  listingPrice: { fontSize: 16, fontWeight: "800", color: colors.text, marginTop: 2 },
-  listingFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 4,
-    flexWrap: "wrap",
-  },
-  metricPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  metricPillText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.textSecondary,
-  },
-  boostChip: {
-    marginLeft: "auto",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: colors.red,
-  },
-  boostChipText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  lead: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-  },
-  leadAvatar: { width: 46, height: 46, borderRadius: 23 },
-  leadChannel: {
-    position: "absolute",
-    right: -2,
-    bottom: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  leadHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  leadName: { fontSize: 14, fontWeight: "700", color: colors.text, flex: 1 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.red },
-  leadProp: { fontSize: 11, color: colors.red, fontWeight: "600" },
-  leadMsg: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
-  leadReply: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  empty: { alignItems: "center", padding: 40, gap: 8 },
-  emptyTitle: { ...typography.h3, marginTop: 8 },
-  emptySub: { ...typography.body, color: colors.textTertiary, textAlign: "center" },
-  emptyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-  },
-  emptyBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  heroPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 28, borderRadius: radii.pill, backgroundColor: "rgba(255,255,255,0.12)" },
+  statsRow: { flexDirection: "row", gap: space[3] },
+  listingWrap: { position: "relative" },
+  listing: { flexDirection: "row", gap: 12, padding: 12 },
+  listingImg: { width: 92, height: 92, borderRadius: radii.sm },
+  listingFooter: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  metricPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, height: 20, borderRadius: radii.pill },
+  boostBtn: { position: "absolute", right: 12, top: 12, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, height: 28, borderRadius: radii.pill },
+  balanceRow: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 10, height: 30, borderRadius: radii.pill },
+  tiersRow: { flexDirection: "row", gap: 8 },
+  tier: { flex: 1, padding: 12, borderRadius: radii.md, borderWidth: 1.5, alignItems: "center", gap: 4, minHeight: 104, justifyContent: "center" },
+  perk: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: radii.sm },
+  leadAvatar: { width: 44, height: 44, borderRadius: 22 },
+  leadChannel: { position: "absolute", right: -2, bottom: -2, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4 },
 });

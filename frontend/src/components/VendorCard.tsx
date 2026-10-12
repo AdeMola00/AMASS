@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, shadows, spacing } from "@/src/constants/theme";
+import { radius, shadows, spacing } from "@/src/constants/theme";
 import type { Vendor } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export function VendorCard({
   vendor,
@@ -12,6 +13,9 @@ export function VendorCard({
   vendor: Vendor;
   onPress?: () => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable onPress={onPress} style={[styles.wrap, shadows.soft]} testID={`vendor-${vendor.id}`}>
       <Image source={{ uri: vendor.cover }} style={styles.cover} contentFit="cover" />
@@ -37,7 +41,8 @@ export function VendorCard({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   wrap: {
     width: 240,
     borderRadius: radius.md,
@@ -51,7 +56,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderWidth: 3,
     borderColor: "#fff",
   },

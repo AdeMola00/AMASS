@@ -1,10 +1,11 @@
 import React from "react";
 import { Text, StyleSheet, TextStyle } from "react-native";
-import { colors, fonts, formatNaira } from "@/src/constants/theme";
+import { fontFamily, formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
 
 /**
- * Premium serif price component — used across cards and detail screens
- * for a Redfin/luxury real-estate magazine feel.
+ * Price component — Plus Jakarta Sans ExtraBold with tabular numerals so
+ * every price/balance in the app shares one confident, aligned voice.
  */
 export function PriceText({
   value,
@@ -19,7 +20,8 @@ export function PriceText({
   style?: TextStyle;
   tone?: "ink" | "red" | "white";
 }) {
-  const color = tone === "white" ? "#fff" : tone === "red" ? colors.red : colors.text;
+  const { colors } = useTheme();
+  const color = tone === "white" ? "#fff" : tone === "red" ? colors.brand : colors.text;
   return (
     <Text style={[styles.price, { fontSize: size, color }, style]}>
       {formatNaira(value)}
@@ -35,14 +37,13 @@ export function PriceText({
 
 const styles = StyleSheet.create({
   price: {
-    fontFamily: fonts.serifBold,
-    fontWeight: "700",
-    letterSpacing: -1.2,
+    fontFamily: fontFamily.extrabold,
+    letterSpacing: -1,
     includeFontPadding: false,
+    fontVariant: ["tabular-nums"],
   },
   suffix: {
-    fontFamily: undefined,
-    fontWeight: "500",
+    fontFamily: fontFamily.medium,
     letterSpacing: 0,
   },
 });

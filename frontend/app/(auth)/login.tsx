@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import { useRouter, Link, useLocalSearchParams } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useAuth } from "@/src/contexts/auth";
@@ -9,10 +8,13 @@ import { AmassLogo } from "@/src/components/AmassLogo";
 import { AppleSignInButton } from "@/src/components/AppleSignInButton";
 import { GoogleSignInButton } from "@/src/components/GoogleSignInButton";
 import { LegalConsent } from "@/src/components/LegalLinks";
-import { colors, radius, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Button, Divider, Input, Screen } from "@/src/ui";
 
 export default function Login() {
   const router = useRouter();
+  const { colors } = useTheme();
   const { redirect } = useLocalSearchParams<{ redirect?: string; reset?: string }>();
   const params = useLocalSearchParams<{ reset?: string }>();
   const { signIn } = useAuth();
@@ -53,38 +55,29 @@ export default function Login() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <KeyboardAwareScrollView
-        contentContainerStyle={styles.scroll}
-        bottomOffset={24}
-        keyboardShouldPersistTaps="handled"
-      >
+    <Screen edges={["top", "bottom"]} testID="login-screen">
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll} bottomOffset={24} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <AmassLogo size="xl" />
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>
-            Sign in to continue exploring properties across Africa.
-          </Text>
+          <View style={{ gap: 6 }}>
+            <AppText variant="display">Welcome back</AppText>
+            <AppText variant="body" tone="secondary">
+              Sign in to continue exploring properties across Africa.
+            </AppText>
+          </View>
         </View>
 
         <View style={styles.form}>
           {params.reset === "1" && (
-            <View style={styles.resetOk} testID="reset-success-banner">
-              <Ionicons name="checkmark-circle" size={16} color={colors.emerald} />
-              <Text style={styles.resetOkText}>Password reset. Sign in with your new password.</Text>
+            <View style={[styles.notice, { backgroundColor: colors.successSoft }]} testID="reset-success-banner" accessibilityRole="alert">
+              <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+              <AppText variant="bodySm" color={colors.success} style={{ flex: 1 }}>
+                Password reset. Sign in with your new password.
+              </AppText>
             </View>
           )}
-          <Field
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@amass.africa"
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            testID="login-email"
-          />
-          <Field
+          <Input label="Email" value={email} onChangeText={setEmail} placeholder="you@amass.africa" autoCapitalize="none" autoComplete="email" keyboardType="email-address" iconLeft="mail-outline" size="lg" testID="login-email" />
+          <Input
             label="Password"
             value={password}
             onChangeText={setPassword}
@@ -92,39 +85,42 @@ export default function Login() {
             secureTextEntry={!showPw}
             autoComplete="password"
             textContentType="password"
+            iconLeft="lock-closed-outline"
+            size="lg"
             testID="login-password"
-            right={
-              <Pressable onPress={() => setShowPw((v) => !v)} hitSlop={12} testID="login-show-password">
-                <Ionicons name={showPw ? "eye-off" : "eye"} size={20} color={colors.textTertiary} />
-              </Pressable>
-            }
+            iconRight={showPw ? "eye-off-outline" : "eye-outline"}
+            onPressIconRight={() => setShowPw((v) => !v)}
+            iconRightTestID="login-show-password"
+            iconRightLabel={showPw ? "Hide password" : "Show password"}
+            onSubmitEditing={submit}
+            returnKeyType="go"
           />
           <View style={styles.forgotRow}>
             <Link href="/(auth)/forgot-password" asChild>
-              <Pressable hitSlop={8} testID="forgot-password-link">
-                <Text style={styles.link}>Forgot password?</Text>
+              <Pressable hitSlop={8} testID="forgot-password-link" accessibilityRole="link">
+                <AppText variant="caption" weight="bold">
+                  Forgot password?
+                </AppText>
               </Pressable>
             </Link>
           </View>
-          {error && <Text style={styles.error} testID="login-error">{error}</Text>}
+          {error && (
+            <View style={[styles.notice, { backgroundColor: colors.errorSoft }]} accessibilityRole="alert">
+              <Ionicons name="alert-circle" size={16} color={colors.error} />
+              <AppText variant="bodySm" tone="error" style={{ flex: 1 }} testID="login-error">
+                {error}
+              </AppText>
+            </View>
+          )}
 
-          <Pressable
-            onPress={submit}
-            style={[styles.cta, loading && { opacity: 0.6 }]}
-            disabled={loading}
-            testID="login-submit-button"
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.ctaText}>Sign In</Text>
-            )}
-          </Pressable>
+          <Button label="Sign In" size="lg" fullWidth loading={loading} onPress={submit} testID="login-submit-button" />
 
           <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
+            <Divider style={{ flex: 1 }} />
+            <AppText variant="caption" tone="tertiary">
+              or
+            </AppText>
+            <Divider style={{ flex: 1 }} />
           </View>
 
           <View style={{ gap: 10 }}>
@@ -133,10 +129,14 @@ export default function Login() {
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>New to AMASS? </Text>
+            <AppText variant="bodySm" tone="tertiary">
+              New to AMASS?{" "}
+            </AppText>
             <Link href="/(auth)/register" asChild>
-              <Pressable testID="go-to-register">
-                <Text style={styles.link}>Create an account</Text>
+              <Pressable testID="go-to-register" accessibilityRole="link" hitSlop={8}>
+                <AppText variant="bodySm" weight="bold">
+                  Create an account
+                </AppText>
               </Pressable>
             </Link>
           </View>
@@ -144,93 +144,16 @@ export default function Login() {
           <LegalConsent action="signing in" />
         </View>
       </KeyboardAwareScrollView>
-    </SafeAreaView>
-  );
-}
-
-function Field({
-  label,
-  right,
-  testID,
-  ...rest
-}: React.ComponentProps<typeof TextInput> & { label: string; right?: React.ReactNode; testID?: string }) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.inputWrap}>
-        <TextInput
-          {...rest}
-          style={styles.input}
-          placeholderTextColor={colors.textMuted}
-          testID={testID}
-        />
-        {right}
-      </View>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  scroll: { flexGrow: 1, padding: spacing.xl, paddingTop: spacing.xxl },
-  header: { gap: spacing.md, marginBottom: spacing.xxl },
-  title: { ...typography.display, marginTop: spacing.xl },
-  subtitle: { ...typography.body, color: colors.textTertiary, lineHeight: 22 },
-  form: { gap: spacing.lg },
-  field: { gap: 6 },
-  fieldLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: "600",
-    marginLeft: 4,
-  },
-  inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: 56,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: spacing.lg,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text,
-    fontWeight: "500",
-  },
-  cta: {
-    marginTop: spacing.md,
-    height: 56,
-    borderRadius: radius.pill,
-    backgroundColor: colors.emerald,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  error: {
-    color: colors.red,
-    fontSize: 13,
-    marginTop: -8,
-  },
-  forgotRow: { alignItems: "flex-end", marginTop: -6 },
-  resetOk: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: colors.emeraldSurface, borderRadius: radius.md, padding: spacing.md,
-  },
-  resetOkText: { flex: 1, color: colors.textSecondary, fontSize: 13, fontWeight: "600" },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: spacing.lg,
-  },
-  footerText: { color: colors.textTertiary, fontSize: 14 },
-  link: { color: colors.emerald, fontSize: 14, fontWeight: "700" },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: spacing.md,
-    gap: 10,
-  },
-  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-  dividerText: { color: colors.textTertiary, fontSize: 12, fontWeight: "700" },
+  scroll: { flexGrow: 1, padding: space[6], paddingTop: space[8] },
+  header: { gap: space[5], marginBottom: space[8], alignItems: "flex-start" },
+  form: { gap: space[4] },
+  forgotRow: { alignItems: "flex-end", marginTop: -space[2] },
+  notice: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radii.md, padding: space[3] },
+  footer: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: space[2] },
+  divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: space[1] },
 });

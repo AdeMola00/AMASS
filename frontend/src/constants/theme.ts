@@ -3,46 +3,46 @@
 import { Platform } from "react-native";
 
 export const colors = {
-  // Surfaces
-  bg: "#FFFFFF",
-  bgAlt: "#FAFAFA",
+  // Surfaces — mirror src/theme lightTheme (warm stone neutrals)
+  bg: "#FAFAF9",
+  bgAlt: "#F5F5F4",
   surface: "#FFFFFF",
-  surfaceSecondary: "#F5F5F5",
-  surfaceTertiary: "#EAEAEA",
+  surfaceSecondary: "#F5F5F4",
+  surfaceTertiary: "#E9E8E6",
   surfaceInverse: "#0A0A0A",
 
   // Text
   text: "#0A0A0A",
-  textSecondary: "#3F3F46",
-  textTertiary: "#71717A",
-  textMuted: "#A1A1AA",
+  textSecondary: "#57534E",
+  textTertiary: "#7A756E",
+  textMuted: "#A8A49E",
   textInverse: "#FFFFFF",
 
   // BRAND — driven by the logo
   red: "#E11B22",         // AMASS red (pin)
-  redDark: "#B7141A",
-  redLight: "#FDECEC",
+  redDark: "#C4161C",
+  redLight: "#FDE3E3",
   redSurface: "#FEF2F2",
 
   // Charcoal black — used as premium primary/interactive alongside red
   ink: "#0A0A0A",
-  inkSoft: "#1C1C1E",
-  inkSurface: "#18181B",
+  inkSoft: "#1A1816",
+  inkSurface: "#171513",
 
   // Legacy accent kept for success chips only
-  gold: "#D97706",
+  gold: "#D99A06",
   goldLight: "#FEF3C7",
 
   // Semantic state colors
-  success: "#059669",
-  warning: "#F59E0B",
-  error: "#E11B22",
-  info: "#3F3F46",
+  success: "#16A34A",
+  warning: "#D97706",
+  error: "#C4161C",
+  info: "#2563EB",
 
   // Borders
-  border: "#EAEAEA",
-  borderStrong: "#D4D4D8",
-  divider: "#F0F0F0",
+  border: "#E9E8E6",
+  borderStrong: "#D6D4D1",
+  divider: "#F5F5F4",
 
   // Status ring colors for map markers
   statusAvailable: "#0A0A0A",
@@ -55,7 +55,7 @@ export const colors = {
   statusReduced: "#B45309",
 
   // Glass
-  glassLight: "rgba(255,255,255,0.72)",
+  glassLight: "rgba(255,255,255,0.78)",
   glassDark: "rgba(10,10,10,0.55)",
   scrim: "rgba(0,0,0,0.35)",
 
@@ -63,8 +63,8 @@ export const colors = {
   // These map former "emerald" / "info" tokens to the new red-black identity.
   emerald: "#0A0A0A",         // was primary green → now premium black
   emeraldDark: "#000000",
-  emeraldLight: "#F5F5F5",
-  emeraldSurface: "#F5F5F5",
+  emeraldLight: "#F5F5F4",
+  emeraldSurface: "#F5F5F4",
 } as const;
 
 export const spacing = {
@@ -150,6 +150,18 @@ export const fontFamily = {
   medium: "PlusJakartaSans-500",
   semibold: "PlusJakartaSans-600",
   bold: "PlusJakartaSans-700",
+  extrabold: "PlusJakartaSans-800",
+} as const;
+
+// Currency accents — MASS (gold) and FIX (FIXA green) so users can always tell
+// the two wallets apart at a glance. Mirrors src/theme tokens for legacy screens.
+export const currency = {
+  mass: "#F5B301",
+  massText: "#A16207",
+  massSoft: "#FEF3C7",
+  fix: "#22C55E",
+  fixText: "#15803D",
+  fixSoft: "#DCFCE7",
 } as const;
 
 // Format naira nicely: ₦145M, ₦8.5M, ₦65k

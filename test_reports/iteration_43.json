@@ -1,0 +1,49 @@
+{
+  "summary": "Frontend-only verification of iteration 43 Premium UI/UX overhaul for AMASS (390x844 mobile viewport, demo@amass.africa). Verified: login → floating-bottom-nav + 5 tabs; Discover (balance-chip, bell, search, open-map, 6 category tiles, featured-rail with 8 listing cards and save heart toggle); Profile (header + wallet-card + 3 stats + 18 standard menu rows + menu-admin-cockpit + sign-out-button, theme-toggle flips to dark instantly); Wallet (header back, wallet-history, mass-balance=6328, fix-balance=480, 6 quick-action pills, wallet-daily-bonus, 3 filter chips, 60 tx rows); Earn (earn-balance, streak, daily-claim, referral card with code 'ADAD-ZDWU', copy/share/have-code → referral-sheet opens with input + apply btn, invalid code → inline 'Referral code not found' no crash); Settings (3 theme chips, 2 switches, change-password, subscription, agent-plans, privacy/terms, delete-account); Notifications (5 group chips + mark-all); Onboarding (next/skip/signin); Help (search + faq-0/1 + 4 action links); About (privacy/terms/contact); Saved-properties (1 saved-card); My-documents (3 filter chips); Identity-verification (4 step cards + cta); Property detail (/property/<id> loads with neighborhood-scores from /intelligence, UNLOCKED listing shows book-tour-btn 'Chat with Agent · Free' + chat-agent-btn — unlock-cta not applicable because listing already unlocked for demo); Property-not-found testID present for bogus id. Dark mode sweep verified for Discover + Earn + Profile + referral-sheet (dark backgrounds, text visible). Theme persists after reload (settings → theme-dark → reload → still dark). Only ONE real regression found: nested-<button> console error on Profile wallet-card (wallet-card Pressable wraps profile-topup Button → <button> inside <button> on RN-web). All other previously-fixed nested-button sites (Discover search, ListingCard) are clean.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "profile · wallet-card", "issue": "Nested <button> hydration error on web preview — the outer Pressable (testID=wallet-card, routes to /wallet) wraps a nested Button (testID=profile-topup, routes to /buy-tokens) at /app/frontend/app/(tabs)/profile.tsx:136-180. RN-web renders both as <button> → React emits 'In HTML, <button> cannot be a descendant of <button>' and 'Button cannot contain a nested Button'. Reproduces every time Profile tab renders. Previous iteration note explicitly asked us to flag any re-appearance of this error. Fix: convert the outer wallet-card to a View (keep accessibilityRole='button' on the inner tap-target OR split into two Pressables that are siblings — e.g. make the balance area tap to /wallet and keep the Top up button sibling).", "testID": "wallet-card", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "stat-saved vs saved-properties count", "issue": "Carry-over from iteration_42: Profile shows Saved=1 but /saved-properties also shows 1 card (favorite from Discover tap in this run). Previous staleness may already be reconciled by backend. No new issue.", "affected_testIDs": ["stat-saved", "saved-card-*"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "verifications": {
+    "auth_shell": "PASS — login + 5 tabs render",
+    "discover": "PASS — all 12 testIDs present, 8 featured listing cards, save heart toggles (POST /favorites/toggle fires)",
+    "profile": "PASS for routing / 18 menu rows + admin cockpit + sign-out; FAIL for nested-button regression on wallet-card",
+    "wallet": "PASS — balances 6328 MASS / 480 FIX, 60 tx rows, filters present",
+    "earn": "PASS — all testIDs, referral invalid code inline error works, no crash",
+    "settings": "PASS — theme chips + switches + legal links, delete-account dialog shown",
+    "notifications": "PASS — group chips + mark-all",
+    "onboarding": "PASS — all 3 testIDs",
+    "help": "PASS — search + faqs + 4 links",
+    "about": "PASS — version + 3 links",
+    "saved_properties": "PASS — 1 saved-card rendered",
+    "my_documents": "PASS — 3 filter chips",
+    "identity_verification": "PASS — 4 step cards + cta",
+    "property_detail": "PASS — neighborhood-scores rendered from /intelligence, book-tour-btn 'Chat with Agent · Free' present for unlocked listing, chat-agent-btn present, property-not-found testID present for bogus id",
+    "dark_mode_persist": "PASS — settings → theme-dark → reload keeps dark; Discover/Earn/Profile/Settings/referral-sheet all render dark surfaces with legible text",
+    "regression_console": "0 pageerrors (except the expected 'Property not found' thrown on bogus id); 0 nested-button errors on Discover search / ListingCard / all other screens — ONLY wallet-card re-introduces the warning"
+  },
+  "test_report_links": ["/app/test_reports/iteration_43.json"],
+  "action_items": [
+    "FIX wallet-card nested-button regression at /app/frontend/app/(tabs)/profile.tsx:136-180: either (a) change the outer Pressable to a View and attach the /wallet navigation to a non-button inner Pressable that excludes the Top-up region, or (b) remove the outer Pressable and make the balance area its own tap-target sibling to the Top-up Button. Verified fix target: console must show 0 'cannot be a descendant of <button>' and 0 'cannot contain a nested button' errors after reload of /profile.",
+    "(OPTIONAL carry-over from iter42) Replace Alert.alert sign-out confirm with cross-platform modal/dialog so web preview shows a confirmation step (currently relies on window.confirm which Playwright accepts automatically)."
+  ],
+  "critical_code_review_comments": [
+    "profile.tsx wallet-card: nesting a Button inside a Pressable is a known RN-web antipattern. Prefer composition where the two tap targets are siblings in a Row View. The iteration 42 fix for Discover search and ListingCard used exactly this pattern — same approach should be applied here.",
+    "profile-topup is inside wallet-card; because the outer Pressable swallows touches first on native, Top up still works on mobile — but on web the nested <button> breaks keyboard focus and hydration. Both platforms benefit from the sibling-pattern fix.",
+    "settings push/email switches render without aria-checked on the switch root (RN-web Switch limitation). Harmless but makes automated 'did the toggle persist?' assertions fragile. Consider adding an outer View with aria-checked bound to the switch value or exposing the current value in a sibling Text node."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only per request)", "frontend": "19 of 20 scoped areas PASS (95%); 1 nested-button regression on wallet-card"},
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The nested-<button> regression is specifically on Profile → wallet-card wrapping profile-topup. All other 2026-redesigned screens are clean. To reproduce: login → tab-profile → watch console → errors fire during initial render of profile.tsx. If a fix is applied, verify by: (1) loading /profile and asserting 0 console messages containing 'nested' or 'descendant'; (2) ensuring wallet-card still navigates to /wallet and profile-topup still navigates to /buy-tokens. Dark-mode persistence is backed by Settings → theme-dark + reload (verified working). Delete-account confirmation uses window.confirm on web — Playwright global dialog handlers must handle it carefully; use `page.once('dialog', ...)` for a single dismiss, not `on`, to avoid being overridden by earlier accept handlers.",
+  "rca_of_issue": "wallet-card nested-button: /app/frontend/app/(tabs)/profile.tsx:136 declares `<Pressable testID='wallet-card' onPress={...} accessibilityRole='button'>` which RN-web renders as `<button data-testid='wallet-card'>`. Inside, at line 162, `<Button label='Top up' ... testID='profile-topup'>` renders as a nested `<button data-testid='profile-topup'>`. React dev build emits two console errors (`<button> cannot be a descendant of <button>` and `<Button> cannot contain a nested <button>`) and the hydration warning overlay. On native, both still work because touches propagate correctly, but on web keyboard focus/accessibility is broken. Mitigation (sibling pattern): keep walletWrap as a plain View; wrap only the left column (balance info) in a Pressable with testID='wallet-card' that pushes to /wallet; leave the Button for Top up as its own sibling. This mirrors the fix already applied to Discover search bar and ListingCard in iteration 42."
+}

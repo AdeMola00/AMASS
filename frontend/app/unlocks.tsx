@@ -1,163 +1,111 @@
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter, Stack } from "expo-router";
 import { Image } from "expo-image";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Card, EmptyState, Screen, ScreenHeader, SkeletonCard } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 export default function UnlocksScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    api
-      .walletUnlocks()
-      .then(setItems)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    setError(false);
+    try {
+      setItems(await api.walletUnlocks());
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const visible = items.filter((it) => it.property);
+
   return (
-    <View style={styles.container}>
+    <Screen testID="unlocks-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>My Unlocked Properties</Text>
-        <View style={{ width: 40 }} />
-      </SafeAreaView>
+      <ScreenHeader title="My Unlocked Properties" subtitle={visible.length ? `${visible.length} unlocked · yours forever` : undefined} />
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.red} />
+        <View style={{ padding: space[4], gap: space[3] }}>
+          <SkeletonCard imageHeight={160} />
+          <SkeletonCard imageHeight={160} />
         </View>
-      ) : items.length === 0 ? (
-        <View style={styles.empty}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="lock-open-outline" size={32} color={colors.textMuted} />
-          </View>
-          <Text style={styles.emptyTitle}>No unlocked properties yet</Text>
-          <Text style={styles.emptyBody}>
-            When you unlock a property, it stays here forever.
-          </Text>
-          <Pressable style={styles.emptyCta} onPress={() => router.replace("/")}>
-            <Text style={styles.emptyCtaText}>Explore properties</Text>
-          </Pressable>
-        </View>
+      ) : error ? (
+        <EmptyState variant="error" title="Couldn't load unlocks" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load(); }} />
+      ) : visible.length === 0 ? (
+        <EmptyState icon="lock-open-outline" title="No unlocked properties yet" body="When you unlock a property, it stays here forever — address, photos and agent contact included." actionLabel="Explore properties" onAction={() => router.replace("/(tabs)" as any)} testID="unlocks-empty" />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
-          {items.map((it) => {
+        <ScrollView
+          contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: 40 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+              }}
+              tintColor={colors.text}
+            />
+          }
+        >
+          {visible.map((it, idx) => {
             const p = it.property;
-            if (!p) return null;
             return (
-              <Pressable
-                key={it.id}
-                onPress={() => router.push(`/property/${p.id}`)}
-                style={[styles.card, shadows.card]}
-              >
-                <Image
-                  source={{ uri: p.images?.[0] }}
-                  style={styles.image}
-                  contentFit="cover"
-                />
+              <Card key={`${it.id ?? p.id}-${idx}`} onPress={() => router.push(`/property/${p.id}`)} elevation="sm" padded={false} testID={`unlock-${it.id}`}>
+                <Image source={{ uri: p.images?.[0] }} style={[styles.image, { backgroundColor: colors.skeleton }]} contentFit="cover" transition={250} />
                 <View style={styles.body}>
-                  <Text style={styles.title} numberOfLines={1}>
-                    {p.title}
-                  </Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <Ionicons name="location" size={11} color={colors.red} />
-                    <Text style={styles.location} numberOfLines={1}>
-                      {p.location}
-                    </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <AppText variant="title" numberOfLines={1} style={{ flex: 1 }}>
+                      {p.title}
+                    </AppText>
+                    <Badge label="Unlocked" tone="success" icon="lock-open" size="xs" />
                   </View>
-                  <Text style={styles.price}>{formatNaira(p.price)}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="location" size={12} color={colors.brand} />
+                    <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+                      {p.location}
+                    </AppText>
+                  </View>
+                  <AppText variant="h3" tabular>
+                    {formatNaira(p.price)}
+                  </AppText>
                   <View style={styles.metaRow}>
                     <TokenIcon size={12} />
-                    <Text style={styles.meta}>
-                      Unlocked for {it.tokens_paid > 0 ? `${it.tokens_paid} tokens` : "FREE"}
-                    </Text>
-                    <Text style={styles.metaDot}>·</Text>
-                    <Text style={styles.meta}>
-                      {new Date(it.created_at).toLocaleDateString()}
-                    </Text>
+                    <AppText variant="micro" tone="tertiary" tabular>
+                      Unlocked for {it.tokens_paid > 0 ? `${it.tokens_paid} MASS` : "FREE"} · {new Date(it.created_at).toLocaleDateString()}
+                    </AppText>
                   </View>
                 </View>
-              </Pressable>
+              </Card>
             );
           })}
         </ScrollView>
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xxl, gap: 10 },
-  emptyIcon: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyTitle: { fontSize: 17, fontWeight: "800", color: colors.text, textAlign: "center" },
-  emptyBody: { fontSize: 13, color: colors.textTertiary, textAlign: "center", lineHeight: 18 },
-  emptyCta: {
-    marginTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: radius.pill,
-    backgroundColor: colors.red,
-  },
-  emptyCtaText: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  card: {
-    flexDirection: "row",
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    overflow: "hidden",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  image: { width: 100, height: 100 },
-  body: { flex: 1, padding: spacing.md, justifyContent: "center", gap: 3 },
-  title: { fontSize: 14, fontWeight: "800", color: colors.text },
-  location: { fontSize: 12, color: colors.textSecondary },
-  price: { fontSize: 15, fontWeight: "800", color: colors.text, marginTop: 2 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
-  meta: { fontSize: 10, color: colors.textTertiary, fontWeight: "700" },
-  metaDot: { fontSize: 10, color: colors.textTertiary },
+  image: { width: "100%", height: 170, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg },
+  body: { padding: space[4], gap: 6 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
 });

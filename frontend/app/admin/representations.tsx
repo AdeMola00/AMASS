@@ -3,37 +3,36 @@
  * List reps by status with approve/reject/request-docs/suspend/revoke actions.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { FlatList, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Avatar, Badge, Button, Card, Chip, EmptyState, Input, Screen, ScreenHeader, Sheet, SkeletonRows, useToast, type BadgeTone, type IconName } from "@/src/ui";
 
 const STATUSES = ["PENDING", "DOCS_REQUESTED", "APPROVED", "REJECTED", "SUSPENDED", "REVOKED"];
-const STATUS_COLOR: Record<string, string> = {
-  PENDING: colors.gold,
-  DOCS_REQUESTED: colors.gold,
-  APPROVED: colors.emerald,
-  REJECTED: colors.red,
-  SUSPENDED: colors.textTertiary,
-  REVOKED: colors.textTertiary,
+const STATUS_META: Record<string, { tone: BadgeTone; icon: IconName; label: string }> = {
+  PENDING: { tone: "warning", icon: "time-outline", label: "Pending" },
+  DOCS_REQUESTED: { tone: "info", icon: "document-attach-outline", label: "Docs requested" },
+  APPROVED: { tone: "success", icon: "checkmark-circle", label: "Approved" },
+  REJECTED: { tone: "error", icon: "close-circle", label: "Rejected" },
+  SUSPENDED: { tone: "neutral", icon: "pause-circle", label: "Suspended" },
+  REVOKED: { tone: "neutral", icon: "remove-circle", label: "Revoked" },
 };
+
+type Action = "approve" | "reject" | "request_docs" | "suspend" | "revoke";
+const ACTIONS: { key: Action; label: string; icon: IconName; hint: string; destructive?: boolean }[] = [
+  { key: "approve", label: "Approve", icon: "checkmark-circle", hint: "Grant the mandate — agent can list and represent." },
+  { key: "request_docs", label: "Request docs", icon: "document-attach", hint: "Ask the agent for more proof before deciding." },
+  { key: "reject", label: "Reject", icon: "close-circle", hint: "Decline this representation request.", destructive: true },
+  { key: "suspend", label: "Suspend", icon: "pause-circle", hint: "Temporarily pause an approved mandate.", destructive: true },
+  { key: "revoke", label: "Revoke", icon: "remove-circle", hint: "Permanently end an approved mandate.", destructive: true },
+];
 
 type Rep = {
   id: string;
@@ -49,19 +48,23 @@ type Rep = {
 
 export default function AdminRepresentationsQueue() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { user } = useAuth();
   const [status, setStatus] = useState("PENDING");
   const [reps, setReps] = useState<Rep[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [active, setActive] = useState<Rep | null>(null);
 
   const load = useCallback(async () => {
+    setError(false);
     try {
       const r = await api.adminRepQueue(status);
       setReps(r as Rep[]);
-    } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Try again");
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -78,95 +81,118 @@ export default function AdminRepresentationsQueue() {
 
   if (!user?.is_admin) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <Header title="Representations" onBack={() => router.back()} />
-        <View style={styles.blocked}>
-          <Ionicons name="lock-closed" size={40} color={colors.red} />
-          <Text style={styles.blockedText}>Admins only</Text>
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Representations" />
+        <EmptyState icon="lock-closed-outline" title="Admins only" body="You need an admin account to review representations." actionLabel="Go back" onAction={() => router.back()} />
+      </Screen>
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="admin-reps">
-      <Header title="Representations" onBack={() => router.back()} />
+  const meta = STATUS_META[status];
 
-      <View style={styles.statusBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: spacing.md }}>
+  return (
+    <Screen testID="admin-reps">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="Representations" subtitle={!loading ? `${reps.length} ${meta.label.toLowerCase()}` : undefined} />
+
+      <View style={[styles.statusBar, { borderBottomColor: colors.border }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: space[4] }}>
           {STATUSES.map((s) => (
-            <Pressable
+            <Chip
               key={s}
-              style={[styles.statusChip, status === s && styles.statusChipOn]}
-              onPress={() => { setStatus(s); setLoading(true); }}
+              label={STATUS_META[s].label}
+              icon={STATUS_META[s].icon}
+              selected={status === s}
+              onPress={() => { if (s !== status) { setStatus(s); setLoading(true); } }}
               testID={`status-${s}`}
-            >
-              <Text style={[styles.statusChipText, status === s && { color: "#fff" }]}>{s.replace(/_/g, " ")}</Text>
-            </Pressable>
+            />
           ))}
         </ScrollView>
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 60 }} color={colors.red} />
+        <View style={{ padding: space[4] }}>
+          <SkeletonRows rows={5} />
+        </View>
+      ) : error ? (
+        <EmptyState variant="error" title="Couldn't load representations" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load(); }} />
       ) : (
         <FlatList
           data={reps}
           keyExtractor={(r) => r.id}
-          contentContainerStyle={{ padding: spacing.xl, gap: 10, paddingBottom: 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.red} />}
+          contentContainerStyle={{ padding: space[4], gap: 10, paddingBottom: 40 + insets.bottom }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.text} />}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="checkmark-done-circle" size={40} color={colors.emerald} />
-              <Text style={styles.emptyText}>No {status.toLowerCase().replace(/_/g, " ")} representations.</Text>
-            </View>
+            <EmptyState
+              variant={status === "PENDING" ? "success" : "empty"}
+              icon={meta.icon}
+              title={`No ${meta.label.toLowerCase()} representations`}
+              body={status === "PENDING" ? "Nice — nothing is waiting on you." : "Switch status above to see other mandates."}
+            />
           }
-          renderItem={({ item }) => (
-            <Pressable style={[styles.card, shadows.soft]} onPress={() => setActive(item)}>
-              <View style={styles.thumb}>
-                {item.property_preview?.media_ids?.[0] ? (
-                  <Image source={{ uri: item.property_preview.media_ids[0] }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
-                ) : (
-                  <Ionicons name="home" size={22} color={colors.textMuted} />
-                )}
-              </View>
-              <View style={{ flex: 1, gap: 3 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={styles.amassId}>{item.amass_property_id}</Text>
-                  <View style={[styles.pill, { backgroundColor: STATUS_COLOR[item.status] ?? colors.textTertiary }]}>
-                    <Text style={styles.pillText}>{item.status.replace(/_/g, " ")}</Text>
+          renderItem={({ item }) => {
+            const m = STATUS_META[item.status] ?? { tone: "neutral" as BadgeTone, icon: "ellipse" as IconName, label: item.status };
+            return (
+              <Card elevation="xs" onPress={() => setActive(item)} style={styles.card} testID={`rep-${item.id}`}>
+                <View style={[styles.thumb, { backgroundColor: colors.surfaceAlt }]}>
+                  {item.property_preview?.media_ids?.[0] ? (
+                    <Image source={{ uri: item.property_preview.media_ids[0] }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={200} />
+                  ) : (
+                    <Ionicons name="home-outline" size={22} color={colors.textMuted} />
+                  )}
+                </View>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <AppText variant="title" tabular numberOfLines={1} style={{ flexShrink: 1 }}>{item.amass_property_id}</AppText>
+                    <Badge label={m.label} tone={m.tone} icon={m.icon} size="xs" />
+                  </View>
+                  <AppText variant="caption" tone="secondary" numberOfLines={1}>
+                    {item.representation_type.replace(/_/g, " ")}{item.mandate_type ? ` · ${item.mandate_type}` : ""}
+                  </AppText>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    {item.agent_preview?.full_name ? (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Avatar name={item.agent_preview.full_name} size={18} tone="soft" />
+                        <AppText variant="caption" tone="tertiary" numberOfLines={1}>{item.agent_preview.full_name}</AppText>
+                      </View>
+                    ) : null}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Ionicons name="document-text-outline" size={12} color={colors.textMuted} />
+                      <AppText variant="caption" tone="muted" tabular>{(item.documents ?? []).length} doc{(item.documents ?? []).length === 1 ? "" : "s"}</AppText>
+                    </View>
                   </View>
                 </View>
-                <Text style={styles.repType}>{item.representation_type.replace(/_/g, " ")} {item.mandate_type ? `· ${item.mandate_type}` : ""}</Text>
-                {item.agent_preview?.full_name && (
-                  <Text style={styles.agent}>Agent: {item.agent_preview.full_name}</Text>
-                )}
-                <Text style={styles.docs}>{(item.documents ?? []).length} document(s)</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-            </Pressable>
-          )}
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </Card>
+            );
+          }}
         />
       )}
 
-      {active && (
-        <DecisionSheet
-          rep={active}
-          onClose={() => setActive(null)}
-          onDone={() => { setActive(null); setLoading(true); load(); }}
-        />
-      )}
-    </SafeAreaView>
+      <DecisionSheet
+        rep={active}
+        onClose={() => setActive(null)}
+        onDone={() => { setActive(null); setLoading(true); load(); }}
+      />
+    </Screen>
   );
 }
 
-function DecisionSheet({ rep, onClose, onDone }: { rep: Rep; onClose: () => void; onDone: () => void }) {
-  const [action, setAction] = useState<"approve" | "reject" | "request_docs" | "suspend" | "revoke">("approve");
+function DecisionSheet({ rep, onClose, onDone }: { rep: Rep | null; onClose: () => void; onDone: () => void }) {
+  const { colors } = useTheme();
+  const toast = useToast();
+  const [action, setAction] = useState<Action>("approve");
   const [reason, setReason] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (rep) { setAction("approve"); setReason(""); setValidUntil(""); }
+  }, [rep]);
+
   const decide = async () => {
+    if (!rep) return;
     setBusy(true);
     try {
       await api.adminRepDecide(rep.id, {
@@ -174,209 +200,110 @@ function DecisionSheet({ rep, onClose, onDone }: { rep: Rep; onClose: () => void
         reason: reason || undefined,
         valid_until: action === "approve" && validUntil ? validUntil : undefined,
       });
+      toast.success(`Representation ${ACTIONS.find((a) => a.key === action)?.label.toLowerCase() ?? "updated"}`, rep.amass_property_id);
       onDone();
     } catch (e: any) {
-      Alert.alert("Failed", e?.message ?? "Try again");
+      toast.error("Decision failed", e?.message ?? "Try again");
     } finally {
       setBusy(false);
     }
   };
 
+  const chosen = ACTIONS.find((a) => a.key === action)!;
+  const dateValid = !validUntil || /^\d{4}-\d{2}-\d{2}$/.test(validUntil);
+
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <View style={styles.modalHeader}>
-            <View>
-              <Text style={styles.modalTitle}>{rep.amass_property_id}</Text>
-              <Text style={styles.modalSub}>{rep.representation_type.replace(/_/g, " ").toUpperCase()}</Text>
-            </View>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={22} color={colors.textTertiary} />
-            </Pressable>
+    <Sheet visible={!!rep} onClose={() => { if (!busy) onClose(); }} title={rep?.amass_property_id ?? ""} testID="rep-decision-sheet">
+      {rep && (
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingBottom: 4 }}>
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            <Badge label={rep.representation_type.replace(/_/g, " ")} tone="neutral" size="md" icon="briefcase-outline" />
+            {rep.mandate_type ? <Badge label={rep.mandate_type} tone="info" size="md" /> : null}
+            {rep.agent_preview?.full_name ? <Badge label={rep.agent_preview.full_name} tone="neutral" size="md" icon="person-outline" /> : null}
           </View>
 
-          <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 12 }}>
-            {rep.documents && rep.documents.length > 0 && (
-              <>
-                <Text style={styles.subLbl}>DOCUMENTS ({rep.documents.length})</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  {rep.documents.map((d, i) => (
-                    <View key={i} style={styles.doc}>
-                      <Image source={{ uri: d }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
-                    </View>
-                  ))}
-                </ScrollView>
-              </>
-            )}
+          {rep.documents && rep.documents.length > 0 ? (
+            <View style={{ gap: 8 }}>
+              <AppText variant="label" tone="tertiary" uppercase>Documents · {rep.documents.length}</AppText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {rep.documents.map((d, i) => (
+                  <View key={i} style={[styles.doc, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                    <Image source={{ uri: d }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={200} />
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          ) : (
+            <View style={[styles.notice, { backgroundColor: colors.warningSoft }]}>
+              <Ionicons name="alert-circle" size={16} color={colors.warning} />
+              <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>No supporting documents were attached to this request.</AppText>
+            </View>
+          )}
 
-            <Text style={styles.subLbl}>DECISION</Text>
+          <View style={{ gap: 8 }}>
+            <AppText variant="label" tone="tertiary" uppercase>Decision</AppText>
             <View style={styles.actionsGrid}>
-              {(["approve", "reject", "request_docs", "suspend", "revoke"] as const).map((a) => (
-                <Pressable
-                  key={a}
-                  onPress={() => setAction(a)}
-                  style={[styles.actionCell, action === a && styles.actionCellOn]}
-                  testID={`admin-action-${a}`}
-                >
-                  <Text style={[styles.actionCellText, action === a && { color: "#fff" }]}>{a.replace(/_/g, " ").toUpperCase()}</Text>
-                </Pressable>
+              {ACTIONS.map((a) => (
+                <Chip
+                  key={a.key}
+                  label={a.label}
+                  icon={a.icon}
+                  selected={action === a.key}
+                  tone={a.key === "approve" ? "fix" : a.destructive ? "brand" : "default"}
+                  onPress={() => setAction(a.key)}
+                  testID={`admin-action-${a.key}`}
+                />
               ))}
             </View>
+            <AppText variant="caption" tone="tertiary">{chosen.hint}</AppText>
+          </View>
 
-            {action === "approve" && (
-              <>
-                <Text style={styles.subLbl}>MANDATE VALID UNTIL (optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={validUntil}
-                  onChangeText={setValidUntil}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </>
-            )}
-
-            <Text style={styles.subLbl}>REASON</Text>
-            <TextInput
-              style={[styles.input, { minHeight: 70, textAlignVertical: "top", paddingTop: 10 }]}
-              value={reason}
-              onChangeText={setReason}
-              multiline
-              placeholder="Note for the agent…"
-              placeholderTextColor={colors.textMuted}
+          {action === "approve" && (
+            <Input
+              label="Mandate valid until · optional"
+              value={validUntil}
+              onChangeText={setValidUntil}
+              placeholder="YYYY-MM-DD"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="numbers-and-punctuation"
+              iconLeft="calendar-outline"
+              error={!dateValid ? "Use the format YYYY-MM-DD" : null}
+              testID="rep-valid-until"
             />
+          )}
 
-            <Pressable style={[styles.cta, busy && { opacity: 0.5 }]} onPress={decide} disabled={busy}>
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>Submit</Text>}
-            </Pressable>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
+          <Input
+            label={action === "approve" ? "Note for the agent · optional" : "Reason · shown to the agent"}
+            value={reason}
+            onChangeText={setReason}
+            multiline
+            placeholder="Add context for this decision…"
+            testID="rep-reason"
+          />
 
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>{title}</Text>
-      <View style={styles.iconBtn} />
-    </View>
+          <Button
+            label={`${chosen.label} representation`}
+            variant={action === "approve" ? "fix" : chosen.destructive ? "brand" : "primary"}
+            size="lg"
+            fullWidth
+            iconLeft={chosen.icon}
+            loading={busy}
+            disabled={!dateValid}
+            onPress={decide}
+            testID="rep-decide-submit"
+          />
+        </ScrollView>
+      )}
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-  statusBar: {
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  statusChip: {
-    paddingHorizontal: 12,
-    height: 32,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statusChipOn: { backgroundColor: colors.ink, borderColor: colors.ink },
-  statusChipText: { fontSize: 11, fontWeight: "700", color: colors.textSecondary },
-
-  card: {
-    flexDirection: "row",
-    padding: 12,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    gap: 12,
-    alignItems: "center",
-  },
-  thumb: {
-    width: 60,
-    height: 60,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  amassId: { fontSize: 12, fontWeight: "800", color: colors.text },
-  pill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill },
-  pillText: { color: "#fff", fontSize: 9, fontWeight: "800", letterSpacing: 0.3 },
-  repType: { fontSize: 12, color: colors.textSecondary, fontWeight: "600" },
-  agent: { fontSize: 11, color: colors.textTertiary },
-  docs: { fontSize: 10, color: colors.textMuted, fontWeight: "700" },
-
-  empty: { padding: spacing.xl, alignItems: "center", gap: 8, marginTop: 60 },
-  emptyText: { fontSize: 13, color: colors.textTertiary },
-  blocked: { padding: spacing.xl, alignItems: "center", gap: 10, marginTop: 40 },
-  blockedText: { fontSize: 14, color: colors.text, fontWeight: "700" },
-
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  modalCard: {
-    maxHeight: "88%",
-    backgroundColor: "#fff",
-    padding: spacing.xl,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    gap: 10,
-  },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  modalTitle: { ...typography.h2, fontSize: 17 },
-  modalSub: { fontSize: 10, color: colors.textTertiary, fontWeight: "800", letterSpacing: 0.5, marginTop: 2 },
-  subLbl: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.6,
-    marginTop: 6,
-  },
-  doc: { width: 100, height: 100, borderRadius: radius.sm, overflow: "hidden", backgroundColor: colors.surfaceSecondary },
-  actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  actionCell: {
-    paddingHorizontal: 10,
-    height: 34,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionCellOn: { backgroundColor: colors.ink, borderColor: colors.ink },
-  actionCellText: { fontSize: 10, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.4 },
-  input: {
-    minHeight: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 14,
-    fontSize: 13,
-    color: colors.text,
-    fontWeight: "600",
-  },
-  cta: {
-    height: 50,
-    borderRadius: radius.pill,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  ctaText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  statusBar: { paddingBottom: space[3], borderBottomWidth: StyleSheet.hairlineWidth },
+  card: { flexDirection: "row", gap: 12, alignItems: "center", padding: 12 },
+  thumb: { width: 60, height: 60, borderRadius: radii.sm, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  doc: { width: 110, height: 110, borderRadius: radii.sm, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
+  actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  notice: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm },
 });

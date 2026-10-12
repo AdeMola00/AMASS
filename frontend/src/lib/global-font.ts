@@ -19,7 +19,8 @@ function weightToFamily(weight?: string | number): string {
   if (!n || Number.isNaN(n) || n <= 400) return fontFamily.regular;
   if (n <= 500) return fontFamily.medium;
   if (n <= 600) return fontFamily.semibold;
-  return fontFamily.bold;
+  if (n <= 700) return fontFamily.bold;
+  return fontFamily.extrabold;
 }
 
 function patch(Component: any) {

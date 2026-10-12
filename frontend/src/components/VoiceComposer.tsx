@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator, Animated, Easing, PanResponder, Platform,
-  Pressable, StyleSheet, Text, View,
+  Pressable, StyleSheet, View,
 } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
@@ -28,7 +28,8 @@ import {
 } from "expo-audio";
 
 import { api } from "@/src/lib/api";
-import { colors } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { AppText } from "@/src/ui";
 
 const MAX_MS = 60_000;
 const CANCEL_DX = -70;       // slide-left to cancel
@@ -51,12 +52,13 @@ function _fmt(ms: number): string {
 
 export function VoiceComposer({ conversationId, disabled, onSending, onUploaded, onError }: Props) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const { colors } = useTheme();
   const [state, setState] = useState<"idle" | "recording" | "locked" | "uploading">("idle");
   const [elapsed, setElapsed] = useState(0);
   const [cancelHint, setCancelHint] = useState(false);
   const startedAtRef = useRef<number>(0);
-  const stopTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const tickRef = useRef<NodeJS.Timeout | null>(null);
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tickRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
   const cancelRef = useRef(false);
@@ -231,31 +233,39 @@ export function VoiceComposer({ conversationId, disabled, onSending, onUploaded,
   // ─── Render ───
   if (state === "uploading") {
     return (
-      <View style={styles.wrapUploading}>
-        <ActivityIndicator color={colors.red} />
-        <Text style={styles.uploadText}>Sending voice note…</Text>
+      <View style={[styles.pillRow, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityLiveRegion="polite">
+        <ActivityIndicator color={colors.brand} />
+        <AppText variant="bodySm" tone="secondary" weight="semibold">
+          Sending voice note…
+        </AppText>
       </View>
     );
   }
 
   if (state === "locked") {
     return (
-      <View style={styles.lockedRow}>
-        <Animated.View style={[styles.dot, { transform: [{ scale: pulse }] }]} />
-        <Text style={styles.lockedText}>Recording · {_fmt(elapsed)}</Text>
+      <View style={[styles.pillRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Animated.View style={[styles.dot, { backgroundColor: colors.brand, transform: [{ scale: pulse }] }]} />
+        <AppText variant="bodySm" weight="semibold" style={{ flex: 1 }} tabular>
+          Recording · {_fmt(elapsed)}
+        </AppText>
         <Pressable
           onPress={() => finalize(true)}
           style={styles.trashBtn}
           hitSlop={10}
           testID="voice-cancel"
+          accessibilityRole="button"
+          accessibilityLabel="Discard recording"
         >
-          <Ionicons name="trash" size={18} color={colors.red} />
+          <Ionicons name="trash" size={18} color={colors.error} />
         </Pressable>
         <Pressable
           onPress={() => finalize(false)}
-          style={styles.sendBtn}
+          style={[styles.sendBtn, { backgroundColor: colors.brand }]}
           hitSlop={10}
           testID="voice-send"
+          accessibilityRole="button"
+          accessibilityLabel="Send voice note"
         >
           <Ionicons name="send" size={16} color="#fff" />
         </Pressable>
@@ -268,18 +278,22 @@ export function VoiceComposer({ conversationId, disabled, onSending, onUploaded,
       <View style={styles.recordingRow}>
         <View style={styles.lockHint}>
           <Ionicons name="lock-closed" size={12} color={colors.textSecondary} />
-          <Text style={styles.lockHintText}>slide up to lock</Text>
+          <AppText variant="micro" tone="secondary">
+            slide up to lock
+          </AppText>
         </View>
-        <View style={styles.recRow}>
-          <Animated.View style={[styles.dot, { transform: [{ scale: pulse }] }]} />
-          <Text style={styles.recTime}>{_fmt(elapsed)}</Text>
+        <View style={[styles.pillRow, { backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: 10 }]}>
+          <Animated.View style={[styles.dot, { backgroundColor: colors.brand, transform: [{ scale: pulse }] }]} />
+          <AppText variant="bodySm" weight="bold" style={{ minWidth: 40 }} tabular>
+            {_fmt(elapsed)}
+          </AppText>
           <Animated.View style={{ flex: 1, transform: [{ translateX: slideX }] }}>
-            <Text style={[styles.cancelHint, cancelHint && { color: colors.red, fontWeight: "800" }]} numberOfLines={1}>
+            <AppText variant="caption" tone={cancelHint ? "error" : "secondary"} weight={cancelHint ? "bold" : "medium"} numberOfLines={1}>
               {cancelHint ? "Release to cancel" : "‹ slide to cancel"}
-            </Text>
+            </AppText>
           </Animated.View>
           <Animated.View
-            style={[styles.micBtnActive, { transform: [{ scale: pulse }] }]}
+            style={[styles.micBtnActive, { backgroundColor: colors.brand, transform: [{ scale: pulse }] }]}
             {...pan.panHandlers}
             testID="voice-mic-active"
           >
@@ -292,9 +306,9 @@ export function VoiceComposer({ conversationId, disabled, onSending, onUploaded,
 
   // idle
   return (
-    <View style={styles.idleWrap} {...pan.panHandlers} testID="voice-mic">
-      <View style={styles.micBtnIdle}>
-        <Ionicons name="mic-outline" size={22} color={colors.red} />
+    <View style={styles.idleWrap} {...pan.panHandlers} testID="voice-mic" accessibilityRole="button" accessibilityLabel="Hold to record a voice note">
+      <View style={[styles.micBtnIdle, { backgroundColor: colors.surfaceAlt }]}>
+        <Ionicons name="mic-outline" size={22} color={colors.brand} />
       </View>
     </View>
   );
@@ -305,44 +319,25 @@ const styles = StyleSheet.create({
   micBtnIdle: {
     width: 44, height: 44, borderRadius: 22,
     alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.surfaceSecondary,
   },
   micBtnActive: {
     width: 46, height: 46, borderRadius: 23,
     alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.red,
   },
   recordingRow: {
     flex: 1, gap: 4,
   },
   lockHint: { flexDirection: "row", alignItems: "center", gap: 4, justifyContent: "flex-end", paddingRight: 6 },
-  lockHintText: { fontSize: 10, color: colors.textSecondary, fontWeight: "700" },
-  recRow: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: 10, height: 46,
-    backgroundColor: "#fff", borderRadius: 23,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider,
-  },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red },
-  recTime: { fontSize: 13, fontWeight: "800", color: colors.text, minWidth: 40 },
-  cancelHint: { fontSize: 12, color: colors.textSecondary },
-  lockedRow: {
-    flex: 1, flexDirection: "row", alignItems: "center", gap: 10,
+  pillRow: {
+    flex: 1, flexDirection: "row", alignItems: "center", gap: 8,
     paddingHorizontal: 12, height: 46,
-    backgroundColor: "#fff", borderRadius: 23,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider,
+    borderRadius: 23,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  lockedText: { flex: 1, fontSize: 13, fontWeight: "700", color: colors.text },
+  dot: { width: 10, height: 10, borderRadius: 5 },
   trashBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   sendBtn: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.red,
+    width: 40, height: 40, borderRadius: 20,
     alignItems: "center", justifyContent: "center",
   },
-  wrapUploading: {
-    flex: 1, flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: 14, height: 46,
-    backgroundColor: "#fff", borderRadius: 23,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider,
-  },
-  uploadText: { fontSize: 13, fontWeight: "700", color: colors.textSecondary },
 });

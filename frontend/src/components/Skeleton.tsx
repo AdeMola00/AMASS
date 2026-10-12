@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { Animated, StyleSheet, View, ViewStyle } from "react-native";
-import { colors } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+
 
 /**
  * Redfin-style shimmer skeleton block. Uses opacity pulse (no dependency).
@@ -16,6 +17,9 @@ export function Skeleton({
   radius?: number;
   style?: ViewStyle;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const opacity = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -39,6 +43,9 @@ export function Skeleton({
 }
 
 export function PropertyCardSkeleton() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.card}>
       <Skeleton height={160} radius={0} />
@@ -56,11 +63,12 @@ export function PropertyCardSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   block: { backgroundColor: colors.surfaceSecondary },
   card: {
     borderRadius: 20,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,

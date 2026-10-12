@@ -7,34 +7,37 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
-  Alert,
   Switch,
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../../src/ui/icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { Button, Screen, ScreenHeader, useToast } from "@/src/ui";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 const CATEGORIES = [
-  { key: "vehicles",    label: "Vehicles",     emoji: "🚗", subs: ["Cars", "SUVs", "Trucks", "Vans", "Buses"] },
-  { key: "motorcycles", label: "Motorcycles",  emoji: "🏍", subs: ["Motorcycles", "Scooters"] },
-  { key: "phones",      label: "Phones",       emoji: "📱", subs: ["iPhone", "Android", "Accessories"] },
-  { key: "electronics", label: "Electronics",  emoji: "💻", subs: ["Laptops", "TV", "Audio", "Cameras", "Gaming"] },
-  { key: "furniture",   label: "Furniture",    emoji: "🛋", subs: ["Sofa", "Bed", "Dining", "Wardrobes", "Office"] },
-  { key: "appliances",  label: "Appliances",   emoji: "🏡", subs: ["Fridge", "Washer", "AC", "Generator", "Solar"] },
-  { key: "fashion",     label: "Fashion",      emoji: "👕", subs: ["Watches", "Bags", "Shoes", "Clothing", "Jewelry"] },
-  { key: "real_estate", label: "Real Estate",  emoji: "🏠", subs: ["Rent", "Sale", "Shortlet", "Land", "Commercial"] },
-  { key: "tools",       label: "Tools",        emoji: "🛠", subs: ["Power Tools", "Hand Tools", "Ladders"] },
-  { key: "business",    label: "Business",     emoji: "📦", subs: ["Business Assets", "Restaurant", "Retail"] },
-  { key: "services",    label: "Services",     emoji: "🧰", subs: ["Home Services", "Repair", "Professional"] },
+  { key: "vehicles",    label: "Vehicles",     icon: "car-sport", subs: ["Cars", "SUVs", "Trucks", "Vans", "Buses"] },
+  { key: "motorcycles", label: "Motorcycles",  icon: "bicycle", subs: ["Motorcycles", "Scooters"] },
+  { key: "phones",      label: "Phones",       icon: "phone-portrait", subs: ["iPhone", "Android", "Accessories"] },
+  { key: "electronics", label: "Electronics",  icon: "laptop", subs: ["Laptops", "TV", "Audio", "Cameras", "Gaming"] },
+  { key: "furniture",   label: "Furniture",    icon: "bed", subs: ["Sofa", "Bed", "Dining", "Wardrobes", "Office"] },
+  { key: "appliances",  label: "Appliances",   icon: "home", subs: ["Fridge", "Washer", "AC", "Generator", "Solar"] },
+  { key: "fashion",     label: "Fashion",      icon: "shirt", subs: ["Watches", "Bags", "Shoes", "Clothing", "Jewelry"] },
+  { key: "real_estate", label: "Real Estate",  icon: "business", subs: ["Rent", "Sale", "Shortlet", "Land", "Commercial"] },
+  { key: "tools",       label: "Tools",        icon: "hammer", subs: ["Power Tools", "Hand Tools", "Ladders"] },
+  { key: "business",    label: "Business",     icon: "cube", subs: ["Business Assets", "Restaurant", "Retail"] },
+  { key: "services",    label: "Services",     icon: "construct", subs: ["Home Services", "Repair", "Professional"] },
 ];
 
 const CONDITIONS = [
@@ -50,8 +53,13 @@ const CITIES = [
 ];
 
 export default function SellListing() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const { colors: tc } = useTheme();
 
   const [images, setImages] = useState<string[]>([]);
   const [category, setCategory] = useState<string | null>(null);
@@ -102,7 +110,7 @@ export default function SellListing() {
         setImages((prev) => [...prev, ...uris].slice(0, 8));
       }
     } catch {
-      Alert.alert("Couldn't open photos", "Try again in a moment.");
+      toast.error("Couldn't open photos", "Try again in a moment.");
     } finally {
       setPickingImgs(false);
     }
@@ -110,13 +118,13 @@ export default function SellListing() {
 
   const captureImage = async () => {
     if (Platform.OS === "web") {
-      Alert.alert("Not available", "Use the phone app to take photos.");
+      toast.info("Not available on web", "Use the phone app to take photos.");
       return;
     }
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Camera access needed", "Allow camera access in Settings.");
+        toast.info("Camera access needed", "Allow camera access in Settings.");
         return;
       }
       const res = await ImagePicker.launchCameraAsync({ quality: 0.7, base64: true });
@@ -145,7 +153,7 @@ export default function SellListing() {
 
   const aiFillDescription = async () => {
     if (!name.trim() || !category) {
-      Alert.alert("Add title & category", "Enter a title and pick a category so AI can help.");
+      toast.info("Add a title & category", "Enter a title and pick a category so AI can help.");
       return;
     }
     setAiBusy(true);
@@ -155,7 +163,7 @@ export default function SellListing() {
       setDescription(dummy);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch {
-      Alert.alert("AI unavailable", "Try again shortly.");
+      toast.error("AI unavailable", "Try again shortly.");
     } finally {
       setAiBusy(false);
     }
@@ -164,12 +172,12 @@ export default function SellListing() {
   const useCurrentLocation = async () => {
     try {
       if (Platform.OS === "web") {
-        Alert.alert("Not available", "Use manual city on web.");
+        toast.info("Not available on web", "Pick your city manually.");
         return;
       }
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Location off", "Allow location in Settings to auto-detect.");
+        toast.info("Location is off", "Allow location in Settings to auto-detect.");
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -213,32 +221,19 @@ export default function SellListing() {
         seller_whatsapp: phone.trim() || undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        "Listing published 🎉",
-        "Your listing is now live on AMASS Marketplace.",
-        [
-          {
-            text: "View",
-            onPress: () => router.replace(`/marketplace/${res.item.id}` as any),
-          },
-        ]
-      );
+      toast.success("Listing published", "Your listing is now live on AMASS Marketplace.");
+      router.replace(`/marketplace/${res.item.id}` as any);
     } catch (e: any) {
-      Alert.alert("Couldn't publish", e?.message || "Please try again.");
+      toast.error("Couldn't publish", e?.message || "Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} testID="sell-back">
-          <Ionicons name="close" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={styles.title}>Sell an item</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <Screen testID="sell-screen">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="Sell an item" subtitle="Declutter · reach verified buyers" backTestID="sell-back" />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -261,14 +256,14 @@ export default function SellListing() {
                       <Text style={styles.coverBadgeText}>Cover</Text>
                     </View>
                   )}
-                  <Pressable onPress={() => removeImage(i)} style={styles.removeBtn} hitSlop={6}>
+                  <Pressable onPress={() => removeImage(i)} style={styles.removeBtn} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Remove photo ${i + 1}`}>
                     <Ionicons name="close" size={14} color="#fff" />
                   </Pressable>
                   <View style={styles.moveRow}>
-                    <Pressable style={styles.moveBtn} onPress={() => moveImage(i, i - 1)}>
+                    <Pressable style={styles.moveBtn} onPress={() => moveImage(i, i - 1)} accessibilityRole="button" accessibilityLabel="Move photo left">
                       <Ionicons name="chevron-back" size={12} color="#fff" />
                     </Pressable>
-                    <Pressable style={styles.moveBtn} onPress={() => moveImage(i, i + 1)}>
+                    <Pressable style={styles.moveBtn} onPress={() => moveImage(i, i + 1)} accessibilityRole="button" accessibilityLabel="Move photo right">
                       <Ionicons name="chevron-forward" size={12} color="#fff" />
                     </Pressable>
                   </View>
@@ -276,7 +271,7 @@ export default function SellListing() {
               ))}
               {images.length < 8 && (
                 <>
-                  <Pressable onPress={pickImages} style={styles.addPhoto} testID="add-photos">
+                  <Pressable onPress={pickImages} style={styles.addPhoto} testID="add-photos" accessibilityRole="button" accessibilityLabel="Add photos from gallery">
                     {pickingImgs ? (
                       <ActivityIndicator color={colors.textSecondary} />
                     ) : (
@@ -286,7 +281,7 @@ export default function SellListing() {
                       </>
                     )}
                   </Pressable>
-                  <Pressable onPress={captureImage} style={styles.addPhoto} testID="camera-photo">
+                  <Pressable onPress={captureImage} style={styles.addPhoto} testID="camera-photo" accessibilityRole="button" accessibilityLabel="Take a photo">
                     <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
                     <Text style={styles.addPhotoText}>Camera</Text>
                   </Pressable>
@@ -302,7 +297,8 @@ export default function SellListing() {
                 <Chip
                   key={c.key}
                   active={category === c.key}
-                  label={`${c.emoji} ${c.label}`}
+                  label={c.label}
+                  icon={c.icon as any}
                   onPress={() => {
                     setCategory(c.key);
                     setSubcategory(null);
@@ -357,6 +353,8 @@ export default function SellListing() {
                 style={styles.aiBtn}
                 disabled={aiBusy}
                 testID="ai-description"
+                accessibilityRole="button"
+                accessibilityLabel="Write description with AI"
               >
                 <Ionicons name="sparkles" size={14} color={colors.red} />
                 <Text style={styles.aiBtnText}>
@@ -402,7 +400,7 @@ export default function SellListing() {
 
           {/* LOCATION */}
           <Section title="Location">
-            <Pressable onPress={useCurrentLocation} style={styles.gpsBtn}>
+            <Pressable onPress={useCurrentLocation} style={styles.gpsBtn} accessibilityRole="button" accessibilityLabel="Use my current location">
               <Ionicons name="locate" size={14} color={colors.red} />
               <Text style={styles.gpsBtnText}>Use my current location</Text>
             </Pressable>
@@ -463,26 +461,27 @@ export default function SellListing() {
         </ScrollView>
 
         {/* Bottom publish bar */}
-        <View style={[styles.publishBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <Pressable
+        <View style={[styles.publishBar, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: tc.bgElevated, borderTopColor: tc.border }]}>
+          <Button
+            label={price ? `Publish · ${formatNaira(price)}` : "Publish listing"}
+            iconLeft="rocket-outline"
+            size="lg"
+            fullWidth
+            loading={saving}
+            disabled={!canPublish}
             onPress={publish}
-            style={[styles.publishBtn, !canPublish && { opacity: 0.5 }]}
-            disabled={!canPublish || saving}
             testID="publish-listing"
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.publishText}>Publish listing</Text>
-            )}
-          </Pressable>
+          />
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -507,6 +506,9 @@ function Field({
   keyboardType?: any;
   testID?: string;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={{ marginTop: 12 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -533,9 +535,12 @@ function Chip({
   active: boolean;
   label: string;
   onPress: () => void;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
   small?: boolean;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={() => {
@@ -554,26 +559,14 @@ function Chip({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 8,
-  },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center", justifyContent: "center",
-  },
-  title: { fontSize: 18, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
 
   section: {
     padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     ...shadows.soft,
   },
   sectionTitle: { fontSize: 15, fontWeight: "800", color: colors.text, letterSpacing: -0.2 },
@@ -656,7 +649,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text,
     fontWeight: "500",
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   textarea: {
     minHeight: 100,
@@ -668,7 +661,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "500",
     textAlignVertical: "top",
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   aiBtn: {
     flexDirection: "row",
@@ -738,17 +731,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0, right: 0, bottom: 0,
     padding: spacing.md,
-    backgroundColor: "#fff",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
     ...shadows.floating,
   },
-  publishBtn: {
-    height: 52,
-    borderRadius: 999,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  publishText: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
 });

@@ -5,7 +5,7 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  ActivityIndicator,
+  Platform,
   FlatList,
   RefreshControl,
   Modal,
@@ -15,11 +15,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../../src/ui/icons";
 import * as Haptics from "expo-haptics";
 
 import { api, MarketplaceItem, MarketCategory } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
-import { colors, radius, shadows, spacing, fontFamily as F } from "@/src/constants/theme";
+import { radius, shadows, spacing, fontFamily as F } from "@/src/constants/theme";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { ClassifiedCard } from "@/src/components/marketplace/ClassifiedCard";
 import { ProviderCard } from "@/src/components/marketplace/ProviderCard";
@@ -34,6 +35,9 @@ import {
 } from "@/src/components/marketplace/MarketFilterSheet";
 import { AdModal } from "@/src/components/AdModal";
 import { useAdTrigger } from "@/src/hooks/useAdTrigger";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { useTheme } from "@/src/theme";
+import { Skeleton, SkeletonCard, EmptyState } from "@/src/ui";
 
 type ViewMode = "grid" | "list";
 type MarketSection = "brands" | "fixa" | "declutter";
@@ -98,7 +102,7 @@ const SECTIONS: { key: MarketSection; label: string }[] = [
 ];
 
 type SortKey = "nearby" | "newest" | "price_asc" | "price_desc" | "rating";
-const SORT_OPTIONS: { key: SortKey; label: string; short: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const SORT_OPTIONS: { key: SortKey; label: string; short: string; icon: IconName }[] = [
   { key: "nearby", label: "Nearby first", short: "Nearby", icon: "navigate-outline" },
   { key: "newest", label: "Newest", short: "Newest", icon: "time-outline" },
   { key: "price_asc", label: "Price: Low to High", short: "Price ↑", icon: "arrow-up-outline" },
@@ -153,6 +157,10 @@ function sortItems(list: MarketplaceItem[], key: SortKey, chosenCity: string): M
 }
 
 export default function Marketplace() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { isDark } = useTheme();
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const filterRef = useRef<MarketFilterSheetRef>(null);
@@ -233,12 +241,15 @@ export default function Marketplace() {
     return p;
   }, [filters, query, section, brandChip, fixaChip, declutterChip]);
 
+  const [loadError, setLoadError] = useState(false);
   const loadItems = useCallback(async () => {
     try {
       const list = await api.marketplace(buildParams());
       setItems(list);
+      setLoadError(false);
     } catch {
       setItems([]);
+      setLoadError(true);
     }
   }, [buildParams]);
 
@@ -485,7 +496,7 @@ export default function Marketplace() {
   return (
     <View style={styles.container} testID="marketplace-screen">
       <FlatList
-        data={section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems}
+        data={(section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems) as any[]}
         keyExtractor={(_, i) => `row-${i}`}
         contentContainerStyle={{ paddingTop: headerH + 8, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
@@ -493,11 +504,40 @@ export default function Marketplace() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} progressViewOffset={headerH} tintColor={colors.red} />
         }
         ListHeaderComponent={loading ? null : listHeader}
+        removeClippedSubviews={Platform.OS !== "web"}
+        initialNumToRender={8}
+        windowSize={7}
+        maxToRenderPerBatch={8}
         ListEmptyComponent={
           loading ? (
-            <View style={styles.loading}>
-              <ActivityIndicator color={colors.red} />
+            <View style={{ paddingHorizontal: spacing.lg, gap: 12 }} testID="market-loading">
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Skeleton height={36} width={110} radius={18} />
+                <Skeleton height={36} width={120} radius={18} />
+                <Skeleton height={36} width={100} radius={18} />
+              </View>
+              <Skeleton height={22} width="40%" />
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <SkeletonCard imageHeight={150} style={{ flex: 1 }} />
+                <SkeletonCard imageHeight={150} style={{ flex: 1 }} />
+              </View>
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <SkeletonCard imageHeight={150} style={{ flex: 1 }} />
+                <SkeletonCard imageHeight={150} style={{ flex: 1 }} />
+              </View>
             </View>
+          ) : loadError ? (
+            <EmptyState
+              variant="error"
+              title="Couldn't load the market"
+              body="Check your connection and try again."
+              actionLabel="Retry"
+              onAction={() => {
+                setLoading(true);
+                loadItems().finally(() => setLoading(false));
+              }}
+              testID="market-error"
+            />
           ) : (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
@@ -532,7 +572,7 @@ export default function Marketplace() {
           loading
             ? (() => null) as any
             : section === "fixa"
-            ? (({ item }) => (
+            ? (({ item }: { item: any }) => (
                 <ProviderCard
                   item={item as MarketplaceItem}
                   onPress={() => openItem(item as MarketplaceItem)}
@@ -558,8 +598,8 @@ export default function Marketplace() {
       {/* ─── Sticky glass header ─────────────────────────────── */}
       <BlurView
         intensity={40}
-        tint="light"
-        style={[styles.header, { paddingTop: insets.top + 6 }]}
+        tint={isDark ? "dark" : "light"}
+        style={[styles.header, { paddingTop: insets.top + 6, backgroundColor: isDark ? "rgba(23,21,19,0.86)" : "rgba(255,255,255,0.80)" }]}
         onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
       >
         {/* Row 1: brand + location + actions */}
@@ -720,20 +760,24 @@ function ChipTile({
   label,
   active,
   onPress,
-  activeColor = colors.ink,
+  activeColor,
   testID,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   active: boolean;
   onPress: () => void;
   activeColor?: string;
   testID?: string;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const fill = activeColor ?? colors.ink;
+
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chipTile, active && { backgroundColor: activeColor, borderColor: activeColor }]}
+      style={[styles.chipTile, active && { backgroundColor: fill, borderColor: fill }]}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       testID={testID}
@@ -750,11 +794,14 @@ function IconBtn({
   label,
   testID,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   onPress: () => void;
   label?: string;
   testID?: string;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={onPress}
@@ -769,7 +816,8 @@ function IconBtn({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
   // Sticky glass header
@@ -784,7 +832,6 @@ const styles = StyleSheet.create({
     gap: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
-    backgroundColor: "rgba(255,255,255,0.80)",
   },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -878,7 +925,7 @@ const styles = StyleSheet.create({
     left: spacing.lg,
     right: spacing.lg,
     maxHeight: 340,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -982,7 +1029,7 @@ const styles = StyleSheet.create({
   // Sort modal
   modalBackdrop: { flex: 1, backgroundColor: "rgba(10,10,10,0.35)", justifyContent: "flex-end" },
   sortSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.lg,

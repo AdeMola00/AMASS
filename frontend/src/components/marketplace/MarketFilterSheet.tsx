@@ -1,17 +1,12 @@
-import React, {
-  forwardRef,
-  useCallback,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../../ui/icons";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
-import { colors, radius, spacing } from "@/src/constants/theme";
+import { radius, spacing } from "@/src/constants/theme";
 import type { MarketCategory } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export type MarketFilterState = {
   category?: string;
@@ -43,13 +38,13 @@ const CITIES = [
   "Abuja - Maitama", "Abuja - Wuse 2", "Abuja - Gwarinpa", "Port Harcourt", "Ibadan", "Kano",
 ];
 
-const SELLER_TYPES: { key: "individual" | "dealer" | "brand"; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const SELLER_TYPES: { key: "individual" | "dealer" | "brand"; label: string; icon: IconName }[] = [
   { key: "individual", label: "Individual", icon: "person-outline" },
   { key: "dealer", label: "Dealer", icon: "storefront-outline" },
   { key: "brand", label: "Brand", icon: "ribbon-outline" },
 ];
 
-const SORT_OPTIONS: { key: NonNullable<MarketFilterState["sort"]>; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const SORT_OPTIONS: { key: NonNullable<MarketFilterState["sort"]>; label: string; icon: IconName }[] = [
   { key: "newest", label: "Newest", icon: "time-outline" },
   { key: "price_asc", label: "Lowest Price", icon: "arrow-down" },
   { key: "price_desc", label: "Highest Price", icon: "arrow-up" },
@@ -70,6 +65,9 @@ export const MarketFilterSheet = forwardRef<
   MarketFilterSheetRef,
   { value: MarketFilterState; categories: MarketCategory[]; onApply: (s: MarketFilterState) => void }
 >(({ value, categories, onApply }, ref) => {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const sheetRef = useRef<BottomSheetModal>(null);
   const [draft, setDraft] = useState<MarketFilterState>(value);
 
@@ -149,7 +147,7 @@ export const MarketFilterSheet = forwardRef<
               {categories.map((c) => (
                 <Chip
                   key={c.key}
-                  label={`${c.emoji || ""} ${c.label}`}
+                  label={c.label}
                   active={draft.category === c.key}
                   onPress={() =>
                     setDraft({
@@ -275,6 +273,9 @@ export const MarketFilterSheet = forwardRef<
 MarketFilterSheet.displayName = "MarketFilterSheet";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -290,10 +291,13 @@ function Chip({
   onPress,
 }: {
   label: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
   active: boolean;
   onPress: () => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={() => {
@@ -319,6 +323,9 @@ function PriceInput({
   value?: number;
   onChange: (v: number | undefined) => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <TextInput
       placeholder={placeholder}
@@ -340,8 +347,11 @@ function ToggleRow({
   label: string;
   value: boolean;
   onValue: (v: boolean) => void;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={() => {
@@ -361,8 +371,9 @@ function ToggleRow({
   );
 }
 
-const styles = StyleSheet.create({
-  sheetBg: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+  sheetBg: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   handle: { backgroundColor: colors.borderStrong, width: 44, height: 5 },
   container: { flex: 1, paddingHorizontal: spacing.lg },
   header: {
@@ -428,7 +439,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -442,7 +453,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: 12,
     paddingBottom: 20,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },

@@ -1,17 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { api } from "@/src/lib/api";
 import { AmassLogo } from "@/src/components/AmassLogo";
-import { colors, radius, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Button, IconButton, Input, Screen } from "@/src/ui";
 
 type Step = "request" | "reset";
 
 export default function ForgotPassword() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [step, setStep] = useState<Step>("request");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -81,51 +83,49 @@ export default function ForgotPassword() {
     }
   };
 
+  const errorBox = error ? (
+    <View style={[styles.notice, { backgroundColor: colors.errorSoft }]} accessibilityRole="alert">
+      <Ionicons name="alert-circle" size={16} color={colors.error} />
+      <AppText variant="bodySm" tone="error" style={{ flex: 1 }} testID="fp-error">
+        {error}
+      </AppText>
+    </View>
+  ) : null;
+
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <KeyboardAwareScrollView contentContainerStyle={styles.scroll} bottomOffset={24} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => router.back()} style={styles.back} hitSlop={12} testID="back-button">
-          <Ionicons name="chevron-back" size={26} color={colors.text} />
-        </Pressable>
+    <Screen edges={["top", "bottom"]} testID="forgot-password-screen">
+      <KeyboardAwareScrollView contentContainerStyle={styles.scroll} bottomOffset={24} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <IconButton icon="chevron-back" label="Go back" onPress={() => router.back()} testID="back-button" style={{ marginLeft: -4 }} />
 
         <View style={styles.header}>
           <AmassLogo size="lg" />
-          <Text style={styles.title}>{step === "request" ? "Reset your password" : "Enter reset code"}</Text>
-          <Text style={styles.subtitle}>
-            {step === "request"
-              ? "Enter your account email and we'll send you a 6-digit reset code."
-              : `We sent a code to ${email}. It expires in 15 minutes.`}
-          </Text>
+          <View style={{ gap: 6 }}>
+            <AppText variant="display">{step === "request" ? "Reset your password" : "Enter reset code"}</AppText>
+            <AppText variant="body" tone="secondary">
+              {step === "request" ? "Enter your account email and we'll send you a 6-digit reset code." : `We sent a code to ${email}. It expires in 15 minutes.`}
+            </AppText>
+          </View>
         </View>
 
         {notice && step === "reset" && (
-          <View style={styles.notice} testID="reset-notice">
-            <Ionicons name="mail-outline" size={16} color={colors.emerald} />
-            <Text style={styles.noticeText}>{notice}</Text>
+          <View style={[styles.notice, { backgroundColor: colors.successSoft, marginBottom: space[3] }]} testID="reset-notice">
+            <Ionicons name="mail-outline" size={16} color={colors.success} />
+            <AppText variant="bodySm" tone="secondary" style={{ flex: 1 }}>
+              {notice}
+            </AppText>
           </View>
         )}
 
         <View style={styles.form}>
           {step === "request" ? (
             <>
-              <Field
-                label="Email"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@amass.africa"
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                testID="fp-email"
-              />
-              {error && <Text style={styles.error} testID="fp-error">{error}</Text>}
-              <Pressable onPress={sendCode} style={[styles.cta, loading && { opacity: 0.6 }]} disabled={loading} testID="fp-send-code">
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>Send reset code</Text>}
-              </Pressable>
+              <Input label="Email" value={email} onChangeText={setEmail} placeholder="you@amass.africa" autoCapitalize="none" autoComplete="email" keyboardType="email-address" iconLeft="mail-outline" size="lg" testID="fp-email" onSubmitEditing={sendCode} returnKeyType="send" />
+              {errorBox}
+              <Button label="Send reset code" size="lg" fullWidth loading={loading} onPress={sendCode} testID="fp-send-code" />
             </>
           ) : (
             <>
-              <Field
+              <Input
                 label="Reset code"
                 value={code}
                 onChangeText={(t) => setCode(t.replace(/[^0-9]/g, "").slice(0, 6))}
@@ -133,9 +133,12 @@ export default function ForgotPassword() {
                 keyboardType="number-pad"
                 autoComplete="one-time-code"
                 textContentType="oneTimeCode"
+                iconLeft="keypad-outline"
+                size="lg"
+                style={{ letterSpacing: 4, fontSize: 18 }}
                 testID="fp-code"
               />
-              <Field
+              <Input
                 label="New password"
                 value={password}
                 onChangeText={setPassword}
@@ -143,86 +146,47 @@ export default function ForgotPassword() {
                 secureTextEntry={!showPw}
                 autoComplete="password-new"
                 textContentType="newPassword"
+                iconLeft="lock-closed-outline"
+                size="lg"
                 testID="fp-new-password"
-                right={
-                  <Pressable onPress={() => setShowPw((v) => !v)} hitSlop={12} testID="fp-show-password">
-                    <Ionicons name={showPw ? "eye-off" : "eye"} size={20} color={colors.textTertiary} />
-                  </Pressable>
-                }
+                iconRight={showPw ? "eye-off-outline" : "eye-outline"}
+                onPressIconRight={() => setShowPw((v) => !v)}
+                iconRightTestID="fp-show-password"
+                iconRightLabel={showPw ? "Hide password" : "Show password"}
+                helper={pwValid ? "✓ Password length looks good" : "Use at least 6 characters"}
+                onSubmitEditing={doReset}
+                returnKeyType="go"
               />
-              <Text style={[styles.hint, pwValid && { color: colors.emerald }]}>
-                {pwValid ? "✓ Password length looks good" : "Use at least 6 characters"}
-              </Text>
-              {error && <Text style={styles.error} testID="fp-error">{error}</Text>}
-              <Pressable onPress={doReset} style={[styles.cta, loading && { opacity: 0.6 }]} disabled={loading} testID="fp-reset-submit">
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>Reset password</Text>}
-              </Pressable>
-              <Pressable onPress={resend} disabled={cooldown > 0} hitSlop={8} style={{ alignSelf: "center", marginTop: spacing.md }} testID="fp-resend">
-                <Text style={[styles.link, cooldown > 0 && { color: colors.textMuted }]}>
+              {errorBox}
+              <Button label="Reset password" size="lg" fullWidth loading={loading} onPress={doReset} testID="fp-reset-submit" />
+              <Pressable onPress={resend} disabled={cooldown > 0} hitSlop={8} style={{ alignSelf: "center", marginTop: space[1] }} testID="fp-resend" accessibilityRole="button">
+                <AppText variant="bodySm" weight="bold" tone={cooldown > 0 ? "muted" : "primary"}>
                   {cooldown > 0 ? `Resend code in ${cooldown}s` : "Didn't get it? Resend code"}
-                </Text>
+                </AppText>
               </Pressable>
             </>
           )}
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Remembered it? </Text>
-            <Pressable onPress={() => router.replace("/(auth)/login")} testID="fp-back-to-login">
-              <Text style={styles.link}>Back to sign in</Text>
+            <AppText variant="bodySm" tone="tertiary">
+              Remembered it?{" "}
+            </AppText>
+            <Pressable onPress={() => router.replace("/(auth)/login")} testID="fp-back-to-login" accessibilityRole="link" hitSlop={8}>
+              <AppText variant="bodySm" weight="bold">
+                Back to sign in
+              </AppText>
             </Pressable>
           </View>
         </View>
       </KeyboardAwareScrollView>
-    </SafeAreaView>
-  );
-}
-
-function Field({
-  label,
-  right,
-  testID,
-  ...rest
-}: React.ComponentProps<typeof TextInput> & { label: string; right?: React.ReactNode; testID?: string }) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.inputWrap}>
-        <TextInput {...rest} style={styles.input} placeholderTextColor={colors.textMuted} testID={testID} />
-        {right}
-      </View>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  scroll: { flexGrow: 1, padding: spacing.xl, paddingTop: spacing.md },
-  back: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginLeft: -8 },
-  header: { gap: spacing.md, marginTop: spacing.md, marginBottom: spacing.xl },
-  title: { ...typography.display, marginTop: spacing.lg },
-  subtitle: { ...typography.body, color: colors.textTertiary, lineHeight: 22 },
-  notice: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: colors.emeraldSurface, borderRadius: radius.md,
-    padding: spacing.md, marginBottom: spacing.md,
-  },
-  noticeText: { flex: 1, color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
-  form: { gap: spacing.lg },
-  field: { gap: 6 },
-  fieldLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: "600", marginLeft: 4 },
-  inputWrap: {
-    flexDirection: "row", alignItems: "center", height: 56,
-    borderRadius: radius.md, backgroundColor: colors.surfaceSecondary, paddingHorizontal: spacing.lg,
-  },
-  input: { flex: 1, fontSize: 16, color: colors.text, fontWeight: "500" },
-  hint: { fontSize: 12, color: colors.textTertiary, marginTop: -8, marginLeft: 4 },
-  cta: {
-    marginTop: spacing.md, height: 56, borderRadius: radius.pill,
-    backgroundColor: colors.emerald, alignItems: "center", justifyContent: "center",
-  },
-  ctaText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  error: { color: colors.red, fontSize: 13, marginTop: -8 },
-  footer: { flexDirection: "row", justifyContent: "center", marginTop: spacing.lg },
-  footerText: { color: colors.textTertiary, fontSize: 14 },
-  link: { color: colors.emerald, fontSize: 14, fontWeight: "700" },
+  scroll: { flexGrow: 1, padding: space[6], paddingTop: space[3] },
+  header: { gap: space[4], marginTop: space[3], marginBottom: space[6], alignItems: "flex-start" },
+  form: { gap: space[4] },
+  notice: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radii.md, padding: space[3] },
+  footer: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: space[2] },
 });

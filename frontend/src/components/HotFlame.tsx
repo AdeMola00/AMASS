@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { StyleSheet, Animated, Text } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+
 
 /**
  * Redfin-style "Hot Home" flame badge — pulses gently to draw the eye.
@@ -13,6 +14,9 @@ export function HotFlame({
   compact?: boolean;
   animated?: boolean;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -43,7 +47,8 @@ export function HotFlame({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   chip: {
     flexDirection: "row",
     alignItems: "center",

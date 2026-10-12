@@ -1,25 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  RefreshControl,
-  Share,
-  Alert,
-  Modal,
-  TextInput,
-} from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, RefreshControl, Share } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, Stack } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import * as Clipboard from "expo-clipboard";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { api } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
-import { colors, radius, shadows, spacing } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { motion, radii, space } from "@/src/theme/tokens";
+import { AnimatedNumber, AppText, Badge, Button, Card, EmptyState, Input, Screen, ScreenHeader, Section, Sheet, SkeletonRows, useToast, type IconName } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 type Task = {
@@ -32,24 +23,50 @@ type Task = {
   claimable_today: boolean;
 };
 
+const TASK_ICON: Record<string, IconName> = {
+  daily_login: "calendar",
+  share_listing: "share-social",
+  phone_verify: "call",
+  complete_profile: "person",
+  upload_property: "home",
+  refer_friend: "people",
+  identity_verify: "shield-checkmark",
+  first_review: "star",
+};
+
+const TASK_HINT: Record<string, string> = {
+  daily_login: "Claim once a day — keep your streak alive.",
+  share_listing: "Share any listing with a friend. Up to 3 bonuses a day.",
+  phone_verify: "Confirm your number to unlock trusted messaging.",
+  complete_profile: "Add your city and a short bio.",
+  upload_property: "Publish a listing — credited automatically on approval.",
+  refer_friend: "Enter a friend's code, or share yours below.",
+};
+
 export default function EarnScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  const toast = useToast();
   const { wallet, refresh } = useWallet();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [referral, setReferral] = useState<{
-    code: string;
-    share_url: string;
-    referred_count: number;
-    tokens_per_referral: number;
-  } | null>(null);
+  const [referral, setReferral] = useState<{ code: string; share_url: string; referred_count: number; tokens_per_referral: number } | null>(null);
   const [claimBusy, setClaimBusy] = useState<string | null>(null);
   const [phoneModal, setPhoneModal] = useState(false);
   const [referralModal, setReferralModal] = useState(false);
+  const [burst, setBurst] = useState<number | null>(null);
+
+  const pop = useSharedValue(1);
+  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  const burstY = useSharedValue(0);
+  const burstO = useSharedValue(0);
+  const burstStyle = useAnimatedStyle(() => ({ opacity: burstO.value, transform: [{ translateY: burstY.value }] }));
 
   const load = useCallback(async () => {
+    setError(false);
     try {
       const [tasksRes, refRes] = await Promise.all([api.earnTasks(), api.myReferral()]);
       // Hide not-yet-available stub tasks so nothing looks broken to users.
@@ -57,8 +74,9 @@ export default function EarnScreen() {
       setTasks(tasksRes.tasks.filter((t) => !HIDDEN_TASKS.includes(t.id)));
       setStreak(tasksRes.streak);
       setReferral(refRes);
-    } catch {}
-    finally {
+    } catch {
+      setError(true);
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -73,20 +91,31 @@ export default function EarnScreen() {
     setRefreshing(false);
   };
 
+  const celebrate = (amount: number) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setBurst(amount);
+    pop.value = withSequence(withSpring(1.04, motion.spring), withSpring(1, motion.spring));
+    burstY.value = 0;
+    burstO.value = 1;
+    burstY.value = withTiming(-56, { duration: 900 });
+    burstO.value = withTiming(0, { duration: 900 });
+    setTimeout(() => setBurst(null), 950);
+  };
+
   const handleTask = async (task: Task) => {
     if (task.completed && task.one_time) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
-    // Dispatch by task id
     switch (task.id) {
       case "daily_login": {
         setClaimBusy(task.id);
         try {
           const r = await api.claimTask("daily_login");
           if (r.ok) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+            celebrate(task.tokens);
+            toast.success(`+${task.tokens} MASS claimed`, "See you tomorrow to keep the streak going.");
           } else {
-            Alert.alert("Already claimed", "Come back tomorrow for another bonus.");
+            toast.info("Already claimed today", "Come back tomorrow for another bonus.");
           }
           await load();
           await refresh();
@@ -99,8 +128,10 @@ export default function EarnScreen() {
         setClaimBusy(task.id);
         try {
           const r = await api.claimTask("share_listing");
-          if (r.ok) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-          else if (r.reason === "daily_limit_reached") Alert.alert("Limit reached", "You've claimed the maximum 3 share bonuses today.");
+          if (r.ok) {
+            celebrate(task.tokens);
+            toast.success(`+${task.tokens} MASS`, "Thanks for spreading the word.");
+          } else if (r.reason === "daily_limit_reached") toast.info("Limit reached", "You've claimed the maximum 3 share bonuses today.");
           await load();
           await refresh();
         } finally {
@@ -114,17 +145,11 @@ export default function EarnScreen() {
       case "complete_profile":
         router.push("/settings");
         return;
-      case "identity_verify":
-        Alert.alert("Coming soon", "Identity verification will be available in the next release.");
-        return;
       case "upload_property":
         router.push("/submit-property");
         return;
       case "refer_friend":
         setReferralModal(true);
-        return;
-      case "first_review":
-        Alert.alert("Coming soon", "Property reviews will unlock after your first inspection.");
         return;
       default:
         return;
@@ -140,144 +165,182 @@ export default function EarnScreen() {
     });
   };
 
+  const copyReferral = async () => {
+    if (!referral) return;
+    await Clipboard.setStringAsync(referral.code);
+    toast.success("Code copied", `${referral.code} is on your clipboard.`);
+  };
+
   const balance = wallet?.spendable ?? 0;
+  const daily = tasks.find((t) => t.id === "daily_login");
+  const dailyClaimable = daily ? daily.claimable_today && !daily.completed : false;
+  const completedCount = tasks.filter((t) => t.completed && t.one_time).length;
+  const oneTimeCount = tasks.filter((t) => t.one_time).length;
+  const weekDots = Array.from({ length: 7 }, (_, i) => i < Math.min(streak % 7 === 0 && streak > 0 ? 7 : streak % 7, 7));
 
   return (
-    <View style={styles.container}>
+    <Screen testID="earn-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color="#fff" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Earn Tokens</Text>
-        <View style={{ width: 40 }} />
-      </SafeAreaView>
-
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
-      >
-        {/* Streak / Balance hero */}
-        <LinearGradient
-          colors={["#0A0A0A", "#1F1F1F"]}
-          style={styles.hero}
-        >
-          <View style={styles.heroTop}>
-            <View>
-              <Text style={styles.heroLabel}>Your token balance</Text>
-              <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                <Text style={styles.heroValue}>{balance.toLocaleString()}</Text>
-                <Text style={styles.heroUnit}>tokens</Text>
-              </View>
-            </View>
+      <ScreenHeader title="Earn tokens" subtitle="Tasks · Referrals · Daily bonus" />
+      <ScrollView contentContainerStyle={{ paddingBottom: 48, gap: space[5] }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}>
+        {/* Streak hero */}
+        <Animated.View style={[{ paddingHorizontal: space[4] }, popStyle]}>
+          <LinearGradient colors={isDark ? ["#1F1D1A", "#141210"] : ["#1A1816", "#0A0A0A"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="earn-hero">
             <View style={styles.heroCoin}>
-              <TokenIcon size={64} animated />
+              <TokenIcon size={130} animated />
             </View>
-          </View>
-          <View style={styles.streakBar}>
-            <Ionicons name="flame" size={16} color="#F5B301" />
-            <Text style={styles.streakText}>
-              {streak > 0 ? `${streak}-day streak!` : "Start a daily-login streak"}
-            </Text>
-            {streak >= 3 && (
-              <View style={styles.streakChip}>
-                <Text style={styles.streakChipText}>🔥 {streak}</Text>
-              </View>
-            )}
-          </View>
-        </LinearGradient>
-
-        {/* Referral card */}
-        {referral && (
-          <View style={[styles.referralCard, shadows.card]}>
-            <View style={styles.referralHeader}>
-              <View style={styles.referralIcon}>
-                <Ionicons name="people" size={22} color="#fff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.referralTitle}>Refer a friend</Text>
-                <Text style={styles.referralBody}>
-                  You earn {referral.tokens_per_referral} tokens · they get 10 bonus
-                </Text>
-              </View>
-            </View>
-            <View style={styles.referralCodeRow}>
-              <View style={styles.referralCode}>
-                <Text style={styles.referralCodeText}>{referral.code}</Text>
-              </View>
-              <Pressable onPress={shareReferral} style={styles.referralShareBtn} testID="referral-share">
-                <Ionicons name="share-social" size={16} color="#fff" />
-                <Text style={styles.referralShareText}>Share</Text>
-              </Pressable>
-            </View>
-            {referral.referred_count > 0 && (
-              <Text style={styles.referralStat}>
-                🎉 {referral.referred_count} friend{referral.referred_count > 1 ? "s" : ""} joined
-              </Text>
-            )}
-          </View>
-        )}
-
-        <Text style={styles.sectionTitle}>Complete tasks · earn tokens</Text>
-        {loading ? (
-          <ActivityIndicator color={colors.red} style={{ marginTop: 40 }} />
-        ) : (
-          <View style={styles.tasksList}>
-            {tasks.map((t) => (
-              <Pressable
-                key={t.id}
-                onPress={() => handleTask(t)}
-                disabled={t.completed && t.one_time}
-                style={[
-                  styles.taskRow,
-                  t.completed && t.one_time && styles.taskRowDone,
-                ]}
-                testID={`task-${t.id}`}
-              >
-                <View
-                  style={[
-                    styles.taskIcon,
-                    { backgroundColor: t.completed && t.one_time ? "#059669" + "18" : "#FFF7DB" },
-                  ]}
-                >
-                  <Ionicons
-                    name={t.completed && t.one_time ? "checkmark-circle" : t.icon}
-                    size={22}
-                    color={t.completed && t.one_time ? "#059669" : "#B27A00"}
-                  />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="label" color="rgba(255,255,255,0.6)" uppercase>
+                  Your MASS balance
+                </AppText>
+                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+                  <AnimatedNumber value={balance} variant="display" color="#fff" style={{ fontSize: 40, lineHeight: 46 }} testID="earn-balance" />
+                  <AppText variant="title" color={colors.mass}>
+                    MASS
+                  </AppText>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.taskLabel}>{t.label}</Text>
-                  <View style={styles.taskMeta}>
-                    <TokenIcon size={11} />
-                    <Text style={styles.taskReward}>+{t.tokens} tokens</Text>
-                    {!t.one_time && (
-                      <>
-                        <Text style={styles.taskDot}>·</Text>
-                        <Text style={styles.taskRepeat}>Repeatable</Text>
-                      </>
-                    )}
+              </View>
+              {burst != null ? (
+                <Animated.View style={[styles.burst, burstStyle]} pointerEvents="none">
+                  <AppText variant="h3" color={colors.mass} tabular>
+                    +{burst}
+                  </AppText>
+                </Animated.View>
+              ) : null}
+            </View>
+
+            <View style={styles.streakRow}>
+              <View style={{ flex: 1, gap: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="flame" size={16} color={colors.mass} />
+                  <AppText variant="title" color="#fff">
+                    {streak > 0 ? `${streak}-day streak` : "Start your streak"}
+                  </AppText>
+                </View>
+                <View style={styles.dots} accessibilityLabel={`${streak} day streak`}>
+                  {weekDots.map((on, i) => (
+                    <View key={i} style={[styles.dot, { backgroundColor: on ? colors.mass : "rgba(255,255,255,0.14)", borderColor: on ? colors.mass : "rgba(255,255,255,0.25)" }]}>
+                      {on ? <Ionicons name="checkmark" size={10} color="#1A1200" /> : null}
+                    </View>
+                  ))}
+                </View>
+              </View>
+              {daily ? (
+                <Button
+                  label={dailyClaimable ? `Claim +${daily.tokens}` : "Claimed"}
+                  variant="mass"
+                  size="md"
+                  iconLeft={dailyClaimable ? "gift" : "checkmark-circle"}
+                  disabled={!dailyClaimable}
+                  loading={claimBusy === "daily_login"}
+                  onPress={() => handleTask(daily)}
+                  testID="daily-claim"
+                />
+              ) : null}
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Referral */}
+        {referral ? (
+          <Section title="Refer a friend" caption={`You earn ${referral.tokens_per_referral} MASS per friend · they get 10 bonus`}>
+            <Card testID="referral-card">
+              <View style={{ gap: 14 }}>
+                <View style={styles.codeRow}>
+                  <View style={[styles.code, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                    <AppText variant="label" tone="tertiary" uppercase>
+                      Your code
+                    </AppText>
+                    <AppText variant="h2" tabular style={{ letterSpacing: 2 }} testID="referral-code">
+                      {referral.code}
+                    </AppText>
+                  </View>
+                  <View style={{ gap: 8 }}>
+                    <Button label="Copy" variant="secondary" size="sm" iconLeft="copy-outline" onPress={copyReferral} testID="referral-copy" />
+                    <Button label="Share" size="sm" iconLeft="share-social" onPress={shareReferral} testID="referral-share" />
                   </View>
                 </View>
-                {t.completed && t.one_time ? (
-                  <View style={styles.taskDoneBadge}>
-                    <Text style={styles.taskDoneText}>Done</Text>
+                <View style={[styles.earnRow, { borderTopColor: colors.divider }]}>
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="h3" tabular>
+                      {referral.referred_count}
+                    </AppText>
+                    <AppText variant="caption" tone="tertiary">
+                      Friends joined
+                    </AppText>
                   </View>
-                ) : claimBusy === t.id ? (
-                  <ActivityIndicator size="small" color={colors.text} />
-                ) : (
-                  <View style={styles.taskCta}>
-                    <Ionicons name="chevron-forward" size={16} color={colors.text} />
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="h3" tabular tone="mass">
+                      +{(referral.referred_count * referral.tokens_per_referral).toLocaleString()}
+                    </AppText>
+                    <AppText variant="caption" tone="tertiary">
+                      MASS earned from referrals
+                    </AppText>
                   </View>
-                )}
-              </Pressable>
-            ))}
-          </View>
-        )}
+                  <Pressable onPress={() => setReferralModal(true)} hitSlop={8} accessibilityRole="button" testID="referral-have-code">
+                    <AppText variant="caption" weight="bold" color={colors.text}>
+                      Have a code?
+                    </AppText>
+                  </Pressable>
+                </View>
+              </View>
+            </Card>
+          </Section>
+        ) : null}
+
+        {/* Tasks */}
+        <Section title="Tasks" caption={oneTimeCount ? `${completedCount} of ${oneTimeCount} one-time tasks complete` : "Complete tasks to earn MASS"}>
+          {loading ? (
+            <Card>
+              <SkeletonRows rows={5} />
+            </Card>
+          ) : error ? (
+            <Card padded={false}>
+              <EmptyState compact variant="error" title="Couldn't load tasks" body="Check your connection and try again." actionLabel="Retry" onAction={load} />
+            </Card>
+          ) : (
+            <View style={{ gap: space[3] }}>
+              {tasks.map((t) => {
+                const done = t.completed && t.one_time;
+                const busy = claimBusy === t.id;
+                return (
+                  <Card key={t.id} onPress={done ? undefined : () => handleTask(t)} testID={`task-${t.id}`} style={done ? { opacity: 0.7 } : undefined}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                      <View style={[styles.taskIcon, { backgroundColor: done ? colors.successSoft : colors.massSoft }]}>
+                        <Ionicons name={done ? "checkmark-circle" : (TASK_ICON[t.id] ?? "sparkles")} size={22} color={done ? colors.success : colors.massText} />
+                      </View>
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <AppText variant="title">{t.label}</AppText>
+                        <AppText variant="caption" tone="tertiary">
+                          {TASK_HINT[t.id] ?? (t.one_time ? "One-time reward" : "Repeatable reward")}
+                        </AppText>
+                        <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
+                          <Badge label={`+${t.tokens} MASS`} tone="mass" icon="sparkles" />
+                          {!t.one_time ? <Badge label="Repeatable" tone="neutral" icon="repeat" /> : null}
+                          {done ? <Badge label="Done" tone="success" icon="checkmark" /> : null}
+                        </View>
+                      </View>
+                      {done ? null : busy ? (
+                        <Badge label="Working…" tone="neutral" />
+                      ) : (
+                        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                      )}
+                    </View>
+                    {t.one_time ? (
+                      <View style={[styles.progress, { backgroundColor: colors.surfaceSunken }]}>
+                        <View style={{ width: done ? "100%" : "0%", height: "100%", backgroundColor: colors.success }} />
+                      </View>
+                    ) : null}
+                  </Card>
+                );
+              })}
+            </View>
+          )}
+        </Section>
       </ScrollView>
 
-      <PhoneVerifyModal
+      <PhoneVerifySheet
         visible={phoneModal}
         onClose={() => {
           setPhoneModal(false);
@@ -285,7 +348,7 @@ export default function EarnScreen() {
           refresh();
         }}
       />
-      <ReferralApplyModal
+      <ReferralApplySheet
         visible={referralModal}
         onClose={() => {
           setReferralModal(false);
@@ -293,11 +356,13 @@ export default function EarnScreen() {
           refresh();
         }}
       />
-    </View>
+    </Screen>
   );
 }
 
-function PhoneVerifyModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function PhoneVerifySheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const toast = useToast();
+  const { colors } = useTheme();
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("+234");
   const [code, setCode] = useState("");
@@ -335,7 +400,8 @@ function PhoneVerifyModal({ visible, onClose }: { visible: boolean; onClose: () 
     try {
       await api.phoneVerifyConfirm(phone, code);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert("Phone verified!", "You've earned 5 tokens.", [{ text: "Great", onPress: onClose }]);
+      toast.success("Phone verified", "You've earned 5 MASS.");
+      onClose();
     } catch (e: any) {
       setError(e?.message ?? "Invalid code");
     } finally {
@@ -344,81 +410,34 @@ function PhoneVerifyModal({ visible, onClose }: { visible: boolean; onClose: () 
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Verify your phone</Text>
-          <Text style={styles.modalSub}>
-            {step === "phone"
-              ? "We'll send you a 6-digit code to confirm your number."
-              : `Enter the 6-digit code sent to ${phone}.`}
-          </Text>
-
-          {step === "phone" ? (
-            <>
-              <TextInput
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                placeholder="+234 800 000 0000"
-                placeholderTextColor={colors.textMuted}
-                style={styles.modalInput}
-                testID="phone-input"
-              />
-              {error && <Text style={styles.modalError}>{error}</Text>}
-              <Pressable
-                onPress={send}
-                style={[styles.modalBtn, busy && { opacity: 0.6 }]}
-                disabled={busy || phone.length < 8}
-              >
-                {busy ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.modalBtnText}>Send code</Text>
-                )}
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <TextInput
-                value={code}
-                onChangeText={setCode}
-                keyboardType="number-pad"
-                placeholder="123456"
-                maxLength={6}
-                placeholderTextColor={colors.textMuted}
-                style={[styles.modalInput, { fontSize: 26, letterSpacing: 12, textAlign: "center" }]}
-                testID="otp-input"
-              />
-              {hint && (
-                <View style={styles.hintBox}>
-                  <Ionicons name="information-circle" size={12} color={colors.textTertiary} />
-                  <Text style={styles.hintText}>{hint}</Text>
-                </View>
-              )}
-              {error && <Text style={styles.modalError}>{error}</Text>}
-              <Pressable
-                onPress={confirm}
-                style={[styles.modalBtn, busy && { opacity: 0.6 }]}
-                disabled={busy || code.length !== 6}
-                testID="confirm-otp"
-              >
-                {busy ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.modalBtnText}>Verify & Earn 5 tokens</Text>
-                )}
-              </Pressable>
-            </>
-          )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <Sheet visible={visible} onClose={onClose} title="Verify your phone" testID="phone-verify-sheet">
+      <View style={{ gap: 14 }}>
+        <AppText variant="bodySm" tone="secondary">
+          {step === "phone" ? "We'll send you a 6-digit code to confirm your number." : `Enter the 6-digit code sent to ${phone}.`}
+        </AppText>
+        {step === "phone" ? (
+          <>
+            <Input label="Phone number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="+234 800 000 0000" iconLeft="call-outline" error={error} testID="phone-input" autoFocus />
+            <Button label="Send code" size="lg" fullWidth loading={busy} disabled={phone.length < 8} onPress={send} testID="send-otp" />
+          </>
+        ) : (
+          <>
+            <Input label="Verification code" value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="123456" maxLength={6} iconLeft="keypad-outline" error={error} helper={hint ?? undefined} testID="otp-input" autoFocus style={{ letterSpacing: 6, fontSize: 20 }} />
+            <Button label="Verify & earn 5 MASS" variant="mass" size="lg" fullWidth loading={busy} disabled={code.length !== 6} onPress={confirm} testID="confirm-otp" />
+            <Pressable onPress={() => setStep("phone")} hitSlop={8} style={{ alignSelf: "center", padding: 8 }} accessibilityRole="button">
+              <AppText variant="caption" color={colors.textSecondary}>
+                Use a different number
+              </AppText>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </Sheet>
   );
 }
 
-function ReferralApplyModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function ReferralApplySheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const toast = useToast();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -436,9 +455,8 @@ function ReferralApplyModal({ visible, onClose }: { visible: boolean; onClose: (
     try {
       const r = await api.applyReferral(code);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert("Referral applied!", `You got ${r.you_get} bonus tokens.`, [
-        { text: "Yay!", onPress: onClose },
-      ]);
+      toast.success("Referral applied", `You got ${r.you_get} bonus MASS.`);
+      onClose();
     } catch (e: any) {
       setError(e?.message ?? "Could not apply code");
     } finally {
@@ -447,251 +465,28 @@ function ReferralApplyModal({ visible, onClose }: { visible: boolean; onClose: (
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Have a referral code?</Text>
-          <Text style={styles.modalSub}>
-            Enter a friend&apos;s code to earn 10 bonus tokens. They earn 50.
-          </Text>
-          <TextInput
-            value={code}
-            onChangeText={(t) => setCode(t.toUpperCase())}
-            autoCapitalize="characters"
-            placeholder="ADA-X4K2"
-            placeholderTextColor={colors.textMuted}
-            style={[styles.modalInput, { fontSize: 20, letterSpacing: 4, textAlign: "center" }]}
-            testID="referral-input"
-          />
-          {error && <Text style={styles.modalError}>{error}</Text>}
-          <Pressable
-            onPress={apply}
-            style={[styles.modalBtn, busy && { opacity: 0.6 }]}
-            disabled={busy || code.length < 6}
-            testID="apply-referral-btn"
-          >
-            {busy ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.modalBtnText}>Apply code · Earn 10 tokens</Text>
-            )}
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <Sheet visible={visible} onClose={onClose} title="Have a referral code?" testID="referral-sheet">
+      <View style={{ gap: 14 }}>
+        <AppText variant="bodySm" tone="secondary">
+          Enter a friend&apos;s code to earn 10 bonus MASS. They earn 50.
+        </AppText>
+        <Input label="Referral code" value={code} onChangeText={(t) => setCode(t.toUpperCase())} autoCapitalize="characters" placeholder="ADA-X4K2" iconLeft="ticket-outline" error={error} testID="referral-input" autoFocus style={{ letterSpacing: 3 }} />
+        <Button label="Apply code · earn 10 MASS" size="lg" fullWidth loading={busy} disabled={code.length < 6} onPress={apply} testID="apply-referral-btn" />
+      </View>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0A0A0A" },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
-  hero: {
-    marginHorizontal: spacing.lg,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  heroTop: { flexDirection: "row", alignItems: "center" },
-  heroLabel: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
-  heroValue: {
-    color: "#fff",
-    fontSize: 40,
-    fontWeight: "900",
-    letterSpacing: -1.5,
-    marginTop: 4,
-  },
-  heroUnit: { color: "rgba(255,255,255,0.5)", fontSize: 14, fontWeight: "700" },
-  heroCoin: { position: "absolute", right: 0, top: 0 },
-  streakBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.1)",
-  },
-  streakText: { color: "#fff", fontSize: 13, fontWeight: "700" },
-  streakChip: {
-    marginLeft: "auto",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(245,179,1,0.2)",
-    borderWidth: 1,
-    borderColor: "#F5B301",
-  },
-  streakChipText: { color: "#F5B301", fontWeight: "900", fontSize: 12 },
-  referralCard: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    padding: 16,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    gap: 12,
-  },
-  referralHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
-  referralIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  referralTitle: { fontSize: 15, fontWeight: "800", color: colors.text },
-  referralBody: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
-  referralCodeRow: { flexDirection: "row", gap: 8, alignItems: "center" },
-  referralCode: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderStyle: "dashed",
-    borderRadius: radius.pill,
-    paddingVertical: 12,
-    alignItems: "center",
-    backgroundColor: "#FAFAFA",
-  },
-  referralCodeText: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: colors.text,
-    letterSpacing: 3,
-  },
-  referralShareBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    height: 44,
-    borderRadius: radius.pill,
-    backgroundColor: colors.text,
-  },
-  referralShareText: { color: "#fff", fontSize: 13, fontWeight: "800" },
-  referralStat: { fontSize: 12, color: "#059669", fontWeight: "700" },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.xl,
-    marginBottom: spacing.md,
-  },
-  tasksList: {
-    marginHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    overflow: "hidden",
-  },
-  taskRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-  },
-  taskRowDone: { opacity: 0.6 },
-  taskIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  taskLabel: { fontSize: 14, fontWeight: "800", color: colors.text },
-  taskMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
-  taskReward: { fontSize: 11, fontWeight: "800", color: "#B27A00" },
-  taskDot: { fontSize: 12, color: colors.textTertiary },
-  taskRepeat: { fontSize: 11, color: colors.textTertiary, fontWeight: "700" },
-  taskCta: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  taskDoneBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: "#059669",
-  },
-  taskDoneText: { color: "#fff", fontSize: 11, fontWeight: "800" },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "flex-end",
-  },
-  modalSheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: 40,
-    gap: 12,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-    alignSelf: "center",
-    marginBottom: 6,
-  },
-  modalTitle: { fontSize: 22, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
-  modalSub: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  modalInput: {
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: 14,
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text,
-    backgroundColor: "#fff",
-  },
-  modalBtn: {
-    height: 54,
-    borderRadius: radius.pill,
-    backgroundColor: colors.red,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalBtnText: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
-  modalError: { color: colors.red, fontSize: 12, fontWeight: "700" },
-  hintBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    padding: 10,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  hintText: { flex: 1, fontSize: 11, color: colors.textSecondary },
+  hero: { borderRadius: radii.xl, padding: 20, gap: 18, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  heroCoin: { position: "absolute", right: -30, top: -34, opacity: 0.16 },
+  burst: { position: "absolute", right: 8, top: 0 },
+  streakRow: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.1)", paddingTop: 16 },
+  dots: { flexDirection: "row", gap: 6 },
+  dot: { width: 22, height: 22, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  codeRow: { flexDirection: "row", alignItems: "stretch", gap: 12 },
+  code: { flex: 1, padding: 14, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth, gap: 4, justifyContent: "center" },
+  earnRow: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 14 },
+  taskIcon: { width: 46, height: 46, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  progress: { height: 4, borderRadius: 2, overflow: "hidden", marginTop: 12 },
 });

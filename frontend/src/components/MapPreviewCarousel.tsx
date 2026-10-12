@@ -19,8 +19,9 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { PropertyCard } from "@/src/components/PropertyCard";
-import { colors, shadows } from "@/src/constants/theme";
+import { shadows } from "@/src/constants/theme";
 import type { Property } from "@/src/lib/api";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 40;
@@ -41,6 +42,9 @@ type Props = {
 };
 
 export function MapPreviewCarousel(props: Props) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const {
     properties,
     activeId,
@@ -243,7 +247,8 @@ export function MapPreviewCarousel(props: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   wrap: {
     position: "absolute",
     left: 0,

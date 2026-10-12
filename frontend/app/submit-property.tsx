@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,34 +7,37 @@ import {
   TextInput,
   ActivityIndicator,
   Platform,
-  Alert,
 } from "react-native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../src/ui/icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { api } from "@/src/lib/api";
-import { colors, radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
+import { radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { PropertyMarker } from "@/src/components/PropertyMarker";
 import { TokenIcon } from "@/src/components/TokenIcon";
 import { useWallet } from "@/src/contexts/wallet";
+import { useTheme } from "@/src/theme";
+import { Button, ProgressBar, Screen, ScreenHeader, Sheet, AppText, useToast } from "@/src/ui";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 type Step = 0 | 1 | 2 | 3 | 4;
 type ListingType = "buy" | "rent" | "lease" | "shortlet";
 type PropertyType = "duplex" | "apartment" | "bungalow" | "land" | "commercial" | "penthouse" | "terrace";
 
-const LISTING_TYPES: { key: ListingType; label: string; icon: keyof typeof Ionicons.glyphMap; caption: string }[] = [
+const LISTING_TYPES: { key: ListingType; label: string; icon: IconName; caption: string }[] = [
   { key: "buy", label: "For Sale", icon: "pricetag", caption: "Sell outright" },
   { key: "rent", label: "For Rent", icon: "key", caption: "Yearly rental" },
   { key: "shortlet", label: "Short Let", icon: "calendar", caption: "Nightly stays" },
   { key: "lease", label: "For Lease", icon: "document-text", caption: "Commercial" },
 ];
 
-const PROPERTY_TYPES: { key: PropertyType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const PROPERTY_TYPES: { key: PropertyType; label: string; icon: IconName }[] = [
   { key: "duplex", label: "Duplex", icon: "business" },
   { key: "apartment", label: "Apartment", icon: "home" },
   { key: "terrace", label: "Terrace", icon: "grid" },
@@ -50,10 +53,16 @@ const AMENITIES = [
 ];
 
 export default function SubmitProperty() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors: tc } = useTheme();
+  const toast = useToast();
   const [step, setStep] = useState<Step>(0);
   const [submitting, setSubmitting] = useState(false);
+  const [limitSheet, setLimitSheet] = useState<{ planName: string; limit: number | null } | null>(null);
 
   // Form state
   const [listingType, setListingType] = useState<ListingType>("buy");
@@ -157,22 +166,9 @@ export default function SubmitProperty() {
           if (j?.plan_name) planName = j.plan_name;
           if (j?.limit) limit = j.limit;
         } catch {}
-        Alert.alert(
-          "Listing limit reached",
-          limit
-            ? `You've reached your ${limit}-property limit on ${planName}. Upgrade to add more listings.`
-            : "You've reached your listing limit. Upgrade to add more.",
-          [
-            { text: "Not now", style: "cancel" },
-            {
-              text: "Upgrade plan",
-              onPress: () => router.push("/agent-plans"),
-              style: "default",
-            },
-          ]
-        );
+        setLimitSheet({ planName, limit });
       } else {
-        Alert.alert("Could not save property", msg || "Please try again");
+        toast.error("Couldn't save property", msg || "Please try again");
       }
       // eslint-disable-next-line no-console
       console.warn("submit failed", e?.message);
@@ -182,18 +178,16 @@ export default function SubmitProperty() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="submit-property-screen">
-      <View style={styles.header}>
-        <Pressable onPress={prevStep} style={styles.back} testID="submit-back">
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={styles.stepText}>Step {step + 1} of 5</Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${((step + 1) / 5) * 100}%` }]} />
-          </View>
-        </View>
-        <View style={styles.back} />
+    <Screen testID="submit-property-screen">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader
+        title="List a property"
+        subtitle={`Step ${step + 1} of 5 · ${["Type", "Details", "Location", "Photos", "Review"][step]}`}
+        onBack={prevStep}
+        backTestID="submit-back"
+      />
+      <View style={{ paddingHorizontal: spacing.xl, paddingBottom: 4 }}>
+        <ProgressBar value={(step + 1) / 5} tone="brand" height={4} />
       </View>
 
       <KeyboardAwareScrollView
@@ -271,23 +265,32 @@ export default function SubmitProperty() {
         )}
       </KeyboardAwareScrollView>
 
-      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <Pressable
+      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: tc.bgElevated, borderTopColor: tc.border }]}>
+        <Button
+          label={step === 4 ? "Publish listing" : "Continue"}
+          iconRight={step === 4 ? "rocket" : "arrow-forward"}
+          variant={step === 4 ? "brand" : "primary"}
+          size="lg"
+          fullWidth
+          loading={submitting}
+          disabled={!canNext()}
           onPress={step === 4 ? submit : nextStep}
-          disabled={!canNext() || submitting}
-          style={[styles.cta, (!canNext() || submitting) && { opacity: 0.4 }]}
           testID="submit-next-btn"
-        >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.ctaText}>
-              {step === 4 ? "Publish Listing" : "Continue"}
-            </Text>
-          )}
-        </Pressable>
+        />
       </View>
-    </SafeAreaView>
+
+      <Sheet visible={!!limitSheet} onClose={() => setLimitSheet(null)} title="Listing limit reached">
+        <AppText variant="body" tone="secondary" style={{ marginBottom: 16 }}>
+          {limitSheet?.limit
+            ? `You've reached your ${limitSheet.limit}-property limit on ${limitSheet.planName}. Upgrade to add more listings.`
+            : "You've reached your listing limit. Upgrade to add more."}
+        </AppText>
+        <View style={{ gap: 8 }}>
+          <Button label="Upgrade plan" iconLeft="pricetags" variant="brand" size="lg" fullWidth onPress={() => { setLimitSheet(null); router.push("/agent-plans"); }} testID="limit-upgrade" />
+          <Button label="Not now" variant="ghost" fullWidth onPress={() => setLimitSheet(null)} />
+        </View>
+      </Sheet>
+    </Screen>
   );
 }
 
@@ -308,6 +311,9 @@ function Step0({
   mandateType,
   setMandateType,
 }: any) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={{ gap: spacing.xl }}>
       <View>
@@ -324,6 +330,8 @@ function Step0({
             onPress={() => setIsOwner(true)}
             style={[styles.mandateOpt, isOwner && styles.mandateOptOn]}
             testID="sp-owner-yes"
+            accessibilityRole="radio"
+            accessibilityState={{ selected: isOwner }}
           >
             <Ionicons name="checkmark-circle" size={18} color={isOwner ? "#fff" : colors.emerald} />
             <Text style={[styles.mandateOptText, isOwner && { color: "#fff" }]}>Yes, I&apos;m the owner</Text>
@@ -332,6 +340,8 @@ function Step0({
             onPress={() => setIsOwner(false)}
             style={[styles.mandateOpt, !isOwner && styles.mandateOptOff]}
             testID="sp-owner-no"
+            accessibilityRole="radio"
+            accessibilityState={{ selected: !isOwner }}
           >
             <Ionicons name="person-outline" size={18} color={!isOwner ? "#fff" : colors.textSecondary} />
             <Text style={[styles.mandateOptText, !isOwner && { color: "#fff" }]}>No, I&apos;m an agent</Text>
@@ -346,6 +356,8 @@ function Step0({
                 onPress={() => setHasMandate(true)}
                 style={[styles.mandateOpt, hasMandate && styles.mandateOptOn]}
                 testID="sp-mandate-yes"
+                accessibilityRole="radio"
+                accessibilityState={{ selected: hasMandate }}
               >
                 <Ionicons name="shield-checkmark" size={18} color={hasMandate ? "#fff" : colors.emerald} />
                 <Text style={[styles.mandateOptText, hasMandate && { color: "#fff" }]}>Yes</Text>
@@ -354,6 +366,8 @@ function Step0({
                 onPress={() => setHasMandate(false)}
                 style={[styles.mandateOpt, !hasMandate && styles.mandateOptWarn]}
                 testID="sp-mandate-no"
+                accessibilityRole="radio"
+                accessibilityState={{ selected: !hasMandate }}
               >
                 <Ionicons name="alert-circle" size={18} color={!hasMandate ? "#fff" : colors.gold} />
                 <Text style={[styles.mandateOptText, !hasMandate && { color: "#fff" }]}>No</Text>
@@ -374,6 +388,9 @@ function Step0({
                         onPress={() => setMandateType(m)}
                         style={[styles.chip, on && styles.chipActive]}
                         testID={`sp-mtype-${m}`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        accessibilityLabel={`${m} mandate`}
                       >
                         <Text style={[styles.chipText, on && { color: "#fff" }]}>{m.toUpperCase()}</Text>
                       </Pressable>
@@ -408,6 +425,9 @@ function Step0({
             style={[styles.gridCard, listingType === t.key && styles.gridCardActive]}
             onPress={() => setListingType(t.key)}
             testID={`listing-${t.key}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: listingType === t.key }}
+            accessibilityLabel={t.label}
           >
             <Ionicons
               name={t.icon}
@@ -432,6 +452,9 @@ function Step0({
             style={[styles.chip, propertyType === p.key && styles.chipActive]}
             onPress={() => setPropertyType(p.key)}
             testID={`ptype-${p.key}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: propertyType === p.key }}
+            accessibilityLabel={p.label}
           >
             <Ionicons
               name={p.icon}
@@ -466,18 +489,22 @@ function AiDescriptionButton({
   location?: string;
   onGenerated: (text: string) => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const { wallet, refresh } = useWallet();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const balance = wallet?.spendable ?? 0;
   const COST = 5;
 
   const generate = async () => {
     if (!title) {
-      Alert.alert("Add a title first", "Give your listing a title, then let AI write the rest.");
+      toast.info("Add a title first", "Give your listing a title, then let AI write the rest.");
       return;
     }
     if (balance < COST) {
-      Alert.alert("Not enough tokens", `You need ${COST} tokens to generate. You have ${balance}.`);
+      toast.error("Not enough MASS", `You need ${COST} MASS to generate. You have ${balance}.`);
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -496,14 +523,14 @@ function AiDescriptionButton({
       await refresh();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e: any) {
-      Alert.alert("AI unavailable", e?.message ?? "Please try again.");
+      toast.error("AI unavailable", e?.message ?? "Please try again.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Pressable style={styles.aiBtn} onPress={generate} disabled={busy} testID="ai-desc-btn">
+    <Pressable style={styles.aiBtn} onPress={generate} disabled={busy} testID="ai-desc-btn" accessibilityRole="button" accessibilityLabel="Generate description with AI" accessibilityState={{ busy, disabled: busy }}>
       {busy ? (
         <ActivityIndicator size="small" color="#fff" />
       ) : (
@@ -518,6 +545,9 @@ function AiDescriptionButton({
 }
 
 function Step1(props: any) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={{ gap: spacing.lg }}>
       <View>
@@ -572,6 +602,9 @@ function Step1(props: any) {
 
 // ─── Step 2: location ────────────────────────────────────
 function Step2(props: any) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={{ gap: spacing.lg }}>
       <View>
@@ -636,6 +669,9 @@ function Step3({
   addImages,
   removeImage,
 }: any) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [picking, setPicking] = useState<null | "library" | "camera">(null);
 
   const pickFromLibrary = async () => {
@@ -708,6 +744,9 @@ function Step3({
                 onPress={() => toggleAmenity(a)}
                 style={[styles.chip, on && styles.chipActive]}
                 testID={`amenity-${a.replace(/\s+/g, "-")}`}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on }}
+                accessibilityLabel={a}
               >
                 {on && <Ionicons name="checkmark" size={14} color="#fff" />}
                 <Text style={[styles.chipText, on && { color: "#fff" }]}>{a}</Text>
@@ -729,6 +768,8 @@ function Step3({
             disabled={!!picking || selectedImages.length >= 10}
             style={[styles.pickerBtn, (picking === "library") && { opacity: 0.5 }]}
             testID="picker-library"
+            accessibilityRole="button"
+            accessibilityLabel="Choose photos from gallery"
           >
             {picking === "library" ? (
               <ActivityIndicator color={colors.text} />
@@ -747,6 +788,8 @@ function Step3({
               (picking === "camera" || Platform.OS === "web") && { opacity: 0.5 },
             ]}
             testID="picker-camera"
+            accessibilityRole="button"
+            accessibilityLabel="Take a photo"
           >
             {picking === "camera" ? (
               <ActivityIndicator color={colors.text} />
@@ -779,6 +822,8 @@ function Step3({
                   style={styles.removeBtn}
                   hitSlop={8}
                   testID={`remove-photo-${idx}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove photo ${idx + 1}`}
                 >
                   <Ionicons name="close" size={16} color="#fff" />
                 </Pressable>
@@ -793,6 +838,9 @@ function Step3({
 
 // ─── Step 4: review ──────────────────────────────────────
 function Step4({ data }: any) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const price = parseInt(data.price || "0", 10);
   return (
     <View style={{ gap: spacing.lg }}>
@@ -831,6 +879,9 @@ function Step4({ data }: any) {
 }
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.reviewRow}>
       <Text style={styles.reviewLabel}>{label}</Text>
@@ -845,6 +896,9 @@ function Field({
   testID,
   ...rest
 }: React.ComponentProps<typeof TextInput> & { label: string; testID?: string; style?: any }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={[{ gap: 6 }, style]}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -858,26 +912,9 @@ function Field({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  back: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  stepText: { fontSize: 12, fontWeight: "700", color: colors.textTertiary, letterSpacing: 0.4 },
-  progressBar: {
-    marginTop: 6,
-    width: "80%",
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.surfaceSecondary,
-    overflow: "hidden",
-  },
-  progressFill: { height: "100%", backgroundColor: colors.red, borderRadius: 2 },
   h1: { ...typography.display, fontSize: 28 },
   h2: { ...typography.h2, marginBottom: 8 },
   sub: { ...typography.body, color: colors.textTertiary, marginTop: 6, lineHeight: 22 },
@@ -889,7 +926,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.border,
     gap: 8,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     minHeight: 120,
     justifyContent: "flex-end",
   },
@@ -906,9 +943,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.text, borderColor: colors.text },
+  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   chipText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
   trustBox: {
     padding: spacing.lg,
@@ -928,7 +965,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1.5,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   mandateOptOn: { backgroundColor: colors.emerald, borderColor: colors.emerald },
   mandateOptOff: { backgroundColor: colors.ink, borderColor: colors.ink },
@@ -1066,7 +1103,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 12,
     left: 12,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: radius.pill,
@@ -1097,16 +1134,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: spacing.lg,
-    backgroundColor: "rgba(255,255,255,0.98)",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
   },
-  cta: {
-    height: 56,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

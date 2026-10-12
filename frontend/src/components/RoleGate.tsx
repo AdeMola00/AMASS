@@ -1,9 +1,10 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, StyleSheet, ScrollView } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, shadows, spacing } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Button, Screen, ScreenHeader, type IconName } from "@/src/ui";
 
 /**
  * A friendly, non-dead-end gate for features that require a role/status
@@ -15,7 +16,7 @@ export function RoleGate({
   title,
   message,
   icon = "lock-closed",
-  tint = colors.red,
+  tint,
   bullets,
   ctaLabel,
   onCta,
@@ -26,7 +27,7 @@ export function RoleGate({
   headerTitle: string;
   title: string;
   message: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
   tint?: string;
   bullets?: string[];
   ctaLabel: string;
@@ -36,102 +37,48 @@ export function RoleGate({
   testID?: string;
 }) {
   const router = useRouter();
+  const { colors } = useTheme();
+  const accent = tint ?? colors.brand;
   return (
-    <View style={styles.container} testID={testID ?? "role-gate"}>
+    <Screen testID={testID ?? "role-gate"}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn} testID="role-gate-back">
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{headerTitle}</Text>
-        <View style={{ width: 40 }} />
-      </SafeAreaView>
-
+      <ScreenHeader title={headerTitle} testID="role-gate-header" />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <View style={[styles.badge, { backgroundColor: tint + "15" }]}>
-          <Ionicons name={icon} size={36} color={tint} />
+        <View style={[styles.badge, { backgroundColor: colors.brandSoft }]}>
+          <Ionicons name={icon} size={36} color={accent} />
         </View>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.msg}>{message}</Text>
+        <AppText variant="h2" align="center">
+          {title}
+        </AppText>
+        <AppText variant="body" tone="secondary" align="center" style={{ paddingHorizontal: space[3] }}>
+          {message}
+        </AppText>
 
         {!!bullets?.length && (
           <View style={styles.bullets}>
             {bullets.map((b) => (
-              <View key={b} style={styles.bulletRow}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.emerald} />
-                <Text style={styles.bulletText}>{b}</Text>
+              <View key={b} style={[styles.bulletRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+                <AppText variant="bodyMedium" style={{ flex: 1 }}>
+                  {b}
+                </AppText>
               </View>
             ))}
           </View>
         )}
 
-        <Pressable style={[styles.cta, { backgroundColor: tint }]} onPress={onCta} testID="role-gate-cta">
-          <Text style={styles.ctaText}>{ctaLabel}</Text>
-        </Pressable>
-
-        {secondaryLabel && (
-          <Pressable style={styles.secondary} onPress={onSecondary ?? (() => router.back())} testID="role-gate-secondary">
-            <Text style={styles.secondaryText}>{secondaryLabel}</Text>
-          </Pressable>
-        )}
+        <Button label={ctaLabel} variant="brand" size="lg" fullWidth onPress={onCta} testID="role-gate-cta" style={{ marginTop: space[2] }} />
+        {secondaryLabel ? (
+          <Button label={secondaryLabel} variant="ghost" fullWidth onPress={onSecondary ?? (() => router.back())} testID="role-gate-secondary" />
+        ) : null}
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: colors.bg,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
-  body: { padding: spacing.xl, alignItems: "center", gap: 12, paddingBottom: spacing.xxl },
-  badge: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: spacing.lg,
-    marginBottom: 4,
-  },
-  title: { fontSize: 22, fontWeight: "900", color: colors.text, textAlign: "center", letterSpacing: -0.4 },
-  msg: { fontSize: 14, color: colors.textSecondary, textAlign: "center", lineHeight: 21, paddingHorizontal: spacing.md },
-  bullets: { width: "100%", gap: 10, marginTop: 8, marginBottom: 8 },
-  bulletRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: 14,
-  },
-  bulletText: { flex: 1, fontSize: 13, color: colors.text, fontWeight: "600", lineHeight: 18 },
-  cta: {
-    width: "100%",
-    height: 54,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-    ...shadows.soft,
-  },
-  ctaText: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: 0.2 },
-  secondary: { height: 48, alignItems: "center", justifyContent: "center", marginTop: 2 },
-  secondaryText: { color: colors.textSecondary, fontSize: 14, fontWeight: "700" },
+  body: { padding: space[6], alignItems: "center", gap: space[3], paddingBottom: space[12] },
+  badge: { width: 92, height: 92, borderRadius: 46, alignItems: "center", justifyContent: "center", marginTop: space[4], marginBottom: space[1] },
+  bullets: { width: "100%", gap: 10, marginTop: space[2], marginBottom: space[2] },
+  bulletRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: radii.md, padding: 14 },
 });

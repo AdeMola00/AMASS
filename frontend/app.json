@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/amass-icon-square.png",
     "scheme": "amass",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.amassafrica.app",

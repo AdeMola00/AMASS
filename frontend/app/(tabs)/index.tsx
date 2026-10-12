@@ -9,7 +9,6 @@ import {
   Platform,
   FlatList,
   Linking,
-  Alert,
   Animated,
   ActivityIndicator,
 } from "react-native";
@@ -17,12 +16,13 @@ import { MapView, Marker, PROVIDER_DEFAULT, Region, IS_MAP_LIMITED_IN_EXPO_GO } 
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../../src/ui/icons";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { api, Property } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
-import { colors, radius, shadows, spacing, typography, formatMarkerPrice } from "@/src/constants/theme";
+import { radius, shadows, spacing, typography, formatMarkerPrice } from "@/src/constants/theme";
 import {
   PropertyMarker,
   ClusterMarker,
@@ -45,6 +45,9 @@ import { NeighborhoodSheet, NeighborhoodSheetRef } from "@/src/components/Neighb
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { MapLegend } from "@/src/components/MapLegend";
 import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { useToast } from "@/src/ui";
+import { useTheme } from "@/src/theme";
 
 const LAST_REGION_KEY = "amass_map_last_region";
 const MAP_LAYER_KEY = "amass_map_layer_v1";
@@ -81,7 +84,7 @@ const RECENT_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 type ChipConf = {
   key: string;
   label: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
   apply: (f: FilterState) => FilterState;
   isActive: (f: FilterState) => boolean;
   // Optional client-side extra filter that runs after the API returns.
@@ -102,6 +105,10 @@ const QUICK_FILTERS: ChipConf[] = [
 type ViewMode = "map" | "list";
 
 export default function HomeMap() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const toast = useToast();
+
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ ai_filters?: string }>();
@@ -528,10 +535,7 @@ export default function HomeMap() {
     if (filters.minPrice) criteria.min_price = filters.minPrice;
     if (filters.maxPrice) criteria.max_price = filters.maxPrice;
     if (Object.keys(criteria).length === 0) {
-      Alert.alert(
-        "Nothing to save",
-        "Add filters or a search term first — then tap this bookmark to save the search."
-      );
+      toast.info("Nothing to save yet", "Add filters or a search term first, then tap the bookmark.");
       return;
     }
     // Auto-name
@@ -544,12 +548,15 @@ export default function HomeMap() {
     try {
       await api.createSavedSearch(name, criteria, true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert("Search saved", `You'll be notified when new listings match "${name}".`, [
-        { text: "View", onPress: () => router.push("/saved-searches" as any) },
-        { text: "Done", style: "default" },
-      ]);
+      toast.show({
+        kind: "success",
+        title: "Search saved",
+        body: `We'll notify you when new listings match "${name}".`,
+        actionLabel: "View",
+        onAction: () => router.push("/saved-searches" as any),
+      });
     } catch (e: any) {
-      Alert.alert("Save failed", e?.message ?? "Please try again.");
+      toast.error("Couldn't save search", e?.message ?? "Please try again.");
     }
   };
 
@@ -560,7 +567,7 @@ export default function HomeMap() {
   if (viewMode === "list") {
     return (
       <View style={styles.container} testID="home-list-screen">
-        <View style={{ paddingTop: searchTop, paddingHorizontal: spacing.lg, backgroundColor: "#fff", zIndex: 5 }}>
+        <View style={{ paddingTop: searchTop, paddingHorizontal: spacing.lg, backgroundColor: colors.bg, zIndex: 5 }}>
           <TopOverlay
             query={query}
             setQuery={setQuery}
@@ -629,7 +636,7 @@ export default function HomeMap() {
         showsCompass={false}
         showsMyLocationButton={false}
         showsUserLocation={locationPermission === "granted"}
-        showsPointsOfInterest={false}
+        showsPointsOfInterests={false}
         showsBuildings={true}
         showsTraffic={false}
         showsIndoors={false}
@@ -850,7 +857,7 @@ export default function HomeMap() {
               const conv = await api.chatStartFromProperty(p.id);
               router.push(`/chat/${conv.id}` as any);
             } catch (e: any) {
-              Alert.alert("Cannot contact agent", e?.message ?? "Try again later");
+              toast.error("Cannot contact agent", e?.message ?? "Try again later");
             }
           }}
           onDismiss={() => {
@@ -925,6 +932,10 @@ function TopOverlay({
   viewMode: ViewMode;
   setViewMode: (v: ViewMode) => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { isDark } = useTheme();
+
   const router = useRouter();
   const hasActiveSearch =
     !!query.trim() ||
@@ -935,11 +946,11 @@ function TopOverlay({
     !!filters.maxPrice;
   return (
     <View>
-      <View style={[styles.searchBar, shadows.card]}>
+      <View style={[styles.searchBar, shadows.card, isDark && { borderColor: colors.border }]}>
         {Platform.OS === "ios" ? (
-          <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={80} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
         ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.98)" }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(23,21,19,0.96)" : "rgba(255,255,255,0.98)" }]} />
         )}
         <AmassLogo size={22} showWordmark={false} style={{ marginLeft: -2 }} />
         <TextInput
@@ -1024,13 +1035,16 @@ function ActionBtn({
   label,
   iconRotation,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   onPress: () => void;
   testID?: string;
   highlight?: boolean;
   label?: string;
   iconRotation?: number;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={onPress}
@@ -1051,6 +1065,9 @@ function ActionBtn({
 }
 
 function EmptyState() {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyIcon}>
@@ -1076,6 +1093,9 @@ function MapFilterChips({
   onToggleKind: (k: ListingKind) => void;
   onClear: () => void;
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const anyActive = statusFilter.size > 0 || kindFilter.size > 0;
   return (
     <ScrollView
@@ -1125,7 +1145,8 @@ function MapFilterChips({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   topOverlay: { position: "absolute", left: spacing.lg, right: spacing.lg },
   searchBar: {
@@ -1142,7 +1163,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, color: colors.text, fontWeight: "500" },
   filterIcon: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: colors.text,
+    backgroundColor: colors.ink,
     alignItems: "center", justifyContent: "center",
     position: "relative",
   },
@@ -1176,7 +1197,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 36,
     borderRadius: radius.pill,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -1199,7 +1220,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.divider,
   },
@@ -1208,7 +1229,7 @@ const styles = StyleSheet.create({
   kindChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   actionBtn: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: colors.border,
   },
@@ -1236,14 +1257,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 11,
     borderRadius: 999,
   },
   mapStatusText: { fontSize: 13, fontWeight: "800", color: colors.text },
   mapStatusCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     paddingHorizontal: 22,
     paddingVertical: 20,
     borderRadius: 18,
@@ -1287,7 +1308,7 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     ...shadows.card,
   },
   permIcon: {

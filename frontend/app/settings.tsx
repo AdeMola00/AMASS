@@ -1,206 +1,147 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, Switch, Alert, Platform } from "react-native";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
+import Constants from "expo-constants";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
+import { useWallet } from "@/src/contexts/wallet";
 import { openPrivacyPolicy, openTerms } from "@/src/lib/legal";
-import { colors, radius, shadows, spacing, typography } from "@/src/constants/theme";
+import { storage } from "@/src/utils/storage";
+import { useTheme, useThemeMode, ThemeMode } from "@/src/theme";
+import { space } from "@/src/theme/tokens";
+import { AppText, ListRow, RowGroup, Screen, ScreenHeader, SegmentedControl, useToast } from "@/src/ui";
 
-type IconName = keyof typeof Ionicons.glyphMap;
+const PREF_PUSH = "amass_pref_push";
+const PREF_EMAIL = "amass_pref_email";
 
 export default function Settings() {
   const router = useRouter();
-  const { signOut } = useAuth();
-  const [darkMode, setDarkMode] = useState(false);
+  const { signOut, user } = useAuth();
+  const { mass } = useWallet();
+  const { colors } = useTheme();
+  const { mode, setMode } = useThemeMode();
+  const toast = useToast();
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  useEffect(() => {
+    storage.getItem<boolean>(PREF_PUSH, true).then((v) => setPushEnabled(v ?? true));
+    storage.getItem<boolean>(PREF_EMAIL, false).then((v) => setEmailEnabled(v ?? false));
+  }, []);
+
+  const savePref = (key: string, setter: (v: boolean) => void) => (v: boolean) => {
+    Haptics.selectionAsync().catch(() => {});
+    setter(v);
+    storage.setItem(key, v).catch(() => {});
+  };
+
+  const confirm = (title: string, body: string, okLabel: string, onOk: () => void) => {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(`${title}\n\n${body}`)) onOk();
+      return;
+    }
+    Alert.alert(title, body, [
+      { text: "Cancel", style: "cancel" },
+      { text: okLabel, style: "destructive", onPress: onOk },
+    ]);
+  };
+
   const onDeleteAccount = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-    Alert.alert(
+    confirm(
       "Delete your AMASS account?",
-      "This is permanent. We'll erase your profile, subscription, wallet, saved searches, favourites and notifications. Any properties you listed will be anonymised so past viewers still see a history.\n\nThis cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete forever",
-          style: "destructive",
-          onPress: () => {
-            // Second-stage confirmation to match Apple's guidance.
-            Alert.alert(
-              "Are you absolutely sure?",
-              "Type DELETE below is not required — but this action erases your account immediately.",
-              [
-                { text: "Keep my account", style: "cancel" },
-                {
-                  text: "Yes, delete",
-                  style: "destructive",
-                  onPress: async () => {
-                    setDeleting(true);
-                    try {
-                      const res = await api.deleteMyAccount();
-                      if (res.ok) {
-                        Haptics.notificationAsync(
-                          Haptics.NotificationFeedbackType.Success
-                        ).catch(() => {});
-                        await signOut();
-                        Alert.alert(
-                          "Account deleted",
-                          "Your AMASS account and personal data have been erased."
-                        );
-                        router.replace("/(auth)/login" as any);
-                      }
-                    } catch (e: any) {
-                      Alert.alert(
-                        "Deletion failed",
-                        e?.message ??
-                          "We couldn't delete your account. Please contact support at hello@amass.africa"
-                      );
-                    } finally {
-                      setDeleting(false);
-                    }
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
+      "This is permanent. We'll erase your profile, subscription, wallet, saved searches, favourites and notifications. Properties you listed are anonymised.\n\nThis cannot be undone.",
+      "Delete forever",
+      () =>
+        confirm("Are you absolutely sure?", "This erases your account immediately.", "Yes, delete", async () => {
+          setDeleting(true);
+          try {
+            const res = await api.deleteMyAccount();
+            if (res.ok) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+              await signOut();
+              toast.success("Account deleted", "Your AMASS account and personal data have been erased.");
+              router.replace("/(auth)/login" as any);
+            }
+          } catch (e: any) {
+            toast.error("Deletion failed", e?.message ?? "We couldn't delete your account. Contact hello@amass.africa");
+          } finally {
+            setDeleting(false);
+          }
+        })
     );
   };
 
+  const version = Constants.expoConfig?.version ?? "1.0.0";
+  const plan = mass?.subscription?.plan_id;
+
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="settings-screen">
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <Text style={styles.title}>Settings</Text>
-        <View style={styles.back} />
-      </View>
+    <Screen testID="settings-screen">
+      <ScreenHeader title="Settings" />
+      <ScrollView contentContainerStyle={{ padding: space[4], gap: space[5], paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+        <RowGroup title="Appearance">
+          <View style={{ padding: space[4], gap: 12 }}>
+            <View style={{ gap: 2 }}>
+              <AppText variant="bodyMedium">Theme</AppText>
+              <AppText variant="caption" tone="tertiary">
+                Light and dark are each designed deliberately — pick one, or follow your device.
+              </AppText>
+            </View>
+            <SegmentedControl<ThemeMode>
+              value={mode}
+              onChange={setMode}
+              testIDPrefix="theme"
+              options={[
+                { value: "system", label: "System", icon: "phone-portrait-outline" },
+                { value: "light", label: "Light", icon: "sunny-outline" },
+                { value: "dark", label: "Dark", icon: "moon-outline" },
+              ]}
+            />
+          </View>
+        </RowGroup>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: 40 }}>
-        <Section title="Preferences">
-          <Row icon="moon-outline" label="Dark mode" trailing={<Switch value={darkMode} onValueChange={setDarkMode} />} />
-          <Row icon="language-outline" label="Language" value="English" onPress={() => {}} />
-          <Row icon="cash-outline" label="Currency" value="Naira (₦)" onPress={() => {}} />
-        </Section>
-
-        <Section title="Notifications">
-          <Row icon="notifications-outline" label="Push notifications" trailing={<Switch value={pushEnabled} onValueChange={setPushEnabled} />} />
-          <Row icon="mail-outline" label="Email updates" trailing={<Switch value={emailEnabled} onValueChange={setEmailEnabled} />} />
-        </Section>
-
-        <Section title="Security">
-          <Row icon="finger-print-outline" label="Biometric unlock" trailing={<Switch value={true} onValueChange={() => {}} />} />
-          <Row icon="lock-closed-outline" label="Change password" onPress={() => {}} />
-        </Section>
-
-        <Section title="Account">
-          <Row icon="star-outline" label="Subscription" value="Premium" onPress={() => router.push("/agent-plans")} />
-          <Row
-            icon="trash-outline"
-            label={deleting ? "Deleting…" : "Delete account"}
-            onPress={deleting ? undefined : onDeleteAccount}
-            destructive
+        <RowGroup title="Notifications">
+          <ListRow
+            icon="notifications-outline"
+            iconTone="brand"
+            label="Push notifications"
+            caption="New leads, messages and unlock receipts"
+            trailing={<Switch value={pushEnabled} onValueChange={savePref(PREF_PUSH, setPushEnabled)} trackColor={{ true: colors.primary }} testID="settings-push-notifications" />}
           />
-        </Section>
+          <ListRow
+            icon="mail-outline"
+            label="Email updates"
+            caption="Saved-search alerts and product news"
+            last
+            trailing={<Switch value={emailEnabled} onValueChange={savePref(PREF_EMAIL, setEmailEnabled)} trackColor={{ true: colors.primary }} testID="settings-email-updates" />}
+          />
+        </RowGroup>
 
-        <Section title="Legal">
-          <Row icon="shield-checkmark-outline" label="Privacy Policy" onPress={() => openPrivacyPolicy()} />
-          <Row icon="document-text-outline" label="Terms of Service" onPress={() => openTerms()} />
-        </Section>
+        <RowGroup title="Security">
+          <ListRow icon="lock-closed-outline" label="Change password" caption={`We'll email a reset code to ${user?.email ?? "your address"}`} onPress={() => router.push({ pathname: "/(auth)/forgot-password", params: { email: user?.email ?? "" } } as any)} last testID="settings-change-password" />
+        </RowGroup>
 
-        <Text style={styles.version}>AMASS v1.0.0 · Africa&apos;s Property OS</Text>
+        <RowGroup title="Account">
+          <ListRow icon="star-outline" iconTone="premium" label="Subscription" value={plan ? `${plan} plan` : "No active plan"} onPress={() => router.push("/subscribe")} testID="settings-subscription" />
+          <ListRow icon="pricetags-outline" label="Agent plans" caption="Starter · Pro · Agency" onPress={() => router.push("/agent-plans")} testID="settings-agent-plans" />
+          <ListRow icon="trash-outline" label={deleting ? "Deleting…" : "Delete account"} caption="Permanently erase your account and data" onPress={deleting ? undefined : onDeleteAccount} destructive last testID="settings-delete-account" />
+        </RowGroup>
+
+        <RowGroup title="Legal">
+          <ListRow icon="shield-checkmark-outline" label="Privacy Policy" onPress={() => openPrivacyPolicy()} testID="settings-privacy-policy" />
+          <ListRow icon="document-text-outline" label="Terms of Service" onPress={() => openTerms()} last testID="settings-terms-of-service" />
+        </RowGroup>
+
+        <AppText variant="caption" tone="muted" align="center" style={styles.version}>
+          AMASS v{version} · Africa&apos;s Property OS
+        </AppText>
       </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={{ gap: spacing.sm }}>
-      <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
-      <View style={[styles.card, shadows.soft]}>{children}</View>
-    </View>
-  );
-}
-
-function Row({
-  icon,
-  label,
-  value,
-  trailing,
-  onPress,
-  destructive,
-}: {
-  icon: IconName;
-  label: string;
-  value?: string;
-  trailing?: React.ReactNode;
-  onPress?: () => void;
-  destructive?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      style={styles.row}
-      testID={`settings-${label.toLowerCase().replace(/\s+/g, "-")}`}
-    >
-      <View style={[styles.rowIcon, destructive && { backgroundColor: colors.redLight }]}>
-        <Ionicons name={icon} size={18} color={destructive ? colors.red : colors.text} />
-      </View>
-      <Text style={[styles.rowLabel, destructive && { color: colors.red }]}>{label}</Text>
-      {value ? (
-        <Text style={styles.rowValue}>{value}</Text>
-      ) : trailing ? (
-        trailing
-      ) : (
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      )}
-    </Pressable>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  back: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  title: { ...typography.h2 },
-  sectionTitle: { fontSize: 11, fontWeight: "700", color: colors.textTertiary, letterSpacing: 0.8, marginLeft: 4 },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: radius.md,
-    overflow: "hidden",
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  rowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rowLabel: { flex: 1, ...typography.body, fontWeight: "500" },
-  rowValue: { ...typography.caption, color: colors.textTertiary },
-  version: { textAlign: "center", color: colors.textMuted, fontSize: 12, marginTop: spacing.xl },
+  version: { marginTop: space[2] },
 });

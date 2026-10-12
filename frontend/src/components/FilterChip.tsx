@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, Text, StyleSheet } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { colors, radius, spacing } from "@/src/constants/theme";
+import type { IconName } from "../ui/icons";
+import { radius, spacing } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export function FilterChip({
   label,
@@ -13,9 +15,12 @@ export function FilterChip({
   label: string;
   active?: boolean;
   onPress?: () => void;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
   variant?: "default" | "solid";
 }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={onPress}
@@ -37,7 +42,8 @@ export function FilterChip({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   chip: {
     height: 36,
     flexShrink: 0,
@@ -46,13 +52,13 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
   chipActive: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
   },
   chipSolidActive: {
     backgroundColor: colors.red,

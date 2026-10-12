@@ -2,59 +2,72 @@
  * Admin Audit Log — Phase 6D
  * Filterable, cursor-paginated stream of every property_audit_logs event.
  */
-import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { colors, radius, spacing, typography } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Chip, EmptyState, IconButton, Input, Screen, ScreenHeader, Sheet, SkeletonRows, type BadgeTone, type IconName } from "@/src/ui";
 
 type Row = Awaited<ReturnType<typeof api.adminAuditLogs>>["items"][number];
 
-const ACTION_COLORS: Record<string, string> = {
-  PROPERTY_CREATED: colors.emerald,
-  PROPERTY_MERGED: colors.red,
-  PROPERTY_VERIFIED: colors.emerald,
-  LISTING_CREATED: colors.ink,
-  DUPLICATE_DETECTED: colors.gold,
-  DUPLICATE_REVIEWED: colors.gold,
-  REPRESENTATION_CREATED: colors.textSecondary,
-  REPRESENTATION_APPROVED: colors.emerald,
-  REPRESENTATION_REJECTED: colors.red,
-  REPRESENTATION_SUSPENDED: colors.textTertiary,
-  REPRESENTATION_REVOKED: colors.red,
-  PASSPORT_VISIBILITY_UPDATED: colors.ink,
+const ACTION_META: Record<string, { tone: BadgeTone; icon: IconName }> = {
+  PROPERTY_CREATED: { tone: "success", icon: "add-circle" },
+  PROPERTY_MERGED: { tone: "brand", icon: "git-merge" },
+  PROPERTY_VERIFIED: { tone: "success", icon: "shield-checkmark" },
+  LISTING_CREATED: { tone: "info", icon: "pricetag" },
+  DUPLICATE_DETECTED: { tone: "warning", icon: "copy" },
+  DUPLICATE_REVIEWED: { tone: "warning", icon: "eye" },
+  CANDIDATE_MERGED: { tone: "brand", icon: "git-merge" },
+  CANDIDATE_MARKED_RELATED: { tone: "info", icon: "link" },
+  REPRESENTATION_CREATED: { tone: "neutral", icon: "people" },
+  REPRESENTATION_APPROVED: { tone: "success", icon: "checkmark-circle" },
+  REPRESENTATION_REJECTED: { tone: "error", icon: "close-circle" },
+  REPRESENTATION_SUSPENDED: { tone: "warning", icon: "pause-circle" },
+  REPRESENTATION_REVOKED: { tone: "error", icon: "remove-circle" },
+  PASSPORT_VISIBILITY_UPDATED: { tone: "info", icon: "eye" },
 };
+
+function metaFor(action: string) {
+  return ACTION_META[action] ?? { tone: "neutral" as BadgeTone, icon: "ellipse" as IconName };
+}
+
+function _relative(iso: string) {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
 export default function AdminAuditLog() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [propertyFilter, setPropertyFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
+  const [draftProperty, setDraftProperty] = useState("");
+  const [draftAction, setDraftAction] = useState("");
   const [actions, setActions] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Row | null>(null);
 
   const load = useCallback(
     async (reset = true) => {
+      if (reset) setError(false);
       try {
         const r = await api.adminAuditLogs({
           property_id: propertyFilter || undefined,
@@ -65,7 +78,7 @@ export default function AdminAuditLog() {
         setRows((prev) => (reset ? r.items : [...prev, ...r.items]));
         setNextCursor(r.next_cursor);
       } catch {
-        // ignore
+        if (reset) setError(true);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -80,53 +93,84 @@ export default function AdminAuditLog() {
       setLoading(false);
       return;
     }
+    setLoading(true);
     load(true);
     api.adminAuditActions().then(setActions).catch(() => {});
   }, [user, propertyFilter, actionFilter]);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  const openFilter = () => {
+    setDraftProperty(propertyFilter);
+    setDraftAction(actionFilter);
+    setFilterOpen(true);
+  };
+  const applyFilter = () => {
+    setPropertyFilter(draftProperty.trim());
+    setActionFilter(draftAction);
+    setFilterOpen(false);
+  };
+  const filterCount = (propertyFilter ? 1 : 0) + (actionFilter ? 1 : 0);
+
+  // Group rows by calendar day for scannability
+  const sections = useMemo(() => {
+    const out: { key: string; label: string; items: Row[] }[] = [];
+    const today = new Date().toDateString();
+    const yest = new Date(Date.now() - 86400000).toDateString();
+    for (const r of rows) {
+      const d = new Date(r.created_at);
+      const key = d.toDateString();
+      let s = out.find((x) => x.key === key);
+      if (!s) {
+        const label = key === today ? "Today" : key === yest ? "Yesterday" : d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+        s = { key, label, items: [] };
+        out.push(s);
+      }
+      s.items.push(r);
+    }
+    return out;
+  }, [rows]);
+  const flat = useMemo(() => sections.flatMap((s) => [{ _header: true, id: `h-${s.key}`, label: s.label } as any, ...s.items]), [sections]);
+
   if (!user?.is_admin) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <Header title="Audit Log" onBack={() => router.back()} />
-        <View style={styles.blocked}>
-          <Ionicons name="lock-closed" size={40} color={colors.red} />
-          <Text style={styles.blockedText}>Admins only</Text>
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScreenHeader title="Audit Log" />
+        <EmptyState icon="lock-closed-outline" title="Admins only" body="You need an admin account to view the audit log." actionLabel="Go back" onAction={() => router.back()} />
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]} testID="admin-audit">
-      <Header
+    <Screen testID="admin-audit">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader
         title="Audit Log"
-        onBack={() => router.back()}
-        right={
-          <Pressable style={styles.iconBtn} onPress={() => setFilterOpen(true)} testID="audit-filter">
-            <Ionicons name="filter" size={20} color={colors.text} />
-          </Pressable>
-        }
+        subtitle={rows.length ? `${rows.length}${nextCursor ? "+" : ""} events` : undefined}
+        right={<IconButton icon="options-outline" label="Filter audit log" onPress={openFilter} badge={filterCount || undefined} testID="audit-filter" />}
       />
 
-      {(propertyFilter || actionFilter) && (
-        <View style={styles.activeFilters}>
-          {propertyFilter && (
-            <Chip label={`Property: ${propertyFilter}`} onClear={() => setPropertyFilter("")} />
-          )}
-          {actionFilter && (
-            <Chip label={`Action: ${actionFilter}`} onClear={() => setActionFilter("")} />
-          )}
+      {filterCount > 0 && (
+        <View style={[styles.activeFilters, { borderBottomColor: colors.border }]}>
+          {propertyFilter ? <Chip label={`Property · ${propertyFilter}`} icon="home-outline" selected onPress={() => setPropertyFilter("")} testID="audit-clear-property" /> : null}
+          {actionFilter ? <Chip label={actionFilter} icon={metaFor(actionFilter).icon} selected onPress={() => setActionFilter("")} testID="audit-clear-action" /> : null}
+          <Pressable onPress={() => { setPropertyFilter(""); setActionFilter(""); }} hitSlop={8} accessibilityRole="button" style={{ justifyContent: "center" }}>
+            <AppText variant="caption" weight="bold" tone="brand">Clear all</AppText>
+          </Pressable>
         </View>
       )}
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 60 }} color={colors.red} />
+        <View style={{ padding: space[4] }}>
+          <SkeletonRows rows={8} />
+        </View>
+      ) : error ? (
+        <EmptyState variant="error" title="Couldn't load the log" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load(true); }} />
       ) : (
         <FlatList
-          data={rows}
-          keyExtractor={(r) => r.id}
-          contentContainerStyle={{ padding: spacing.xl, paddingBottom: 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={colors.red} />}
+          data={flat}
+          keyExtractor={(r: any) => r.id}
+          contentContainerStyle={{ padding: space[4], paddingBottom: 40 + insets.bottom }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={colors.text} />}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
             if (nextCursor && !loadingMore) {
@@ -135,248 +179,148 @@ export default function AdminAuditLog() {
             }
           }}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="file-tray-outline" size={40} color={colors.textMuted} />
-              <Text style={styles.emptyText}>No audit events match your filter.</Text>
-            </View>
+            <EmptyState
+              icon="file-tray-outline"
+              title="No audit events"
+              body={filterCount ? "Nothing matches your current filter." : "Events will appear here as properties are created, merged and verified."}
+              actionLabel={filterCount ? "Clear filters" : undefined}
+              onAction={filterCount ? () => { setPropertyFilter(""); setActionFilter(""); } : undefined}
+            />
           }
-          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 20 }} color={colors.red} /> : null}
-          renderItem={({ item }) => <AuditRow row={item} onOpen={() => setExpanded(item)} />}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 20 }} color={colors.textTertiary} /> : nextCursor ? <View style={{ height: 20 }} /> : rows.length ? (
+            <AppText variant="caption" tone="muted" align="center" style={{ marginTop: 16 }}>End of log</AppText>
+          ) : null}
+          renderItem={({ item }: any) =>
+            item._header ? (
+              <AppText variant="label" tone="tertiary" uppercase style={styles.dayHeader}>{item.label}</AppText>
+            ) : (
+              <AuditRow row={item} onOpen={() => setExpanded(item)} />
+            )
+          }
         />
       )}
 
       {/* Filter sheet */}
-      <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter audit log</Text>
-              <Pressable onPress={() => setFilterOpen(false)} hitSlop={10}>
-                <Ionicons name="close" size={22} color={colors.textTertiary} />
-              </Pressable>
-            </View>
-            <Text style={styles.fieldLbl}>Property (AMASS ID or UUID)</Text>
-            <TextInput
-              style={styles.input}
-              value={propertyFilter}
-              onChangeText={setPropertyFilter}
-              placeholder="AMASS-LAG-00000001"
-              autoCapitalize="characters"
-              placeholderTextColor={colors.textMuted}
-            />
-            <Text style={styles.fieldLbl}>Action</Text>
+      <Sheet visible={filterOpen} onClose={() => setFilterOpen(false)} title="Filter audit log" testID="audit-filter-sheet">
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14 }}>
+          <Input
+            label="Property · AMASS ID or UUID"
+            value={draftProperty}
+            onChangeText={setDraftProperty}
+            placeholder="AMASS-LAG-00000001"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            iconLeft="home-outline"
+            testID="audit-filter-property"
+          />
+          <View style={{ gap: 8 }}>
+            <AppText variant="caption" tone="secondary">Action</AppText>
             <View style={styles.actionChips}>
-              <Pressable
-                style={[styles.actionChip, !actionFilter && styles.actionChipOn]}
-                onPress={() => setActionFilter("")}
-              >
-                <Text style={[styles.actionChipText, !actionFilter && { color: "#fff" }]}>All</Text>
-              </Pressable>
-              {actions.slice(0, 20).map((a) => (
-                <Pressable
-                  key={a}
-                  style={[styles.actionChip, actionFilter === a && styles.actionChipOn]}
-                  onPress={() => setActionFilter(a)}
-                >
-                  <Text style={[styles.actionChipText, actionFilter === a && { color: "#fff" }]} numberOfLines={1}>
-                    {a}
-                  </Text>
-                </Pressable>
+              <Chip label="All" selected={!draftAction} onPress={() => setDraftAction("")} />
+              {actions.slice(0, 24).map((a) => (
+                <Chip key={a} label={a.replace(/_/g, " ").toLowerCase()} icon={metaFor(a).icon} selected={draftAction === a} onPress={() => setDraftAction(a)} testID={`audit-action-${a}`} />
               ))}
             </View>
-            <Pressable style={styles.applyBtn} onPress={() => setFilterOpen(false)}>
-              <Text style={styles.applyBtnText}>Apply</Text>
-            </Pressable>
           </View>
-        </View>
-      </Modal>
+          <View style={{ gap: 8, marginTop: 4 }}>
+            <Button label="Apply filters" size="lg" fullWidth iconLeft="funnel" onPress={applyFilter} testID="audit-filter-apply" />
+            <Button label="Reset" variant="ghost" fullWidth onPress={() => { setDraftProperty(""); setDraftAction(""); }} />
+          </View>
+        </ScrollView>
+      </Sheet>
 
       {/* Detail sheet */}
-      <Modal visible={!!expanded} transparent animationType="slide" onRequestClose={() => setExpanded(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{expanded?.action}</Text>
-              <Pressable onPress={() => setExpanded(null)} hitSlop={10}>
-                <Ionicons name="close" size={22} color={colors.textTertiary} />
-              </Pressable>
+      <Sheet visible={!!expanded} onClose={() => setExpanded(null)} title={expanded?.action.replace(/_/g, " ") ?? ""} testID="audit-detail-sheet">
+        {expanded && (
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+              <Badge label={expanded.action} tone={metaFor(expanded.action).tone} icon={metaFor(expanded.action).icon} size="md" />
+              <Badge label={`${expanded.actor_type ?? "system"}`} tone="neutral" size="md" icon="person-outline" />
             </View>
-            {expanded && (
-              <View style={{ gap: 8 }}>
-                <DetailRow lbl="Property UUID" val={expanded.property_id ?? "—"} />
-                <DetailRow lbl="Actor" val={`${expanded.actor_type ?? "?"} · ${expanded.actor_id ?? "—"}`} />
-                <DetailRow lbl="When" val={new Date(expanded.created_at).toLocaleString()} />
-                <DetailRow lbl="Reason" val={expanded.reason ?? "—"} />
-                <Text style={[styles.fieldLbl, { marginTop: 8 }]}>NEW VALUE</Text>
-                <Text style={styles.json}>{JSON.stringify(expanded.new_value, null, 2)}</Text>
-                {expanded.old_value != null && (
-                  <>
-                    <Text style={[styles.fieldLbl, { marginTop: 8 }]}>OLD VALUE</Text>
-                    <Text style={styles.json}>{JSON.stringify(expanded.old_value, null, 2)}</Text>
-                  </>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+            <DetailRow lbl="Property" val={expanded.property_id ?? "—"} mono />
+            <DetailRow lbl="Actor" val={expanded.actor_id ?? "—"} mono />
+            <DetailRow lbl="When" val={new Date(expanded.created_at).toLocaleString()} />
+            <DetailRow lbl="Reason" val={expanded.reason ?? "—"} />
+            <JsonBlock label="New value" value={expanded.new_value} />
+            {expanded.old_value != null && <JsonBlock label="Old value" value={expanded.old_value} />}
+            {expanded.property_id ? (
+              <Button
+                label="Open property passport"
+                variant="secondary"
+                fullWidth
+                iconLeft="document-text-outline"
+                onPress={() => { setExpanded(null); router.push(`/property-passport/${expanded.property_id}` as any); }}
+                style={{ marginTop: 4 }}
+              />
+            ) : null}
+          </ScrollView>
+        )}
+      </Sheet>
+    </Screen>
   );
 }
 
 function AuditRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
-  const color = ACTION_COLORS[row.action] ?? colors.textTertiary;
+  const { colors } = useTheme();
+  const m = metaFor(row.action);
+  const toneBg = {
+    neutral: colors.surfaceAlt, brand: colors.brandSoft, success: colors.successSoft, warning: colors.warningSoft,
+    error: colors.errorSoft, info: colors.infoSoft, mass: colors.massSoft, fix: colors.fixSoft, premium: colors.premiumSoft, inverse: colors.surfaceInverse,
+  }[m.tone];
+  const toneFg = {
+    neutral: colors.textSecondary, brand: colors.brand, success: colors.success, warning: colors.warning,
+    error: colors.error, info: colors.info, mass: colors.massText, fix: colors.fixText, premium: colors.premium, inverse: colors.textInverse,
+  }[m.tone];
   return (
-    <Pressable style={styles.row} onPress={onOpen}>
-      <View style={[styles.dot, { backgroundColor: color }]} />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.action}>{row.action}</Text>
-        <Text style={styles.rowMeta}>
-          {row.actor_type ?? "?"} · {new Date(row.created_at).toLocaleString()}
-        </Text>
-        {row.property_id && <Text style={styles.rowProp} numberOfLines={1}>{row.property_id}</Text>}
+    <Pressable
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${row.action.replace(/_/g, " ")}, ${_relative(row.created_at)}`}
+      style={({ pressed }) => [styles.row, { borderBottomColor: colors.divider }, pressed && { backgroundColor: colors.surfaceAlt }]}
+      testID={`audit-row-${row.id}`}
+    >
+      <View style={[styles.rowIcon, { backgroundColor: toneBg }]}>
+        <Ionicons name={m.icon} size={16} color={toneFg} />
       </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <AppText variant="bodyMedium" numberOfLines={1}>{row.action.replace(/_/g, " ")}</AppText>
+        <AppText variant="caption" tone="tertiary" numberOfLines={1}>
+          {row.actor_type ?? "system"}{row.property_id ? ` · ${row.property_id}` : ""}
+        </AppText>
+      </View>
+      <AppText variant="caption" tone="muted" tabular>{_relative(row.created_at)}</AppText>
+      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
     </Pressable>
   );
 }
 
-function Chip({ label, onClear }: { label: string; onClear: () => void }) {
+function DetailRow({ lbl, val, mono }: { lbl: string; val: string; mono?: boolean }) {
   return (
-    <View style={styles.chip}>
-      <Text style={styles.chipText}>{label}</Text>
-      <Pressable onPress={onClear} hitSlop={10}>
-        <Ionicons name="close" size={14} color={colors.text} />
-      </Pressable>
+    <View style={{ gap: 2 }}>
+      <AppText variant="label" tone="tertiary" uppercase>{lbl}</AppText>
+      <AppText variant="bodySm" style={mono ? styles.mono : undefined} selectable>{val}</AppText>
     </View>
   );
 }
 
-function DetailRow({ lbl, val }: { lbl: string; val: string }) {
+function JsonBlock({ label, value }: { label: string; value: any }) {
+  const { colors } = useTheme();
   return (
-    <View>
-      <Text style={styles.fieldLbl}>{lbl}</Text>
-      <Text style={styles.detailVal}>{val}</Text>
-    </View>
-  );
-}
-
-function Header({ title, onBack, right }: { title: string; onBack: () => void; right?: React.ReactNode }) {
-  return (
-    <View style={styles.header}>
-      <Pressable style={styles.iconBtn} onPress={onBack}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>{title}</Text>
-      {right ?? <View style={styles.iconBtn} />}
+    <View style={{ gap: 6 }}>
+      <AppText variant="label" tone="tertiary" uppercase>{label}</AppText>
+      <View style={[styles.json, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+        <AppText variant="caption" style={styles.mono} selectable>{JSON.stringify(value, null, 2)}</AppText>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", ...typography.h2, fontSize: 17 },
-
-  activeFilters: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    padding: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chipText: { fontSize: 11, fontWeight: "700", color: colors.text },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  dot: { width: 12, height: 12, borderRadius: 6 },
-  action: { fontSize: 13, fontWeight: "800", color: colors.text },
-  rowMeta: { fontSize: 11, color: colors.textTertiary, marginTop: 2, fontWeight: "600" },
-  rowProp: { fontSize: 10, color: colors.textTertiary, marginTop: 2, fontFamily: "monospace" as any },
-
-  empty: { padding: spacing.xl, alignItems: "center", gap: 8, marginTop: 60 },
-  emptyText: { fontSize: 13, color: colors.textTertiary },
-
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  modalCard: {
-    maxHeight: "90%",
-    backgroundColor: "#fff",
-    padding: spacing.xl,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    gap: 10,
-  },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  modalTitle: { ...typography.h2, fontSize: 17 },
-  fieldLbl: { fontSize: 10, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.5 },
-  detailVal: { fontSize: 13, color: colors.text, fontWeight: "600", marginTop: 2 },
-  input: {
-    minHeight: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 14,
-    fontSize: 13,
-    color: colors.text,
-    fontWeight: "600",
-  },
-  actionChips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
-  actionChip: {
-    paddingHorizontal: 10,
-    height: 30,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionChipOn: { backgroundColor: colors.ink, borderColor: colors.ink },
-  actionChipText: { fontSize: 10, fontWeight: "700", color: colors.textSecondary, maxWidth: 160 },
-  applyBtn: {
-    height: 48,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  applyBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
-  json: {
-    fontSize: 11,
-    color: colors.text,
-    backgroundColor: colors.surfaceSecondary,
-    padding: 10,
-    borderRadius: radius.sm,
-    fontFamily: "monospace" as any,
-  },
-  blocked: { padding: spacing.xl, alignItems: "center", gap: 10, marginTop: 40 },
-  blockedText: { fontSize: 14, color: colors.text, fontWeight: "700" },
+  activeFilters: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: space[4], paddingBottom: space[3], borderBottomWidth: StyleSheet.hairlineWidth, alignItems: "center" },
+  dayHeader: { marginTop: space[4], marginBottom: space[2], marginLeft: 4 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: StyleSheet.hairlineWidth, minHeight: 60 },
+  rowIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  actionChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  json: { padding: 12, borderRadius: radii.sm, borderWidth: StyleSheet.hairlineWidth },
+  mono: { fontFamily: "monospace" as any, letterSpacing: 0 },
 });

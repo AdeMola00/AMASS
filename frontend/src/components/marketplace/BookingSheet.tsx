@@ -1,11 +1,4 @@
-import React, {
-  forwardRef,
-  useCallback,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -21,7 +14,8 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { api, MarketplaceItem } from "@/src/lib/api";
-import { colors, radius, spacing, formatNaira, shadows } from "@/src/constants/theme";
+import { radius, spacing, formatNaira, shadows } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export type BookingSheetRef = {
   open: (item: MarketplaceItem) => void;
@@ -46,6 +40,9 @@ function nextDates(count: number = 7) {
 }
 
 export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const sheetRef = useRef<BottomSheetModal>(null);
   const [item, setItem] = useState<MarketplaceItem | null>(null);
   const [name, setName] = useState("");
@@ -274,7 +271,8 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
 
 BookingSheet.displayName = "BookingSheet";
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
   body: { padding: spacing.lg, paddingBottom: 40, gap: 4 },
 
@@ -327,7 +325,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     alignItems: "center",
     gap: 2,
   },
@@ -343,7 +341,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   timeChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   timeChipText: { fontSize: 12, fontWeight: "700", color: colors.text },
@@ -352,7 +350,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,

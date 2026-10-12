@@ -1,18 +1,12 @@
-import React, {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../ui/icons";
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
 import { api } from "@/src/lib/api";
-import { colors, radius, spacing, formatNaira } from "@/src/constants/theme";
+import { radius, spacing, formatNaira } from "@/src/constants/theme";
+import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export type NeighborhoodSheetRef = {
   open: (propertyId: string) => void;
@@ -26,6 +20,9 @@ type Intel = Awaited<ReturnType<typeof api.propertyIntelligence>>;
  * Trigger by tapping "Neighborhood insights" on a property.
  */
 export const NeighborhoodSheet = forwardRef<NeighborhoodSheetRef, object>((_, ref) => {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const sheetRef = useRef<BottomSheetModal>(null);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Intel | null>(null);
@@ -186,10 +183,16 @@ export const NeighborhoodSheet = forwardRef<NeighborhoodSheetRef, object>((_, re
 NeighborhoodSheet.displayName = "NeighborhoodSheet";
 
 function Card({ children }: { children: React.ReactNode }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return <View style={styles.card}>{children}</View>;
 }
 
-function CardHead({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
+function CardHead({ icon, title }: { icon: IconName; title: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.cardHead}>
       <View style={styles.cardHeadIcon}>
@@ -201,6 +204,9 @@ function CardHead({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -210,6 +216,9 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
 }
 
 function BarRow({ label, value, tone }: { label: string; value: number; tone: string }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.barRow}>
       <Text style={styles.barLabel}>{label}</Text>
@@ -221,7 +230,10 @@ function BarRow({ label, value, tone }: { label: string; value: number; tone: st
   );
 }
 
-function PoiRow({ icon, label, km }: { icon: keyof typeof Ionicons.glyphMap; label: string; km: number }) {
+function PoiRow({ icon, label, km }: { icon: IconName; label: string; km: number }) {
+  const colors = useLegacyColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.poiRow}>
       <View style={styles.poiIcon}>
@@ -234,8 +246,9 @@ function PoiRow({ icon, label, km }: { icon: keyof typeof Ionicons.glyphMap; lab
   );
 }
 
-const styles = StyleSheet.create({
-  sheetBg: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+const makeStyles = (colors: LegacyColors) =>
+  StyleSheet.create({
+  sheetBg: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   handle: { backgroundColor: colors.borderStrong, width: 44, height: 5 },
   wrap: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: 4 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md },
@@ -266,7 +279,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     marginBottom: 12,
   },
   cardHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },

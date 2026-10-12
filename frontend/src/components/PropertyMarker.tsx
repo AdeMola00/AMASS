@@ -14,6 +14,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IconName } from "../ui/icons";
 import type { Property } from "@/src/lib/api";
 
 // Hardcoded registry mirror (keep in sync with /app/backend/property_types.py
@@ -64,7 +65,7 @@ export function availabilityStatus(p: { status?: string | null }): AvailabilityS
 
 export const STATUS_META: Record<
   AvailabilityStatus,
-  { label: string; color: string; glyph: keyof typeof Ionicons.glyphMap | null }
+  { label: string; color: string; glyph: IconName | null }
 > = {
   available:   { label: "Available",   color: "#16A34A", glyph: null },          // green
   coming_soon: { label: "Coming soon", color: "#D97706", glyph: "time" },        // amber + clock
@@ -86,7 +87,7 @@ export function listingKind(t?: string | null): ListingKind {
 
 export const LISTING_TYPE_META: Record<
   ListingKind,
-  { label: string; icon: keyof typeof Ionicons.glyphMap }
+  { label: string; icon: IconName }
 > = {
   sale:     { label: "For sale", icon: "pricetag" },
   rent:     { label: "For rent", icon: "key" },

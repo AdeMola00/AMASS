@@ -1,0 +1,36 @@
+{
+  "summary": "FRONTEND-ONLY regression at 390x844 for the premium UI/UX overhaul + backend /api/agent/score 500 fix. Tested LOGIN -> SETTINGS theme toggle (chip theme-dark / theme-light) -> /property/{id} (owner AND buyer, locked AND unlocked-exclusive) -> UnlockSheet -> Home tab + FilterSheet -> Marketplace (brands/fixa/declutter tabs, sort pill, view toggle, filter) in BOTH LIGHT and DARK themes -> /submit-property wizard -> /become-agent -> /agent/onboarding -> /admin/discovery -> /agent-dashboard + /agent-score (score 500 fix verification) -> /inbox -> /chat/{id} (voice-mic swap). RESULT: 0 red-screen, 0 pageerror, 0 console error across every route visited. BACKEND FIX VERIFIED: GET /api/agent/score now returns 200 with full breakdown ({score:59, tier:'Verified Agent', 6 factors}) for demo; /agent-dashboard and /agent-score load with zero /api/agent/score 500s in the console (iteration-44 regression gone). PROPERTY DETAIL (owner, demo on 78d096af-ea92-4658-9fb4-24b885dd2042): all required testIDs present -> back-btn, share-btn, fav-btn, agent-profile-link, own-listing-note, save-btn, chat-agent-btn, book-tour-btn (label='Manage listing'), improve-request-inspection, improve-apply-finance. PROPERTY DETAIL (buyer tunde.showcase on LOCKED 927d08a8-...): locked-banner + unlock-cta-btn + unlock-cta-balance all render; tapping unlock-cta-btn opens UnlockSheet with unlock-balance-after + unlock-confirm-btn (buyer has 15 MASS, cost 10, so confirm shown correctly; buy-tokens-cta correctly absent since affordable). PROPERTY DETAIL (buyer on UNLOCKED EXCLUSIVE 78d096af-...): btn-contact-agent, book-tour-btn ('Chat with Agent · Free'), reveal-agent-contact-btn, save-btn, chat-agent-btn all present; tapping reveal-agent-contact-btn opens agent-mode UnlockSheet (10 MASS fee, balance after 5 MASS). HOME tab filter chips/search all legible in both themes: home-map-screen, home-search-input, open-filter-sheet, filter-chip-{for-sale,for-rent,land,commercial,luxury,verified,recently-added,open-house}, status-chip-{available,coming_soon,closed}, map-legend-chip. MARKETPLACE: mkt-tab-brands/fixa/declutter switch cleanly; sort-pill, view-toggle, market-filter-btn all open/close; Featured rail price pills in DARK theme = white text on dark pill (verified via screenshot) — NOT the white-on-white regression. SUBMIT-PROPERTY: sp-mandate chips wire active state correctly (active=amber fill+black text, legible in both themes); 'For Sale' listing-type card renders with dark fill + white text in light mode (confirmed in screenshot). CHAT voice composer: voice-mic renders in the empty state; typing text swaps it for chat-send (confirmed in dark theme — demo /chat/{id}). ADMIN /admin/discovery renders fine (no pending-duplicate candidates to open /admin/duplicate-review/{id} for — expected empty state). PROPERTY PASSPORT skipped per instructions (demo's agent-properties/mine returned 500 rows but none with an assigned amass_id, so no /property-passport/{amass_id} target exists). THEME SWITCH persists across reloads and flips the dominant background color (verified visually across home/marketplace/property/submit-property). NO deprecated expo packages observed in the migrated screens. NO invisible text / same-colour-as-bg issues found in dark theme.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_45.json"
+  ],
+  "action_items": [
+    "No required fixes. Phase-3 premium UI overhaul (Listing Detail rewrite + UnlockSheet redesign + ~35 legacy screens migrated + /api/agent/score 500 fix) is fully regression-clean at 390px in both light and dark themes.",
+    "OPTIONAL polish (non-blocking): UnlockSheet has no explicit `unlock-sheet-close` testID — sheet currently closes via backdrop/drag only. If the design wants an explicit close affordance, add a testID='unlock-sheet-close' to the top-right chevron.",
+    "OPTIONAL: Backfill `amass_id` on legacy demo-owned listings so /property-passport/{amass_id} can be smoke-tested (demo currently has 500 listings but 0 with amass_id). Not a regression — just means PropertyScoreCard couldn't be visited this round."
+  ],
+  "critical_code_review_comments": [
+    "iteration_44 flagged /api/agent/score 500 (tz-naive vs tz-aware datetime) — this round confirms the endpoint now returns 200 and renders the breakdown card on both /agent-score and /agent-dashboard with no console error leak. Fix is landed.",
+    "UnlockSheet correctly chooses between unlock-confirm-btn (balance sufficient) and buy-tokens-cta (balance insufficient) — verified with buyer at 15 MASS vs 10 MASS cost -> confirm appears, buy-tokens-cta absent. Good.",
+    "sp-mandate-no chip uses amber (rgb(245,179,1) / rgb(251,191,36)) + black text — this is a WARN-style active state (contrasts cleanly against both light rgb(255,255,255) and dark surfaces), not the generic 'dark fill + white text' pattern. Intentional and legible, flagging only for consistency review."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only run; spot-checked /api/agent/score + /api/agent/analytics both 200)",
+    "frontend": "100% — every route in the review request renders without red-screen, pageerror, or console error in BOTH light and dark themes; every required testID present; voice-mic / chat-send swap verified; UnlockSheet open/affordable path verified; theme toggle persists."
+  },
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Premium UI overhaul + /api/agent/score tz-fix are regression-clean. Credentials still: demo@amass.africa / amass2026 (admin+agent, 21 seeded listings but 0 with amass_id) and tunde.showcase@amass.africa / Showcase2026! (buyer, starts with 15 MASS). Locked buyer-testable properties: 927d08a8-fe10-4d8c-9558-1bc178aa7834 and 5215439a-ef85-44d4-9332-192c2b5b6ec8. Unlocked-exclusive: 78d096af-ea92-4658-9fb4-24b885dd2042. Home tab opens a FIXA AdModal on first visit — dismiss via text='Skip' before interacting with the search bar / filter chips. UnlockSheet has NO `unlock-sheet-close` testID — close via Escape key / backdrop tap. For /property-passport testing you must first seed/assign an amass_id to one of demo's listings. React-native-maps on web shows a placeholder (expected) — status-chip-* only mount when the mobile map draws real markers, so on web preview they may appear only after a brief delay.",
+  "rca_of_issue": "N/A — this round found no regressions. The iteration-44 /api/agent/score 500 (tz-naive datetime from mongo compared to tz-aware cutoff) is confirmed resolved: live call to GET /api/agent/score as demo returns HTTP 200 with full factor breakdown, and both /agent-score and /agent-dashboard load without the previous 2x 500 traceback leaking into console."
+}

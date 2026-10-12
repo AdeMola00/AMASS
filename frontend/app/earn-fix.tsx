@@ -1,23 +1,17 @@
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter, Stack } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { api, FixEarnRule } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
-import { colors, radius, shadows, spacing } from "@/src/constants/theme";
+import { useTheme } from "@/src/theme";
+import { radii, space } from "@/src/theme/tokens";
+import { AnimatedNumber, AppText, BalanceChip, Button, EmptyState, Screen, ScreenHeader, SkeletonRows } from "@/src/ui";
+import type { IconName } from "@/src/ui";
 
-const FIX_COLOR = "#22C55E";
-const FIX_DEEP = "#15803D";
-
-const EVENT_ICON: Record<string, keyof typeof import("@react-native-vector-icons/ionicons").default.glyphMap> = {
+const EVENT_ICON: Record<string, IconName> = {
   job_completed: "checkmark-done",
   positive_rating: "star",
   referral_signup: "person-add",
@@ -31,155 +25,145 @@ const EVENT_ICON: Record<string, keyof typeof import("@react-native-vector-icons
 
 export default function EarnFixScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors, shadows } = useTheme();
   const { fix } = useWallet();
   const [rules, setRules] = useState<FixEarnRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    api.fixEarnRules().then(setRules).finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    setError(false);
+    try {
+      setRules(await api.fixEarnRules());
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Earn FIX</Text>
-        <View style={styles.balanceChip}>
-          <Ionicons name="shield-checkmark" size={12} color={FIX_DEEP} />
-          <Text style={styles.balanceChipText}>{fix?.spendable ?? 0} FIX</Text>
-        </View>
-      </SafeAreaView>
+  useEffect(() => {
+    load();
+  }, [load]);
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={styles.hero}>
-          <View style={styles.heroBadge}>
-            <Ionicons name="construct" size={22} color="#fff" />
+  return (
+    <Screen testID="earn-fix-screen">
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title="Earn FIX" right={<BalanceChip compact />} />
+
+      <ScrollView
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: 40 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load();
+            }}
+            tintColor={colors.text}
+          />
+        }
+      >
+        <Animated.View entering={FadeInDown.duration(260)} style={[styles.hero, { backgroundColor: colors.surfaceInverse }, shadows.md]}>
+          <View style={styles.heroRow}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <AppText variant="label" color="rgba(255,255,255,0.6)" uppercase>
+                FIX balance
+              </AppText>
+              <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 6 }}>
+                <AnimatedNumber value={fix?.spendable ?? 0} variant="h1" color={colors.textInverse} />
+                <AppText variant="title" color={colors.fix} style={{ marginBottom: 3 }}>
+                  FIX
+                </AppText>
+              </View>
+            </View>
+            <View style={[styles.heroBadge, { backgroundColor: colors.fix }]}>
+              <Ionicons name="construct" size={22} color="#052E1F" />
+            </View>
           </View>
-          <Text style={styles.heroTitle}>Earn FIX by helping customers</Text>
-          <Text style={styles.heroBody}>
-            Verified FIXA service providers earn FIX for every completed job, 5-star
-            rating, referral, and milestone. Redeem FIX for profile boosts,
-            priority listing, and customer discounts.
-          </Text>
+          <AppText variant="h3" color={colors.textInverse} style={{ marginTop: 14 }}>
+            Earn FIX by helping customers
+          </AppText>
+          <AppText variant="bodySm" color="rgba(255,255,255,0.72)" style={{ marginTop: 4 }}>
+            Verified FIXA pros earn FIX for every completed job, 5-star rating, referral and milestone. Redeem it for boosts, priority listing and customer discounts.
+          </AppText>
+          <View style={styles.heroActions}>
+            <Button label="Boost with FIX" variant="fix" size="sm" iconLeft="rocket" onPress={() => router.push("/fix-features")} testID="earn-fix-boost" />
+            <Button label="Buy FIX" variant="inverse" size="sm" iconLeft="add" onPress={() => router.push("/buy-fix")} testID="earn-fix-buy" />
+          </View>
+        </Animated.View>
+
+        <View style={{ gap: 4 }}>
+          <AppText variant="h3">How you earn</AppText>
+          <AppText variant="bodySm" tone="tertiary">
+            FIX is awarded automatically once each event is verified.
+          </AppText>
         </View>
 
         {loading ? (
-          <View style={styles.loading}><ActivityIndicator color={FIX_COLOR} /></View>
+          <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border, padding: space[4] }]}>
+            <SkeletonRows rows={5} />
+          </View>
+        ) : error ? (
+          <EmptyState variant="error" compact title="Couldn't load rewards" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load(); }} />
+        ) : rules.length === 0 ? (
+          <EmptyState compact icon="gift-outline" title="No reward rules yet" body="Check back soon — new ways to earn FIX are on the way." />
         ) : (
-          <View style={styles.list}>
-            {rules.map((r) => {
-              const iconName = EVENT_ICON[r.event] ?? "gift";
-              return (
-                <View key={r.event} style={styles.row}>
-                  <View style={styles.rowIcon}>
-                    <Ionicons name={iconName} size={20} color={FIX_DEEP} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle}>{r.description}</Text>
-                    <Text style={styles.rowKey}>{r.event.replace(/_/g, " ")}</Text>
-                  </View>
-                  <View style={styles.rewardChip}>
-                    <Text style={styles.rewardChipText}>+{r.amount}</Text>
-                    <Text style={styles.rewardChipUnit}>FIX</Text>
-                  </View>
+          <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }, shadows.xs]}>
+            {rules.map((r, i) => (
+              <Animated.View
+                key={r.event}
+                entering={FadeInDown.delay(40 + i * 30).duration(220)}
+                style={[styles.row, i < rules.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}
+                accessibilityLabel={`${r.description}: plus ${r.amount} FIX`}
+              >
+                <View style={[styles.rowIcon, { backgroundColor: colors.fixSoft }]}>
+                  <Ionicons name={EVENT_ICON[r.event] ?? "gift"} size={18} color={colors.fixText} />
                 </View>
-              );
-            })}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="bodyMedium" numberOfLines={2}>
+                    {r.description}
+                  </AppText>
+                  <AppText variant="micro" tone="tertiary" uppercase>
+                    {r.event.replace(/_/g, " ")}
+                  </AppText>
+                </View>
+                <View style={[styles.reward, { backgroundColor: colors.fix }]}>
+                  <AppText variant="title" color="#052E1F" tabular>
+                    +{r.amount}
+                  </AppText>
+                  <AppText variant="micro" color="#052E1F">
+                    FIX
+                  </AppText>
+                </View>
+              </Animated.View>
+            ))}
           </View>
         )}
 
-        <View style={styles.note}>
-          <Ionicons name="information-circle" size={14} color={colors.textTertiary} />
-          <Text style={styles.noteText}>
-            FIX is awarded automatically after each event is verified. Rewards
-            can be redeemed instantly from the Boost screen.
-          </Text>
+        <View style={[styles.note, { backgroundColor: colors.surfaceAlt }]}>
+          <Ionicons name="information-circle" size={16} color={colors.info} />
+          <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
+            Rewards land in your wallet instantly and can be redeemed from the Boost screen at any time.
+          </AppText>
         </View>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  iconBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center", justifyContent: "center",
-  },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
-  balanceChip: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 10, height: 30, borderRadius: 15,
-    backgroundColor: "rgba(34,197,94,0.15)",
-  },
-  balanceChipText: { fontSize: 12, fontWeight: "900", color: FIX_DEEP, letterSpacing: 0.3 },
-
-  hero: {
-    margin: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    backgroundColor: "#0A0A0A",
-    gap: 8,
-  },
-  heroBadge: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: FIX_COLOR,
-    alignItems: "center", justifyContent: "center",
-  },
-  heroTitle: { color: "#fff", fontSize: 20, fontWeight: "900", letterSpacing: -0.4, marginTop: 4 },
-  heroBody: { color: "rgba(255,255,255,0.75)", fontSize: 13, lineHeight: 19 },
-
-  loading: { padding: 40, alignItems: "center" },
-  list: {
-    marginHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: "#fff",
-    overflow: "hidden",
-    ...shadows.soft,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  rowIcon: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: "rgba(34,197,94,0.12)",
-    alignItems: "center", justifyContent: "center",
-  },
-  rowTitle: { fontSize: 14, fontWeight: "700", color: colors.text },
-  rowKey: {
-    fontSize: 10, color: colors.textTertiary,
-    marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: "700",
-  },
-  rewardChip: {
-    flexDirection: "row", alignItems: "baseline", gap: 3,
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
-    backgroundColor: FIX_COLOR,
-  },
-  rewardChipText: { color: "#fff", fontSize: 15, fontWeight: "900", letterSpacing: -0.3 },
-  rewardChipUnit: { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
-
-  note: {
-    flexDirection: "row", alignItems: "flex-start", gap: 8,
-    margin: spacing.lg, padding: 12, borderRadius: radius.md,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  noteText: { flex: 1, fontSize: 11, color: colors.textSecondary, lineHeight: 15 },
+  hero: { borderRadius: radii.xl, padding: space[5] },
+  heroRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  heroBadge: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  heroActions: { flexDirection: "row", gap: 8, marginTop: 16, flexWrap: "wrap" },
+  group: { borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: space[4], paddingVertical: 12, minHeight: 60 },
+  rowIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  reward: { flexDirection: "row", alignItems: "baseline", gap: 3, paddingHorizontal: 10, height: 30, borderRadius: radii.xs },
+  note: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm },
 });
