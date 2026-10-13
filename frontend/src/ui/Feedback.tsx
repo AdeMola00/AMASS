@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, View, ViewStyle, AccessibilityInfo, Pressable } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import Animated, {
@@ -156,15 +156,19 @@ export function AnimatedNumber({
   const reduce = useReducedMotion();
   const sv = useSharedValue(reduce ? value : 0);
   const [text, setText] = useState(format(reduce ? value : 0));
+  // `format` is plain JS — it must run on the JS thread, never inside the worklet.
+  const formatRef = useRef(format);
+  formatRef.current = format;
+  const applyText = useCallback((v: number) => setText(formatRef.current(v)), []);
   useEffect(() => {
     sv.value = withTiming(value, { duration: reduce ? 0 : duration, easing: Easing.out(Easing.cubic) });
   }, [value, duration, reduce, sv]);
   useAnimatedReaction(
     () => sv.value,
-    (v) => {
-      runOnJS(setText)(format(v));
+    (v, prev) => {
+      if (v !== prev) runOnJS(applyText)(v);
     },
-    [format]
+    [applyText]
   );
   return (
     <AppText variant={variant} tabular color={color} style={style} testID={testID} accessibilityLabel={format(value)}>
