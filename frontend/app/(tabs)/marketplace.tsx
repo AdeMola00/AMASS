@@ -36,6 +36,8 @@ import {
 import { AdModal } from "@/src/components/AdModal";
 import { useAdTrigger } from "@/src/hooks/useAdTrigger";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { FixaGate } from "@/src/components/fixa/FixaGate";
+import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { Skeleton, SkeletonCard, EmptyState } from "@/src/ui";
 
@@ -188,6 +190,14 @@ export default function Marketplace() {
   const [headerH, setHeaderH] = useState<number>(insets.top + 176);
   const [sortKey, setSortKey] = useState<SortKey>("nearby");
   const [sortOpen, setSortOpen] = useState(false);
+  // FIXA gate — FIX balance must be > 0 to browse providers (read live, never cached).
+  const [fixAccess, setFixAccess] = useState<{ allowed: boolean; balance: number } | null>(null);
+  const { fix: fixWallet } = useWallet();
+  useEffect(() => {
+    if (section !== "fixa") return;
+    api.fixaAccess().then((r) => setFixAccess({ allowed: r.allowed, balance: r.balance })).catch(() => setFixAccess(null));
+  }, [section, fixWallet?.spendable]);
+  const fixaLocked = section === "fixa" && fixAccess !== null && !fixAccess.allowed;
 
   // Restore prefs
   useEffect(() => {
@@ -301,6 +311,11 @@ export default function Marketplace() {
 
   const openItem = (it: MarketplaceItem) => {
     noteInteraction();
+    // FIXA providers live behind the FIX gate — their profile + contact unlock is /fixa/[id].
+    if (it.category === "services") {
+      router.push(`/fixa/${it.id}` as any);
+      return;
+    }
     router.push(`/marketplace/${it.id}` as any);
   };
 
@@ -496,20 +511,22 @@ export default function Marketplace() {
   return (
     <View style={styles.container} testID="marketplace-screen">
       <FlatList
-        data={(section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems) as any[]}
+        data={(fixaLocked ? [] : section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems) as any[]}
         keyExtractor={(_, i) => `row-${i}`}
         contentContainerStyle={{ paddingTop: headerH + 8, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} progressViewOffset={headerH} tintColor={colors.red} />
         }
-        ListHeaderComponent={loading ? null : listHeader}
+        ListHeaderComponent={loading || fixaLocked ? null : listHeader}
         removeClippedSubviews={Platform.OS !== "web"}
         initialNumToRender={8}
         windowSize={7}
         maxToRenderPerBatch={8}
         ListEmptyComponent={
-          loading ? (
+          fixaLocked ? (
+            <FixaGate balance={fixAccess?.balance ?? 0} compact testID="market-fixa-gate" />
+          ) : loading ? (
             <View style={{ paddingHorizontal: spacing.lg, gap: 12 }} testID="market-loading">
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <Skeleton height={36} width={110} radius={18} />
@@ -622,8 +639,8 @@ export default function Marketplace() {
               </Text>
               <Ionicons name="chevron-down" size={13} color={colors.textSecondary} />
             </Pressable>
+            <IconBtn icon="storefront-outline" onPress={() => router.push("/marketplace/my-listings" as any)} label="My listings and offers" testID="market-my-listings-btn" />
             <IconBtn icon="heart-outline" onPress={() => router.push("/marketplace/saved" as any)} label="Saved items" testID="market-saved-btn" />
-            <IconBtn icon="notifications-outline" onPress={() => router.push("/notifications" as any)} label="Notifications" testID="market-notif-btn" />
           </View>
         </View>
 

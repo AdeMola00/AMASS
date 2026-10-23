@@ -95,10 +95,15 @@ export const fontFamilies = {
   semibold: "PlusJakartaSans-600",
   bold: "PlusJakartaSans-700",
   extrabold: "PlusJakartaSans-800",
+  /** Distinctive display serif — hero titles & editorial moments only (not numbers). */
+  display: "DMSerifDisplay",
 } as const;
 
 /** Type scale — tight, consistent line heights (1.15 display → 1.5 body) */
 export const typeScale = {
+  /** Editorial serif hero — marketing/section titles. Never for prices (no tabular figures). */
+  hero: { fontSize: 34, lineHeight: 38, letterSpacing: -0.6, fontFamily: fontFamilies.display },
+  heroSm: { fontSize: 26, lineHeight: 30, letterSpacing: -0.4, fontFamily: fontFamilies.display },
   display: { fontSize: 36, lineHeight: 40, letterSpacing: -1.1, fontFamily: fontFamilies.extrabold },
   h1: { fontSize: 28, lineHeight: 32, letterSpacing: -0.8, fontFamily: fontFamilies.extrabold },
   h2: { fontSize: 22, lineHeight: 26, letterSpacing: -0.5, fontFamily: fontFamilies.bold },

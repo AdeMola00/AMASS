@@ -301,7 +301,10 @@ def register_earn_routes(db: AsyncIOMotorDatabase) -> APIRouter:
                 {"$inc": {"attempts": 1}},
             )
             raise HTTPException(400, "Invalid code")
-        # Save phone on user
+        # Save phone on user — a verified phone belongs to exactly one account.
+        clash = await db.users.find_one({"phone": data.phone, "phone_verified": True, "id": {"$ne": user_id}}, {"_id": 0, "id": 1})
+        if clash:
+            raise HTTPException(409, "That phone number is already verified on another AMASS account.")
         await db.users.update_one(
             {"id": user_id},
             {"$set": {"phone": data.phone, "phone_verified": True}},

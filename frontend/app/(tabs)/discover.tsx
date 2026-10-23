@@ -19,7 +19,7 @@ type Category = { key: string; label: string; caption: string; icon: IconName; t
 const CATEGORIES: Category[] = [
   { key: "buy", label: "Buy", caption: "Homes & land for sale", icon: "home", tone: "brand", route: `/(tabs)?ai_filters=${encodeURIComponent(JSON.stringify({ listing_type: "buy" }))}` },
   { key: "rent", label: "Rent", caption: "Yearly & shortlet", icon: "key", tone: "info", route: `/(tabs)?ai_filters=${encodeURIComponent(JSON.stringify({ listing_type: "rent" }))}` },
-  { key: "services", label: "Services", caption: "FIXA verified pros", icon: "construct", tone: "fix", route: "/(tabs)/marketplace" },
+  { key: "services", label: "Services", caption: "FIXA verified pros", icon: "construct", tone: "fix", route: "/fixa" },
   { key: "brands", label: "Brands", caption: "Stores & products", icon: "storefront", tone: "mass", route: "/(tabs)/marketplace" },
   { key: "declutter", label: "Declutter", caption: "Sell or clear a home", icon: "cube", tone: "premium", route: "/marketplace/sell" },
   { key: "improve", label: "Improve", caption: "Inspect · Finance · Renovate", icon: "hammer", tone: "default", route: "/improve" },

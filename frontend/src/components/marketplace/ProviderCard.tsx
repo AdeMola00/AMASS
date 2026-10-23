@@ -196,20 +196,29 @@ export function ProviderCard({
           <Text style={styles.price}>{formatNaira(item.price)}</Text>
         </View>
         <View style={styles.actionsRow}>
-          <Pressable
-            onPress={handleCall}
-            style={styles.iconAction}
-            testID={`fixa-call-${item.id}`}
-          >
-            <Ionicons name="call" size={16} color={colors.text} />
-          </Pressable>
-          <Pressable
-            onPress={handleWhatsApp}
-            style={[styles.iconAction, { backgroundColor: "#25D366" }]}
-            testID={`fixa-whatsapp-${item.id}`}
-          >
-            <Ionicons name="logo-whatsapp" size={16} color="#fff" />
-          </Pressable>
+          {item.contact_locked ? (
+            <Pressable onPress={onPress} style={styles.lockedAction} testID={`fixa-unlock-${item.id}`} accessibilityRole="button" accessibilityLabel="Unlock contact with FIX">
+              <Ionicons name="lock-closed" size={13} color={colors.text} />
+              <Text style={styles.lockedActionText}>Contact</Text>
+            </Pressable>
+          ) : (
+            <>
+              <Pressable
+                onPress={handleCall}
+                style={styles.iconAction}
+                testID={`fixa-call-${item.id}`}
+              >
+                <Ionicons name="call" size={16} color={colors.text} />
+              </Pressable>
+              <Pressable
+                onPress={handleWhatsApp}
+                style={[styles.iconAction, { backgroundColor: "#25D366" }]}
+                testID={`fixa-whatsapp-${item.id}`}
+              >
+                <Ionicons name="logo-whatsapp" size={16} color="#fff" />
+              </Pressable>
+            </>
+          )}
           <Pressable onPress={handleBook} style={styles.bookBtn} testID={`fixa-book-${item.id}`}>
             <Text style={styles.bookBtnText}>Book Now</Text>
           </Pressable>
@@ -319,6 +328,17 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
   },
   bookBtnText: { color: "#fff", fontSize: 13, fontFamily: F.bold, letterSpacing: 0.2 },
+  lockedAction: {
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  lockedActionText: { fontSize: 12, fontFamily: F.bold, color: colors.text },
 
   // Featured (horizontal card)
   featuredCard: {

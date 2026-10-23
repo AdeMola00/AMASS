@@ -7,11 +7,12 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 
-import { api, MarketplaceItem } from "@/src/lib/api";
+import { api, MarketplaceItem, MarketReportReason } from "@/src/lib/api";
+import { useAuth } from "@/src/contexts/auth";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, Card, EmptyState, IconButton, Screen, ScreenHeader, Skeleton, useToast } from "@/src/ui";
+import { AppText, Badge, Button, Card, EmptyState, IconButton, Input, Screen, ScreenHeader, Sheet, Skeleton, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { ImageGallery } from "@/src/components/marketplace/ImageGallery";
 import { ClassifiedCard } from "@/src/components/marketplace/ClassifiedCard";
@@ -20,6 +21,15 @@ import { MakeOfferSheet, MakeOfferSheetRef } from "@/src/components/marketplace/
 const GALLERY_H = 380;
 /** WhatsApp brand green — identical in both themes. */
 const WHATSAPP = "#25D366";
+
+const REPORT_REASONS: { key: MarketReportReason; label: string; hint: string; icon: IconName }[] = [
+  { key: "scam", label: "Scam or fraud", hint: "Asks for deposits, fake payment proof, too good to be true", icon: "warning-outline" },
+  { key: "prohibited", label: "Prohibited item", hint: "Weapons, drugs, counterfeit or stolen goods", icon: "ban-outline" },
+  { key: "wrong_category", label: "Wrong category", hint: "Listed in the wrong section or misleading title", icon: "swap-horizontal-outline" },
+  { key: "duplicate", label: "Duplicate listing", hint: "Same item posted several times", icon: "copy-outline" },
+  { key: "offensive", label: "Offensive content", hint: "Hateful, explicit or harassing photos/text", icon: "eye-off-outline" },
+  { key: "other", label: "Something else", hint: "Tell us what's wrong below", icon: "ellipsis-horizontal-circle-outline" },
+];
 
 function timeAgo(iso?: string): string {
   if (!iso) return "";
@@ -42,6 +52,7 @@ export default function ItemDetail() {
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const toast = useToast();
+  const { user } = useAuth();
   const offerRef = useRef<MakeOfferSheetRef>(null);
 
   const [item, setItem] = useState<MarketplaceItem | null>(null);
@@ -49,6 +60,8 @@ export default function ItemDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [chatBusy, setChatBusy] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -61,8 +74,9 @@ export default function ItemDetail() {
       setSaved(savedRes.ids.includes(id));
       // Record view (silent)
       api.marketplaceRecordView(id).catch(() => {});
-    } catch {
-      setError(true);
+    } catch (e: any) {
+      // A removed/unknown listing is a terminal "unavailable" state, not a retryable error.
+      setError(e?.status !== 404);
     } finally {
       setLoading(false);
     }
@@ -114,8 +128,19 @@ export default function ItemDetail() {
     Linking.openURL(`tel:${item.seller_phone}`).catch(() => toast.error("Couldn't open dialer"));
   };
 
-  const openChat = () => toast.info("Chat with seller", "In-app messaging is launching soon. Try WhatsApp or Call for now.");
-  const reportListing = () => toast.success("Report received", "Thanks for flagging this. Our team will review within 24 hours.");
+  const openChat = async () => {
+    if (!item || chatBusy) return;
+    Haptics.selectionAsync().catch(() => {});
+    setChatBusy(true);
+    try {
+      const conv = await api.chatStartFromItem(item.id);
+      router.push(`/chat/${conv.id}` as any);
+    } catch (e: any) {
+      toast.error("Couldn't start chat", e?.message ?? "Please try again.");
+    } finally {
+      setChatBusy(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -145,6 +170,10 @@ export default function ItemDetail() {
   const gallery = item.images?.length ? item.images : [item.image];
   const isSpecial = item.is_boosted || item.is_featured;
   const condition = CONDITION_LABEL[item.condition ?? ""] ?? item.condition ?? "—";
+  const status = item.status ?? "active";
+  const isOwner = !!user?.id && item.seller_id === user.id;
+  const isSold = status === "sold";
+  const isPaused = status === "paused";
 
   return (
     <Screen edges={[]} testID={`item-detail-${item.id}`}>
@@ -152,21 +181,47 @@ export default function ItemDetail() {
       <ScrollView contentContainerStyle={{ paddingBottom: 170 + insets.bottom }} showsVerticalScrollIndicator={false}>
         {/* Image gallery */}
         <ImageGallery images={gallery} height={GALLERY_H} />
+        {isSold ? (
+          <View style={styles.soldOverlay} pointerEvents="none" testID="item-sold-banner">
+            <View style={[styles.soldRibbon, { backgroundColor: colors.text }]}>
+              <Ionicons name="checkmark-done" size={16} color={colors.bg} />
+              <AppText variant="title" color={colors.bg}>
+                Sold
+              </AppText>
+            </View>
+          </View>
+        ) : null}
 
         {/* Floating back / actions */}
         <View style={[styles.topActions, { top: insets.top + 8 }]} pointerEvents="box-none">
           <IconButton icon="chevron-back" label="Go back" variant="inverse" color="#FFFFFF" onPress={() => router.back()} testID="detail-back" />
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <IconButton icon={saved ? "heart" : "heart-outline"} label={saved ? "Remove from saved" : "Save"} variant="inverse" color={saved ? colors.brand : "#FFFFFF"} onPress={toggleSave} testID="detail-save" />
+            {!isOwner ? <IconButton icon={saved ? "heart" : "heart-outline"} label={saved ? "Remove from saved" : "Save"} variant="inverse" color={saved ? colors.brand : "#FFFFFF"} onPress={toggleSave} testID="detail-save" /> : null}
             <IconButton icon="share-outline" label="Share" variant="inverse" color="#FFFFFF" onPress={shareItem} testID="detail-share" />
           </View>
         </View>
 
         {/* Header block */}
         <Animated.View entering={FadeInDown.duration(240)} style={[styles.headerBlock, { backgroundColor: colors.bg }]}>
+          {isOwner ? (
+            <Card elevation="none" style={{ backgroundColor: colors.surfaceAlt, borderColor: "transparent" }} testID="own-listing-note">
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <Ionicons name="storefront-outline" size={20} color={colors.text} />
+                <View style={{ flex: 1 }}>
+                  <AppText variant="bodyMedium">This is your listing</AppText>
+                  <AppText variant="caption" tone="tertiary">
+                    {isSold ? "Marked as sold." : isPaused ? "Paused — hidden from buyers." : `Live · ${item.views || 0} views · ${item.saves || 0} saves`}
+                  </AppText>
+                </View>
+                <Button label="Manage" size="sm" variant="secondary" iconLeft="create-outline" onPress={() => router.push("/marketplace/my-listings" as any)} testID="manage-listing" />
+              </View>
+            </Card>
+          ) : null}
           <View style={styles.badgeRow}>
+            {isSold ? <Badge label="Sold" tone="neutral" icon="checkmark-done" /> : null}
+            {isPaused ? <Badge label="Paused" tone="warning" icon="pause" /> : null}
             {isSpecial ? <Badge label={item.is_boosted ? "Boosted" : "Featured"} tone="mass" icon="flash" /> : null}
-            {item.negotiable ? <Badge label="Negotiable" tone="success" icon="swap-horizontal" /> : null}
+            {item.negotiable && !isSold ? <Badge label="Negotiable" tone="success" icon="swap-horizontal" /> : null}
             {item.condition ? <Badge label={condition} tone="neutral" /> : null}
           </View>
           <View style={styles.priceRow}>
@@ -282,7 +337,7 @@ export default function ItemDetail() {
             <Trust icon="cash-outline" title="Inspect before you pay" body="Never send money upfront." />
             <Trust icon="alert-circle-outline" title="Report scams" body="Flag any suspicious listing." />
           </Card>
-          <Button label="Report this listing" variant="ghost" size="sm" iconLeft="flag-outline" onPress={reportListing} testID="report-listing" style={{ alignSelf: "center" }} />
+          {!isOwner ? <Button label="Report this listing" variant="ghost" size="sm" iconLeft="flag-outline" onPress={() => setReportOpen(true)} testID="report-listing" style={{ alignSelf: "center" }} /> : null}
         </Section>
 
         {/* Related */}
@@ -302,18 +357,100 @@ export default function ItemDetail() {
         ) : null}
       </ScrollView>
 
-      {/* Bottom action bar */}
-      <View style={[styles.actionBar, { backgroundColor: colors.bgElevated, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + 4 }, shadows.lg]}>
-        <View style={styles.actionRow}>
-          <Button label="Chat" variant="outline" iconLeft="chatbubble-ellipses-outline" size="md" onPress={openChat} testID="action-chat" style={{ flex: 1 }} />
-          <Button label="Call" variant="primary" iconLeft="call" size="md" onPress={openCall} testID="action-call" style={{ flex: 1 }} />
-          <Button label="WhatsApp" iconLeft="logo-whatsapp" size="md" onPress={openWhatsApp} testID="action-whatsapp" style={{ flex: 1.2, backgroundColor: WHATSAPP }} />
+      {/* Bottom action bar — buyers only; sold items can't be contacted/offered */}
+      {isOwner ? null : isSold ? (
+        <View style={[styles.actionBar, { backgroundColor: colors.bgElevated, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + 4 }, shadows.lg]} testID="sold-action-bar">
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Ionicons name="checkmark-done-circle" size={22} color={colors.textTertiary} />
+            <AppText variant="bodySm" tone="secondary" style={{ flex: 1 }}>
+              This item has been sold. Browse similar finds below or save a search to catch the next one.
+            </AppText>
+          </View>
+          <Button label="Browse similar items" variant="secondary" size="lg" fullWidth iconLeft="search" onPress={() => router.push({ pathname: "/marketplace/search", params: { q: item.subcategory } } as any)} testID="browse-similar" />
         </View>
-        <Button label={`Make an offer · ${formatNaira(item.price)}`} variant="brand" size="lg" fullWidth iconLeft="pricetag" onPress={() => offerRef.current?.open(item)} testID="action-offer" />
-      </View>
+      ) : (
+        <View style={[styles.actionBar, { backgroundColor: colors.bgElevated, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + 4 }, shadows.lg]}>
+          <View style={styles.actionRow}>
+            <Button label="Chat" variant="outline" iconLeft="chatbubble-ellipses-outline" size="md" onPress={openChat} loading={chatBusy} testID="action-chat" style={{ flex: 1 }} />
+            <Button label="Call" variant="primary" iconLeft="call" size="md" onPress={openCall} testID="action-call" style={{ flex: 1 }} />
+            <Button label="WhatsApp" iconLeft="logo-whatsapp" size="md" onPress={openWhatsApp} testID="action-whatsapp" style={{ flex: 1.2, backgroundColor: WHATSAPP }} />
+          </View>
+          <Button label={`Make an offer · ${formatNaira(item.price)}`} variant="brand" size="lg" fullWidth iconLeft="pricetag" onPress={() => offerRef.current?.open(item)} testID="action-offer" />
+        </View>
+      )}
 
-      <MakeOfferSheet ref={offerRef} />
+      <MakeOfferSheet ref={offerRef} onSent={() => toast.show({ kind: "success", title: "Offer sent", body: "We'll notify you when the seller replies.", actionLabel: "Track offers", onAction: () => router.push("/marketplace/my-listings?tab=sent" as any) })} />
+      <ReportSheet visible={reportOpen} itemId={item.id} onClose={() => setReportOpen(false)} />
     </Screen>
+  );
+}
+
+function ReportSheet({ visible, itemId, onClose }: { visible: boolean; itemId: string; onClose: () => void }) {
+  const { colors } = useTheme();
+  const toast = useToast();
+  const [reason, setReason] = useState<MarketReportReason | null>(null);
+  const [details, setDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setReason(null);
+      setDetails("");
+    }
+  }, [visible]);
+
+  const submit = async () => {
+    if (!reason) return;
+    setBusy(true);
+    try {
+      const r = await api.marketplaceReport(itemId, reason, details.trim() || undefined);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      toast.success(r.duplicate ? "Report updated" : "Report received", r.auto_paused ? "This listing has been paused pending review." : "Thanks for flagging this — our team reviews reports within 24 hours.");
+      onClose();
+    } catch (e: any) {
+      toast.error("Couldn't send report", e?.message ?? "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Report this listing" testID="report-sheet">
+      <View style={{ gap: 10 }}>
+        <AppText variant="bodySm" tone="secondary">
+          Reports are anonymous. The seller won’t know who flagged the listing.
+        </AppText>
+        <View style={{ gap: 6 }}>
+          {REPORT_REASONS.map((r) => {
+            const active = reason === r.key;
+            return (
+              <Pressable
+                key={r.key}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setReason(r.key);
+                }}
+                style={[styles.reasonRow, { backgroundColor: active ? colors.surfaceAlt : colors.surface, borderColor: active ? colors.text : colors.border }]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                testID={`report-reason-${r.key}`}
+              >
+                <Ionicons name={r.icon} size={18} color={active ? colors.text : colors.textSecondary} />
+                <View style={{ flex: 1 }}>
+                  <AppText variant="bodyMedium">{r.label}</AppText>
+                  <AppText variant="micro" tone="tertiary" numberOfLines={1}>
+                    {r.hint}
+                  </AppText>
+                </View>
+                <Ionicons name={active ? "radio-button-on" : "radio-button-off"} size={18} color={active ? colors.brand : colors.textMuted} />
+              </Pressable>
+            );
+          })}
+        </View>
+        <Input label="Details (optional)" placeholder="Anything that helps us review faster" value={details} onChangeText={setDetails} multiline maxLength={600} style={{ minHeight: 72, textAlignVertical: "top" }} testID="report-details" />
+        <Button label="Send report" variant="destructive" size="lg" fullWidth disabled={!reason} loading={busy} onPress={submit} testID="report-submit" />
+      </View>
+    </Sheet>
   );
 }
 
@@ -360,6 +497,9 @@ function Trust({ icon, title, body }: { icon: IconName; title: string; body: str
 
 const styles = StyleSheet.create({
   topActions: { position: "absolute", left: space[4], right: space[4], flexDirection: "row", justifyContent: "space-between" },
+  soldOverlay: { position: "absolute", top: 0, left: 0, right: 0, height: GALLERY_H, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10,10,10,0.35)" },
+  soldRibbon: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 18, paddingVertical: 10, borderRadius: radii.pill },
+  reasonRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radii.md, borderWidth: 1 },
   headerBlock: { marginTop: -24, borderTopLeftRadius: radii.xxl, borderTopRightRadius: radii.xxl, paddingHorizontal: space[4], paddingTop: space[5], gap: 8 },
   badgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   priceRow: { flexDirection: "row", alignItems: "flex-end", gap: 10 },

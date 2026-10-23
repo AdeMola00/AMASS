@@ -68,6 +68,14 @@ export default function Login() {
         </View>
 
         <View style={styles.form}>
+          <Button label="Continue with phone number" size="lg" fullWidth iconLeft="phone-portrait-outline" onPress={() => router.push({ pathname: "/(auth)/phone", params: redirect ? { redirect } : {} } as any)} testID="login-phone-button" />
+          <View style={styles.divider}>
+            <Divider style={{ flex: 1 }} />
+            <AppText variant="caption" tone="tertiary">
+              or sign in with email
+            </AppText>
+            <Divider style={{ flex: 1 }} />
+          </View>
           {params.reset === "1" && (
             <View style={[styles.notice, { backgroundColor: colors.successSoft }]} testID="reset-success-banner" accessibilityRole="alert">
               <Ionicons name="checkmark-circle" size={16} color={colors.success} />
@@ -113,7 +121,7 @@ export default function Login() {
             </View>
           )}
 
-          <Button label="Sign In" size="lg" fullWidth loading={loading} onPress={submit} testID="login-submit-button" />
+          <Button label="Sign In" size="lg" fullWidth variant="secondary" loading={loading} onPress={submit} testID="login-submit-button" />
 
           <View style={styles.divider}>
             <Divider style={{ flex: 1 }} />

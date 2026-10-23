@@ -68,6 +68,8 @@ def register_admin_cockpit_routes(db, require_admin):
         total_props = await db.properties_geo.count_documents({})
         total_listings = await db.property_listings.count_documents({})
         merged = await db.properties_geo.count_documents({"physical_status": "MERGED"})
+        pending_estates = await db.estates.count_documents({"status": "pending"})
+        open_social_reports = await db.social_reports.count_documents({"status": "OPEN"})
         return {
             "pending_duplicate_review": pending_dup,
             "pending_representations": pending_reps,
@@ -75,6 +77,8 @@ def register_admin_cockpit_routes(db, require_admin):
             "total_properties": total_props,
             "total_listings": total_listings,
             "merged_properties": merged,
+            "pending_estates": pending_estates,
+            "open_social_reports": open_social_reports,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 

@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Literal, Optional
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 
@@ -163,8 +163,8 @@ SUBSCRIPTION_PLANS = [
     },
 ]
 
-WELCOME_TOKENS = 15  # Free MASS tokens on first wallet touch
-WELCOME_FIX = 10     # Free FIX tokens on first FIX-wallet touch
+WELCOME_TOKENS = 300  # Default welcome MASS (admin-editable: app_settings.monetization.welcome_bonus)
+WELCOME_FIX = 100     # Default welcome FIX (admin-editable)
 DEFAULT_UNLOCK_PERMANENCE_DAYS = 0  # 0 = forever
 
 
@@ -290,8 +290,15 @@ class WalletService:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
 
-    @staticmethod
-    def _welcome_amount(currency: Currency) -> int:
+    async def _welcome_amount(self, currency: Currency) -> int:
+        """Admin-editable welcome bonus (app_settings.monetization.welcome_bonus)."""
+        try:
+            cfg = await self.db.app_settings.find_one({"key": "monetization"}, {"_id": 0, "value": 1})
+            wb = ((cfg or {}).get("value") or {}).get("welcome_bonus") or {}
+            if currency in wb and int(wb[currency]) >= 0:
+                return int(wb[currency])
+        except Exception:
+            pass
         return WELCOME_TOKENS if currency == "MASS" else WELCOME_FIX
 
     async def get_or_create(self, user_id: str, currency: Currency = "MASS") -> dict:
@@ -310,7 +317,7 @@ class WalletService:
                 )
             return wallet
         # Create new wallet with welcome amount
-        welcome = self._welcome_amount(currency)
+        welcome = await self._welcome_amount(currency)
         doc = Wallet(user_id=user_id, currency=currency).model_dump()
         doc["bonus_balance"] = welcome
         doc["lifetime_earned"] = welcome
@@ -323,6 +330,7 @@ class WalletService:
             welcome,
             f"Welcome to {label}! Enjoy your starter {currency} tokens.",
             currency=currency,
+            extra={"balance_before": 0, "status": "completed"},
         )
         return {**doc}
 
@@ -335,7 +343,11 @@ class WalletService:
         description: str,
         currency: Currency = "MASS",
         meta: Optional[dict] = None,
+        extra: Optional[dict] = None,
     ) -> None:
+        """Append-only ledger row. `extra` carries monetization fields
+        (balance_before, status, feature_key, target_id, category, zone_tier,
+        price_snapshot, idempotency_key, …). Completed rows are never edited."""
         tx = Transaction(
             user_id=user_id,
             currency=currency,
@@ -345,6 +357,10 @@ class WalletService:
             description=description,
             meta=meta or {},
         ).model_dump()
+        tx.setdefault("status", "completed")
+        tx.setdefault("balance_before", balance_after - amount)
+        if extra:
+            tx.update(extra)
         await self.db.token_transactions.insert_one({**tx})
 
     async def credit(
@@ -357,9 +373,10 @@ class WalletService:
         currency: Currency = "MASS",
         is_bonus: bool = False,
         meta: Optional[dict] = None,
+        extra: Optional[dict] = None,
     ) -> dict:
         # Ensure wallet exists (creates on first touch with welcome bonus).
-        await self.get_or_create(user_id, currency)
+        before = await self.get_or_create(user_id, currency)
         field = "bonus_balance" if is_bonus else "balance"
         # Atomic increment — safe under concurrent credits/debits.
         w = await self.db.wallets.find_one_and_update(
@@ -374,6 +391,7 @@ class WalletService:
         await self._log(
             user_id, kind, amount, w["balance"] + w["bonus_balance"], description,
             currency=currency, meta=meta,
+            extra={"balance_before": before["balance"] + before["bonus_balance"], **(extra or {})},
         )
         return w
 
@@ -386,6 +404,7 @@ class WalletService:
         *,
         currency: Currency = "MASS",
         meta: Optional[dict] = None,
+        extra: Optional[dict] = None,
     ) -> dict:
         """Spend bonus tokens first, then primary balance — atomically."""
         w = await self.get_or_create(user_id, currency)
@@ -421,11 +440,13 @@ class WalletService:
                     user_id, kind, -amount,
                     updated["balance"] + updated["bonus_balance"],
                     description, currency=currency, meta=meta,
+                    extra={"balance_before": spendable, **(extra or {})},
                 )
                 return updated
             # Re-read wallet & recompute allocations
             w = await self.get_or_create(user_id, currency)
-            if w["balance"] + w["bonus_balance"] < amount:
+            spendable = w["balance"] + w["bonus_balance"]
+            if spendable < amount:
                 raise HTTPException(402, f"Insufficient {currency} tokens")
             use_bonus = min(w["bonus_balance"], amount)
             use_balance = amount - use_bonus
@@ -635,72 +656,34 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
     @router.post("/properties/unlock")
     async def unlock_property(
         data: UnlockIn,
+        request: Request,
         creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     ):
-        user_id = await _current_user_id(creds)
-        prop = await db.properties.find_one({"id": data.property_id}, {"_id": 0})
-        if not prop:
-            raise HTTPException(404, "Property not found")
-        # Already unlocked?
-        existing = await db.property_unlocks.find_one(
-            {
-                "user_id": user_id,
-                "property_id": data.property_id,
-                "$or": [
-                    {"expires_at": None},
-                    {"expires_at": {"$gt": datetime.now(timezone.utc)}},
-                ],
-            },
-            {"_id": 0},
-        )
-        if existing:
-            return {"ok": True, "already_unlocked": True, "unlock": existing}
-        cost = compute_token_cost(prop)
-        if cost == 0:
-            # Free / AMASS Exclusive — record unlock but no cost
-            rec = UnlockRecord(
-                user_id=user_id, property_id=data.property_id, tokens_paid=0
-            ).model_dump()
-            await db.property_unlocks.insert_one({**rec})
-            return {"ok": True, "free": True, "unlock": rec, "tokens_paid": 0}
+        """Legacy alias of POST /api/unlocks {featureKey:"property"}. Fee, balance and the
+        entitlement are resolved by the shared monetization service — one charge per property."""
+        from monetization import UnlockService  # local import avoids a cycle
 
-        # Debit tokens
+        user_id = await _current_user_id(creds)
+        user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+        if not user:
+            raise HTTPException(401, "User not found")
+        usvc = UnlockService(db)
+        key = request.headers.get("Idempotency-Key") or f"legacy:{user_id}:{data.property_id}:{uuid.uuid4().hex}"
         try:
-            w = await svc.debit(
-                user_id,
-                cost,
-                "spend_unlock",
-                f"Unlocked property {prop.get('title', '')}",
-                meta={"property_id": data.property_id, "cost": cost},
-            )
+            res = await usvc.unlock(user, "property", data.property_id, key)
         except HTTPException as e:
             if e.status_code == 402:
-                wallet = await svc.get_or_create(user_id)
-                raise HTTPException(
-                    402,
-                    {
-                        "error": "insufficient_tokens",
-                        "required": cost,
-                        "balance": wallet["balance"] + wallet["bonus_balance"],
-                        "shortfall": cost - (wallet["balance"] + wallet["bonus_balance"]),
-                    },
-                )
+                q = await usvc.quote(user, "property", data.property_id, log_attempt=False)
+                raise HTTPException(402, {"error": "insufficient_tokens", "required": q["fee"], "balance": q["balance"], "shortfall": max(0, q["fee"] - q["balance"])})
             raise
-        expires = None
-        if DEFAULT_UNLOCK_PERMANENCE_DAYS > 0:
-            expires = datetime.now(timezone.utc) + timedelta(days=DEFAULT_UNLOCK_PERMANENCE_DAYS)
-        rec = UnlockRecord(
-            user_id=user_id,
-            property_id=data.property_id,
-            tokens_paid=cost,
-            expires_at=expires,
-        ).model_dump()
-        await db.property_unlocks.insert_one({**rec})
+        charged = int(res.get("charged", 0))
         return {
             "ok": True,
-            "unlock": rec,
-            "tokens_paid": cost,
-            "balance": w["balance"] + w["bonus_balance"],
+            "already_unlocked": res.get("free_reason") == "already_unlocked",
+            "free": charged == 0,
+            "unlock": res.get("entitlement"),
+            "tokens_paid": charged,
+            "balance": res.get("balance_after"),
         }
 
     @router.get("/wallet/unlocks")
@@ -708,11 +691,28 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
         creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     ):
         user_id = await _current_user_id(creds)
-        docs = (
-            await db.property_unlocks.find({"user_id": user_id}, {"_id": 0})
+        # Entitlements are the source of truth (legacy property_unlocks were migrated at startup).
+        ents = (
+            await db.entitlements.find({"user_id": user_id, "feature_key": "property", "status": {"$in": ["active", "refunded"]}}, {"_id": 0})
             .sort("created_at", -1)
             .to_list(200)
         )
+        docs = [
+            {
+                "id": e["id"],
+                "user_id": user_id,
+                "property_id": e["target_id"],
+                "tokens_paid": int(e.get("amount_paid") or 0),
+                "currency": e.get("currency", "MASS"),
+                "status": e.get("status"),
+                "expires_at": None,
+                "created_at": e.get("created_at"),
+                "transaction_id": e.get("transaction_id"),
+                "category": e.get("category"),
+                "zone_tier": e.get("zone_tier"),
+            }
+            for e in ents
+        ]
         # Fetch property titles for display
         ids = [d["property_id"] for d in docs]
         if ids:

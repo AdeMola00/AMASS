@@ -24,7 +24,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="discover" options={{ title: "Discover" }} />
       <Tabs.Screen name="marketplace" options={{ title: "Market" }} />
-      <Tabs.Screen name="messages" options={{ title: "Inbox" }} />
+      <Tabs.Screen name="neighbours" options={{ title: "Neighbours" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
@@ -86,7 +86,7 @@ function FloatingBottomBar({ state, navigation }: any) {
               key={r.key}
               route={r}
               active={state.index === i}
-              badge={r.name === "messages" ? unread : 0}
+              badge={r.name === "neighbours" ? unread : 0}
               onPress={() => {
                 const event = navigation.emit({ type: "tabPress", target: r.key, canPreventDefault: true });
                 if (!event.defaultPrevented) navigation.navigate(r.name);
@@ -144,8 +144,8 @@ function tabConfig(routeName: string): { label: string; icon: IconName; iconActi
       return { label: "Discover", icon: "compass-outline", iconActive: "compass" };
     case "marketplace":
       return { label: "Market", icon: "grid-outline", iconActive: "grid" };
-    case "messages":
-      return { label: "Inbox", icon: "chatbubbles-outline", iconActive: "chatbubbles" };
+    case "neighbours":
+      return { label: "Neighbours", icon: "people-outline", iconActive: "people" };
     case "profile":
       return { label: "Profile", icon: "person-outline", iconActive: "person" };
     default:

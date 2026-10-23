@@ -1,0 +1,37 @@
+{
+  "summary": "Map-first monetization spec (Jan 2026) tested end-to-end. Backend: 38/38 pytest cases pass across the review-specific suite (test_review_map_monetization.py — 15 cases) + existing regression suites (test_monetization_spec.py 15/15 + test_property_access_two_tier.py 8/8). All review contract items verified: welcome bonus 300 MASS from /api/monetization/config; GET /api/properties exposes token_cost==access_cost, zone_tier A-D, unlocked bool; no agent_phone/agent_email on locked items; GET /api/map/markers 401 anon → 200 auth with exact shape {id,category,type,lat,lng,unlocked,verified,approx} + count + approx_radius_m:150, fresh user markers approx=true/unlocked=false, after unlock marker becomes unlocked=true/approx=false and lat/lng mutate (jitter removed); GET /api/unlocks/quote returns fee, fee_ngn, balance, balance_after, can_afford, already_unlocked=false, is_owner correct for demo (admin NOT exempt — paid fee on non-owned property, is_owner=false; owned listings return is_owner=true/fee=0); POST /api/unlocks with Idempotency-Key charges exactly once, same key → identical result no second charge, different key same property → charged 0 + free_reason 'already_unlocked', missing header → 422, unaffordable → 402 + wallet unchanged; /details 403 UNLOCK_REQUIRED before unlock, 200 after, /api/unlocks/mine + /api/wallet/unlocks both list it; legacy POST /api/properties/unlock aliases correctly (first call charged, second call already_unlocked=true tokens_paid=0, insufficient balance returns 402 {error:'insufficient_tokens',required,balance,shortfall}); FIX gate — fresh users have 100 FIX welcome so /api/fixa/providers 200, after zeroing FIX /api/fixa/access returns allowed=false and /api/fixa/providers 403 FIX_REQUIRED; /api/settings/pricing returns free_amass_sale=false, agent_contact_fee=0, conversion present. Frontend: /app/frontend/app/(tabs)/index.tsx map-first rewrite renders cleanly at 390x844 after demo login — all required testIDs present: home-map-screen, home-search-input, open-filter-sheet, home-ai-btn, map-balance-chip (shows 'M 9,114 F 510'), fab-map-layer/locate/zoom-in/zoom-out, map-legend (10 sale · 3 rent · unlocked), quick filter chips (filter-chip-for-sale/to-rent/land/commercial/luxury/verified). Toggling 'For Sale' chip updates legend 10/3 → 10/0 and resets back correctly. NO list-view-toggle / home-list-screen / property-card-dock present (confirmed absent). Tab bar navigates to /discover, /marketplace, /messages, /profile; inbox badge '2' renders. Web map is the placeholder image ('Interactive map available on mobile') and shows 1 cluster bubble (cluster-6) — individual pin-<id> elements are not clickable on web per review-spec note. Fallback verified: property-detail unlock-cta-btn opens dialog surfacing unlock-cta-balance + unlock-balance-after (buyer tunde balance M15/F10 < 150 MASS fee → insufficient-state so unlock-confirm-btn not rendered, which is correct UX). No red-screen, no page errors. Only known-ignorable web-RN warnings: shadow*/pointerEvents/useNativeDriver (all documented in iteration_46 context). No react_native deprecations found in reviewed files.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_review_map_monetization.py",
+    "/app/test_reports/pytest/pytest_iteration47_review.xml",
+    "/app/test_reports/pytest/pytest_iteration47_full.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/app/frontend/app/(tabs)/index.tsx (665 LoC) is approaching the 700-line soft limit — consider extracting pin rendering, cluster expansion, and quick-filter logic into dedicated hooks/components in a future refactor.",
+    "Buyer tunde.showcase@amass.africa carries M15/F10 (pre-existing wallet from an older welcome-bonus epoch). Not a bug — welcome bonus 300 MASS applies to fresh users only — but QA scripts that assume a 300 MASS buyer will fail; use _new_user() for charging tests.",
+    "The map-first home currently renders a single cluster-6 bubble on the web placeholder (cluster index built from 13 markers). Individual pin-<id> testIDs are present in code but not exposed on web unless cluster expands; the fallback via property-detail CTA covers UnlockDialog on web, which is what the review spec explicitly accepts.",
+    "server.py annotate_properties correctly strips agent_phone/agent_email on locked items (verified by test_properties_list_shape)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_review_map_monetization.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (38/38 — review-specific 15/15 + regression 23/23)",
+    "frontend": "100% (all required testIDs present, flows verified)"
+  },
+  "seed_data_creation": "Each test registers an ephemeral mono_* / rev_* user via /api/auth/register — no database seeding or /api/seed invocation (per do-not-wipe-listings guard).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login flow on web requires clicking the inline 'Sign in' link on the onboarding carousel first (page.get_by_text('Sign in')) before the /login screen is reachable; the carousel 'Skip' button also works. Use testIDs login-email / login-password / login-submit-button (NOT login-form-* variants). The web map is a static placeholder image — markers collapse to a single cluster-6 bubble that does not expand on click; verify UnlockDialog via /property/<id> → unlock-cta-btn (CTA renders unlock-cta-balance + unlock-balance-after; unlock-confirm-btn appears only when balance >= fee). Known-ignorable warnings: shadow*/pointerEvents/useNativeDriver. Do NOT run POST /api/seed (wipes listings). For charging tests always use a fresh registered user (welcome bonus = 300 MASS / 100 FIX).",
+  "rca_of_issue": "N/A — no regressions. The only observational caveat is that buyer tunde's wallet was topped-up historically to M15 only (which is below current welcome bonus 300). That is pre-existing seed-data drift, not a bug in the Jan-2026 monetization work."
+}

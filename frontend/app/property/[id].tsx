@@ -25,23 +25,26 @@ import { formatNaira, formatMarkerPrice } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { useTheme } from "@/src/theme";
 import { motion, radii, space } from "@/src/theme/tokens";
-import { AppText, Avatar, Badge, Button, Card, EmptyState, IconButton, Skeleton, useToast } from "@/src/ui";
+import { AppText, Avatar, Badge, Button, Card, EmptyState, IconButton, Skeleton, UnlockDialog, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { PropertyMarker } from "@/src/components/PropertyMarker";
 import { PriceText } from "@/src/components/PriceText";
 import { ListingCard } from "@/src/components/ListingCard";
 import { HotFlame } from "@/src/components/HotFlame";
 import { TokenIcon } from "@/src/components/TokenIcon";
-import { UnlockSheet, UnlockSheetRef } from "@/src/components/UnlockSheet";
 import { useWallet } from "@/src/contexts/wallet";
 import { useAuth } from "@/src/contexts/auth";
 import { recordRecentlyViewed } from "@/src/lib/recently-viewed";
+import { track, viaFrom } from "@/src/lib/analytics";
+import { AddToCollectionSheet } from "@/src/components/neighbours/AddToCollectionSheet";
+import type { PropertySocialContext } from "@/src/lib/api";
 
 const GALLERY_H = 400;
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 
 export default function PropertyDetails() {
-  const { id, unlock } = useLocalSearchParams<{ id: string; unlock?: string }>();
+  const { id, unlock, via } = useLocalSearchParams<{ id: string; unlock?: string; via?: string }>();
+  const arrivedVia = viaFrom(via);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -49,9 +52,9 @@ export default function PropertyDetails() {
   const toast = useToast();
   const { wallet } = useWallet();
   const { user } = useAuth();
-  const unlockRef = React.useRef<UnlockSheetRef>(null);
   const autoUnlockDone = React.useRef(false);
   const [property, setProperty] = useState<Property | null>(null);
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const [similar, setSimilar] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [favorited, setFavorited] = useState(false);
@@ -59,6 +62,8 @@ export default function PropertyDetails() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [social, setSocial] = useState<PropertySocialContext[string] | null>(null);
   const heart = useSharedValue(1);
   const heartAnim = useAnimatedStyle(() => ({ transform: [{ scale: heart.value }] }));
 
@@ -84,30 +89,17 @@ export default function PropertyDetails() {
       api.favoriteIds().then((r) => setFavorited(r.ids.includes(id))).catch(() => {});
       api.recordView(id).catch(() => {});
       recordRecentlyViewed(id).catch(() => {});
+      api.socialContext([id]).then((r) => setSocial(r[id] ?? null)).catch(() => {});
+      track("property_detail_view", { property_id: id, arrived_via: arrivedVia });
     }
-  }, [id, reload]);
+  }, [id, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Returning from a top-up? Re-open the matching unlock sheet automatically.
+  // Returning from a top-up? Re-open the unlock confirmation automatically.
   useEffect(() => {
     if (!property || !unlock || autoUnlockDone.current) return;
     autoUnlockDone.current = true;
-    const t = setTimeout(() => {
-      if (unlock === "access" && !property.unlocked) {
-        unlockRef.current?.open({
-          propertyId: property.id,
-          propertyTitle: property.title,
-          tokenCost: property.access_cost ?? property.token_cost ?? 5,
-          mode: "access",
-        });
-      } else if (unlock === "agent" && property.unlocked && !property.agent_unlocked) {
-        unlockRef.current?.open({
-          propertyId: property.id,
-          propertyTitle: property.title,
-          tokenCost: property.agent_contact_cost ?? 10,
-          mode: "agent",
-        });
-      }
-    }, 600);
+    if (property.unlocked) return;
+    const t = setTimeout(() => setUnlockOpen(true), 600);
     return () => clearTimeout(t);
   }, [property, unlock]);
 
@@ -155,25 +147,22 @@ export default function PropertyDetails() {
     }
   }, [property, chatBusy, router, toast]);
 
-  const openAccessSheet = useCallback(() => {
+  const openUnlock = useCallback(() => {
     if (!property) return;
-    unlockRef.current?.open({
-      propertyId: property.id,
-      propertyTitle: property.title,
-      tokenCost: property.access_cost ?? property.token_cost ?? 5,
-      mode: "access",
-    });
-  }, [property]);
+    Haptics.selectionAsync().catch(() => {});
+    track("paid_action_start", { property_id: property.id, arrived_via: arrivedVia });
+    setUnlockOpen(true);
+  }, [property, arrivedVia]);
 
-  const openAgentSheet = useCallback(() => {
-    if (!property) return;
-    unlockRef.current?.open({
-      propertyId: property.id,
-      propertyTitle: property.title,
-      tokenCost: property.agent_contact_cost ?? 10,
-      mode: "agent",
-    });
-  }, [property]);
+  const onUnlocked = useCallback(
+    (res: { charged: number; currency: string }) => {
+      setUnlockOpen(false);
+      if (id) track("payment_completed", { property_id: id, arrived_via: arrivedVia, charged: res.charged });
+      if (res.charged > 0) toast.success("Property unlocked", `${res.charged} ${res.currency} deducted · yours forever.`);
+      reload();
+    },
+    [reload, toast, id, arrivedVia]
+  );
 
   if (loading) {
     return (
@@ -216,9 +205,8 @@ export default function PropertyDetails() {
   };
 
   const priceSuffix = property.listing_type === "rent" ? "/year" : property.listing_type === "shortlet" ? "/night" : "";
-  const accessCost = property.access_cost ?? property.token_cost ?? 5;
-  const agentCost = property.agent_contact_cost ?? 10;
-  const hasAccess = !!(property.unlocked || property.is_free_amass_sale || property.is_amass_exclusive);
+  const accessCost = property.access_cost ?? property.token_cost ?? 0;
+  const hasAccess = !!(property.unlocked || property.is_free_amass_sale);
   const ctaBottomPad = Math.max(insets.bottom, 16);
 
   return (
@@ -262,6 +250,9 @@ export default function PropertyDetails() {
               <Ionicons name="chevron-back" size={22} color="#fff" />
             </Pressable>
             <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable style={styles.glassBtn} onPress={() => { Haptics.selectionAsync().catch(() => {}); setListOpen(true); }} testID="add-to-list-btn" accessibilityRole="button" accessibilityLabel="Add to a shared list" hitSlop={8}>
+                <Ionicons name="albums-outline" size={20} color="#fff" />
+              </Pressable>
               <Pressable style={styles.glassBtn} onPress={onShare} testID="share-btn" accessibilityRole="button" accessibilityLabel="Share this property" hitSlop={8}>
                 <Ionicons name="share-outline" size={20} color="#fff" />
               </Pressable>
@@ -308,8 +299,8 @@ export default function PropertyDetails() {
         <View style={[styles.sheet, { backgroundColor: colors.bg }]}>
           <View style={styles.badgeRow}>
             <StatusBadge status={property.status} />
-            {property.verified && <Badge label="Verified" tone="success" icon="shield-checkmark" />}
-            {(property.is_free_amass_sale || property.is_amass_exclusive) && (
+            {property.verified && property.status !== "verified" && <Badge label="Verified" tone="success" icon="shield-checkmark" />}
+            {property.is_free_amass_sale && (
               <Badge label="Listed by AMASS · Free access" tone="fix" icon="ribbon" />
             )}
           </View>
@@ -325,6 +316,35 @@ export default function PropertyDetails() {
             <AppText variant="bodySm" tone="secondary" style={{ flex: 1 }}>
               {property.location}
             </AppText>
+          </View>
+
+          {/* Decide together — social context (never reveals paid info) */}
+          <View style={[styles.socialRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]} testID="social-row">
+            {social?.saved_by?.length ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+                <View style={{ flexDirection: "row" }}>
+                  {social.saved_by.slice(0, 3).map((u, i) => (
+                    <View key={u.id} style={{ marginLeft: i ? -8 : 0 }}>
+                      <Avatar name={u.full_name} uri={u.avatar_url} size={24} tone="soft" />
+                    </View>
+                  ))}
+                </View>
+                <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+                  Saved by {social.saved_by[0].full_name.split(" ")[0]}
+                  {social.saved_by.length > 1 ? ` +${social.saved_by.length - 1}` : ""}
+                  {social.in_collections?.length ? ` · in ${social.in_collections[0].emoji ?? ""} ${social.in_collections[0].name}` : ""}
+                </AppText>
+              </View>
+            ) : social?.in_collections?.length ? (
+              <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+                In {social.in_collections.map((c) => `${c.emoji ?? ""} ${c.name}`.trim()).slice(0, 2).join(", ")}
+              </AppText>
+            ) : (
+              <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+                Deciding with someone? Add this home to a private shared list.
+              </AppText>
+            )}
+            <Button label="Add to list" size="xs" variant="secondary" iconLeft="albums-outline" onPress={() => setListOpen(true)} testID="add-to-list-inline" />
           </View>
 
           {property.ai_valuation ? (
@@ -351,7 +371,7 @@ export default function PropertyDetails() {
                   Property details locked
                 </AppText>
                 <AppText variant="caption" color={colors.textInverse} style={{ opacity: 0.75, marginTop: 2 }}>
-                  Pay the access fee to reveal the exact address, all photos, full specs and AI insights. Agent contact is a separate optional fee.
+                  One fee reveals the exact address, every photo, full specs, AI insights and the agent's direct contact — forever.
                 </AppText>
               </View>
               <View style={[styles.costPill, { backgroundColor: colors.massSoft, borderColor: colors.mass }]}>
@@ -492,8 +512,8 @@ export default function PropertyDetails() {
                 </View>
               ) : (
                 <>
-                  {/* Direct contact — separate disclosed fee (Tier 2) */}
-                  {property.agent_unlocked ? (
+                  {/* Direct contact — included in the single unlock */}
+                  {property.agent_phone || property.agent_email ? (
                     <View style={styles.contactRevealed} testID="agent-contact-revealed">
                       {property.agent_phone ? (
                         <ContactLine icon="call" value={property.agent_phone} onPress={() => Linking.openURL(`tel:${property.agent_phone}`)} />
@@ -503,15 +523,9 @@ export default function PropertyDetails() {
                       ) : null}
                     </View>
                   ) : (
-                    <Button
-                      label={`Reveal direct contact · ${agentCost} MASS`}
-                      variant="outline"
-                      iconLeft="lock-closed"
-                      fullWidth
-                      onPress={openAgentSheet}
-                      style={{ marginTop: space[3] }}
-                      testID="reveal-agent-contact-btn"
-                    />
+                    <AppText variant="caption" tone="tertiary" style={{ marginTop: space[3] }} testID="agent-contact-unavailable">
+                      No direct number on file for this agent — use the free in-app chat below.
+                    </AppText>
                   )}
 
                   {/* Contact Agent — opens in-app chat (always free, no number exposed) */}
@@ -626,7 +640,7 @@ export default function PropertyDetails() {
         ) : (
           <Pressable
             style={({ pressed }) => [styles.unlockCta, { backgroundColor: pressed ? colors.brandPressed : colors.brand }, shadows.brand]}
-            onPress={openAccessSheet}
+            onPress={openUnlock}
             testID="unlock-cta-btn"
             accessibilityRole="button"
             accessibilityLabel={`Unlock for ${accessCost} MASS. You have ${wallet?.spendable ?? 0} MASS`}
@@ -634,7 +648,7 @@ export default function PropertyDetails() {
             <TokenIcon size={18} tone="white" />
             <View>
               <AppText variant="title" color="#fff">
-                Unlock for {accessCost} MASS
+                Unlock for {accessCost.toLocaleString()} MASS
               </AppText>
               <AppText variant="micro" color="#fff" style={{ opacity: 0.75, marginTop: 1 }} testID="unlock-cta-balance" tabular>
                 You have {(wallet?.spendable ?? 0).toLocaleString()} MASS · confirm before paying
@@ -643,7 +657,8 @@ export default function PropertyDetails() {
           </Pressable>
         )}
       </View>
-      <UnlockSheet ref={unlockRef} onSuccess={reload} />
+      <UnlockDialog visible={unlockOpen} featureKey="property" targetId={property.id} onClose={() => setUnlockOpen(false)} onUnlocked={onUnlocked} />
+      <AddToCollectionSheet visible={listOpen} onClose={() => setListOpen(false)} targetId={property.id} kind="property" onAdded={() => api.socialContext([property.id]).then((r) => setSocial(r[property.id] ?? null)).catch(() => {})} />
 
       {/* Fullscreen gallery modal */}
       <Modal visible={fullscreen} animationType="fade" onRequestClose={() => setFullscreen(false)}>
@@ -834,6 +849,7 @@ const styles = StyleSheet.create({
   },
   badgeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   locRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  socialRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, padding: 10, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth },
   valPill: {
     flexDirection: "row",
     alignItems: "center",

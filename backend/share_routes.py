@@ -214,6 +214,8 @@ def register_share_routes(db: AsyncIOMotorDatabase, require_auth):
             }
         )
         # Denormalised counter on the property for cheap reads.
+        # Legacy docs may carry share_by_channel: null — $inc can't create a sub-field on null.
+        await db.properties.update_one({"id": property_id, "share_by_channel": None}, {"$set": {"share_by_channel": {}}})
         await db.properties.update_one(
             {"id": property_id},
             {
@@ -249,6 +251,7 @@ def register_share_routes(db: AsyncIOMotorDatabase, require_auth):
                 "created_at": now,
             }
         )
+        await db.agent_applications.update_one({"user_id": agent["user_id"], "share_by_channel": None}, {"$set": {"share_by_channel": {}}})
         await db.agent_applications.update_one(
             {"user_id": agent["user_id"]},
             {

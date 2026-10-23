@@ -32,7 +32,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { formatMarkerPrice } from "@/src/constants/theme";
+import { formatMarkerPrice, formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { fontFamilies, radii, space } from "@/src/theme/tokens";
 import { AppText, Avatar, Button, IconButton, Input, Screen, Sheet, Skeleton, useToast } from "@/src/ui";
@@ -430,7 +430,7 @@ export default function ConversationScreen() {
     try {
       await api.chatBlockUser(other.id);
       setBlockOpen(false);
-      toast.success("User blocked", `${other.full_name || other.email} can no longer message you.`);
+      toast.success("User blocked", `${other.full_name || "This user"} can no longer message you.`);
       router.back();
     } catch (e: any) {
       toast.error("Couldn't block", e?.message ?? "Try again");
@@ -439,7 +439,8 @@ export default function ConversationScreen() {
 
   const other = conv?.participants?.find((p: any) => p.id !== user?.id);
   const property = conv?.property;
-  const otherName = other?.full_name || other?.email || "Chat";
+  const marketItem = conv?.item;
+  const otherName = conv?.kind === "group" ? (conv?.title || "Group chat") : (other?.full_name || "Neighbour");
   const isOnline = presence.typing || (presence.last_seen ? (Date.now() - new Date(presence.last_seen).getTime()) / 1000 < 60 : false);
 
   const headerSubtitle = useMemo(() => {
@@ -554,6 +555,38 @@ export default function ConversationScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
+            ) : marketItem ? (
+              <Pressable
+                onPress={() => router.push(`/marketplace/${marketItem.id}` as any)}
+                style={({ pressed }) => [
+                  styles.propCard,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  shadows.xs,
+                  pressed && { opacity: 0.92 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`View listing ${marketItem.name}`}
+                testID="chat-item-card"
+              >
+                {marketItem.image ? (
+                  <Image source={{ uri: marketItem.image }} style={[styles.propImg, { backgroundColor: colors.surfaceAlt }]} />
+                ) : (
+                  <View style={[styles.propImg, { backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }]}>
+                    <Ionicons name="pricetag-outline" size={20} color={colors.textMuted} />
+                  </View>
+                )}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="label" tone="tertiary" uppercase>About this item</AppText>
+                  <AppText variant="title" numberOfLines={1}>{marketItem.name}</AppText>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>{marketItem.status === "sold" ? "Sold" : marketItem.city || "Declutter"}</AppText>
+                    <AppText variant="caption" weight="bold" tone="brand" tabular>
+                      {formatNaira(marketItem.price)}
+                    </AppText>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </Pressable>
             ) : null
           }
           ListEmptyComponent={
@@ -561,7 +594,7 @@ export default function ConversationScreen() {
               <Avatar name={otherName} size={64} verified={!!other?.verified} tone="soft" />
               <AppText variant="h3" align="center" style={{ marginTop: 12 }}>{otherName}</AppText>
               <AppText variant="bodySm" tone="tertiary" align="center" style={{ maxWidth: 280 }}>
-                {property ? "Say hello and ask anything about this property — viewings, price, documents." : "This is the start of your conversation. Messages are private between you two."}
+                {property ? "Say hello and ask anything about this property — viewings, price, documents." : marketItem ? "Ask about condition, pickup or delivery — and agree a price before you meet." : "This is the start of your conversation. Messages are private between you two."}
               </AppText>
             </View>
           }
@@ -730,6 +763,8 @@ export default function ConversationScreen() {
         <View style={{ gap: 4, marginBottom: 4 }}>
           {property ? (
             <MenuRow icon="home-outline" label="View property" caption={property.title} onPress={() => { setMenuOpen(false); router.push(`/property/${property.id}` as any); }} testID="menu-view-property" />
+          ) : marketItem ? (
+            <MenuRow icon="pricetag-outline" label="View listing" caption={marketItem.name} onPress={() => { setMenuOpen(false); router.push(`/marketplace/${marketItem.id}` as any); }} testID="menu-view-item" />
           ) : null}
           <MenuRow icon="flag-outline" label="Report user or message" caption="Flag harassment, spam or fraud" onPress={openReport} testID="menu-report" />
           <MenuRow icon="ban-outline" label="Block user" caption="They won't be able to message you" onPress={openBlock} destructive testID="menu-block" />

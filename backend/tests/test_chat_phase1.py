@@ -51,6 +51,8 @@ async def _seed_property_async(agent_id: str) -> str:
         await db.properties.insert_one({
             "id": pid, "title": "Chat Test Duplex",
             "location": "Victoria Island, Lagos", "price": 250_000_000,
+            "city": "Lagos", "state": "Lagos", "latitude": 6.4281, "longitude": 3.4219,
+            "status": "available",
             "listing_type": "sale", "property_type": "residential",
             "images": ["https://example.com/img.jpg"], "agent_id": agent_id,
             "agent_name": "Test Agent", "verified": True,

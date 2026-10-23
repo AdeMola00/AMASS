@@ -38,6 +38,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: "Services",
     rows: [
+      { icon: "storefront-outline", label: "My Market Listings", route: "/marketplace/my-listings", caption: "Declutter items · Offers in & out · Sales", tone: "brand" },
       { icon: "hammer-outline", label: "Provider Dashboard", route: "/provider-dashboard", caption: "FIXA jobs · FIX earnings · Boost", tone: "fix" },
       { icon: "construct-outline", label: "Improve My Property", route: "/improve", caption: "Inspections · Financing · Renovation", tone: "info" },
       { icon: "megaphone-outline", label: "My Ad Campaigns", route: "/ads", caption: "Analytics · AI coach · Pause/refund" },

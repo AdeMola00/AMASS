@@ -26,10 +26,11 @@ Safeguards
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from pymongo.errors import DuplicateKeyError
@@ -100,6 +101,13 @@ async def unlock_flags(
             access = True
         elif t == AGENT_TIER:
             agent = True
+    # Unified entitlement (monetization): one paid unlock grants both tiers.
+    ent = await db.entitlements.find_one(
+        {"user_id": user_id, "feature_key": "property", "target_id": property_id, "status": "active"},
+        {"_id": 0, "id": 1},
+    )
+    if ent:
+        access = agent = True
     return {
         "access": access or legacy,
         "agent": agent or legacy,
@@ -151,13 +159,16 @@ def register_property_access_routes(
     @router.get("/settings/pricing")
     async def public_pricing():
         pricing = await get_wallet_pricing(db)
+        from monetization import PricingEngine
+        mon = await PricingEngine(db).config()
         return {
             "property_access_fee": int(pricing.get("property_access_fee", 5)),
-            "agent_contact_fee": int(pricing.get("agent_contact_fee", 10)),
-            "access_period_days": int(pricing.get("access_period_days", 0) or 0),
+            "agent_contact_fee": 0,
+            "access_period_days": 0,
             "currency": pricing.get("currency", "MASS"),
             "privacy_policy_url": pricing.get("privacy_policy_url", ""),
-            "free_amass_sale": bool(pricing.get("free_amass_sale", True)),
+            "free_amass_sale": bool(mon.get("free_amass_sale", False)),
+            "conversion": mon.get("conversion"),
         }
 
     # ─── Access info for the confirm sheet ──────────────────────
@@ -176,7 +187,8 @@ def register_property_access_routes(
             except HTTPException:
                 user_id = None
         pricing = await get_wallet_pricing(db)
-        is_free = pricing.get("free_amass_sale", True) and is_free_amass_sale(prop)
+        from monetization import property_fee
+        fee, is_free = await property_fee(db, prop)
         flags = await unlock_flags(db, user_id, property_id)
         contact = await agent_contact_for(db, prop)
         balance = await _spendable(user_id) if user_id else 0
@@ -184,15 +196,15 @@ def register_property_access_routes(
             "property_id": property_id,
             "is_free": is_free,
             "currency": pricing.get("currency", "MASS"),
-            "access_period_days": int(pricing.get("access_period_days", 0) or 0),
+            "access_period_days": 0,
             "balance": balance,
             "access": {
                 "unlocked": is_free or flags["access"],
-                "fee": access_fee_for(pricing, prop),
+                "fee": fee,
             },
             "agent_contact": {
-                "unlocked": flags["agent"],
-                "fee": agent_contact_fee_for(pricing),
+                "unlocked": is_free or flags["access"],
+                "fee": 0,
                 "available": contact is not None,
             },
         }
@@ -201,74 +213,33 @@ def register_property_access_routes(
     @router.post("/properties/{property_id}/access")
     async def unlock_access(
         property_id: str,
+        request: Request,
         user: dict = Depends(get_current_user),
     ):
-        prop = await db.properties.find_one({"id": property_id}, {"_id": 0})
-        if not prop:
-            raise HTTPException(404, "Property not found")
-        user_id = user["id"]
-        pricing = await get_wallet_pricing(db)
-
-        # Already have it (or legacy full unlock)?
-        flags = await unlock_flags(db, user_id, property_id)
-        if flags["access"]:
-            return {"ok": True, "already_unlocked": True, "tier": ACCESS_TIER, "tokens_paid": 0}
-
-        is_free = pricing.get("free_amass_sale", True) and is_free_amass_sale(prop)
-        cost = 0 if is_free else access_fee_for(pricing, prop)
-
-        # Reserve the unlock row first (unique index blocks a double-tap race).
-        now = datetime.now(timezone.utc)
+        """Alias of POST /api/unlocks {featureKey:"property"} — single charge per property.
+        Fee, balance and entitlement are resolved server-side (monetization)."""
+        from monetization import UnlockService  # local import avoids a cycle
+        usvc = UnlockService(db)
+        key = request.headers.get("Idempotency-Key") or f"alias:{user['id']}:{property_id}:{uuid.uuid4().hex}"
         try:
-            await db.property_unlocks.insert_one(
-                {
-                    "user_id": user_id,
-                    "property_id": property_id,
-                    "tier": ACCESS_TIER,
-                    "status": "pending",
-                    "tokens_paid": 0,
-                    "expires_at": None,
-                    "created_at": now,
-                }
-            )
-        except DuplicateKeyError:
-            return {"ok": True, "already_unlocked": True, "tier": ACCESS_TIER, "tokens_paid": 0}
-
-        if cost > 0:
-            try:
-                w = await svc.debit(
-                    user_id, cost, "spend_unlock",
-                    f"Property access — {prop.get('title', '')}",
-                    meta={"property_id": property_id, "tier": ACCESS_TIER, "cost": cost},
-                )
-            except HTTPException as e:
-                # Roll back the reservation so the user can retry after topping up.
-                await db.property_unlocks.delete_one(
-                    {"user_id": user_id, "property_id": property_id, "tier": ACCESS_TIER, "status": "pending"}
-                )
-                if e.status_code == 402:
-                    bal = await _spendable(user_id)
-                    raise HTTPException(402, {
-                        "error": "insufficient_tokens",
-                        "required": cost,
-                        "balance": bal,
-                        "shortfall": cost - bal,
-                    })
-                raise
-            balance_after = w["balance"] + w["bonus_balance"]
-        else:
-            balance_after = await _spendable(user_id)
-
-        await db.property_unlocks.update_one(
-            {"user_id": user_id, "property_id": property_id, "tier": ACCESS_TIER},
-            {"$set": {"status": "paid", "tokens_paid": cost, "expires_at": _expiry(pricing), "paid_at": now}},
-        )
+            res = await usvc.unlock(user, "property", property_id, key)
+        except HTTPException as e:
+            if e.status_code == 402:
+                q = await usvc.quote(user, "property", property_id, log_attempt=False)
+                raise HTTPException(402, {
+                    "error": "insufficient_tokens",
+                    "required": q["fee"],
+                    "balance": q["balance"],
+                    "shortfall": max(0, q["fee"] - q["balance"]),
+                })
+            raise
         return {
             "ok": True,
+            "already_unlocked": res.get("charged", 0) == 0 and res.get("free_reason") == "already_unlocked",
             "tier": ACCESS_TIER,
-            "free": is_free,
-            "tokens_paid": cost,
-            "balance": balance_after,
+            "free": res.get("charged", 0) == 0,
+            "tokens_paid": res.get("charged", 0),
+            "balance": res.get("balance_after"),
         }
 
     # ─── Tier 2: pay to reveal agent PRIVATE contact ────────────
@@ -277,105 +248,27 @@ def register_property_access_routes(
         property_id: str,
         user: dict = Depends(get_current_user),
     ):
+        """Agent contact is INCLUDED in the single property unlock. This route stays
+        for older clients: it returns the contact when entitled and never charges."""
         prop = await db.properties.find_one({"id": property_id}, {"_id": 0})
         if not prop:
             raise HTTPException(404, "Property not found")
-        user_id = user["id"]
-        pricing = await get_wallet_pricing(db)
-        flags = await unlock_flags(db, user_id, property_id)
-        is_free = pricing.get("free_amass_sale", True) and is_free_amass_sale(prop)
-
-        # Must have basic access first.
-        if not (is_free or flags["access"]):
+        flags = await unlock_flags(db, user["id"], property_id)
+        is_owner = prop.get("agent_id") == user["id"]
+        if not (flags["access"] or is_owner):
+            from monetization import UnlockService
+            q = await UnlockService(db).quote(user, "property", property_id, log_attempt=False)
             raise HTTPException(403, {
                 "error": "access_required",
-                "message": "Unlock the property details first before revealing agent contact.",
+                "message": "Unlock this property to see the agent's contact.",
+                "required": q["fee"],
+                "balance": q["balance"],
             })
-
-        # Already revealed?
-        if flags["agent"]:
-            contact = await agent_contact_for(db, prop)
-            return {"ok": True, "already_unlocked": True, "tier": AGENT_TIER, "tokens_paid": 0, "contact": contact}
-
-        # Pre-check deliverability — never charge for contact we don't hold.
         contact = await agent_contact_for(db, prop)
-        if not contact:
-            raise HTTPException(422, {
-                "error": "contact_unavailable",
-                "message": "This listing has no direct contact on file. Use in-app chat to reach the agent.",
-            })
+        if contact is None:
+            raise HTTPException(422, {"error": "contact_unavailable", "message": "This listing has no agent contact on file. Use in-app chat instead."})
+        return {"ok": True, "already_unlocked": True, "tier": AGENT_TIER, "tokens_paid": 0, "contact": contact}
 
-        cost = agent_contact_fee_for(pricing)
-        now = datetime.now(timezone.utc)
-        try:
-            await db.property_unlocks.insert_one(
-                {
-                    "user_id": user_id,
-                    "property_id": property_id,
-                    "tier": AGENT_TIER,
-                    "status": "pending",
-                    "tokens_paid": 0,
-                    "expires_at": None,
-                    "created_at": now,
-                }
-            )
-        except DuplicateKeyError:
-            return {"ok": True, "already_unlocked": True, "tier": AGENT_TIER, "tokens_paid": 0, "contact": contact}
-
-        balance_after = await _spendable(user_id)
-        if cost > 0:
-            try:
-                w = await svc.debit(
-                    user_id, cost, "spend_unlock",
-                    f"Agent contact — {prop.get('title', '')}",
-                    meta={"property_id": property_id, "tier": AGENT_TIER, "cost": cost},
-                )
-            except HTTPException as e:
-                await db.property_unlocks.delete_one(
-                    {"user_id": user_id, "property_id": property_id, "tier": AGENT_TIER, "status": "pending"}
-                )
-                if e.status_code == 402:
-                    bal = await _spendable(user_id)
-                    raise HTTPException(402, {
-                        "error": "insufficient_tokens",
-                        "required": cost,
-                        "balance": bal,
-                        "shortfall": cost - bal,
-                    })
-                raise
-            balance_after = w["balance"] + w["bonus_balance"]
-
-        # Post-charge delivery check — if the contact vanished, reverse the charge.
-        contact = await agent_contact_for(db, prop)
-        if not contact:
-            if cost > 0:
-                await svc.credit(
-                    user_id, cost, "refund",
-                    f"Refund — agent contact unavailable ({prop.get('title', '')})",
-                    meta={"property_id": property_id, "tier": AGENT_TIER, "auto_reversal": True},
-                )
-            await db.property_unlocks.delete_one(
-                {"user_id": user_id, "property_id": property_id, "tier": AGENT_TIER}
-            )
-            raise HTTPException(422, {
-                "error": "contact_unavailable",
-                "refunded": cost,
-                "message": "Agent contact could not be delivered. Your tokens were refunded.",
-            })
-
-        await db.property_unlocks.update_one(
-            {"user_id": user_id, "property_id": property_id, "tier": AGENT_TIER},
-            {"$set": {"status": "paid", "tokens_paid": cost, "expires_at": _expiry(pricing), "paid_at": now}},
-        )
-        return {
-            "ok": True,
-            "tier": AGENT_TIER,
-            "tokens_paid": cost,
-            "balance": balance_after,
-            "contact": contact,
-        }
-
-    # ─── Admin: wallet ledger review ────────────────────────────
     @router.get("/admin/wallet/transactions")
     async def admin_wallet_transactions(
         user_id: Optional[str] = None,

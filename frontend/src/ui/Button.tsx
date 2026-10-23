@@ -9,7 +9,7 @@ import { AppText } from "./Text";
 
 import type { IconName } from "./icons";
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "brand" | "mass" | "fix" | "outline" | "inverse";
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 export type ButtonProps = Omit<PressableProps, "style" | "children"> & {
   label: string;
@@ -27,6 +27,7 @@ export type ButtonProps = Omit<PressableProps, "style" | "children"> & {
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const SIZES: Record<ButtonSize, { h: number; px: number; fs: number; icon: number; gap: number }> = {
+  xs: { h: 32, px: 12, fs: 12, icon: 14, gap: 4 },
   sm: { h: 36, px: 14, fs: 13, icon: 16, gap: 6 },
   md: { h: 48, px: 20, fs: 15, icon: 18, gap: 8 },
   lg: { h: 56, px: 24, fs: 16, icon: 20, gap: 10 },

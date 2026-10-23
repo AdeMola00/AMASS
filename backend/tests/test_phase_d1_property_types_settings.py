@@ -376,6 +376,7 @@ class TestPhase6Regression:
 
 # ── Idempotent seeding after backend restart ────────────────
 class TestIdempotentSeeding:
+    @pytest.mark.restarts_backend
     def test_restart_backend_no_duplicate_seed(self, s, admin_headers):
         # Count property_types + app_settings before
         before_types = s.get(f"{BASE_URL}/api/property-types",

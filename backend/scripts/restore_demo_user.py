@@ -108,7 +108,7 @@ async def main() -> None:
                 "has_mandate_authority": True,
                 "verification_level": 3,
                 "status": "approved",
-                "slug": "ada-demo",
+                "slug": "ada-demo-a8d30c",
                 "rating": 4.8,
                 "reviews_count": 12,
                 "updated_at": now,

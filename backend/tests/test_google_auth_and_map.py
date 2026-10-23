@@ -8,7 +8,11 @@ import os
 import pytest
 import requests
 
-BASE_URL = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/")
+BASE_URL = (
+    os.environ.get("EXPO_PUBLIC_BACKEND_URL")
+    or os.environ.get("EXPO_BACKEND_URL")
+    or "http://localhost:8001"
+).rstrip("/")
 
 
 @pytest.fixture(scope="module")

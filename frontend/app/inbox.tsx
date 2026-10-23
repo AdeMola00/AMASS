@@ -211,7 +211,7 @@ export default function InboxScreen() {
           renderItem={({ item }) => {
             const other = item.other_participants?.[0];
             const isUnread = (item.unread_count ?? 0) > 0;
-            const name = other?.full_name || other?.email || "Unknown";
+            const name = item.kind === "group" ? (item.title || "Group chat") : (other?.full_name || "Neighbour");
             return (
               <Card onPress={() => router.push(`/chat/${item.id}` as any)} testID={`conv-${item.id}`} elevation="xs" style={isUnread ? { borderColor: colors.borderStrong } : undefined}>
                 <View style={styles.row}>
@@ -228,6 +228,12 @@ export default function InboxScreen() {
                     {item.property && (
                       <AppText variant="micro" tone="tertiary" numberOfLines={1}>
                         {item.property.title} · {formatNaira(item.property.price)}
+                      </AppText>
+                    )}
+                    {item.item && (
+                      <AppText variant="micro" tone="tertiary" numberOfLines={1}>
+                        {item.item.name} · {formatNaira(item.item.price)}
+                        {item.item.status === "sold" ? " · Sold" : ""}
                       </AppText>
                     )}
                     <AppText variant="bodySm" tone={isUnread ? "primary" : "secondary"} weight={isUnread ? "semibold" : undefined} numberOfLines={1}>

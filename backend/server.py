@@ -1,5 +1,6 @@
 """AMASS - Africa's Property Operating System — Backend API"""
 import os
+import asyncio
 import uuid
 import logging
 from datetime import datetime, timedelta, timezone
@@ -82,7 +83,7 @@ logger = logging.getLogger("amass")
 # ─── Models ───────────────────────────────────────────────
 class UserOut(BaseModel):
     id: str
-    email: str
+    email: Optional[str] = None  # phone-only accounts have no email
     full_name: str
     phone: Optional[str] = None
     phone_verified: bool = False
@@ -151,7 +152,7 @@ class Property(BaseModel):
     token_cost: Optional[int] = None  # override; else computed from category
     # Sharing analytics (Phase 3)
     share_count: Optional[int] = 0
-    share_by_channel: Optional[dict] = None
+    share_by_channel: dict = Field(default_factory=dict)
     views_count: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -317,19 +318,42 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+# ─── Monetization core: shared unlock service, entitlements, zone pricing, FIX gate ───
+from monetization import (
+    register_monetization_routes,
+    ensure_monetization_indexes,
+    property_fee,
+    annotate_properties,
+    UnlockService as _UnlockService,
+)
+_mon_router, _mon_admin, _unlock_svc, require_fix_access = register_monetization_routes(db, get_current_user, require_admin)
+app.include_router(_mon_router)
+app.include_router(_mon_admin)
+
+
 def user_to_out(u: dict) -> UserOut:
     email = (u.get("email") or "").lower()
     is_admin = bool(u.get("is_admin")) or email in ADMIN_EMAILS
     return UserOut(
         id=u["id"],
-        email=u["email"],
-        full_name=u["full_name"],
+        email=u.get("email"),
+        full_name=u.get("full_name") or "AMASS neighbour",
         phone=u.get("phone"),
+        phone_verified=bool(u.get("phone_verified")),
         avatar_url=u.get("avatar_url"),
+        city=u.get("city"),
         is_agent=u.get("is_agent", False),
         is_admin=is_admin,
         created_at=u["created_at"],
     )
+
+
+def decode_user_id(token: str) -> Optional[str]:
+    """Best-effort user id from a bearer token (None when missing/invalid)."""
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG]).get("sub")
+    except jwt.PyJWTError:
+        return None
 
 
 # ─── Auth endpoints ───────────────────────────────────────
@@ -442,20 +466,6 @@ async def list_properties(
         except jwt.PyJWTError:
             user_id = None
 
-    unlocked_ids: set = set()
-    if user_id and docs:
-        now = datetime.now(timezone.utc)
-        cursor = db.property_unlocks.find(
-            {
-                "user_id": user_id,
-                "property_id": {"$in": [d["id"] for d in docs]},
-                "$or": [{"expires_at": None}, {"expires_at": {"$gt": now}}],
-            },
-            {"_id": 0, "property_id": 1},
-        )
-        async for r in cursor:
-            unlocked_ids.add(r["property_id"])
-
     # Enrich with recent view/favorite counts (last 7 days) + token economy fields.
     if docs:
         ids = [p["id"] for p in docs]
@@ -476,15 +486,8 @@ async def list_properties(
             c = counts.get(p["id"], {"views_recent": 0, "favorites_recent": 0})
             p["views_recent"] = c["views_recent"]
             p["favorites_recent"] = c["favorites_recent"]
-    # Always add token economy fields on each item
-    pricing = await get_wallet_pricing(db)
-    for p in docs:
-        p["is_amass_exclusive"] = bool(p.get("is_amass_exclusive", False))
-        p["is_free_amass_sale"] = pricing.get("free_amass_sale", True) and is_free_amass_sale(p)
-        p["token_cost"] = access_fee_for(pricing, p)
-        p["access_cost"] = p["token_cost"]
-        # Free-AMASS-sale is always "unlocked" for everyone.
-        p["unlocked"] = p["is_free_amass_sale"] or (p["id"] in unlocked_ids if user_id else False)
+    # Zone/category pricing + entitlements (same source of truth as /unlocks and /map/markers).
+    await annotate_properties(db, docs, user_id)
     return docs
 
 
@@ -504,15 +507,15 @@ async def get_property(
         except jwt.PyJWTError:
             user_id = None
 
-    pricing = await get_wallet_pricing(db)
     is_exclusive = bool(doc.get("is_amass_exclusive", False))
-    is_free = pricing.get("free_amass_sale", True) and is_free_amass_sale(doc)
-    access_cost = access_fee_for(pricing, doc)
-    agent_cost = agent_contact_fee_for(pricing)
+    # Monetization: one zone/category-priced unlock per property, agent contact included.
+    access_cost, is_free = await property_fee(db, doc)
+    agent_cost = 0
 
     flags = await unlock_flags(db, user_id, property_id)
-    access_unlocked = is_free or flags["access"]
-    agent_unlocked = flags["agent"]
+    is_owner = bool(user_id) and (doc.get("agent_id") == user_id)
+    access_unlocked = is_free or flags["access"] or is_owner
+    agent_unlocked = access_unlocked
 
     doc["is_amass_exclusive"] = is_exclusive
     doc["is_free_amass_sale"] = is_free
@@ -1101,7 +1104,8 @@ async def marketplace(
     sort: Optional[str] = None,  # newest | price_asc | price_desc | views | saves
     limit: int = 200,
 ):
-    query: dict = {}
+    # Public feeds only show live listings (paused/sold/removed are hidden).
+    query: dict = {"status": {"$nin": ["paused", "sold", "removed"]}}
     if category:
         query["category"] = category
     if subcategory:
@@ -1151,7 +1155,22 @@ async def marketplace(
         # default: boosted first, then newest
         cursor = cursor.sort([("is_boosted", -1), ("is_featured", -1), ("posted_at", -1)])
     docs = await cursor.limit(limit).to_list(limit)
-    return docs
+    return [_strip_fixa_contact(d) for d in docs]
+
+
+FIXA_SENSITIVE_FIELDS = ("seller_phone", "seller_whatsapp", "contact_prefs")
+
+
+def _strip_fixa_contact(doc: dict) -> dict:
+    """FIXA providers (category=services) never expose contact details in
+    list/preview payloads — only `/api/fixa/providers/{id}/details` (entitled) does."""
+    if doc.get("category") == "services":
+        d = dict(doc)
+        for f in FIXA_SENSITIVE_FIELDS:
+            d.pop(f, None)
+        d["contact_locked"] = True
+        return d
+    return doc
 
 
 @api.get("/marketplace/collections")
@@ -1176,15 +1195,35 @@ async def marketplace_vendor(vendor_id: str):
 
 
 @api.get("/marketplace/items/{item_id}")
-async def marketplace_item(item_id: str):
-    it = await db.marketplace.find_one({"id": item_id}, {"_id": 0})
+async def marketplace_item(
+    item_id: str,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+):
+    it = await db.marketplace.find_one({"id": item_id, "status": {"$ne": "removed"}}, {"_id": 0})
     if not it:
         raise HTTPException(404, "Item not found")
-    # Related items from the same subcategory
+    it.setdefault("status", "active")
+    # Related items from the same subcategory (live listings only)
     related = await db.marketplace.find(
-        {"subcategory": it["subcategory"], "id": {"$ne": it["id"]}},
+        {"subcategory": it["subcategory"], "id": {"$ne": it["id"]}, "status": {"$nin": ["paused", "sold", "removed"]}},
         {"_id": 0},
     ).limit(6).to_list(6)
+    if it.get("category") == "services":
+        # FIXA provider: contact only for entitled viewers / owner / admin.
+        entitled = False
+        if creds:
+            try:
+                payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+                uid = payload.get("sub")
+                u = await db.users.find_one({"id": uid}, {"_id": 0, "id": 1, "is_admin": 1, "email": 1})
+                if u:
+                    u["is_admin"] = bool(u.get("is_admin")) or (u.get("email") or "").lower() in ADMIN_EMAILS
+                    entitled = await _unlock_svc.has_access(u, "fixa_provider", item_id, await _unlock_svc.resolve_target("fixa_provider", item_id))
+            except Exception:
+                entitled = False
+        if not entitled:
+            it = _strip_fixa_contact(it)
+        related = [_strip_fixa_contact(r) for r in related]
     return {"item": it, "related": related}
 
 
@@ -1243,12 +1282,17 @@ class FixaBookingIn(BaseModel):
 
 
 @api.post("/marketplace/fixa/book")
-async def fixa_book(data: FixaBookingIn, user: dict = Depends(get_current_user)):
+async def fixa_book(data: FixaBookingIn, user: dict = Depends(require_fix_access)):
     it = await db.marketplace.find_one({"id": data.item_id}, {"_id": 0})
     if not it:
         raise HTTPException(404, "Provider not found")
     if it.get("category") != "services":
         raise HTTPException(400, "This item is not a FIXA service listing")
+    # Booking is a protected FIXA action — requires the provider entitlement (or owner/admin).
+    _t = await _unlock_svc.resolve_target("fixa_provider", data.item_id)
+    if not await _unlock_svc.has_access(user, "fixa_provider", data.item_id, _t):
+        _q = await _unlock_svc.quote(user, "fixa_provider", data.item_id, log_attempt=False)
+        raise HTTPException(403, {"code": "UNLOCK_REQUIRED", "fee": _q["fee"], "fee_ngn": _q["fee_ngn"], "currency": "FIX", "balance": _q["balance"]})
     doc = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
@@ -1820,7 +1864,18 @@ SEED_NEIGHBORHOODS = [
 
 
 @api.post("/seed")
-async def seed_data(_admin: dict = Depends(require_admin)):
+async def seed_data(dry_run: bool = False, _admin: dict = Depends(require_admin)):
+    """Dev reset: wipes + reseeds listings, marketplace, vendors, collections,
+    neighbourhoods. `?dry_run=true` only reports what would be seeded."""
+    if dry_run:
+        return {
+            "dry_run": True,
+            "properties": len(SEED_PROPERTIES),
+            "marketplace": len(SEED_MARKETPLACE),
+            "vendors": len(SEED_VENDORS),
+            "collections": len(SEED_COLLECTIONS),
+            "neighborhoods": len(SEED_NEIGHBORHOODS),
+        }
     return await _do_seed()
 
 
@@ -1912,7 +1967,19 @@ def _chat_factory(system: str) -> _ChatWrapper:
 app.include_router(register_earn_routes(db))
 app.include_router(register_agent_tool_routes(db, _chat_factory))
 app.include_router(register_ads_routes(db))
-app.include_router(register_marketplace_v2_routes(db, get_current_user))
+app.include_router(register_marketplace_v2_routes(db, get_current_user, require_admin))
+
+# ─── Neighbours (social) layer: phone OTP sign-in · funnel analytics · friends/collections · estates ───
+from phone_auth import register_phone_auth_routes, ensure_phone_auth_indexes
+from analytics import register_analytics_routes, ensure_analytics_indexes
+from social import register_social_routes, ensure_social_indexes
+from community import register_community_routes, ensure_community_indexes, event_reminder_sweep
+from social_seed import seed_neighbours_pilot
+
+app.include_router(register_phone_auth_routes(db, get_current_user, bearer, decode_user_id, create_token, user_to_out, hash_password))
+app.include_router(register_analytics_routes(db, bearer, decode_user_id, require_admin))
+app.include_router(register_social_routes(db, get_current_user, require_admin, annotate_properties))
+app.include_router(register_community_routes(db, get_current_user, require_admin, bearer, decode_user_id))
 from intelligence import register_intelligence_routes  # noqa: E402
 app.include_router(register_intelligence_routes(db))
 from apple_auth import register_apple_auth_route  # noqa: E402
@@ -2094,7 +2161,19 @@ async def _download_file(file_path: str, user: dict = Depends(get_current_user))
                 {"_id": 0, "id": 1},
             )
             if not ref_task:
-                raise HTTPException(403, "Forbidden")
+                # Neighbours: estate managers may open a pending resident's proof;
+                # approved estate members may see service-request photos.
+                url = f"/api/files/{file_path}"
+                allowed = False
+                proof = await db.estate_members.find_one({"proof_url": url}, {"_id": 0, "estate_id": 1})
+                if proof:
+                    allowed = await db.estate_members.find_one({"estate_id": proof["estate_id"], "user_id": user["id"], "role": "manager", "status": "approved"}, {"_id": 0, "id": 1}) is not None
+                if not allowed:
+                    sr = await db.service_requests.find_one({"photos": url}, {"_id": 0, "estate_id": 1})
+                    if sr:
+                        allowed = await db.estate_members.find_one({"estate_id": sr["estate_id"], "user_id": user["id"], "status": "approved"}, {"_id": 0, "id": 1}) is not None
+                if not allowed:
+                    raise HTTPException(403, "Forbidden")
     try:
         data, ct = await _os_get_object(file_path)
     except HTTPException:
@@ -2112,8 +2191,31 @@ app.add_middleware(
 )
 
 
+async def _monetization_startup():
+    """Indexes → default prices → legacy unlock migration → reconciliation loop."""
+    try:
+        await ensure_monetization_indexes(db)
+        seeded = await _unlock_svc.pricing.seed_defaults()
+        migrated = await _unlock_svc.migrate_legacy_unlocks()
+        rec = await _unlock_svc.reconcile()
+        logging.getLogger("amass.monetization").info("monetization ready seeded=%s migrated=%s reconcile=%s", seeded, migrated, rec)
+    except Exception as e:  # never block boot
+        logging.getLogger("amass.monetization").exception("monetization startup failed: %s", e)
+
+    async def _loop():
+        while True:
+            await asyncio.sleep(600)
+            try:
+                await _unlock_svc.reconcile()
+            except Exception as e:
+                logging.getLogger("amass.monetization").warning("reconcile failed: %s", e)
+
+    asyncio.create_task(_loop())
+
+
 @app.on_event("startup")
 async def on_startup():
+    await _monetization_startup()
     # ─── DB Indexes (idempotent) ─────────────────────────────
     try:
         await db.properties.create_index("id", unique=True)
@@ -2126,7 +2228,26 @@ async def on_startup():
         await db.token_transactions.create_index("meta.idempotency_key", sparse=True)
         await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
         await db.notifications.create_index("id", unique=True)
-        await db.users.create_index("email", unique=True)
+        await ensure_phone_auth_indexes(db)  # partial-unique email (phone-only accounts) + OTP TTLs
+        await ensure_analytics_indexes(db)
+        await ensure_social_indexes(db)
+        await ensure_community_indexes(db)
+        try:
+            _demo = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0, "id": 1})
+            _seeded = await seed_neighbours_pilot(db, (_demo or {}).get("id"))
+            logger.info("neighbours pilot seed: %s", _seeded)
+        except Exception as _e:  # never block boot
+            logger.warning("neighbours seed failed: %s", _e)
+
+        async def _reminder_loop():
+            while True:
+                await asyncio.sleep(600)
+                try:
+                    await event_reminder_sweep(db)
+                except Exception as _e:
+                    logger.warning("event reminder sweep failed: %s", _e)
+
+        asyncio.create_task(_reminder_loop())
         await db.users.create_index("referral_code", sparse=True)
         await db.favorites.create_index([("user_id", 1), ("property_id", 1)], unique=True)
         await db.favorites.create_index("property_id")

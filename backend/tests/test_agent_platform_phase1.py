@@ -225,22 +225,25 @@ class TestSubscribeFlow:
 
 # ─── 3. Quota enforcement on Starter ─────────────────────────────
 class TestQuotaEnforcement:
-    def test_quota_on_starter(self, session, demo_headers):
-        r = session.get(
-            f"{BASE_URL}/api/agent-platform/quota", headers=demo_headers
+    """Uses a throwaway account so the assertions don't depend on how many
+    listings the shared demo user has accumulated across suites."""
+
+    @pytest.fixture(scope="class")
+    def starter_headers(self, session):
+        email = f"quota+{int(time.time())}_{uuid.uuid4().hex[:6]}@example.com"
+        r = session.post(
+            f"{BASE_URL}/api/auth/register",
+            json={"email": email, "password": "test1234", "full_name": "Quota Tester"},
         )
         assert r.status_code == 200, r.text
-        q = r.json()
-        assert q["plan_id"] == "starter"
-        assert q["listing_limit"] == 5
-        # active listings should be > 5 because we're on starter now and had 9+ listings
-        STATE["active_on_starter"] = q["active_listings"]
-        assert q["at_limit"] is True, f"expected at_limit true (active={q['active_listings']})"
+        token = r.json().get("access_token") or r.json().get("token")
+        return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-    def test_create_property_402_on_starter(self, session, demo_headers):
-        prop = {
-            "title": "TEST_should_fail_402",
-            "description": "should be rejected",
+    @staticmethod
+    def _prop(title: str) -> dict:
+        return {
+            "title": title,
+            "description": "quota filler",
             "price": 1_000_000,
             "listing_type": "buy",
             "property_type": "apartment",
@@ -258,8 +261,30 @@ class TestQuotaEnforcement:
             "is_owner": False,
             "has_mandate": False,
         }
+
+    def test_quota_on_starter(self, session, starter_headers):
+        r = session.get(f"{BASE_URL}/api/agent-platform/quota", headers=starter_headers)
+        assert r.status_code == 200, r.text
+        q = r.json()
+        assert q["plan_id"] == "starter"
+        assert q["listing_limit"] == 5
+        assert q["at_limit"] is False
+        for i in range(q["remaining"]):
+            rc = session.post(
+                f"{BASE_URL}/api/properties",
+                json=self._prop(f"TEST_quota_fill_{i}"),
+                headers=starter_headers,
+            )
+            assert rc.status_code == 200, rc.text
+        q2 = session.get(f"{BASE_URL}/api/agent-platform/quota", headers=starter_headers).json()
+        assert q2["active_listings"] == 5
+        assert q2["at_limit"] is True
+
+    def test_create_property_402_on_starter(self, session, starter_headers):
         r = session.post(
-            f"{BASE_URL}/api/properties", json=prop, headers=demo_headers
+            f"{BASE_URL}/api/properties",
+            json=self._prop("TEST_should_fail_402"),
+            headers=starter_headers,
         )
         assert r.status_code == 402, f"expected 402, got {r.status_code}: {r.text}"
         detail = r.json().get("detail") or {}
@@ -444,9 +469,11 @@ class TestRegression:
         assert r.status_code == 200
 
     def test_payments_initialize(self, session, demo_headers):
+        # "explorer" (₦1,000) is the cheapest bundle at/above the admin-configured
+        # top-up minimum (`/api/monetization/config.topup_min_ngn`).
         r = session.post(
             f"{BASE_URL}/api/payments/initialize",
-            json={"provider": "paystack", "currency": "MASS", "bundle_id": "starter"},
+            json={"provider": "paystack", "currency": "MASS", "bundle_id": "explorer"},
             headers=demo_headers,
         )
         # Mocked in .env — should return 200 with a checkout_url or similar

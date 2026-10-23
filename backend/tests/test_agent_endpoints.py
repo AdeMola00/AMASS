@@ -63,11 +63,10 @@ class TestCreateProperty:
         r = api_client.post(f"{base_url}/api/properties", json=bad, headers=auth_headers)
         assert r.status_code == 422, r.text
 
-    def test_create_property_success_and_persistence(self, base_url, api_client, auth_headers):
-        # Get current user
-        me_r = api_client.get(f"{base_url}/api/auth/me", headers=auth_headers)
-        assert me_r.status_code == 200
-        me = me_r.json()
+    def test_create_property_success_and_persistence(self, base_url, api_client):
+        # Fresh account → guaranteed Starter quota headroom (the shared demo user
+        # may already sit at its plan limit after other suites run).
+        auth_headers, me = _register_fresh_user(base_url, api_client)
 
         payload = {**VALID_PAYLOAD, "title": f"TEST_prop_{uuid.uuid4().hex[:6]}"}
         r = api_client.post(f"{base_url}/api/properties", json=payload, headers=auth_headers)
@@ -86,14 +85,19 @@ class TestCreateProperty:
         assert prop["agent_id"] == me["id"]
         assert prop["agent_name"] == me["full_name"]
 
-        # Persistence — public GET works
+        # Persistence — owner sees the full record (agent identity included)
         pid = prop["id"]
-        get_r = api_client.get(f"{base_url}/api/properties/{pid}")
+        get_r = api_client.get(f"{base_url}/api/properties/{pid}", headers=auth_headers)
         assert get_r.status_code == 200
         got = get_r.json()
         assert "_id" not in got
         assert got["id"] == pid
         assert got["agent_id"] == me["id"]
+
+        # Anonymous preview hides agent identity until unlocked (monetization rule)
+        pub_r = api_client.get(f"{base_url}/api/properties/{pid}")
+        assert pub_r.status_code == 200
+        assert pub_r.json()["agent_id"] is None
 
         # Visible from public list
         list_r = api_client.get(f"{base_url}/api/properties", params={"q": payload["title"]})
@@ -254,10 +258,8 @@ class TestAgentLeads:
 # ─── Regression: seed endpoint still 200 ────────────────────
 class TestSeedRegression:
     def test_seed_endpoint_returns_200(self, base_url, api_client):
-        r = api_client.post(f"{base_url}/api/seed")
-        assert r.status_code == 200, r.text
-        body = r.json()
-        # Structural sanity
-        assert "properties" in body and body["properties"] >= 9
-        assert "marketplace" in body and body["marketplace"] >= 1
-        assert "neighborhoods" in body and body["neighborhoods"] >= 5
+        """Seed is admin-only now (security hardening). We only assert the gate here —
+        running the real seed wipes every listing in the shared database."""
+        assert api_client.post(f"{base_url}/api/seed").status_code == 401
+        headers, _ = _register_fresh_user(base_url, api_client)
+        assert api_client.post(f"{base_url}/api/seed", headers=headers).status_code == 403

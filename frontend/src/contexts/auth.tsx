@@ -10,6 +10,8 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, full_name: string, phone?: string) => Promise<void>;
   signInWithApple: (payload: { identity_token: string; full_name?: string; email?: string }) => Promise<void>;
+  /** Phone OTP (and Google) flows already hold a token — adopt the session. */
+  adoptSession: (access_token: string, user: UserProfile) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -64,6 +66,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const adoptSession = useCallback(async (access_token: string, u: UserProfile) => {
+    await storage.secureSet(AUTH_STORAGE_KEY, access_token);
+    setUser(u);
+  }, []);
+
   const signOut = useCallback(async () => {
     await storage.secureRemove(AUTH_STORAGE_KEY);
     // resetPushRegistration();
@@ -82,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signInWithApple, signOut, refresh }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signInWithApple, adoptSession, signOut, refresh }}>
       {children}
     </AuthContext.Provider>
   );

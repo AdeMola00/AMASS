@@ -95,11 +95,15 @@ class TestEarnTasks:
 class TestPhoneVerify:
     def test_start_and_confirm_awards_5_and_sets_flag(self):
         u = _new_user(email_prefix="phone")
+        # Phone numbers are unique per AMASS account (phone OTP sign-in) → never
+        # reuse a fixed number across runs.
+        phone_a = "+23480" + uuid.uuid4().hex[:8].translate(str.maketrans("abcdef", "012345"))
+        phone_b = "+23481" + uuid.uuid4().hex[:8].translate(str.maketrans("abcdef", "012345"))
         # Start
         r = requests.post(
             f"{BASE_URL}/api/earn/phone/start",
             headers=_h(u["token"]),
-            json={"phone": "+2348012345678"},
+            json={"phone": phone_a},
             timeout=20,
         )
         assert r.status_code == 200, r.text
@@ -111,7 +115,7 @@ class TestPhoneVerify:
         r = requests.post(
             f"{BASE_URL}/api/earn/phone/confirm",
             headers=_h(u["token"]),
-            json={"phone": "+2348012345678", "code": "123456"},
+            json={"phone": phone_a, "code": "123456"},
             timeout=20,
         )
         assert r.status_code == 200, r.text
@@ -127,14 +131,14 @@ class TestPhoneVerify:
         r2 = requests.post(
             f"{BASE_URL}/api/earn/phone/start",
             headers=_h(u["token"]),
-            json={"phone": "+2348099999999"},
+            json={"phone": phone_b},
             timeout=20,
         )
         assert r2.status_code == 200
         r3 = requests.post(
             f"{BASE_URL}/api/earn/phone/confirm",
             headers=_h(u["token"]),
-            json={"phone": "+2348099999999", "code": "123456"},
+            json={"phone": phone_b, "code": "123456"},
             timeout=20,
         )
         assert r3.status_code == 200

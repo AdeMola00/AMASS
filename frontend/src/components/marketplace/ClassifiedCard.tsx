@@ -51,7 +51,7 @@ export function ClassifiedCard({
   return (
     <Pressable onPress={onPress} style={[styles.gridCard, { width: cardWidth }]} testID={`market-item-${item.id}`}>
       <View style={styles.gridImageWrap}>
-        <Image source={{ uri: item.image }} style={styles.gridImage} contentFit="cover" transition={180} />
+        <Image source={{ uri: item.image }} style={[styles.gridImage, item.status === "sold" && { opacity: 0.6 }]} contentFit="cover" transition={180} />
         <LinearGradient
           colors={["transparent", "rgba(10,10,10,0.55)"]}
           style={styles.scrim}
@@ -61,13 +61,14 @@ export function ClassifiedCard({
           <Text style={styles.pricePillText}>{formatNaira(item.price)}</Text>
         </View>
         <View style={styles.badgeStack} pointerEvents="none">
-          {item.is_boosted && <Badge label="Boosted" color="#F5B301" textColor="#0A0A0A" />}
-          {!item.is_boosted && item.is_featured && <Badge label="Featured" color="#7C3AED" />}
-          {!item.is_boosted && !item.is_featured && item.on_sale && item.original_price && item.original_price > item.price && (
+          {item.status === "sold" && <Badge label="SOLD" color={colors.ink} />}
+          {item.status !== "sold" && item.is_boosted && <Badge label="Boosted" color="#F5B301" textColor="#0A0A0A" />}
+          {item.status !== "sold" && !item.is_boosted && item.is_featured && <Badge label="Featured" color="#7C3AED" />}
+          {item.status !== "sold" && !item.is_boosted && !item.is_featured && item.on_sale && item.original_price && item.original_price > item.price && (
             <Badge label={`-${Math.round(((item.original_price - item.price) / item.original_price) * 100)}%`} color={colors.red} />
           )}
         </View>
-        {onFavorite && (
+        {onFavorite && item.status !== "sold" && (
           <Pressable
             onPress={onFavorite}
             style={styles.heartBtn}
@@ -139,6 +140,7 @@ function ListRow({
           <Text style={styles.metaText}>{timeAgo(item.posted_at)}</Text>
         </View>
         <View style={styles.chipRow}>
+          {item.status === "sold" && <MiniChip label="Sold" tone="ink" />}
           <MiniChip label={formatCondition(item.condition)} />
           {item.seller_verified && <MiniChip label="Verified" tone="success" />}
           {item.seller_type === "dealer" && <MiniChip label="Dealer" tone="ink" />}

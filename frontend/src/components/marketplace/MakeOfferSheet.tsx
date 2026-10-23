@@ -12,7 +12,7 @@ export type MakeOfferSheetRef = {
   close: () => void;
 };
 
-export const MakeOfferSheet = forwardRef<MakeOfferSheetRef, object>((_, ref) => {
+export const MakeOfferSheet = forwardRef<MakeOfferSheetRef, { onSent?: () => void }>(({ onSent }, ref) => {
   const colors = useLegacyColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -54,7 +54,10 @@ export const MakeOfferSheet = forwardRef<MakeOfferSheetRef, object>((_, ref) => 
       await api.marketplaceMakeOffer(item.id, amount, msg.trim() || undefined);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setSent(true);
-      setTimeout(() => sheetRef.current?.dismiss(), 1200);
+      setTimeout(() => {
+        sheetRef.current?.dismiss();
+        onSent?.();
+      }, 900);
     } catch (e: any) {
       Alert.alert("Couldn't send offer", e?.message || "Please try again.");
     } finally {

@@ -7,6 +7,7 @@ import { useTheme } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
 import { AppText, EmptyState, Screen, ScreenHeader, SkeletonCard, useToast } from "@/src/ui";
 import { ListingCard } from "@/src/components/ListingCard";
+import { AddToCollectionSheet } from "@/src/components/neighbours/AddToCollectionSheet";
 
 export default function SavedProperties() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function SavedProperties() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
+  const [listFor, setListFor] = useState<Property | null>(null);
 
   const twoCol = width >= 700;
   const cardW = twoCol ? (Math.min(width, 1100) - space[4] * 2 - space[3]) / 2 : width - space[4] * 2;
@@ -92,7 +94,7 @@ export default function SavedProperties() {
           initialNumToRender={6}
           windowSize={5}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
-          renderItem={({ item }) => <ListingCard property={item} width={cardW} saved onToggleSave={onToggle} testID={`saved-card-${item.id}`} />}
+          renderItem={({ item }) => <ListingCard property={item} width={cardW} saved onToggleSave={onToggle} onAddToList={setListFor} testID={`saved-card-${item.id}`} />}
           ListFooterComponent={
             <AppText variant="caption" tone="muted" align="center" style={{ marginTop: space[3] }}>
               Saved properties sync across your devices.
@@ -100,6 +102,7 @@ export default function SavedProperties() {
           }
         />
       )}
+      {listFor ? <AddToCollectionSheet visible onClose={() => setListFor(null)} targetId={listFor.id} kind="property" /> : null}
     </Screen>
   );
 }

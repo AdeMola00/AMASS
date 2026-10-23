@@ -255,6 +255,7 @@ class TestAccountDeletion:
 
 # ─── 7. Slug backfill idempotency across restart ────────
 class TestSlugBackfillIdempotency:
+    @pytest.mark.restarts_backend
     def test_restart_and_verify(self, session, demo_headers, demo_me):
         # Snapshot slug before restart
         r0 = session.get(f"{BASE_URL}/api/agent-platform/public/{DEMO_SLUG}")

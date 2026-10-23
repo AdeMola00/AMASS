@@ -76,7 +76,7 @@ def _now() -> datetime:
 async def _hydrate_participants(db, ids: List[str]) -> List[Dict[str, Any]]:
     rows = await db.users.find(
         {"id": {"$in": ids}},
-        {"_id": 0, "id": 1, "email": 1, "full_name": 1, "profile_photo": 1,
+        {"_id": 0, "id": 1, "full_name": 1, "profile_photo": 1, "avatar_url": 1,
          "is_agent": 1, "verified": 1},
     ).to_list(len(ids))
     return rows
@@ -91,6 +91,22 @@ async def _hydrate_property(db, property_id: Optional[str]) -> Optional[Dict[str
          "verified": 1, "bedrooms": 1, "bathrooms": 1, "size_sqm": 1},
     )
     return p
+
+
+async def _hydrate_item(db, item_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Marketplace item preview for item-linked (buyer ↔ seller) conversations."""
+    if not item_id: return None
+    it = await db.marketplace.find_one(
+        {"id": item_id},
+        {"_id": 0, "id": 1, "name": 1, "price": 1, "image": 1, "city": 1,
+         "status": 1, "seller_id": 1, "seller_name": 1, "condition": 1},
+    )
+    if it: it.setdefault("status", "active")
+    return it
+
+
+async def _is_blocked(db, a: str, b: str) -> bool:
+    return await db.chat_blocks.find_one({"$or": [{"blocker_id": a, "blocked_id": b}, {"blocker_id": b, "blocked_id": a}]}, {"_id": 0}) is not None
 
 
 async def _assert_participant(db, conversation_id: str, user_id: str, is_admin: bool = False):
@@ -142,7 +158,7 @@ async def _wait_for_new_messages(db, conversation_id: str, after: datetime,
 
 
 async def _notify(db, user_id: str, conversation_id: str, sender_name: str,
-                  preview: str, property_id: Optional[str]):
+                  preview: str, property_id: Optional[str], item_id: Optional[str] = None):
     await db.notifications.insert_one({
         "id": str(uuid.uuid4()),
         "user_id": user_id,
@@ -152,6 +168,7 @@ async def _notify(db, user_id: str, conversation_id: str, sender_name: str,
         "read": False,
         "meta": {"conversation_id": conversation_id,
                  "property_id": property_id,
+                 "item_id": item_id,
                  "sender_name": sender_name},
         "created_at": _now().isoformat(),
     })
@@ -217,6 +234,80 @@ def register_chat_routes(db, get_current_user, require_admin):
         conv.pop("_id", None)
         return conv
 
+    # ── Start from marketplace item (buyer ↔ seller) ─────────
+    @router.post("/conversations/from-item/{item_id}")
+    async def start_from_item(item_id: str, user: dict = Depends(get_current_user)):
+        item = await db.marketplace.find_one(
+            {"id": item_id, "status": {"$ne": "removed"}},
+            {"_id": 0, "id": 1, "seller_id": 1, "name": 1, "category": 1},
+        )
+        if not item:
+            raise HTTPException(404, "Listing not found")
+        if item.get("category") == "services":
+            raise HTTPException(400, "FIXA providers are contacted after unlocking with FIX")
+        seller_id = item.get("seller_id")
+        if not seller_id:
+            raise HTTPException(400, "This listing has no seller to contact")
+        if seller_id == user["id"]:
+            raise HTTPException(400, "This is your own listing")
+        existing = await db.conversations.find_one(
+            {"item_id": item_id,
+             "participant_ids": {"$all": [user["id"], seller_id], "$size": 2}},
+            {"_id": 0},
+        )
+        if existing:
+            return existing
+        now = _now()
+        conv = {
+            "id": str(uuid.uuid4()),
+            "kind": "marketplace",
+            "property_id": None,
+            "listing_id": None,
+            "item_id": item_id,
+            "participant_ids": sorted([user["id"], seller_id]),
+            "created_by": user["id"],
+            "last_message_preview": None,
+            "last_message_at": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.conversations.insert_one(conv)
+        conv.pop("_id", None)
+        return conv
+
+    # ── Direct chat between accepted connections (Neighbours) ──
+    @router.post("/conversations/direct/{other_id}")
+    async def start_direct(other_id: str, user: dict = Depends(get_current_user)):
+        if other_id == user["id"]:
+            raise HTTPException(400, "That's you")
+        if await _is_blocked(db, user["id"], other_id):
+            raise HTTPException(403, "You can't message this person")
+        connected = await db.connections.find_one({"pair": sorted([user["id"], other_id]), "status": "accepted"}, {"_id": 0, "id": 1})
+        if not connected and not user.get("is_admin"):
+            raise HTTPException(403, "Connect with this person first to message them")
+        existing = await db.conversations.find_one(
+            {"kind": "direct", "participant_ids": {"$all": [user["id"], other_id], "$size": 2}},
+            {"_id": 0},
+        )
+        if existing:
+            return existing
+        now = _now()
+        conv = {
+            "id": str(uuid.uuid4()),
+            "kind": "direct",
+            "property_id": None,
+            "listing_id": None,
+            "participant_ids": sorted([user["id"], other_id]),
+            "created_by": user["id"],
+            "last_message_preview": None,
+            "last_message_at": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.conversations.insert_one(conv)
+        conv.pop("_id", None)
+        return conv
+
     # ── Support conversation (buyer ↔ admin) ─────────────────
     @router.post("/conversations/support")
     async def start_support(user: dict = Depends(get_current_user)):
@@ -267,6 +358,7 @@ def register_chat_routes(db, get_current_user, require_admin):
             other_ids = [uid for uid in c.get("participant_ids", []) if uid != user["id"]]
             c["other_participants"] = [by_id.get(oid) for oid in other_ids if by_id.get(oid)]
             c["property"] = await _hydrate_property(db, c.get("property_id"))
+            c["item"] = await _hydrate_item(db, c.get("item_id"))
             c["unread_count"] = await _unread_count_for(db, c["id"], user["id"])
             # Phase-2 filters
             if verified_only:
@@ -277,8 +369,9 @@ def register_chat_routes(db, get_current_user, require_admin):
                 hay = " ".join(filter(None, [
                     (c.get("last_message_preview") or ""),
                     *(p.get("full_name") or "" for p in c["other_participants"]),
-                    *(p.get("email") or "" for p in c["other_participants"]),
+                    (c.get("title") or ""),
                     (c.get("property") or {}).get("title", ""),
+                    (c.get("item") or {}).get("name", ""),
                 ])).lower()
                 if needle not in hay:
                     continue
@@ -291,6 +384,7 @@ def register_chat_routes(db, get_current_user, require_admin):
         conv = await _assert_participant(db, conv_id, user["id"])
         conv["participants"] = await _hydrate_participants(db, conv["participant_ids"])
         conv["property"] = await _hydrate_property(db, conv.get("property_id"))
+        conv["item"] = await _hydrate_item(db, conv.get("item_id"))
         conv["unread_count"] = await _unread_count_for(db, conv_id, user["id"])
         return conv
 
@@ -361,7 +455,7 @@ def register_chat_routes(db, get_current_user, require_admin):
             "id": str(uuid.uuid4()),
             "conversation_id": conv_id,
             "sender_id": user["id"],
-            "sender_name": user.get("full_name") or user.get("email") or "Someone",
+            "sender_name": user.get("full_name") or "A neighbour",
             "text": text_val,
             "kind": data.kind,
             "attachments": data.attachments or [],
@@ -382,7 +476,7 @@ def register_chat_routes(db, get_current_user, require_admin):
         # Notifications to other participants
         for oid in other_ids:
             await _notify(db, oid, conv_id, msg["sender_name"], preview,
-                          conv.get("property_id"))
+                          conv.get("property_id"), conv.get("item_id"))
         msg.pop("_id", None)
         return msg
 
@@ -661,6 +755,15 @@ async def create_chat_indexes(db):
     await db.conversations.create_index("id", unique=True)
     await db.conversations.create_index([("participant_ids", 1), ("last_message_at", -1)])
     await db.conversations.create_index([("property_id", 1), ("kind", 1)])
+    await db.conversations.create_index([("item_id", 1), ("kind", 1)])
+    # Marketplace offers / reports (owned by marketplace_v2 but indexed here with the chat set)
+    await db.marketplace_offers.create_index("id", unique=True)
+    await db.marketplace_offers.create_index([("seller_id", 1), ("status", 1), ("created_at", -1)])
+    await db.marketplace_offers.create_index([("buyer_id", 1), ("created_at", -1)])
+    await db.marketplace_reports.create_index("id", unique=True)
+    await db.marketplace_reports.create_index([("status", 1), ("created_at", -1)])
+    await db.marketplace_reports.create_index([("item_id", 1), ("reporter_id", 1), ("status", 1)])
+    await db.marketplace.create_index([("status", 1), ("posted_at", -1)])
     await db.chat_messages.create_index("id", unique=True)
     await db.chat_messages.create_index([("conversation_id", 1), ("created_at", -1)])
     # Migration — drop any pre-existing idempotency index (from the previous

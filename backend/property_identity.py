@@ -537,7 +537,7 @@ def register_property_identity_routes(db, require_auth, require_admin):
     async def my_properties(user: dict = Depends(require_auth)):
         listings = await db.property_listings.find(
             {"agent_id": user["id"]}, {"_id": 0}
-        ).to_list(500)
+        ).sort("created_at", -1).to_list(500)
         prop_ids = list({l["property_id"] for l in listings})
         props = await db.properties_geo.find(
             {"property_uuid": {"$in": prop_ids}}, {"_id": 0}

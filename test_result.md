@@ -603,3 +603,113 @@ agent_communication:
         agent onboarding, ProviderCard no-phone/no-WhatsApp, AdModal feedback (toast + closes).
       - a11y roles/labels/states on chip/radio/checkbox/photo pressables in submit-property,
         become-agent, marketplace/sell, agent/onboarding (testIDs unchanged).
+  - agent: "main"
+    message: |
+      PHASE 3.6 — Marketplace sell-side: listing lifecycle, offers, reports, item chat (Jun 2026)
+      Backend (marketplace_v2.py + chat.py + server.py; pytest tests/test_marketplace_offers_reports.py 9/9):
+      - Listing status: active|paused|sold|removed. GET /api/marketplace feed/search/categories only
+        show active; GET /api/marketplace/items/{id} opens sold (status field) but 404s removed;
+        sellers/{id} returns active+sold; my-listings returns active/paused/sold + open_offers count.
+      - PATCH /api/marketplace/items/{id} (owner: name/description/price/negotiable/status) —
+        status=sold auto-declines open offers + notifies buyers; DELETE soft-removes.
+      - Offers: POST /items/{id}/offer (blocks own listing 400, sold/paused 409, supersedes buyer's
+        previous open offer, notifies seller MARKET_OFFER), GET /offers/received, GET /offers/sent
+        (both hydrate `item`), POST /offers/{id}/respond {action accept|decline|counter,
+        counter_amount} — seller on sent/countered; buyer may accept/decline a counter; accept
+        creates a buyer↔seller chat (kind=marketplace, item_id) and returns conversation_id;
+        POST /offers/{id}/withdraw (buyer).
+      - Reports: POST /items/{id}/report {reason, details} (dedupe per reporter, 3 open → auto-pause),
+        admin GET /api/marketplace/admin/reports?status=OPEN|RESOLVED|ALL,
+        POST /admin/reports/{id}/resolve {action dismiss|pause_listing|remove_listing|restore_listing}.
+      - Chat: POST /api/chat/conversations/from-item/{item_id} (idempotent, 400 own listing/FIXA);
+        conversations now carry `item` preview; NEW_MESSAGE meta.item_id.
+      - FIXED pre-existing bug: nested Pydantic models + `from __future__ import annotations` made
+        POST /api/marketplace/items return 422 ("query.data missing") — models are module-level now,
+        so the Sell flow (/marketplace/sell) actually posts.
+      Frontend:
+      - NEW /marketplace/my-listings (testIDs my-listings-screen, my-listings-tab-listings|received|sent,
+        my-listings-sell, my-listing-{id}, manage-{id} → manage-sheet with manage-view/edit/sold/relist/
+        pause/resume/delete, edit-sheet (edit-name/price/description/negotiable/save), delete-sheet
+        (delete-confirm), offer-{id} cards with offer-accept/decline/counter/withdraw/chat-{id},
+        counter-sheet (counter-amount/counter-submit)). Deep-link ?tab=received|sent.
+      - /marketplace/[id]: Chat button now real (action-chat → /chat/{id}); report-listing opens
+        report-sheet (report-reason-{scam|prohibited|wrong_category|duplicate|offensive|other},
+        report-details, report-submit); owner sees own-listing-note + manage-listing (no contact bar,
+        no save/report); sold item shows item-sold-banner + sold-action-bar (browse-similar) instead of
+        contact/offer bar; MakeOfferSheet success → toast with "Track offers".
+      - Market tab header: market-my-listings-btn (storefront) replaces market-notif-btn.
+      - Profile → Services → "My Market Listings" row. Chat thread shows chat-item-card for
+        item conversations (+ menu-view-item); inbox preview shows item name · price.
+      - Notifications: MARKET_OFFER → /marketplace/my-listings?tab=…; MARKET_MODERATION kind.
+      - NEW /admin/market-reports (tile-market-reports on /admin): filters reports-filter-open|resolved,
+        market-report-{id} cards with dismiss-/pause-/remove-{id} (+ remove-sheet confirm-remove-listing).
+      Seller/buyer for E2E: demo@amass.africa (seller, admin) + register a fresh buyer or use
+      tunde.showcase@amass.africa / Showcase2026!. Create a listing via POST /api/marketplace/items
+      (fields: name, description≥10, price, category, subcategory, condition, image, images[]).
+  - agent: "main"
+    message: |
+      NEIGHBOURS / SOCIAL PHASE — frontend complete (Jun 2026). Backend: community.py/social.py/
+      phone_auth.py/analytics.py already wired (pytest tests/test_neighbours.py 15 pass). New backend:
+      POST /api/community/uploads {data_url} → {url:"/api/files/..."} and /api/files auth now allows
+      estate managers to read pending residents' proof_url and estate members to read service-request photos.
+      Demo (demo@amass.africa / amass2026) is MANAGER of pilot estate "Lekki Gardens Phase 2"
+      (id 9a99a06d-c7c3-441c-bc4f-508659f8c7cf). Phone OTP sign-in: any number, code 123456 (mocked).
+      New screens (all under /neighbours, reached from the Neighbours tab testIDs nb-quick-friends|
+      collections|places|events, nb-estate-{id}, nb-find-estate, nb-ask, nb-report-issue, nb-settings):
+      - /neighbours/estates (estates-screen, estates-search, estate-row-{id}, estates-propose →
+        request-estate-sheet req-estate-name/city/area/manager/submit)
+      - /neighbours/estates/[id] (estate-screen; non-member: estate-join → join-estate-sheet
+        join-mode-code|request, join-code-input, join-proof-btn, join-unit-input, join-submit; member:
+        estate-tabs Feed/Q&A/Groups/Events/Issues/People, estate-compose → compose-sheet
+        compose-type-{question|recommendation|general|notice}, compose-title/body/submit; ask-question;
+        group-create → group-sheet group-name/submit, group-toggle-{id}; estate-host-event;
+        estate-report-issue, estate-all-issues; People: pending-{id} approve-/reject-/proof-{id},
+        member-{id}, manage-{id} → proof-sheet member-make-manager/member-remove; manager estate-code →
+        code-sheet estate-join-code/estate-share-code/estate-rotate-code; estate-leave)
+      - /neighbours/posts/[id] (post-screen, post-body, post-upvote, reply-input, reply-send, reply-{id},
+        accept-{replyId} (asker only), post-menu → post-pin/post-hide/post-delete/post-report)
+      - /neighbours/events (events-screen, events-scope-upcoming|mine|past, events-new, event-row-{id})
+      - /neighbours/events/new (event-kind-*, event-title, event-day-{n}, event-time-{HHMM},
+        event-location, event-audience-estate|connections|public, event-capacity, event-chat, event-submit)
+      - /neighbours/events/[id] (event-screen, rsvp-going|maybe|declined, event-chat, event-property →
+        /property/{id}?via=estate:…, event-menu → event-cancel (host) / event-report)
+      - /neighbours/places (places-screen; web shows list only; places-cat-{cat}, place-row-{id} →
+        place-sheet place-recommend (opens note input place-note-input/place-note-submit), place-save →
+        add-to-collection-sheet kind=place, place-directions, place-report; places-add → add-place-sheet
+        place-name/place-cat-{cat}/place-address/place-note/place-submit)
+      - /neighbours/services (services-screen, services-filter-active|done, services-scope-all|mine
+        (managers), services-new, sr-row-{id}) · /neighbours/services/new (sr-cat-{cat}, sr-title,
+        sr-desc, sr-location, sr-add-photo, sr-urgent, sr-submit → replaces to detail) ·
+        /neighbours/services/[id] (service-detail-screen, sr-update-{i} timeline, manager:
+        sr-set-acknowledged|in_progress|resolved|closed → sr-update-sheet sr-update-note/confirm,
+        sr-find-fixa → /fixa (gated); reporter: sr-close-mine)
+      - /neighbours/settings (nb-settings-tab-privacy|recognition, nb-edit-profile → nb-handle/nb-bio/
+        nb-profile-save, nb-toggle-handle/contacts/saves, nb-contacts-off|on, unblock-/unmute-{id},
+        nb-phone, nb-feedback → nb-feedback-input/send; recognition: rec-points, rec-progress-{key})
+      - /neighbours/collections/join/[code] (collection-join-screen, join-collection, join-invalid)
+      Property detail hooks: add-to-list-btn (top bar) + social-row with add-to-list-inline → existing
+      add-to-collection-sheet (add-to-{collectionId}, new-collection-btn/name/submit). Saved properties
+      cards: add-to-list-{propertyId}. Analytics: property_detail_view (arrived_via from ?via=),
+      paid_action_start on unlock CTA, payment_completed on unlock; home map marker_tap + impressions.
+      Button size "xs" added to the UI kit (previous screens already used it — would have crashed).
+      CONVERSION GUARD (must hold): nothing in Neighbours reveals paid property details or agent
+      contact; every property tap lands on /property/[id] which keeps UnlockDialog + MASS fee intact.
+  - agent: "main"
+    message: |
+      ADMIN · NEIGHBOURS MODULE (new) + backend test-suite stabilisation.
+      Backend: full pytest suite now 734 passed / 4 skipped against localhost (conftest defaults
+      EXPO_BACKEND_URL/EXPO_PUBLIC_BACKEND_URL/TEST_BASE_URL to http://localhost:8001; xdist scheduler
+      keeps every class of a file on one worker; `restarts_backend` marker auto-skipped when -n>1;
+      /api/seed gained ?dry_run=true (admin gate test no longer wipes listings); /agent/properties/mine
+      now newest-first). Cockpit dashboard returns pending_estates + open_social_reports.
+      Frontend: new /admin/neighbours (testID admin-neighbours; tile-neighbours on /admin). Tabs
+      nb-admin-tabs-funnel|estates|reports. Funnel: nb-admin-days-7|30|90, nb-admin-money (nb-admin-paid,
+      nb-admin-social-share), nb-admin-steps, nb-admin-attribution (nb-admin-via-{via}), nb-admin-adoption.
+      Estates: nb-admin-estates-pending|active|rejected chips, nb-admin-estate-{id} cards with
+      nb-admin-approve-{id} (immediate) / nb-admin-reject-{id} (→ nb-admin-confirm sheet,
+      nb-admin-confirm-btn / nb-admin-confirm-cancel), empty nb-admin-estates-empty. Reports:
+      nb-admin-reports-open|resolved chips, nb-admin-report-{id} with nb-admin-hide-/restore-/ban-/
+      dismiss-/open-{id}; ban → confirm sheet. Approve notifies the proposer (ESTATE_APPROVED) and makes
+      them an approved resident/manager; estates then appear under /neighbours/estates.
+      Seed helpers: POST /api/community/estates/request (any user) creates a pending estate;
+      POST /api/social/reports {target_type:"post", target_id, reason:"spam", estate_id} creates a report.

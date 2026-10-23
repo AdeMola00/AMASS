@@ -26,6 +26,8 @@ const KIND_META: Record<string, { icon: IconName; tone: Tone; group: Group }> = 
   milestone_completed: { icon: "flag", tone: "success", group: "services" },
   project_completed: { icon: "trophy", tone: "success", group: "services" },
   agent_referral_created: { icon: "people", tone: "info", group: "money" },
+  MARKET_OFFER: { icon: "pricetag", tone: "mass", group: "services" },
+  MARKET_MODERATION: { icon: "flag", tone: "warning", group: "services" },
 };
 
 const GROUPS: { key: Group; label: string; icon: IconName }[] = [
@@ -33,7 +35,7 @@ const GROUPS: { key: Group; label: string; icon: IconName }[] = [
   { key: "messages", label: "Messages", icon: "chatbubble-outline" },
   { key: "property", label: "Property", icon: "home-outline" },
   { key: "money", label: "Wallet", icon: "wallet-outline" },
-  { key: "services", label: "Services", icon: "construct-outline" },
+  { key: "services", label: "Services & Market", icon: "construct-outline" },
 ];
 
 function timeAgo(iso: string): string {
@@ -108,7 +110,11 @@ export default function Notifications() {
   const openNotif = (n: any) => {
     Haptics.selectionAsync().catch(() => {});
     const meta = n.meta || {};
-    if (meta.conversation_id) router.push(`/chat/${meta.conversation_id}` as any);
+    // Offer notifications land on the offers tab (an accepted offer may also carry a chat).
+    if (n.kind === "MARKET_OFFER" && meta.offer_id) router.push(`/marketplace/my-listings?tab=${meta.tab === "sent" ? "sent" : "received"}` as any);
+    else if (n.kind === "MARKET_MODERATION") router.push("/marketplace/my-listings" as any);
+    else if (meta.conversation_id) router.push(`/chat/${meta.conversation_id}` as any);
+    else if (meta.item_id) router.push(`/marketplace/${meta.item_id}` as any);
     else if (meta.inspection_id) router.push(`/improve/inspection/${meta.inspection_id}` as any);
     else if (meta.application_id) router.push(`/improve/finance/${meta.application_id}` as any);
     else if (meta.project_id) router.push(`/improve/project/${meta.project_id}` as any);

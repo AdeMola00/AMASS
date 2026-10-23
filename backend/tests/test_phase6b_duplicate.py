@@ -9,6 +9,7 @@ Existing Phase 6A fixture (do NOT delete):
 from __future__ import annotations
 
 import os
+import random
 import time
 import uuid
 
@@ -512,9 +513,13 @@ class TestGpsAccuracyMultiplier:
 class TestRegression:
     def test_brand_new_lat_lng_full_flow(self, s, demo_headers):
         csid = f"csid-fresh-{uuid.uuid4().hex[:8]}"
-        # Somewhere in Lagos with no existing property nearby (Ikorodu area)
+        # Somewhere in Lagos with no existing property nearby (Ikorodu area).
+        # Randomised offset (~±1.5 km) so repeated runs don't pile onto one spot
+        # and trip the duplicate detector.
+        lat = 6.6194 + random.uniform(-0.015, 0.015)
+        lng = 3.5105 + random.uniform(-0.015, 0.015)
         oid = _new_draft(
-            s, demo_headers, csid, 6.6194, 3.5105,
+            s, demo_headers, csid, lat, lng,
             details={"property_type": "bungalow", "bedrooms": 3,
                      "bathrooms": 2, "building_size_sqm": 150},
             listing={"listing_type": "buy", "price": 45_000_000},

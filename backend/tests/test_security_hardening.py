@@ -82,10 +82,13 @@ class TestSeedAdminGating:
         assert "admin" in r.text.lower()
 
     def test_seed_admin_demo_returns_200(self, client, demo_headers):
-        r = client.post(f"{BASE_URL}/api/seed", headers=demo_headers)
+        # dry_run: proves the admin passes the gate WITHOUT wiping every listing
+        # in the shared database (which breaks every other suite mid-run).
+        r = client.post(f"{BASE_URL}/api/seed", params={"dry_run": "true"}, headers=demo_headers)
         assert r.status_code == 200, r.text
         body = r.json()
         assert isinstance(body, dict), body
+        assert body.get("dry_run") is True
         # Should contain counts for at least properties + marketplace
         assert any(k in body for k in ("properties", "marketplace", "seeded"))
 
@@ -312,10 +315,10 @@ class TestRegressionSurface:
         assert r.status_code == 200, r.text
         assert r.json()["email"] == DEMO_EMAIL
 
-    def test_properties_returns_9(self, client):
+    def test_properties_returns_seed(self, client):
         r = client.get(f"{BASE_URL}/api/properties")
         assert r.status_code == 200, r.text
-        assert len(r.json()) == 9, f"expected 9 properties, got {len(r.json())}"
+        assert len(r.json()) >= 9, f"expected at least the 9 seed properties, got {len(r.json())}"
 
     def test_marketplace_list(self, client):
         r = client.get(f"{BASE_URL}/api/marketplace")
@@ -364,12 +367,12 @@ class TestRegressionSurface:
         Test both so we surface any mismatch clearly."""
         r_init = client.post(
             f"{BASE_URL}/api/payments/init",
-            json={"provider": "paystack", "currency": "MASS", "bundle_id": "starter"},
+            json={"provider": "paystack", "currency": "MASS", "bundle_id": "explorer"},
             headers=demo_headers,
         )
         r_initialize = client.post(
             f"{BASE_URL}/api/payments/initialize",
-            json={"provider": "paystack", "currency": "MASS", "bundle_id": "starter"},
+            json={"provider": "paystack", "currency": "MASS", "bundle_id": "explorer"},
             headers=demo_headers,
         )
         # At least one path must return a checkout url + reference

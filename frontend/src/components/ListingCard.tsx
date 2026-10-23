@@ -26,6 +26,8 @@ export function ListingCard({
   style,
   compact,
   testID,
+  via,
+  onAddToList,
 }: {
   property: Property;
   width?: number | `${number}%`;
@@ -34,6 +36,10 @@ export function ListingCard({
   style?: ViewStyle;
   compact?: boolean;
   testID?: string;
+  /** Funnel attribution appended as ?via= (e.g. "collection:<id>", "friend", "estate"). */
+  via?: string;
+  /** Shows a second overlay button that lets the user drop the home into a shared list. */
+  onAddToList?: (property: Property) => void;
 }) {
   const { colors, shadows, isDark } = useTheme();
   const router = useRouter();
@@ -69,7 +75,7 @@ export function ListingCard({
       <Pressable
         onPress={() => {
           Haptics.selectionAsync().catch(() => {});
-          router.push(`/property/${property.id}` as any);
+          router.push((via ? `/property/${property.id}?via=${encodeURIComponent(via)}` : `/property/${property.id}`) as any);
         }}
         accessibilityRole="button"
         accessibilityLabel={`${property.title}, ${formatMarkerPrice(property.price, property.listing_type)}, ${property.location}`}
@@ -143,6 +149,21 @@ export function ListingCard({
           <Ionicons name={isSaved ? "heart" : "heart-outline"} size={18} color={isSaved ? colors.brand : colors.text} />
         </Pressable>
       </Animated.View>
+      {onAddToList ? (
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            onAddToList(property);
+          }}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Add to a shared list"
+          testID={`add-to-list-${property.id}`}
+          style={[styles.heart, styles.listBtn, { backgroundColor: isDark ? "rgba(23,21,19,0.8)" : "rgba(255,255,255,0.9)" }]}
+        >
+          <Ionicons name="albums-outline" size={17} color={colors.text} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -153,6 +174,7 @@ const styles = StyleSheet.create({
   topRow: { position: "absolute", top: 10, left: 10, right: 50, flexDirection: "row", alignItems: "flex-start" },
   heartWrap: { position: "absolute", top: 10, right: 10 },
   heart: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  listBtn: { position: "absolute", top: 10, right: 50 },
   priceWrap: { position: "absolute", left: 12, bottom: 10 },
   body: { padding: 12, gap: 4 },
   locRow: { flexDirection: "row", alignItems: "center", gap: 4 },

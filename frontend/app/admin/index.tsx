@@ -95,11 +95,14 @@ export default function AdminCockpitHub() {
             <View style={{ gap: 12 }}>
               <Tile title="Duplicate review queue" caption={`${dash.pending_duplicate_review} propert${dash.pending_duplicate_review === 1 ? "y" : "ies"} flagged`} icon="git-compare-outline" badge={dash.pending_duplicate_review} tone="mass" onPress={() => router.push("/admin/duplicate-queue" as any)} testID="tile-dup-queue" />
               <Tile title="Representation reviews" caption={`${dash.pending_representations} pending · ${dash.docs_requested} docs requested`} icon="ribbon-outline" badge={dash.pending_representations + dash.docs_requested} tone="success" onPress={() => router.push("/admin/representations" as any)} testID="tile-rep-queue" />
+              <Tile title="Neighbours & community" caption="Social → paid funnel · estate approvals · report moderation" icon="people-outline" badge={(dash.pending_estates ?? 0) + (dash.open_social_reports ?? 0)} tone="brand" onPress={() => router.push("/admin/neighbours" as any)} testID="tile-neighbours" />
               <Tile title="Chat reports" caption="Moderation queue · blocks · resolutions" icon="chatbubble-ellipses-outline" tone="brand" onPress={() => router.push("/admin/chat-reports" as any)} testID="tile-chat-reports" />
+              <Tile title="Market reports" caption="Flagged Declutter listings · pause · remove" icon="flag-outline" tone="warning" onPress={() => router.push("/admin/market-reports" as any)} testID="tile-market-reports" />
               <Tile title="Audit log" caption="Immutable event stream across all properties" icon="document-text-outline" tone="default" onPress={() => router.push("/admin/audit-log" as any)} testID="tile-audit" />
               <Tile title="Merge / Verify properties" caption="Search by AMASS ID → compare → merge or verify" icon="swap-horizontal-outline" tone="brand" onPress={() => router.push("/admin/duplicate-queue" as any)} testID="tile-merge" />
               <Tile title="Property Discovery" caption="Google Places search · Cost meter · Candidate → Lead pipeline" icon="compass-outline" tone="fix" onPress={() => router.push("/admin/discovery" as any)} testID="tile-discovery" />
               <Tile title="Platform settings" caption="Feature flags · Property types · Config" icon="settings-outline" tone="info" onPress={() => router.push("/admin/settings" as any)} testID="tile-settings" />
+              <Tile title="Monetization & pricing" caption="MASS/FIX fees by zone · tiers · token value · revenue report" icon="pricetags-outline" tone="mass" onPress={() => router.push("/admin/pricing" as any)} testID="tile-pricing" />
             </View>
 
             <AppText variant="caption" tone="tertiary" align="center">

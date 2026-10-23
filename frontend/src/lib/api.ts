@@ -109,18 +109,124 @@ export type WalletTransaction = {
   description: string;
   meta: Record<string, any>;
   created_at: string;
+  // Monetization ledger extras (unlock charges / credits)
+  feature_key?: "property" | "fixa_provider";
+  category?: string | null;
+  zone_tier?: string | null;
+  price_snapshot?: { amount: number; currency: string; token_ngn: number; ngn: number } | null;
+  status?: string;
+  auto_credit?: boolean;
 };
 
 export type UserProfile = {
   id: string;
-  email: string;
+  email: string | null;
   full_name: string;
-  phone?: string;
+  phone?: string | null;
+  phone_verified?: boolean;
   avatar_url?: string;
+  city?: string | null;
   is_agent: boolean;
   is_admin?: boolean;
   created_at: string;
 };
+
+// ─── Neighbours (social) types ───────────────────────────
+export type PublicUser = {
+  id: string;
+  full_name: string;
+  avatar_url?: string | null;
+  handle?: string | null;
+  city?: string | null;
+  verified?: boolean;
+  is_agent?: boolean;
+  badges?: string[];
+  member_since?: number | null;
+};
+export type ConnectionState = { status: "pending" | "accepted" | "declined"; requested_by_me: boolean; id?: string } | null;
+export type Connection = { id: string; status: string; requested_by_me: boolean; message?: string | null; created_at: string; user: PublicUser };
+export type SocialMe = PublicUser & {
+  bio?: string | null;
+  settings: { discoverable_by_contacts: boolean; discoverable_by_handle: boolean; share_saves: boolean; contact_match_enabled: boolean; contact_match_last_at?: string | null; has_phone: boolean };
+  recognition: { points: number; badges: { key: string; label: string }[] };
+  counts: { connections: number; pending_in: number; collections: number; estates: number };
+};
+export type SharedCollection = {
+  id: string; name: string; emoji?: string | null; kind: "homes" | "places"; description?: string | null; owner_id: string; is_owner: boolean;
+  members: PublicUser[]; member_count: number; item_count: number; cover_images: string[]; updated_at?: string; created_at: string;
+  last_activity?: { kind: string; user_id: string; label?: string; at: string } | null;
+};
+export type CollectionItem = {
+  id: string; kind: "property" | "place"; target_id: string; note?: string | null; added_by?: PublicUser | null; created_at: string;
+  reactions: { love: number; maybe: number; no: number; mine?: "love" | "maybe" | "no" | null }; comment_count: number;
+  property?: Property | null; place?: Place | null;
+};
+export type CollectionComment = { id: string; collection_id: string; item_id?: string | null; user_id: string; text: string; created_at: string; user?: PublicUser | null };
+export type CollectionDetail = SharedCollection & { invite_code?: string | null; items: CollectionItem[]; comments: CollectionComment[] };
+export type PropertySocialContext = Record<string, { saved_by: PublicUser[]; in_collections: { id: string; name: string; emoji?: string | null; shared: boolean }[] }>;
+
+export type Estate = {
+  id: string; name: string; slug: string; city: string; state?: string | null; area?: string | null; description?: string | null; latitude?: number | null; longitude?: number | null;
+  cover_image?: string | null; amenities: string[]; rules?: string | null; status: string; verification_methods: string[]; pilot?: boolean;
+  membership: { status: "pending" | "approved" | "rejected"; role: "resident" | "manager"; joined_at?: string | null; verification_method?: string | null } | null;
+  member_count?: number; upcoming_events?: number; open_questions?: number; distance_km?: number;
+  managers?: PublicUser[]; is_manager?: boolean; pending_requests?: number; join_code?: string | null; teaser?: { recent_activity_count: number };
+};
+export type EstatePost = {
+  id: string; estate_id: string; group_id?: string | null; author?: PublicUser | null; type: "notice" | "question" | "recommendation" | "general"; is_official: boolean;
+  title?: string | null; body: string; place_id?: string | null; tags: string[]; answers_count: number; accepted_reply_id?: string | null; upvoted?: boolean; upvote_count: number; pinned?: boolean; status: string; created_at: string; estate_name?: string;
+};
+export type PostReply = { id: string; post_id: string; author?: PublicUser | null; body: string; is_accepted: boolean; created_at: string };
+export type EstateGroup = { id: string; estate_id: string; name: string; description?: string | null; emoji?: string | null; member_count: number; joined: boolean };
+export type EstateMember = { id: string; user: PublicUser; role: "resident" | "manager"; status: string; verification_method?: string | null; created_at: string; approved_at?: string | null; has_proof?: boolean; note?: string | null };
+export type CommunityEvent = {
+  id: string; title: string; description?: string | null; kind: "gathering" | "viewing" | "activity" | "meeting"; starts_at: string; ends_at?: string | null; location_label: string; latitude?: number | null; longitude?: number | null;
+  audience: "estate" | "connections" | "public"; estate_id?: string | null; estate_name?: string | null; property_id?: string | null; capacity?: number | null; host?: PublicUser | null; conversation_id?: string | null; status: string;
+  my_rsvp?: "going" | "maybe" | "declined" | null; going_count: number; maybe_count: number; is_host: boolean; going?: PublicUser[]; property?: Partial<Property> | null;
+};
+export type Place = {
+  id: string; name: string; category: string; latitude: number; longitude: number; address_label?: string | null; estate_id?: string | null; is_amenity: boolean; is_promoted?: boolean; label?: string | null;
+  recommendation_count: number; recommended_by_me: boolean; distance_km?: number; notes?: { user_id: string; text: string; at: string; user?: PublicUser | null }[]; recommenders?: PublicUser[]; verified_resident_recommendations?: number; status?: string;
+};
+export type ServiceRequest = {
+  id: string; estate_id: string; reporter?: PublicUser | null; category: string; title: string; description: string; location_label?: string | null; photos: string[]; urgent: boolean;
+  status: "open" | "acknowledged" | "in_progress" | "resolved" | "closed"; fixa_item_id?: string | null; fixa_provider?: { id: string; name: string; seller_name?: string; subcategory?: string; image?: string; rating?: number } | null;
+  updates: { by?: string; status: string; note?: string | null; at: string; user?: PublicUser | null }[]; created_at: string; updated_at: string; is_mine: boolean; can_manage?: boolean;
+};
+export type FunnelWindow = {
+  marker_impressions: number; marker_taps: number; detail_views: number; paid_action_starts: number; payments_completed: number; payments_failed: number;
+  tap_rate: number | null; detail_to_start: number | null; start_to_paid: number | null;
+};
+export type FunnelVia = "direct" | "friend" | "collection" | "estate" | "recommendation" | "share" | "search";
+export type AdminFunnel = {
+  days: number; since: string; current: FunnelWindow; previous: FunnelWindow;
+  attribution: Record<FunnelVia, { detail_views: number; paid_action_starts: number; payments_completed: number }>;
+  signin: { starts: number; otp_sent: number; otp_verified: number; completed: number; phone_completed: number };
+  social: {
+    contact_match_optins: number; connections_sent: number; connections_accepted: number; estate_requests: number; estate_approvals: number; active_estates: number;
+    collections_created: number; collections_shared: number; collection_items_added: number; event_rsvps: number; questions_asked: number; questions_answered: number; service_requests: number;
+  };
+  moderation: { reports_open: number; reports_resolved: number; median_response_hours: number | null; feedback_count: number };
+  note: string;
+};
+export type SocialReport = {
+  id: string; reporter_id: string; target_type: "user" | "post" | "reply" | "event" | "place" | "comment" | "collection"; target_id: string; reason: string; details?: string | null;
+  estate_id?: string | null; status: "OPEN" | "RESOLVED"; resolution?: string | null; created_at: string; resolved_at?: string | null;
+  reporter?: PublicUser | null; target_user?: PublicUser | null; estate_name?: string | null; target_preview?: string; target_status?: string | null;
+};
+
+export type NeighboursHome = {
+  estates: Estate[];
+  connections: { count: number; pending_in: number; preview: PublicUser[] };
+  collections: { id: string; name: string; emoji?: string | null; item_count: number; member_count: number; cover_images: string[]; members: PublicUser[] }[];
+  events: CommunityEvent[];
+  open_questions: EstatePost[];
+  notices: EstatePost[];
+  open_service_requests: number;
+  profile: { handle?: string | null; points: number; badges: string[]; contacts_on: boolean };
+  phone_verified: boolean;
+};
+export type PhoneStartOut = { ok: boolean; phone: string; phone_masked: string; expires_in: number; cooldown_seconds: number; provider: string; mocked: boolean; dev_hint?: string };
 
 export type MarketplaceItem = {
   id: string;
@@ -178,6 +284,53 @@ export type MarketplaceItem = {
   provider_service_areas?: string[];
   is_fixa_verified?: boolean;
   fixa_badges?: string[];
+  /** FIXA: contact is hidden until the provider is unlocked with FIX (set by the backend on list payloads). */
+  contact_locked?: boolean;
+  /** Listing lifecycle (missing = active). */
+  status?: ListingStatus;
+  /** Only on /marketplace/my-listings — offers awaiting the seller. */
+  open_offers?: number;
+  sold_at?: string;
+};
+
+export type ListingStatus = "active" | "paused" | "sold" | "removed";
+
+export type OfferStatus = "sent" | "countered" | "accepted" | "declined" | "withdrawn" | "superseded";
+
+export type MarketOffer = {
+  id: string;
+  item_id: string;
+  buyer_id: string;
+  buyer_name?: string;
+  seller_id?: string;
+  amount: number;
+  asking_price?: number;
+  message?: string | null;
+  counter_amount?: number | null;
+  counter_message?: string | null;
+  agreed_amount?: number | null;
+  status: OfferStatus;
+  conversation_id?: string | null;
+  closed_reason?: string;
+  created_at: string;
+  updated_at?: string;
+  item?: Pick<MarketplaceItem, "id" | "name" | "image" | "price" | "city" | "status" | "seller_id" | "seller_name"> | null;
+};
+
+export type MarketReportReason = "scam" | "prohibited" | "wrong_category" | "duplicate" | "offensive" | "other";
+
+export type MarketReport = {
+  id: string;
+  item_id: string;
+  seller_id?: string;
+  reporter_id: string;
+  reporter_name?: string;
+  reason: MarketReportReason;
+  details?: string | null;
+  status: "OPEN" | "RESOLVED";
+  resolution?: string;
+  created_at: string;
+  item?: MarketOffer["item"];
 };
 
 export type MarketCategory = {
@@ -297,6 +450,18 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** Error carrying HTTP status + structured `detail` (e.g. {code:"UNLOCK_REQUIRED", fee, balance}). */
+export class ApiError extends Error {
+  status: number;
+  detail: any;
+  constructor(message: string, status: number, detail?: any) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -306,17 +471,146 @@ async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}/api${path}`, { ...opts, headers });
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
+    let detail: any = undefined;
     try {
       const j = await res.json();
-      msg = j.detail || msg;
+      detail = j.detail;
+      msg = typeof j.detail === "string" ? j.detail : j.detail?.message || j.detail?.error || msg;
     } catch {}
-    throw new Error(msg);
+    const err = new ApiError(msg, res.status, detail);
+    throw err;
   }
   if (res.status === 204) return undefined as T;
   return res.json();
 }
 
+/* ─── Monetization types ─────────────────────────────────────────────── */
+export type FeatureKey = "property" | "fixa_provider";
+export type UnlockQuote = {
+  feature_key: FeatureKey;
+  target_id: string;
+  label: string;
+  category: string;
+  zone_tier: "A" | "B" | "C" | "D";
+  currency: "MASS" | "FIX";
+  fee: number;
+  fee_ngn: number;
+  token_ngn: number;
+  balance: number;
+  balance_after: number;
+  can_afford: boolean;
+  already_unlocked: boolean;
+  is_owner: boolean;
+  available: boolean;
+};
+export type UnlockResult = {
+  ok: boolean;
+  feature_key: FeatureKey;
+  target_id: string;
+  charged: number;
+  currency: "MASS" | "FIX";
+  balance_after: number;
+  free_reason?: string | null;
+  entitlement?: { id: string; status: string; amount_paid: number; created_at: string } | null;
+  details: any;
+};
+export type MapMarker = {
+  id: string;
+  category: "sale" | "rent";
+  type?: string;
+  lat: number;
+  lng: number;
+  unlocked: boolean;
+  verified: boolean;
+  approx: boolean;
+};
+export type ProviderPreview = {
+  id: string;
+  display_name: string;
+  initials: string;
+  category: string;
+  rating?: number;
+  reviews?: number;
+  area?: string;
+  verified: boolean;
+  badges: string[];
+  years_experience?: number;
+  jobs_completed?: number;
+  image?: string | null;
+  is_boosted: boolean;
+  tier?: number;
+  unlocked?: boolean;
+  bio?: string;
+  zone_tier?: string;
+};
+
 export const api = {
+  // ─── Monetization (shared unlock service) ───
+  monetizationConfig: () =>
+    req<{ conversion: { MASS_ngn: number; FIX_ngn: number }; welcome_bonus: { MASS: number; FIX: number }; topup_min_ngn: number; topup_bonus_tiers: { min_ngn: number; bonus_pct: number }[] }>("/monetization/config"),
+  unlockQuote: (featureKey: FeatureKey, targetId: string) =>
+    req<UnlockQuote>(`/unlocks/quote?featureKey=${featureKey}&targetId=${encodeURIComponent(targetId)}`),
+  unlock: (featureKey: FeatureKey, targetId: string, idempotencyKey: string) =>
+    req<UnlockResult>("/unlocks", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({ featureKey, targetId }),
+    }),
+  unlockStatus: (key: string) => req<{ status: "pending" | "completed" | "failed"; result?: UnlockResult; error?: string }>(`/unlocks/status/${key}`),
+  unlockCancel: (featureKey: FeatureKey, targetId: string, reason?: string) =>
+    req<{ ok: boolean }>("/unlocks/cancel", { method: "POST", body: JSON.stringify({ featureKey, targetId, reason }) }),
+  myUnlocks: (featureKey: FeatureKey) =>
+    req<{ items: { entitlement: any; property?: Property; provider?: ProviderPreview & { phone?: string; whatsapp?: string } }[]; count: number }>(`/unlocks/mine?featureKey=${featureKey}`),
+  reportUnlock: (entitlementId: string, reason: "unavailable" | "unreachable", note?: string) =>
+    req<{ ok: boolean; credited: number; currency: string }>(`/unlocks/${entitlementId}/report`, { method: "POST", body: JSON.stringify({ reason, note }) }),
+  propertyDetails: (id: string) => req<Property>(`/properties/${id}/details`),
+  mapMarkers: (params?: Record<string, string | number | boolean | undefined>) => {
+    const qs = params
+      ? "?" +
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined && v !== null && String(v) !== "")
+          .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+          .join("&")
+      : "";
+    return req<{ markers: MapMarker[]; count: number; approx_radius_m: number }>(`/map/markers${qs}`);
+  },
+  // FIXA (gated — FIX > 0)
+  fixaAccess: () => req<{ allowed: boolean; balance: number; currency: "FIX" }>("/fixa/access"),
+  fixaProviders: (params?: Record<string, string | number | boolean | undefined>) => {
+    const qs = params
+      ? "?" +
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined && v !== null && String(v) !== "")
+          .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+          .join("&")
+      : "";
+    return req<{ items: ProviderPreview[]; count: number; subcategories: string[]; fix_balance: number }>(`/fixa/providers${qs}`);
+  },
+  fixaProvider: (id: string) => req<ProviderPreview>(`/fixa/providers/${id}`),
+  fixaProviderDetails: (id: string) => req<any>(`/fixa/providers/${id}/details`),
+  // Admin — pricing & monetization
+  adminPricing: () => req<{ prices: any[]; conversion: any; zone_multipliers: any; bases: any }>("/admin/pricing"),
+  adminSetPrice: (data: { featureKey: FeatureKey; category: string; zoneTier: string; amount: number; note?: string }) =>
+    req<any>("/admin/pricing", { method: "POST", body: JSON.stringify(data) }),
+  adminPricingHistory: (params?: Record<string, string | undefined>) => {
+    const qs = params
+      ? "?" + Object.entries(params).filter(([, v]) => !!v).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&")
+      : "";
+    return req<{ history: any[] }>(`/admin/pricing/history${qs}`);
+  },
+  adminZones: () => req<{ zones: Record<string, string>; default: string }>("/admin/pricing/zones"),
+  adminSetZones: (zones: Record<string, string>) => req<{ zones: Record<string, string> }>("/admin/pricing/zones", { method: "PUT", body: JSON.stringify({ zones }) }),
+  adminTiers: () => req<{ tiers: Record<string, number>; bases: Record<string, number> }>("/admin/pricing/tiers"),
+  adminSetTiers: (tiers: Record<string, number>) => req<{ tiers: Record<string, number> }>("/admin/pricing/tiers", { method: "PUT", body: JSON.stringify({ tiers }) }),
+  adminMonetizationConfig: () => req<any>("/admin/monetization/config"),
+  adminSetMonetizationConfig: (patch: any) => req<any>("/admin/monetization/config", { method: "PUT", body: JSON.stringify(patch) }),
+  adminMonetizationReport: (params?: Record<string, string | undefined>) => {
+    const qs = params
+      ? "?" + Object.entries(params).filter(([, v]) => !!v).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&")
+      : "";
+    return req<any>(`/admin/monetization/report${qs}`);
+  },
+
   // Auth
   register: (data: { email: string; password: string; full_name: string; phone?: string }) =>
     req<{ access_token: string; user: UserProfile }>("/auth/register", {
@@ -339,6 +633,127 @@ export const api = {
       body: JSON.stringify({ session_id }),
     }),
   me: () => req<UserProfile>("/auth/me"),
+  // ─── Phone OTP (primary mobile sign-in) ───
+  phoneStart: (data: { phone?: string; dial_code?: string; number?: string; purpose?: "signin" | "link" | "change" }) =>
+    req<PhoneStartOut>("/auth/phone/start", { method: "POST", body: JSON.stringify(data) }),
+  phoneResend: (data: { phone: string; purpose?: "signin" | "link" | "change" }) =>
+    req<PhoneStartOut>("/auth/phone/resend", { method: "POST", body: JSON.stringify(data) }),
+  phoneVerify: (data: { phone: string; code: string; purpose?: "signin" | "link" | "change"; full_name?: string }) =>
+    req<{ access_token?: string; user?: UserProfile; is_new?: boolean; ok?: boolean; changed?: boolean; phone_masked?: string }>("/auth/phone/verify", { method: "POST", body: JSON.stringify(data) }),
+  phoneStatus: () => req<{ phone_masked?: string | null; verified: boolean; has_email_credential: boolean; provider: string; mocked: boolean }>("/auth/phone/status"),
+  addEmailCredential: (email: string, password: string) => req<{ ok: boolean; email: string }>("/auth/account/add-email", { method: "POST", body: JSON.stringify({ email, password }) }),
+  // ─── Analytics (funnel) ───
+  analyticsIngest: (events: { name: string; props?: Record<string, string | number | boolean>; ts?: string; session_id?: string }[]) =>
+    req<{ ok: boolean; accepted: number }>("/analytics/events", { method: "POST", body: JSON.stringify({ events }) }),
+  adminFunnel: (days = 30) => req<AdminFunnel>(`/admin/analytics/funnel?days=${days}`),
+  // ─── Social: me / friends ───
+  socialMe: () => req<SocialMe>("/social/me"),
+  socialPatchMe: (patch: Partial<{ display_name: string; handle: string; bio: string; city: string; discoverable_by_contacts: boolean; discoverable_by_handle: boolean; share_saves: boolean }>) =>
+    req<SocialMe>("/social/me", { method: "PATCH", body: JSON.stringify(patch) }),
+  socialUser: (id: string) => req<PublicUser & { bio?: string | null; recognition: { points: number; badges: { key: string; label: string }[] }; connection: ConnectionState; shared_estates: { id: string; name: string }[]; is_me: boolean }>(`/social/users/${id}`),
+  socialSearch: (q: string) => req<(PublicUser & { connection: ConnectionState })[]>(`/social/search?q=${encodeURIComponent(q)}`),
+  socialContactsMatch: (hashes: string[]) => req<{ matches: (PublicUser & { connection: ConnectionState })[]; hashed: number; discoverable: boolean }>("/social/contacts/match", { method: "POST", body: JSON.stringify({ hashes }) }),
+  socialContactsDisable: () => req<{ ok: boolean }>("/social/contacts/sync", { method: "DELETE" }),
+  socialConnections: () => req<{ accepted: Connection[]; incoming: Connection[]; outgoing: Connection[] }>("/social/connections"),
+  socialConnect: (user_id: string, message?: string) => req<{ ok: boolean; status: string; id: string }>("/social/connections", { method: "POST", body: JSON.stringify({ user_id, message }) }),
+  socialRespondConnection: (id: string, action: "accept" | "decline" | "cancel" | "remove") => req<{ ok: boolean; status: string }>(`/social/connections/${id}/${action}`, { method: "POST" }),
+  socialBlock: (user_id: string) => req<{ ok: boolean }>(`/social/block/${user_id}`, { method: "POST" }),
+  socialUnblock: (user_id: string) => req<{ ok: boolean }>(`/social/block/${user_id}`, { method: "DELETE" }),
+  socialMute: (user_id: string) => req<{ ok: boolean }>(`/social/mute/${user_id}`, { method: "POST" }),
+  socialUnmute: (user_id: string) => req<{ ok: boolean }>(`/social/mute/${user_id}`, { method: "DELETE" }),
+  socialBlocked: () => req<{ blocked: PublicUser[]; muted: PublicUser[] }>("/social/blocked"),
+  socialReport: (data: { target_type: "user" | "post" | "reply" | "event" | "place" | "comment" | "collection"; target_id: string; reason: string; details?: string; estate_id?: string }) =>
+    req<{ ok: boolean; report_id: string; duplicate?: boolean }>("/social/reports", { method: "POST", body: JSON.stringify(data) }),
+  socialRecognition: () => req<{ points: number; badges: { key: string; label: string }[]; progress: { key: string; label: string; kind: string; have: number; need: number; earned: boolean }[]; recent: any[]; note: string }>("/social/recognition"),
+  socialFeedback: (data: { area?: string; rating?: number; text: string }) => req<{ ok: boolean }>("/social/feedback", { method: "POST", body: JSON.stringify(data) }),
+  socialContext: (ids: string[]) => req<PropertySocialContext>(`/social/context/properties?ids=${ids.join(",")}`),
+  // ─── Social: collections ───
+  collections: () => req<SharedCollection[]>("/social/collections"),
+  collectionCreate: (data: { name: string; kind?: "homes" | "places"; emoji?: string; description?: string }) => req<SharedCollection>("/social/collections", { method: "POST", body: JSON.stringify(data) }),
+  collection: (id: string) => req<CollectionDetail>(`/social/collections/${id}`),
+  collectionPatch: (id: string, patch: { name?: string; emoji?: string; description?: string }) => req<{ ok: boolean }>(`/social/collections/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  collectionDelete: (id: string) => req<{ ok: boolean; deleted?: boolean; left?: boolean }>(`/social/collections/${id}`, { method: "DELETE" }),
+  collectionAddItem: (id: string, data: { kind?: "property" | "place"; target_id: string; note?: string }) => req<{ ok: boolean; item_id: string; duplicate?: boolean }>(`/social/collections/${id}/items`, { method: "POST", body: JSON.stringify(data) }),
+  collectionRemoveItem: (id: string, item_id: string) => req<{ ok: boolean }>(`/social/collections/${id}/items/${item_id}`, { method: "DELETE" }),
+  collectionReact: (id: string, item_id: string, reaction: "love" | "maybe" | "no" | "clear") => req<{ ok: boolean }>(`/social/collections/${id}/items/${item_id}/react`, { method: "POST", body: JSON.stringify({ reaction }) }),
+  collectionComment: (id: string, text: string, item_id?: string) => req<CollectionComment>(`/social/collections/${id}/comments`, { method: "POST", body: JSON.stringify({ text, item_id }) }),
+  collectionInvite: (id: string, user_id: string) => req<{ ok: boolean; already_member?: boolean }>(`/social/collections/${id}/invite`, { method: "POST", body: JSON.stringify({ user_id }) }),
+  collectionRotateCode: (id: string) => req<{ invite_code: string }>(`/social/collections/${id}/invite-code/rotate`, { method: "POST" }),
+  collectionJoinPreview: (code: string) => req<{ id: string; name: string; emoji?: string | null; owner?: PublicUser | null; member_count: number; item_count: number; already_member: boolean }>(`/social/collections/join/${code}`),
+  collectionJoin: (code: string) => req<{ ok: boolean; collection_id: string; already_member?: boolean }>(`/social/collections/join/${code}`, { method: "POST" }),
+  collectionRemoveMember: (id: string, member_id: string) => req<{ ok: boolean }>(`/social/collections/${id}/members/${member_id}/remove`, { method: "POST" }),
+  // ─── Community: estates ───
+  neighboursHome: () => req<NeighboursHome>("/community/home"),
+  estates: (params?: { q?: string; city?: string; lat?: number; lng?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.q) qs.set("q", params.q);
+    if (params?.city) qs.set("city", params.city);
+    if (params?.lat != null && params?.lng != null) {
+      qs.set("lat", String(params.lat));
+      qs.set("lng", String(params.lng));
+    }
+    const s = qs.toString();
+    return req<{ items: Estate[]; my_estate_ids: string[] }>(`/community/estates${s ? `?${s}` : ""}`);
+  },
+  myEstates: () => req<Estate[]>("/community/estates/mine"),
+  estate: (id: string) => req<Estate>(`/community/estates/${id}`),
+  estateRequest: (data: { name: string; city: string; state?: string; area?: string; description?: string; latitude?: number; longitude?: number; i_am_manager?: boolean }) =>
+    req<{ ok: boolean; estate_id: string; status: string; message: string }>("/community/estates/request", { method: "POST", body: JSON.stringify(data) }),
+  estateJoin: (id: string, data: { join_code?: string; proof_url?: string; unit?: string; note?: string }) => req<{ ok: boolean; status: string; method?: string; message?: string; already_member?: boolean }>(`/community/estates/${id}/join`, { method: "POST", body: JSON.stringify(data) }),
+  estateLeave: (id: string) => req<{ ok: boolean }>(`/community/estates/${id}/leave`, { method: "POST" }),
+  estatePatch: (id: string, patch: { description?: string; cover_image?: string; amenities?: string[]; rules?: string; rotate_join_code?: boolean }) => req<{ ok: boolean; join_code?: string | null }>(`/community/estates/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  estateMembers: (id: string, status: "approved" | "pending" | "all" = "approved") => req<EstateMember[]>(`/community/estates/${id}/members?status=${status}`),
+  estateMemberProof: (id: string, member_id: string) => req<{ proof_url: string; unit?: string | null }>(`/community/estates/${id}/members/${member_id}/proof`),
+  estateReviewMember: (id: string, member_id: string, action: "approve" | "reject" | "make_manager" | "remove", note?: string) => req<{ ok: boolean }>(`/community/estates/${id}/members/${member_id}/review`, { method: "POST", body: JSON.stringify({ action, note }) }),
+  estatePosts: (id: string, params?: { type?: string; group_id?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.type) qs.set("type", params.type);
+    if (params?.group_id) qs.set("group_id", params.group_id);
+    const s = qs.toString();
+    return req<{ items: EstatePost[]; has_more: boolean }>(`/community/estates/${id}/posts${s ? `?${s}` : ""}`);
+  },
+  estatePostCreate: (id: string, data: { type: EstatePost["type"]; title?: string; body: string; group_id?: string; place_id?: string; tags?: string[]; official?: boolean }) => req<EstatePost>(`/community/estates/${id}/posts`, { method: "POST", body: JSON.stringify(data) }),
+  post: (id: string) => req<EstatePost & { replies: PostReply[]; place?: Place | null }>(`/community/posts/${id}`),
+  postReply: (id: string, body: string) => req<PostReply>(`/community/posts/${id}/replies`, { method: "POST", body: JSON.stringify({ body }) }),
+  postAccept: (id: string, reply_id: string) => req<{ ok: boolean }>(`/community/posts/${id}/accept/${reply_id}`, { method: "POST" }),
+  postUpvote: (id: string) => req<{ upvoted: boolean }>(`/community/posts/${id}/upvote`, { method: "POST" }),
+  postModerate: (id: string, action: "hide" | "restore" | "pin" | "unpin" | "delete") => req<{ ok: boolean }>(`/community/posts/${id}/moderate?action=${action}`, { method: "POST" }),
+  estateGroups: (id: string) => req<EstateGroup[]>(`/community/estates/${id}/groups`),
+  estateGroupCreate: (id: string, data: { name: string; description?: string; emoji?: string }) => req<EstateGroup>(`/community/estates/${id}/groups`, { method: "POST", body: JSON.stringify(data) }),
+  groupMembership: (group_id: string, action: "join" | "leave") => req<{ ok: boolean; joined: boolean }>(`/community/groups/${group_id}/${action}`, { method: "POST" }),
+  // ─── Community: events / places / service requests ───
+  events: (params?: { estate_id?: string; scope?: "upcoming" | "mine" | "past" }) => {
+    const qs = new URLSearchParams();
+    if (params?.estate_id) qs.set("estate_id", params.estate_id);
+    if (params?.scope) qs.set("scope", params.scope);
+    const s = qs.toString();
+    return req<CommunityEvent[]>(`/community/events${s ? `?${s}` : ""}`);
+  },
+  eventCreate: (data: { title: string; description?: string; kind?: CommunityEvent["kind"]; starts_at: string; ends_at?: string; location_label: string; latitude?: number; longitude?: number; audience?: CommunityEvent["audience"]; estate_id?: string; property_id?: string; capacity?: number; group_chat?: boolean }) =>
+    req<CommunityEvent>("/community/events", { method: "POST", body: JSON.stringify(data) }),
+  event: (id: string) => req<CommunityEvent>(`/community/events/${id}`),
+  eventRsvp: (id: string, status: "going" | "maybe" | "declined") => req<{ ok: boolean; status: string; conversation_id?: string | null }>(`/community/events/${id}/rsvp`, { method: "POST", body: JSON.stringify({ status }) }),
+  eventCancel: (id: string) => req<{ ok: boolean }>(`/community/events/${id}/cancel`, { method: "POST" }),
+  placesNearby: (params: { lat: number; lng: number; radius_km?: number; category?: string; estate_id?: string }) => {
+    const qs = new URLSearchParams({ lat: String(params.lat), lng: String(params.lng) });
+    if (params.radius_km) qs.set("radius_km", String(params.radius_km));
+    if (params.category) qs.set("category", params.category);
+    if (params.estate_id) qs.set("estate_id", params.estate_id);
+    return req<{ items: Place[]; categories: string[] }>(`/community/places?${qs.toString()}`);
+  },
+  placeCreate: (data: { name: string; category: string; latitude: number; longitude: number; address_label?: string; estate_id?: string; is_amenity?: boolean; note?: string }) => req<{ ok: boolean; place_id: string; place?: Place; duplicate?: boolean }>("/community/places", { method: "POST", body: JSON.stringify(data) }),
+  place: (id: string) => req<Place>(`/community/places/${id}`),
+  placeRecommend: (id: string, text?: string) => req<{ ok: boolean; recommended: boolean }>(`/community/places/${id}/recommend`, { method: "POST", body: JSON.stringify({ text }) }),
+  serviceRequests: (estate_id: string, scope: "mine" | "all" = "mine") => req<{ items: ServiceRequest[]; is_manager: boolean; categories: string[] }>(`/community/estates/${estate_id}/service-requests?scope=${scope}`),
+  serviceRequestCreate: (data: { estate_id: string; category: string; title: string; description: string; location_label?: string; photos?: string[]; urgent?: boolean }) => req<ServiceRequest>("/community/service-requests", { method: "POST", body: JSON.stringify(data) }),
+  serviceRequest: (id: string) => req<ServiceRequest>(`/community/service-requests/${id}`),
+  serviceRequestUpdate: (id: string, data: { status: "acknowledged" | "in_progress" | "resolved" | "closed"; note?: string; fixa_item_id?: string }) => req<{ ok: boolean; status: string }>(`/community/service-requests/${id}/update`, { method: "POST", body: JSON.stringify(data) }),
+  communityUpload: (data_url: string) => req<{ url: string; path: string }>("/community/uploads", { method: "POST", body: JSON.stringify({ data_url }) }),
+  // ─── Admin: community ───
+  adminSocialReports: (status: "OPEN" | "RESOLVED" | "ALL" = "OPEN") => req<{ items: SocialReport[]; open_total: number }>(`/social/admin/reports?status=${status}`),
+  adminSocialResolve: (id: string, action: "dismiss" | "hide" | "restore" | "ban_user") => req<{ ok: boolean }>(`/social/admin/reports/${id}/resolve?action=${action}`, { method: "POST" }),
+  adminEstates: (status: "pending" | "active" | "rejected" | "ALL" = "pending") => req<{ items: (Estate & { creator?: PublicUser | null; created_by?: string })[] }>(`/community/admin/estates?status=${status}`),
+  adminReviewEstate: (id: string, action: "approve" | "reject") => req<{ ok: boolean }>(`/community/admin/estates/${id}/review?action=${action}`, { method: "POST" }),
   forgotPassword: (email: string) =>
     req<{ ok: boolean; message: string }>("/auth/forgot-password", {
       method: "POST",
@@ -437,7 +852,30 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ amount, message }),
     }),
-  marketplaceOffersSent: () => req<any[]>("/marketplace/offers/sent"),
+  marketplaceOffersSent: () => req<MarketOffer[]>("/marketplace/offers/sent"),
+  marketplaceOffersReceived: () => req<MarketOffer[]>("/marketplace/offers/received"),
+  marketplaceRespondOffer: (id: string, action: "accept" | "decline" | "counter", counter_amount?: number, message?: string) =>
+    req<{ ok: boolean; offer: MarketOffer }>(`/marketplace/offers/${id}/respond`, {
+      method: "POST",
+      body: JSON.stringify({ action, counter_amount, message }),
+    }),
+  marketplaceWithdrawOffer: (id: string) =>
+    req<{ ok: boolean; offer: MarketOffer }>(`/marketplace/offers/${id}/withdraw`, { method: "POST" }),
+  marketplaceUpdateListing: (id: string, patch: { name?: string; description?: string; price?: number; negotiable?: boolean; status?: "active" | "paused" | "sold" }) =>
+    req<{ ok: boolean; item: MarketplaceItem }>(`/marketplace/items/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  marketplaceDeleteListing: (id: string) => req<{ ok: boolean }>(`/marketplace/items/${id}`, { method: "DELETE" }),
+  marketplaceReport: (id: string, reason: MarketReportReason, details?: string) =>
+    req<{ ok: boolean; report_id: string; duplicate?: boolean; auto_paused?: boolean }>(`/marketplace/items/${id}/report`, {
+      method: "POST",
+      body: JSON.stringify({ reason, details }),
+    }),
+  adminMarketReports: (status: "OPEN" | "RESOLVED" | "ALL" = "OPEN", limit = 100) =>
+    req<{ items: MarketReport[]; count: number; open_total: number }>(`/marketplace/admin/reports?status=${status}&limit=${limit}`),
+  adminResolveMarketReport: (id: string, action: "dismiss" | "remove_listing" | "pause_listing" | "restore_listing", note?: string) =>
+    req<{ ok: boolean; action: string }>(`/marketplace/admin/reports/${id}/resolve`, { method: "POST", body: JSON.stringify({ action, note }) }),
+  chatStartFromItem: (item_id: string) => req<any>(`/chat/conversations/from-item/${item_id}`, { method: "POST" }),
+  /** Direct 1:1 chat — only between accepted connections (enforced server-side). */
+  chatStartDirect: (user_id: string) => req<any>(`/chat/conversations/direct/${user_id}`, { method: "POST" }),
   marketplaceCreateListing: (data: {
     name: string;
     description: string;
@@ -1704,6 +2142,8 @@ export const api = {
       total_properties: number;
       total_listings: number;
       merged_properties: number;
+      pending_estates: number;
+      open_social_reports: number;
       generated_at: string;
     }>("/admin/cockpit/dashboard"),
   adminDuplicateQueue: (limit = 50) =>

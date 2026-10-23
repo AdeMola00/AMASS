@@ -11,4 +11,7 @@ export { ToastProvider, useToast } from "./Toast";
 export { SegmentedControl, BalanceChip } from "./Controls";
 export { Sheet, ChargeConfirm } from "./Sheet";
 export { OfflineBanner } from "./OfflineBanner";
+export { Stepper, Tabs, Toggle, BarChart, Sparkline } from "./Navigation";
+export type { StepStatus } from "./Navigation";
+export { UnlockDialog } from "./UnlockDialog";
 export type { IconName } from "./icons";

@@ -79,7 +79,7 @@ export default function HelpSupport() {
 
         <RowGroup title="Get in touch">
           <ListRow icon="mail" iconTone="brand" label="Email support" caption={SUPPORT_EMAIL} onPress={contactEmail} testID="help-email" />
-          <ListRow icon="chatbubbles" iconTone="success" label="Message us in-app" caption="Chat with the AMASS team from your inbox" onPress={() => router.push("/(tabs)/messages")} last testID="help-chat" />
+          <ListRow icon="chatbubbles" iconTone="success" label="Message us in-app" caption="Chat with the AMASS team from your inbox" onPress={() => router.push("/inbox" as any)} last testID="help-chat" />
         </RowGroup>
 
         <View style={{ gap: 8 }}>

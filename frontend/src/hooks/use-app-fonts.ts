@@ -9,4 +9,5 @@ export const useAppFonts = (): readonly [boolean, Error | null] =>
     "PlusJakartaSans-600": require("../../assets/fonts/PlusJakartaSans-600.ttf"),
     "PlusJakartaSans-700": require("../../assets/fonts/PlusJakartaSans-700.ttf"),
     "PlusJakartaSans-800": require("../../assets/fonts/PlusJakartaSans-800.ttf"),
+    DMSerifDisplay: require("../../assets/fonts/DMSerifDisplay-Regular.ttf"),
   });

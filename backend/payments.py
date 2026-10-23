@@ -172,6 +172,16 @@ def register_payment_routes(
         bundle_name = bundle["name"]
         amount_ngn = int(bundle["price_ngn"])
 
+        # Monetization config: top-up minimum + optional bonus tiers (admin-editable).
+        mcfg = ((await db.app_settings.find_one({"key": "monetization"}, {"_id": 0, "value": 1})) or {}).get("value") or {}
+        min_ngn = int(mcfg.get("topup_min_ngn", 1000) or 1000)
+        if amount_ngn < min_ngn:
+            raise HTTPException(422, f"Minimum top-up is ₦{min_ngn:,}")
+        tier_bonus = 0
+        for tier in sorted(mcfg.get("topup_bonus_tiers") or [], key=lambda t: int(t.get("min_ngn", 0))):
+            if amount_ngn >= int(tier.get("min_ngn", 0)):
+                tier_bonus = int(round(int(bundle["tokens"]) * float(tier.get("bonus_pct", 0)) / 100.0))
+
         # Persist intent BEFORE calling provider (so webhooks can find it)
         intent = {
             "reference": reference,
@@ -182,7 +192,8 @@ def register_payment_routes(
             "bundle_name": bundle_name,
             "currency": data.currency,
             "credits": bundle["tokens"],
-            "bonus": bundle.get("bonus", 0),
+            "bonus": int(bundle.get("bonus", 0)) + tier_bonus,
+            "bonus_tier": tier_bonus,
             "amount_ngn": amount_ngn,
             "status": "initialized",
             "created_at": datetime.now(timezone.utc).isoformat(),

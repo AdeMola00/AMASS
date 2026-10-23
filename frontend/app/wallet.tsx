@@ -51,6 +51,12 @@ export default function WalletScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [txFilter, setTxFilter] = useState<TxFilter>("all");
+  const [conversion, setConversion] = useState<{ MASS_ngn: number; FIX_ngn: number }>({ MASS_ngn: 10, FIX_ngn: 10 });
+
+  useEffect(() => {
+    api.monetizationConfig().then((c) => setConversion(c.conversion)).catch(() => {});
+  }, []);
+  const ngn = (n: number, ccy: "MASS" | "FIX") => `≈ ₦${(n * (ccy === "FIX" ? conversion.FIX_ngn : conversion.MASS_ngn)).toLocaleString()}`;
 
   const loadTx = useCallback(async () => {
     setTxLoading(true);
@@ -146,6 +152,9 @@ export default function WalletScreen() {
                 MASS
               </AppText>
             </View>
+            <AppText variant="caption" color="rgba(255,255,255,0.65)" tabular testID="mass-balance-ngn">
+              {ngn(massBalance, "MASS")} · 1 MASS = ₦{conversion.MASS_ngn}
+            </AppText>
             <View style={styles.heroSplit}>
               <HeroStat label="Primary" value={massPrimary} />
               <View style={styles.heroDivider} />
@@ -203,6 +212,9 @@ export default function WalletScreen() {
                 FIX
               </AppText>
             </View>
+            <AppText variant="caption" color="rgba(255,255,255,0.65)" tabular testID="fix-balance-ngn">
+              {ngn(fixBalance, "FIX")} · 1 FIX = ₦{conversion.FIX_ngn}
+            </AppText>
             <View style={styles.heroSplit}>
               <HeroStat label="Earned lifetime" value={fixEarned} />
               <View style={styles.heroDivider} />
@@ -213,7 +225,7 @@ export default function WalletScreen() {
           <View style={styles.actions}>
             <QuickAction icon="add" label="Buy FIX" tone="fix" onPress={() => router.push("/buy-fix" as any)} />
             <QuickAction icon="trending-up" label="Earn FIX" onPress={() => router.push("/earn-fix" as any)} />
-            <QuickAction icon="rocket" label="Boost" onPress={() => router.push("/fix-features" as any)} />
+            <QuickAction icon="construct" label="Browse FIXA" onPress={() => router.push("/fixa" as any)} />
           </View>
         </View>
 
@@ -293,21 +305,28 @@ export default function WalletScreen() {
                   {items.map((tx, i) => {
                     const meta = TX_META[tx.kind] || { icon: "cash" as IconName, tone: "default" as const };
                     const positive = tx.amount > 0;
-                    const ccy = tx.currency ?? "MASS";
+                    const ccy = (tx.currency ?? "MASS") as "MASS" | "FIX";
+                    const time = new Date(tx.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+                    const context = tx.feature_key
+                      ? [tx.feature_key === "property" ? (tx.category === "sale" ? "Sale" : "Rent") : `Tier ${tx.category}`, tx.zone_tier ? `Zone ${tx.zone_tier}` : null, tx.auto_credit ? "Auto-credit" : null].filter(Boolean).join(" · ")
+                      : null;
                     return (
                       <ListRow
                         key={tx.id}
                         icon={meta.icon}
                         iconTone={meta.tone}
                         label={tx.description}
-                        caption={new Date(tx.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                        caption={context ? `${time} · ${context}` : time}
                         last={i === items.length - 1}
                         testID={`tx-${tx.id}`}
                         trailing={
-                          <View style={{ alignItems: "flex-end", gap: 4 }}>
+                          <View style={{ alignItems: "flex-end", gap: 2 }}>
                             <AppText variant="title" tabular color={positive ? colors.success : colors.text}>
                               {positive ? "+" : ""}
                               {tx.amount.toLocaleString()}
+                            </AppText>
+                            <AppText variant="micro" tone="tertiary" tabular>
+                              {ngn(Math.abs(tx.amount), ccy)}
                             </AppText>
                             <Badge label={ccy} tone={ccy === "FIX" ? "fix" : "mass"} size="xs" />
                           </View>
