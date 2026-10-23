@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, View, ViewProps, ViewStyle } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText } from "./Text";
@@ -188,6 +189,10 @@ export function Chip({
       testID={testID}
       style={[styles.chip, { backgroundColor: selected ? selBg : colors.surfaceAlt }, style]}
     >
+      {selected ? (
+        // glossy sheen on selected pills — same treatment as primary buttons
+        <LinearGradient colors={["rgba(255,255,255,0.16)", "rgba(255,255,255,0)"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "50%" }]} />
+      ) : null}
       {icon ? <Ionicons name={icon} size={14} color={selected ? selFg : colors.textSecondary} /> : null}
       <AppText variant="caption" color={selected ? selFg : colors.textSecondary}>
         {label}
@@ -248,6 +253,7 @@ const styles = StyleSheet.create({
     height: 36,
     paddingHorizontal: 14,
     borderRadius: radii.pill,
+    overflow: "hidden",
   },
   chipCount: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
 });

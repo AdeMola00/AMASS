@@ -116,6 +116,15 @@ export function Button({
           <LinearGradient colors={[...gradients.gloss]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "45%" }]} />
         </>
       ) : null}
+      {variant === "fix" && !isDisabled ? (
+        <>
+          <LinearGradient colors={[...gradients.fix]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={[...gradients.gloss]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "45%" }]} />
+        </>
+      ) : null}
+      {variant === "primary" && !isDisabled ? (
+        <LinearGradient colors={["rgba(255,255,255,0.14)", "rgba(255,255,255,0)"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "50%" }]} />
+      ) : null}
       {loading ? (
         <ActivityIndicator color={p.fg} />
       ) : (

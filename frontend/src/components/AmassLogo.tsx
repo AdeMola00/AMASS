@@ -1,6 +1,5 @@
 import React from "react";
-import { View, Image, Text, StyleSheet, ViewStyle } from "react-native";
-import { useTheme } from "@/src/theme";
+import { View, Image, ViewStyle } from "react-native";
 
 type Size = "sm" | "md" | "lg" | "xl";
 
@@ -12,53 +11,44 @@ const SIZE_MAP: Record<Size, number> = {
   xl: 112, // splash / onboarding hero
 };
 
-// Intrinsic aspect ratio (width / height) of the authoritative emblem artwork.
-// Measured once from the supplied file so it is never stretched or cropped.
-const EMBLEM_ASPECT = 1.5275;
+// Intrinsic proportions of the client-supplied artwork (AMASS LOGO 6), measured
+// once by scripts/generate_brand_assets.py so nothing is ever stretched or cropped.
+const EMBLEM_ASPECT = 1.5746; // pin + house (width / height)
+const LOCKUP_ASPECT = 1.2303; // pin + house + AMASS wordmark (width / height)
+const LOCKUP_OVER_EMBLEM = 877 / 637; // lockup height relative to the emblem height
 
-// Authoritative AMASS brand emblem (supplied by the client), finished with the
-// brand gradient — brand red → deep crimson with a soft glossy highlight.
-// Generated from the unaltered master by scripts/generate_glossy_emblem.py.
+// Source of truth: the full lockup and the emblem are both cut from the same
+// master, finished with the brand gradient (brand red → deep crimson, soft gloss).
 const EMBLEM_SRC = require("../../assets/images/amass-emblem-glossy.png");
+const LOCKUP_SRC = require("../../assets/images/amass-lockup.png");
 
 /**
  * AMASS brand logo.
  *
- *   • showWordmark=false → emblem only. Use in app bars, bottom nav, loading,
- *     map branding, profile avatar fallback.
- *   • showWordmark=true  → emblem + "AMASS" typographic lockup. Use on splash,
- *     onboarding, login, register and hero branding areas.
+ *   • showWordmark=false → emblem only (pin + house). App bars, bottom nav,
+ *     loading, map branding, avatar fallback.
+ *   • showWordmark=true  → the full lockup artwork (pin + house + AMASS
+ *     wordmark) exactly as supplied. Splash, onboarding, auth, hero branding.
  *
- * `tone="light"` renders the wordmark text white for dark backgrounds — the
- * emblem itself is never recoloured.
+ * `size` is always the EMBLEM height in dp; the lockup grows below it so
+ * existing layouts keep their visual weight. Place the lockup on light
+ * surfaces (the wordmark is glossy ink) — use a frosted panel over photos.
  */
 export function AmassLogo({
   size = "lg",
   showWordmark = true,
-  tone = "dark",
   style,
   testID,
 }: {
   size?: Size | number;
   showWordmark?: boolean;
-  tone?: "dark" | "light";
   style?: ViewStyle;
   testID?: string;
 }) {
-  const { colors } = useTheme();
   const h = typeof size === "number" ? size : SIZE_MAP[size];
-  const w = h * EMBLEM_ASPECT;
-
-  const emblem = (
-    <Image
-      source={EMBLEM_SRC}
-      style={{ width: w, height: h }}
-      resizeMode="contain"
-      accessibilityIgnoresInvertColors
-    />
-  );
 
   if (!showWordmark) {
+    const w = h * EMBLEM_ASPECT;
     return (
       <View
         style={[{ height: h, width: w, alignItems: "center", justifyContent: "center" }, style]}
@@ -66,33 +56,21 @@ export function AmassLogo({
         accessibilityRole="image"
         accessibilityLabel="AMASS"
       >
-        {emblem}
+        <Image source={EMBLEM_SRC} style={{ width: w, height: h }} resizeMode="contain" accessibilityIgnoresInvertColors />
       </View>
     );
   }
 
-  const fs = Math.round(h * 0.38);
+  const lh = Math.round(h * LOCKUP_OVER_EMBLEM);
+  const lw = Math.round(lh * LOCKUP_ASPECT);
   return (
     <View
-      style={[{ alignItems: "center" }, style]}
+      style={[{ height: lh, width: lw, alignItems: "center", justifyContent: "center" }, style]}
       testID={testID ?? "amass-logo-lockup"}
       accessibilityRole="image"
       accessibilityLabel="AMASS"
     >
-      {emblem}
-      <Text
-        style={[
-          styles.wordmark,
-          {
-            fontSize: fs,
-            letterSpacing: fs * 0.1,
-            marginTop: Math.round(h * 0.14),
-            color: tone === "light" ? "#FFFFFF" : colors.text,
-          },
-        ]}
-      >
-        AMASS
-      </Text>
+      <Image source={LOCKUP_SRC} style={{ width: lw, height: lh }} resizeMode="contain" accessibilityIgnoresInvertColors />
     </View>
   );
 }
@@ -127,7 +105,3 @@ export function AmassPinIcon({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wordmark: { fontWeight: "900", includeFontPadding: false },
-});

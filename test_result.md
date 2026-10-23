@@ -788,3 +788,17 @@ agent_communication:
       "brand" is a gradient pill, Gloss sheen on wallet/profile heroes, Screen fade-and-lift on open, useBounceRefresh
       (brand-tinted spinner + settle bounce) on Discover/Market/Neighbours/Wallet/Notifications. Demo:
       demo@amass.africa / amass2026 (966+ unread seeded by earlier tests — fine).
+  - agent: "main"
+    message: |
+      GLOSSY BRAND REFRESH (Corner-inspired) + WELCOME FLOW — FIRST TEST PASS. Frontend only.
+      Brand: new source-of-truth artwork (AMASS LOGO 6) → assets/images/amass-lockup.png (pin+house+AMASS wordmark, transparent,
+      glossy red→crimson pin), amass-emblem-glossy.png, amass-wordmark.png, FIXA PRO cut-outs fixa-pro-lockup.png / fixa-hat.png.
+      AmassLogo: showWordmark → renders the full lockup IMAGE (testID amass-logo-lockup); emblem-only unchanged (amass-logo-emblem).
+      Splash "/" (splash-screen): AMASS moment (amass-brand-moment, splash-amass-lockup, tagline) ~2s → FIXA moment
+      (fixa-brand-moment: green gradient + white card with FIXA PRO) ~2s → routes to /onboarding (signed out) or /(tabs).
+      brand-skip always visible. Onboarding (/onboarding, onboarding-screen): 5 slides — 0 AMASS (sky, floating lockup on frosted
+      glass onboarding-amass-lockup, tilted home tiles), 1 FIXA (onboarding-fixa-lockup, service chips, green "Continue"),
+      2 verified, 3 tokens (bullets), 4 AI/brands. testIDs onboarding-title-{i}, onboarding-next (brand gradient on slide 0,
+      fix gradient on slide 1, ink after), onboarding-skip, onboarding-signin → /login. Parallax + floating bob + stagger;
+      reduced-motion disables them. Button: brand/fix gradient fills + sheen on primary; selected Chips get a sheen.
+      Login/register/forgot/phone/about now show the lockup. Demo: demo@amass.africa / amass2026.
