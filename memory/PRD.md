@@ -512,3 +512,10 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - **Reports**: open / resolved; hide · restore · ban user (confirm) · dismiss · open target. `GET /api/social/admin/reports`, `POST …/resolve`.
 - `admin/cockpit/dashboard` now returns `pending_estates`, `open_social_reports`.
 - Verified: testing_agent iteration_52 (backend 21/21 incl. end-to-end propose→approve; all UI flows green; conversion guard intact).
+
+## Neighbours follow-ups — Friend Nudges · Estate Join Alerts · Funnel CSV (Jun 2026)
+- **Friend Nudges** (`/api/map/markers` → `friends_saved:int`, `in_shared_list:bool`): counts saves by *accepted connections who opted into `share_saves`* and flags properties sitting in a shared (≥2 member) collection. Map pins get a brand ring + badge (`pin-nudge-{id}`), legend shows "N by friends", UnlockDialog shows `unlock-friend-nudge` ("1 friend saved this"). Never unlocks or reveals anything — MASS fee intact.
+- **Estate Join Alerts** (`GET /api/community/alerts` → `{join_requests, connection_requests, total}`): managers see `nb-join-alert-{estateId}` card on the hub (→ estate People tab), Neighbours tab badge = unread chats + alerts; `ESTATE_REQUEST` notification carries `meta.estate_id`.
+- **Funnel CSV** (`GET /api/admin/analytics/funnel.csv?days=`): admin-gated (401/403), `text/csv` with `amass-neighbours-funnel-{d}d-{date}.csv`; sections funnel/attribution/social/moderation mirror the JSON funnel. `nb-admin-export-csv` on `/admin/neighbours` — native: expo-file-system + expo-sharing; web: blob download.
+- **Bug fixed** (`social.py`): `connections.pair` (array) had a *unique multikey* index → every user was limited to ONE connection (second request → 500 DuplicateKeyError). Uniqueness moved to string `pair_key`; startup drops the old index + backfills existing rows.
+- Tests: `tests/test_neighbours_alerts_nudges.py` 8/8, `tests/test_iteration53_review.py` 9/9, Neighbours suites 34 pass / 1 skip. testing_agent iteration_53 — all green (backend + web UI).

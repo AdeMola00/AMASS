@@ -303,7 +303,7 @@ def register_social_routes(db, get_current_user, require_admin, annotate_propert
             if existing.get("responded_at") and (now() - existing["responded_at"].replace(tzinfo=existing["responded_at"].tzinfo or now().tzinfo)) < timedelta(days=7) and existing["status"] == "declined":
                 raise HTTPException(429, "You can send another request in a few days")
             await db.connections.delete_one({"id": existing["id"]})
-        doc = {"id": new_id(), "pair": pair, "requester_id": user["id"], "addressee_id": data.user_id, "status": "pending", "message": (data.message or "").strip() or None, "created_at": now(), "responded_at": None}
+        doc = {"id": new_id(), "pair": pair, "pair_key": ":".join(pair), "requester_id": user["id"], "addressee_id": data.user_id, "status": "pending", "message": (data.message or "").strip() or None, "created_at": now(), "responded_at": None}
         await db.connections.insert_one(doc)
         me = await _profile(user)
         await notify(db, data.user_id, "CONNECTION_REQUEST", f"{me.get('display_name') or user.get('full_name')} wants to connect", doc["message"] or "Accept to share collections and message each other.", {"connection_id": doc["id"], "user_id": user["id"]})
@@ -680,7 +680,15 @@ async def ensure_social_indexes(db) -> None:
     await db.social_profiles.create_index("handle", unique=True, partialFilterExpression={"handle": {"$type": "string"}})
     await db.social_profiles.create_index("phone_hash", partialFilterExpression={"phone_hash": {"$type": "string"}})
     await db.connections.create_index("id", unique=True)
-    await db.connections.create_index("pair", unique=True)
+    # `pair` is an array → a unique index on it is multikey (uniqueness per element), which
+    # would limit every user to a single connection. Uniqueness lives on the string `pair_key`.
+    existing = await db.connections.index_information()
+    if existing.get("pair_1", {}).get("unique"):
+        await db.connections.drop_index("pair_1")
+    async for c in db.connections.find({"pair_key": {"$exists": False}}, {"_id": 1, "pair": 1}):
+        await db.connections.update_one({"_id": c["_id"]}, {"$set": {"pair_key": ":".join(sorted(c["pair"]))}})
+    await db.connections.create_index("pair")
+    await db.connections.create_index("pair_key", unique=True)
     await db.connections.create_index([("addressee_id", 1), ("status", 1)])
     await db.shared_collections.create_index("id", unique=True)
     await db.shared_collections.create_index("member_ids")

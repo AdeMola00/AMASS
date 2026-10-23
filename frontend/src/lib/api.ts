@@ -523,6 +523,10 @@ export type MapMarker = {
   unlocked: boolean;
   verified: boolean;
   approx: boolean;
+  /** Friends (who share their saves) that saved this property — counts only, never names. */
+  friends_saved: number;
+  /** Sits in one of my shared lists. */
+  in_shared_list: boolean;
 };
 export type ProviderPreview = {
   id: string;
@@ -646,6 +650,14 @@ export const api = {
   analyticsIngest: (events: { name: string; props?: Record<string, string | number | boolean>; ts?: string; session_id?: string }[]) =>
     req<{ ok: boolean; accepted: number }>("/analytics/events", { method: "POST", body: JSON.stringify({ events }) }),
   adminFunnel: (days = 30) => req<AdminFunnel>(`/admin/analytics/funnel?days=${days}`),
+  /** CSV export of the funnel (admin). Returns the raw text + server-suggested filename. */
+  adminFunnelCsv: async (days = 30): Promise<{ text: string; filename: string }> => {
+    const res = await fetch(`${BASE}/api/admin/analytics/funnel.csv?days=${days}`, { headers: await authHeaders() });
+    if (!res.ok) throw new ApiError(`HTTP ${res.status}`, res.status);
+    const cd = res.headers.get("content-disposition") ?? "";
+    const m = /filename="([^"]+)"/.exec(cd);
+    return { text: await res.text(), filename: m?.[1] ?? `amass-neighbours-funnel-${days}d.csv` };
+  },
   // ─── Social: me / friends ───
   socialMe: () => req<SocialMe>("/social/me"),
   socialPatchMe: (patch: Partial<{ display_name: string; handle: string; bio: string; city: string; discoverable_by_contacts: boolean; discoverable_by_handle: boolean; share_saves: boolean }>) =>
@@ -749,6 +761,7 @@ export const api = {
   serviceRequest: (id: string) => req<ServiceRequest>(`/community/service-requests/${id}`),
   serviceRequestUpdate: (id: string, data: { status: "acknowledged" | "in_progress" | "resolved" | "closed"; note?: string; fixa_item_id?: string }) => req<{ ok: boolean; status: string }>(`/community/service-requests/${id}/update`, { method: "POST", body: JSON.stringify(data) }),
   communityUpload: (data_url: string) => req<{ url: string; path: string }>("/community/uploads", { method: "POST", body: JSON.stringify({ data_url }) }),
+  communityAlerts: () => req<{ join_requests: number; connection_requests: number; total: number }>("/community/alerts"),
   // ─── Admin: community ───
   adminSocialReports: (status: "OPEN" | "RESOLVED" | "ALL" = "OPEN") => req<{ items: SocialReport[]; open_total: number }>(`/social/admin/reports?status=${status}`),
   adminSocialResolve: (id: string, action: "dismiss" | "hide" | "restore" | "ban_user") => req<{ ok: boolean }>(`/social/admin/reports/${id}/resolve?action=${action}`, { method: "POST" }),

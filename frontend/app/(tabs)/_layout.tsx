@@ -34,10 +34,10 @@ function useUnreadCount(active: boolean) {
   const [unread, setUnread] = useState(0);
   useEffect(() => {
     let alive = true;
+    // Neighbours tab badge = unread chats + alerts waiting on me (estate join requests I manage, friend requests).
     const load = () =>
-      api
-        .chatUnreadCount()
-        .then((r) => alive && setUnread(r.unread_count ?? 0))
+      Promise.all([api.chatUnreadCount().catch(() => ({ unread_count: 0 })), api.communityAlerts().catch(() => ({ total: 0 }))])
+        .then(([c, a]) => alive && setUnread((c.unread_count ?? 0) + (a.total ?? 0)))
         .catch(() => {});
     load();
     const id = setInterval(load, 30000);

@@ -30,6 +30,7 @@ export function UnlockDialog({
   onClose,
   onUnlocked,
   testID = "unlock-dialog",
+  children,
 }: {
   visible: boolean;
   featureKey: FeatureKey;
@@ -37,6 +38,8 @@ export function UnlockDialog({
   onClose: () => void;
   onUnlocked: (result: UnlockResult) => void;
   testID?: string;
+  /** Optional context rendered under the header (e.g. a friends-saved nudge). Never alters the fee. */
+  children?: React.ReactNode;
 }) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -153,6 +156,8 @@ export function UnlockDialog({
           </AppText>
         </View>
       </View>
+
+      {children}
 
       {loading || !quote ? (
         <View style={{ gap: 10, marginTop: space[3] }}>

@@ -5,10 +5,12 @@
  * Reports : social moderation queue (hide / restore / ban / dismiss)
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 
 import { api, type AdminFunnel, type Estate, type FunnelVia, type PublicUser, type SocialReport } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
@@ -61,6 +63,37 @@ export default function AdminNeighboursScreen() {
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ kind: "reject"; estate: AdminEstate } | { kind: "ban"; report: SocialReport } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const { text, filename } = await api.adminFunnelCsv(days);
+      if (Platform.OS === "web") {
+        const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        toast.success("CSV downloaded", filename);
+        return;
+      }
+      const uri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(uri, text, { encoding: FileSystem.EncodingType.UTF8 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: "text/csv", dialogTitle: "Share funnel CSV", UTI: "public.comma-separated-values-text" });
+      } else {
+        toast.info("Saved to app cache", filename);
+      }
+    } catch (err: any) {
+      toast.error("Couldn't export CSV", err?.message ?? "Try again");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setError(null);
@@ -152,7 +185,7 @@ export default function AdminNeighboursScreen() {
         ) : error ? (
           <EmptyState variant="error" title="Couldn't load" body={error} actionLabel="Retry" onAction={() => { setLoading(true); load(); }} />
         ) : tab === "funnel" && funnel ? (
-          <FunnelView funnel={funnel} days={days} onDays={(d) => { setDays(d); setLoading(true); }} />
+          <FunnelView funnel={funnel} days={days} onDays={(d) => { setDays(d); setLoading(true); }} onExport={exportCsv} exporting={exporting} />
         ) : tab === "estates" ? (
           <>
             <View style={styles.chips}>
@@ -219,7 +252,7 @@ function openTarget(router: ReturnType<typeof useRouter>, r: SocialReport) {
 }
 
 /* ─── Funnel ─────────────────────────────────────────────────────────── */
-function FunnelView({ funnel, days, onDays }: { funnel: AdminFunnel; days: 7 | 30 | 90; onDays: (d: 7 | 30 | 90) => void }) {
+function FunnelView({ funnel, days, onDays, onExport, exporting }: { funnel: AdminFunnel; days: 7 | 30 | 90; onDays: (d: 7 | 30 | 90) => void; onExport: () => void; exporting: boolean }) {
   const { colors } = useTheme();
   const cur = funnel.current;
   const prev = funnel.previous;
@@ -243,10 +276,12 @@ function FunnelView({ funnel, days, onDays }: { funnel: AdminFunnel; days: 7 | 3
 
   return (
     <>
-      <View style={styles.chips}>
+      <View style={[styles.chips, { alignItems: "center" }]}>
         {([7, 30, 90] as const).map((d) => (
           <Chip key={d} label={`${d} days`} selected={days === d} onPress={() => onDays(d)} testID={`nb-admin-days-${d}`} />
         ))}
+        <View style={{ flex: 1 }} />
+        <Button label="Export CSV" size="sm" variant="outline" iconLeft="download-outline" loading={exporting} onPress={onExport} testID="nb-admin-export-csv" />
       </View>
 
       {/* Money truth */}

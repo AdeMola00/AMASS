@@ -18,12 +18,14 @@ Allowed client event names (anything else is dropped silently):
 """
 from __future__ import annotations
 
+import csv
+import io
 import statistics
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field
 
 ALLOWED = {
@@ -80,6 +82,47 @@ def register_analytics_routes(db, bearer, decode_user_id, require_admin):
 
     @router.get("/admin/analytics/funnel")
     async def funnel(days: int = Query(30, ge=1, le=365), _: dict = Depends(require_admin)):
+        return await _funnel(days)
+
+    @router.get("/admin/analytics/funnel.csv")
+    async def funnel_csv(days: int = Query(30, ge=1, le=365), _: dict = Depends(require_admin)):
+        """Same numbers as the JSON funnel, flattened to a board-friendly CSV
+        (section, metric, current, previous, change)."""
+        data = await _funnel(days)
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["AMASS Neighbours → paid funnel", f"last {days} days", f"since {data['since'][:10]}", f"generated {_now().isoformat(timespec='seconds')}"])
+        w.writerow([])
+        w.writerow(["section", "metric", "current", "previous", "change_pct"])
+
+        def change(cur, prev):
+            if prev in (0, None) or cur is None:
+                return ""
+            return f"{((cur - prev) / prev) * 100:.1f}"
+
+        cur, prev = data["current"], data["previous"]
+        for k in ("marker_impressions", "marker_taps", "detail_views", "paid_action_starts", "payments_completed", "payments_failed"):
+            w.writerow(["funnel", k, cur[k], prev[k], change(cur[k], prev[k])])
+        for k in ("tap_rate", "detail_to_start", "start_to_paid"):
+            w.writerow(["funnel_rates", k, "" if cur[k] is None else cur[k], "" if prev[k] is None else prev[k], ""])
+        social_paid = sum(data["attribution"][v]["payments_completed"] for v in ("friend", "collection", "estate", "recommendation"))
+        total_paid = sum(a["payments_completed"] for a in data["attribution"].values())
+        w.writerow(["attribution", "social_share_of_paid", f"{(social_paid / total_paid):.4f}" if total_paid else "", "", ""])
+        for via, a in data["attribution"].items():
+            for k in ("detail_views", "paid_action_starts", "payments_completed"):
+                w.writerow(["attribution", f"{via}.{k}", a[k], "", ""])
+        for section in ("signin", "social", "moderation"):
+            for k, v in data[section].items():
+                w.writerow([section, k, "" if v is None else v, "", ""])
+        w.writerow([])
+        w.writerow(["note", data["note"]])
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="amass-neighbours-funnel-{days}d-{_now().date().isoformat()}.csv"'},
+        )
+
+    async def _funnel(days: int) -> dict:
         since = _now() - timedelta(days=days)
         prev_since = since - timedelta(days=days)
 

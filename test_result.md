@@ -713,3 +713,13 @@ agent_communication:
       them an approved resident/manager; estates then appear under /neighbours/estates.
       Seed helpers: POST /api/community/estates/request (any user) creates a pending estate;
       POST /api/social/reports {target_type:"post", target_id, reason:"spam", estate_id} creates a report.
+  - agent: "main"
+    message: |
+      ITERATION 53 — Friend Nudges + Estate Join Alerts + Funnel CSV verified green (backend + web UI).
+      Root-caused the failing nudges tests: NOT a Starlette/test-client issue — `connections.pair` is an
+      array and its unique index was multikey, so any user could hold only one connection (2nd POST
+      /api/social/connections → 500 DuplicateKeyError). Fixed in social.py: `pair_key` string carries
+      uniqueness; ensure_social_indexes drops the old `pair_1` unique index and backfills `pair_key`.
+      Map marker contract: friends_saved(int) / in_shared_list(bool). Alerts: GET /community/alerts.
+      CSV: GET /admin/analytics/funnel.csv?days= (admin only). Frontend testIDs: pin-nudge-{id},
+      unlock-friend-nudge, nb-join-alert-{estateId}, nb-admin-export-csv.

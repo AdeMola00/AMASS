@@ -793,6 +793,15 @@ def register_community_routes(db, get_current_user, require_admin, bearer, decod
         return {"url": f"/api/files/{path}", "path": path}
 
     # ─── Neighbours home (one call for the hub screen) ───
+    @router.get("/alerts")
+    async def neighbours_alerts(user: dict = Depends(get_current_user)):
+        """Lightweight badge counts for the Neighbours tab (polled): join requests
+        waiting on estates I manage + friend requests waiting on me."""
+        managed = [m["estate_id"] for m in await db.estate_members.find({"user_id": user["id"], "role": "manager", "status": "approved"}, {"_id": 0, "estate_id": 1}).to_list(20)]
+        join_requests = await db.estate_members.count_documents({"estate_id": {"$in": managed}, "status": "pending"}) if managed else 0
+        connection_requests = await db.connections.count_documents({"addressee_id": user["id"], "status": "pending"})
+        return {"join_requests": join_requests, "connection_requests": connection_requests, "total": join_requests + connection_requests}
+
     @router.get("/home")
     async def neighbours_home(user: dict = Depends(get_current_user)):
         ms = await db.estate_members.find({"user_id": user["id"], "status": {"$in": ["approved", "pending"]}}, {"_id": 0}).to_list(10)
@@ -802,7 +811,11 @@ def register_community_routes(db, get_current_user, require_admin, bearer, decod
         for m in ms:
             e = ests.get(m["estate_id"])
             if e:
-                estates.append(_estate_out(e, m, await _estate_counts(e["id"]) if m["status"] == "approved" else None))
+                counts = await _estate_counts(e["id"]) if m["status"] == "approved" else None
+                if counts is not None and m.get("role") == "manager":
+                    counts["is_manager"] = True
+                    counts["pending_requests"] = await db.estate_members.count_documents({"estate_id": e["id"], "status": "pending"})
+                estates.append(_estate_out(e, m, counts))
         approved_ids = [m["estate_id"] for m in ms if m["status"] == "approved"]
         conns = await connection_ids(db, user["id"])
         pending_in = await db.connections.count_documents({"addressee_id": user["id"], "status": "pending"})

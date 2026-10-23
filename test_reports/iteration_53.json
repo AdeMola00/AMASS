@@ -1,0 +1,31 @@
+{
+  "summary": "Iteration 53 — full verification of the 3 Neighbours follow-up features (Friend Nudges on map, Estate Join Alerts, Funnel CSV Export) + the connections.pair_key multikey-index fix. Backend: pytest tests/test_neighbours_alerts_nudges.py + tests/test_neighbours.py + tests/test_neighbours_extras.py = 34 passed, 1 skipped (as expected). New verification suite /app/backend/tests/test_iteration53_review.py = 9/9 passed (multi-connection fix, markers friends_saved/in_shared_list shape, friend share_saves=true counts & stranger never counts, /community/alerts shape + 401 + join-request increments manager + ESTATE_REQUEST notification with meta.estate_id, funnel.csv 200 + text/csv + filename 'amass-neighbours-funnel-30d-…' + header 'section,metric,current,previous,change_pct' + payments_completed row matches JSON current.payments_completed + 401 unauth + 403 non-admin). Frontend (web preview 390x844): login succeeded via intro Sign-in link; /admin/neighbours → Funnel tab → nb-admin-export-csv triggered a real browser download amass-neighbours-funnel-30d-2026-10-23.csv (expo-file-system/expo-sharing web fallback works — no crash, no toast fallback needed). Neighbours tab shows nb-join-alert-{estateId} ('8 residents waiting to join · Review') and bottom-tab accessibilityLabel reports 'Neighbours tab, 28 unread'. Home map legend shows '9 by friends' nudge chip. UnlockDialog nudge wrapper (testID unlock-friend-nudge) is wired in /app/frontend/app/(tabs)/index.tsx:646 and renders when a nudge pin is tapped (not tappable on web — react-native-maps shows placeholder, as expected). Minor RN-web console warnings (shadow*, pointerEvents, useNativeDriver) are known/cosmetic.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration53_review.py",
+    "/app/test_reports/pytest/pytest_iteration53_review.xml",
+    "/app/test_reports/pytest/pytest_iteration53_neighbours.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "social.py pair_key uniqueness fix is validated end-to-end: two independent fresh users can connect to demo and both land in demo's accepted list (previously 2nd insert returned 500)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration53_review.py (new verification suite)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Each test case registers fresh it53+<uuid>@amass.africa users. One join request against pilot estate 'Lekki Gardens Phase 2' was created during testing (visible in UI as '8 residents waiting to join').",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "CSV export via nb-admin-export-csv works on web (triggers download). Nudge chip renders in home map legend; UnlockDialog nudge testID unlock-friend-nudge is wired but not reachable from web (map placeholder) — verify on native build. Login via web requires clicking 'Sign in' link at bottom of brand-intro carousel (first launch only). Fresh users count 300 MASS + 100 FIX welcome bonus per monetization config. Backend tests run with EXPO_BACKEND_URL=http://localhost:8001.",
+  "rca_of_issue": "Previously connections.pair was a multikey (array) unique index, so Mongo's unique constraint collapsed all of a user's pairs into one; the 2nd outbound/inbound connection raised DuplicateKeyError → 500. Fix: uniqueness moved to a scalar string pair_key = min(a,b)+'|'+max(a,b); startup migration drops the old array index and backfills pair_key on existing docs. Verified: u1→demo accept + u2→demo accept both return 200 and demo's accepted list contains both friends."
+}

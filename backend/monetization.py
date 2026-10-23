@@ -33,6 +33,7 @@ from pymongo import ASCENDING
 from pymongo.errors import DuplicateKeyError
 
 from app_settings import get_setting
+from social_common import marker_social_context
 from tokens import WalletService
 
 FeatureKey = Literal["property", "fixa_provider"]
@@ -846,6 +847,8 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
             query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
         docs = await db.properties.find(query, {"_id": 0, "id": 1, "listing_type": 1, "property_type": 1, "latitude": 1, "longitude": 1, "agent_id": 1, "verified": 1}).limit(min(limit, 500)).to_list(500)
         ent_ids = {e["target_id"] for e in await db.entitlements.find({"user_id": user["id"], "feature_key": "property", "status": "active"}, {"_id": 0, "target_id": 1}).to_list(2000)}
+        # Friend nudges: counts only (friends who share their saves + my shared lists). Never reveals paid data.
+        social = await marker_social_context(db, user["id"], [d["id"] for d in docs])
         out = []
         for d in docs:
             if d.get("latitude") is None or d.get("longitude") is None:
@@ -854,7 +857,12 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
             lat, lng = d["latitude"], d["longitude"]
             if not unlocked:
                 lat, lng = _jitter(d["id"], lat, lng)
-            out.append({"id": d["id"], "category": property_category(d), "type": d.get("property_type"), "lat": lat, "lng": lng, "unlocked": unlocked, "verified": bool(d.get("verified")), "approx": not unlocked})
+            s = social.get(d["id"], {})
+            out.append({
+                "id": d["id"], "category": property_category(d), "type": d.get("property_type"), "lat": lat, "lng": lng, "unlocked": unlocked,
+                "verified": bool(d.get("verified")), "approx": not unlocked,
+                "friends_saved": int(s.get("friends_saved", 0)), "in_shared_list": bool(s.get("in_shared_list", False)),
+            })
         return {"markers": out, "count": len(out), "approx_radius_m": 150}
 
     # ── FIXA (gated) ──

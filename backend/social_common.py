@@ -90,6 +90,30 @@ async def connection_ids(db, user_id: str) -> set[str]:
     return {p for r in rows for p in r["pair"] if p != user_id}
 
 
+async def marker_social_context(db, user_id: str, property_ids: list[str]) -> dict[str, dict]:
+    """Counts-only social nudge for map pins: how many friends (who opted into
+    `share_saves`) saved each property + whether it sits in one of MY shared lists.
+    Never returns names and never touches paid data."""
+    if not property_ids:
+        return {}
+    out: dict[str, dict] = {}
+    conns = await connection_ids(db, user_id)
+    if conns:
+        sharing = [p["user_id"] async for p in db.social_profiles.find({"user_id": {"$in": list(conns)}, "share_saves": True}, {"_id": 0, "user_id": 1})]
+        if sharing:
+            rows = await db.favorites.aggregate([
+                {"$match": {"property_id": {"$in": property_ids}, "user_id": {"$in": sharing}}},
+                {"$group": {"_id": "$property_id", "n": {"$sum": 1}}},
+            ]).to_list(len(property_ids))
+            for r in rows:
+                out.setdefault(r["_id"], {})["friends_saved"] = int(r["n"])
+    shared_ids = [c["id"] async for c in db.shared_collections.find({"member_ids": user_id, "member_ids.1": {"$exists": True}}, {"_id": 0, "id": 1})]
+    if shared_ids:
+        for pid in await db.collection_items.distinct("target_id", {"collection_id": {"$in": shared_ids}, "target_id": {"$in": property_ids}}):
+            out.setdefault(pid, {})["in_shared_list"] = True
+    return out
+
+
 async def award(db, user_id: str, kind: str, points: int, ref: Optional[dict] = None) -> None:
     """Non-monetary recognition. Never touches wallets; never unlocks paid data.
     Idempotent per (user, kind, ref) so repeated actions can't farm points."""

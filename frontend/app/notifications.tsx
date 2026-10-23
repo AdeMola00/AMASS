@@ -9,7 +9,7 @@ import { radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, Chip, EmptyState, IconButton, Screen, ScreenHeader, SkeletonRows, useToast, type IconName } from "@/src/ui";
 
 type Tone = "default" | "brand" | "mass" | "fix" | "success" | "warning" | "info" | "premium";
-type Group = "all" | "messages" | "property" | "money" | "services";
+type Group = "all" | "messages" | "property" | "money" | "services" | "neighbours";
 
 const KIND_META: Record<string, { icon: IconName; tone: Tone; group: Group }> = {
   NEW_MESSAGE: { icon: "chatbubble", tone: "brand", group: "messages" },
@@ -28,6 +28,22 @@ const KIND_META: Record<string, { icon: IconName; tone: Tone; group: Group }> = 
   agent_referral_created: { icon: "people", tone: "info", group: "money" },
   MARKET_OFFER: { icon: "pricetag", tone: "mass", group: "services" },
   MARKET_MODERATION: { icon: "flag", tone: "warning", group: "services" },
+  // Neighbours (social layer)
+  ESTATE_REQUEST: { icon: "person-add", tone: "warning", group: "neighbours" },
+  ESTATE_APPROVED: { icon: "shield-checkmark", tone: "success", group: "neighbours" },
+  ESTATE_REJECTED: { icon: "close-circle", tone: "warning", group: "neighbours" },
+  ESTATE_NOTICE: { icon: "megaphone", tone: "brand", group: "neighbours" },
+  ANSWER_ACCEPTED: { icon: "checkmark-circle", tone: "success", group: "neighbours" },
+  POST_REPLY: { icon: "chatbubble-ellipses", tone: "info", group: "neighbours" },
+  QUESTION_ANSWERED: { icon: "chatbubble-ellipses", tone: "info", group: "neighbours" },
+  CONNECTION_REQUEST: { icon: "people", tone: "brand", group: "neighbours" },
+  CONNECTION_ACCEPTED: { icon: "people", tone: "success", group: "neighbours" },
+  COLLECTION_INVITE: { icon: "albums", tone: "mass", group: "neighbours" },
+  COLLECTION_ACTIVITY: { icon: "albums", tone: "info", group: "neighbours" },
+  EVENT_REMINDER: { icon: "calendar", tone: "info", group: "neighbours" },
+  EVENT_CANCELLED: { icon: "calendar", tone: "warning", group: "neighbours" },
+  SERVICE_REQUEST: { icon: "construct", tone: "fix", group: "neighbours" },
+  SERVICE_REQUEST_UPDATE: { icon: "construct", tone: "success", group: "neighbours" },
 };
 
 const GROUPS: { key: Group; label: string; icon: IconName }[] = [
@@ -36,6 +52,7 @@ const GROUPS: { key: Group; label: string; icon: IconName }[] = [
   { key: "property", label: "Property", icon: "home-outline" },
   { key: "money", label: "Wallet", icon: "wallet-outline" },
   { key: "services", label: "Services & Market", icon: "construct-outline" },
+  { key: "neighbours", label: "Neighbours", icon: "people-outline" },
 ];
 
 function timeAgo(iso: string): string {
@@ -113,6 +130,14 @@ export default function Notifications() {
     // Offer notifications land on the offers tab (an accepted offer may also carry a chat).
     if (n.kind === "MARKET_OFFER" && meta.offer_id) router.push(`/marketplace/my-listings?tab=${meta.tab === "sent" ? "sent" : "received"}` as any);
     else if (n.kind === "MARKET_MODERATION") router.push("/marketplace/my-listings" as any);
+    // Neighbours: managers land on the People tab to review join requests.
+    else if (n.kind === "ESTATE_REQUEST" && meta.estate_id) router.push(`/neighbours/estates/${meta.estate_id}?tab=people` as any);
+    else if (meta.service_request_id) router.push(`/neighbours/services/${meta.service_request_id}` as any);
+    else if (meta.post_id) router.push(`/neighbours/posts/${meta.post_id}` as any);
+    else if (meta.event_id) router.push(`/neighbours/events/${meta.event_id}` as any);
+    else if (meta.collection_id) router.push(`/neighbours/collections/${meta.collection_id}` as any);
+    else if (meta.connection_id) router.push("/neighbours/friends" as any);
+    else if (meta.estate_id) router.push(`/neighbours/estates/${meta.estate_id}` as any);
     else if (meta.conversation_id) router.push(`/chat/${meta.conversation_id}` as any);
     else if (meta.item_id) router.push(`/marketplace/${meta.item_id}` as any);
     else if (meta.inspection_id) router.push(`/improve/inspection/${meta.inspection_id}` as any);
@@ -125,7 +150,7 @@ export default function Notifications() {
 
   const filtered = useMemo(() => (group === "all" ? items : items.filter((n) => (KIND_META[n.kind]?.group ?? "property") === group)), [items, group]);
   const counts = useMemo(() => {
-    const c: Record<Group, number> = { all: items.length, messages: 0, property: 0, money: 0, services: 0 };
+    const c: Record<Group, number> = { all: items.length, messages: 0, property: 0, money: 0, services: 0, neighbours: 0 };
     for (const n of items) c[KIND_META[n.kind]?.group ?? "property"]++;
     return c;
   }, [items]);

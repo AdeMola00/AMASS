@@ -134,25 +134,51 @@ export default function NeighboursTab() {
               </Card>
             ) : (
               approved.map((e) => (
-                <Pressable key={e.id} onPress={() => router.push(`/neighbours/estates/${e.id}` as any)} accessibilityRole="button" accessibilityLabel={`Open ${e.name}`} testID={`nb-estate-${e.id}`}>
-                  <Card elevation="sm" padded={false} style={{ overflow: "hidden" }}>
-                    {e.cover_image ? <Image source={{ uri: e.cover_image }} style={styles.cover} contentFit="cover" transition={150} /> : null}
-                    <View style={{ padding: 14, gap: 8 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        <AppText variant="title" style={{ flex: 1 }} numberOfLines={1}>
-                          {e.name}
+                <View key={e.id} style={{ gap: 8 }}>
+                  <Pressable onPress={() => router.push(`/neighbours/estates/${e.id}` as any)} accessibilityRole="button" accessibilityLabel={`Open ${e.name}`} testID={`nb-estate-${e.id}`}>
+                    <Card elevation="sm" padded={false} style={{ overflow: "hidden" }}>
+                      {e.cover_image ? <Image source={{ uri: e.cover_image }} style={styles.cover} contentFit="cover" transition={150} /> : null}
+                      <View style={{ padding: 14, gap: 8 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <AppText variant="title" style={{ flex: 1 }} numberOfLines={1}>
+                            {e.name}
+                          </AppText>
+                          <Badge label={e.membership?.role === "manager" ? "Manager" : "Verified resident"} tone={e.membership?.role === "manager" ? "brand" : "success"} icon="shield-checkmark" size="xs" />
+                        </View>
+                        <View style={{ flexDirection: "row", gap: 14, flexWrap: "wrap" }}>
+                          <Stat icon="people-outline" label={`${e.member_count ?? 0} residents`} />
+                          <Stat icon="calendar-outline" label={`${e.upcoming_events ?? 0} upcoming`} />
+                          <Stat icon="help-circle-outline" label={`${e.open_questions ?? 0} open questions`} />
+                        </View>
+                      </View>
+                    </Card>
+                  </Pressable>
+                  {e.is_manager && e.pending_requests ? (
+                    <Pressable
+                      onPress={() => router.push(`/neighbours/estates/${e.id}?tab=people` as any)}
+                      style={({ pressed }) => [styles.alertRow, { backgroundColor: colors.warningSoft, borderColor: colors.warning }, pressed && { opacity: 0.9 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${e.pending_requests} join requests waiting for ${e.name}. Review now.`}
+                      testID={`nb-join-alert-${e.id}`}
+                    >
+                      <View style={[styles.alertIcon, { backgroundColor: colors.warning }]}>
+                        <Ionicons name="person-add" size={14} color="#fff" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <AppText variant="bodySm" weight="bold">
+                          {e.pending_requests} resident{e.pending_requests === 1 ? "" : "s"} waiting to join
                         </AppText>
-                        <Badge label={e.membership?.role === "manager" ? "Manager" : "Verified resident"} tone={e.membership?.role === "manager" ? "brand" : "success"} icon="shield-checkmark" size="xs" />
+                        <AppText variant="micro" tone="secondary">
+                          Verify their unit or proof so they can see the feed.
+                        </AppText>
                       </View>
-                      <View style={{ flexDirection: "row", gap: 14, flexWrap: "wrap" }}>
-                        <Stat icon="people-outline" label={`${e.member_count ?? 0} residents`} />
-                        <Stat icon="calendar-outline" label={`${e.upcoming_events ?? 0} upcoming`} />
-                        <Stat icon="help-circle-outline" label={`${e.open_questions ?? 0} open questions`} />
-                      </View>
-                      {e.is_manager && e.pending_requests ? <Badge label={`${e.pending_requests} join request${e.pending_requests === 1 ? "" : "s"} to review`} tone="warning" icon="person-add" size="xs" /> : null}
-                    </View>
-                  </Card>
-                </Pressable>
+                      <AppText variant="caption" weight="bold" color={colors.warning}>
+                        Review
+                      </AppText>
+                      <Ionicons name="chevron-forward" size={14} color={colors.warning} />
+                    </Pressable>
+                  ) : null}
+                </View>
               ))
             )}
 
@@ -338,6 +364,8 @@ const styles = StyleSheet.create({
   estateIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   inlineBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 44, borderRadius: radii.md },
   cover: { width: "100%", height: 120 },
+  alertRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth },
+  alertIcon: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   addCircle: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   dashed: { flexDirection: "row", alignItems: "center", gap: 8, padding: 14, borderRadius: radii.md, borderWidth: 1, borderStyle: "dashed" },
   collCard: { width: 168, padding: 10, borderRadius: radii.lg, borderWidth: 1, gap: 6 },

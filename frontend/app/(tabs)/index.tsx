@@ -43,7 +43,7 @@ const QUICK_FILTERS: ChipConf[] = [
 ];
 
 /** Lean marker → minimal Property shape so the cluster index & markers can reuse it. No price/title is ever prefetched. */
-type Pin = Property & { unlocked: boolean; approx: boolean; category: "sale" | "rent" };
+type Pin = Property & { unlocked: boolean; approx: boolean; category: "sale" | "rent"; friendsSaved: number; inSharedList: boolean };
 const toPin = (m: MapMarker): Pin =>
   ({
     id: m.id,
@@ -55,7 +55,18 @@ const toPin = (m: MapMarker): Pin =>
     unlocked: m.unlocked,
     approx: m.approx,
     category: m.category,
+    friendsSaved: m.friends_saved ?? 0,
+    inSharedList: !!m.in_shared_list,
   }) as unknown as Pin;
+const hasNudge = (p: Pin) => p.friendsSaved > 0 || p.inSharedList;
+/** Attribution for the conversion funnel: a friend's save beats a shared list beats direct. */
+const pinVia = (p: Pin): "friend" | "collection" | "direct" => (p.friendsSaved > 0 ? "friend" : p.inSharedList ? "collection" : "direct");
+const nudgeText = (p: Pin) => {
+  const parts: string[] = [];
+  if (p.friendsSaved > 0) parts.push(`${p.friendsSaved} friend${p.friendsSaved === 1 ? "" : "s"} saved this`);
+  if (p.inSharedList) parts.push("in one of your shared lists");
+  return parts.join(" · ");
+};
 
 export default function HomeMap() {
   const { colors, shadows, isDark } = useTheme();
@@ -82,6 +93,7 @@ export default function HomeMap() {
   const [locationPermission, setLocationPermission] = useState<"unknown" | "granted" | "denied" | "blocked">("unknown");
   const [unlockTarget, setUnlockTarget] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [friendsOnly, setFriendsOnly] = useState(false);
   const initialRegionRef = useRef<Region>(BOOTSTRAP_REGION);
   const introDoneRef = useRef(false);
   const lastRegionSaveRef = useRef(0);
@@ -206,7 +218,9 @@ export default function HomeMap() {
     } catch {}
   }, [searchParams.ai_filters, router]);
 
-  const clusterIndex = useMemo(() => buildIndex(pins), [pins]);
+  const nudgeCount = useMemo(() => pins.filter(hasNudge).length, [pins]);
+  const visiblePins = useMemo(() => (friendsOnly ? pins.filter(hasNudge) : pins), [pins, friendsOnly]);
+  const clusterIndex = useMemo(() => buildIndex(visiblePins), [visiblePins]);
   const clusters = useMemo(() => getClusters(clusterIndex, region), [clusterIndex, region]);
   useEffect(() => {
     trackMarkerImpressions(clusters.length);
@@ -215,24 +229,27 @@ export default function HomeMap() {
   const onMarkerPress = (p: Pin) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setActiveId(p.id);
-    track("marker_tap", { property_id: p.id, unlocked: p.unlocked, category: p.category });
+    const via = pinVia(p);
+    track("marker_tap", { property_id: p.id, unlocked: p.unlocked, category: p.category, arrived_via: via });
     if (p.unlocked) {
-      router.push(`/property/${p.id}` as any);
+      router.push(`/property/${p.id}?via=${via}` as any);
       return;
     }
     if (locked) {
       toast.show({ kind: "info", title: "Get MASS to unlock details", body: "The map is free — property details need MASS tokens.", actionLabel: "Get MASS", onAction: () => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any) });
       return;
     }
-    track("paid_action_start", { property_id: p.id, arrived_via: "direct" });
+    track("paid_action_start", { property_id: p.id, arrived_via: via });
     setUnlockTarget(p.id);
   };
 
   const onUnlocked = (res: UnlockResult) => {
     setUnlockTarget(null);
-    track("payment_completed", { property_id: res.target_id, arrived_via: "direct", charged: res.charged });
+    const target = pins.find((p) => p.id === res.target_id);
+    const via = target ? pinVia(target) : "direct";
+    track("payment_completed", { property_id: res.target_id, arrived_via: via, charged: res.charged });
     setPins((prev) => prev.map((p) => (p.id === res.target_id ? { ...p, unlocked: true, approx: false } : p)));
-    router.push(`/property/${res.target_id}` as any);
+    router.push(`/property/${res.target_id}?via=${via}` as any);
   };
 
   const onRegionChangeComplete = (r: Region) => {
@@ -343,8 +360,9 @@ export default function HomeMap() {
   const zoomLevel = zoomFromDelta(region.latitudeDelta);
   const searchTop = insets.top + 6;
   const bottomStack = 66 + Math.max(insets.bottom, 12) + 14;
-  const saleCount = pins.filter((p) => p.category === "sale").length;
-  const rentCount = pins.length - saleCount;
+  const saleCount = visiblePins.filter((p) => p.category === "sale").length;
+  const rentCount = visiblePins.length - saleCount;
+  const unlockPin = unlockTarget ? pins.find((p) => p.id === unlockTarget) : undefined;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]} testID="home-map-screen">
@@ -392,7 +410,7 @@ export default function HomeMap() {
             <Marker
               key={p.id}
               coordinate={{ latitude: p.latitude, longitude: p.longitude }}
-              accessibilityLabel={`${p.category === "sale" ? "For sale" : "To rent"} ${p.property_type}. ${p.unlocked ? "Unlocked — tap to view." : locked ? "Locked — get MASS to unlock." : "Tap to unlock details."}`}
+              accessibilityLabel={`${p.category === "sale" ? "For sale" : "To rent"} ${p.property_type}. ${hasNudge(p) ? `${nudgeText(p)}. ` : ""}${p.unlocked ? "Unlocked — tap to view." : locked ? "Locked — get MASS to unlock." : "Tap to unlock details."}`}
               onPress={() => onMarkerPress(p)}
               anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={Platform.OS === "android" || p.id === activeId}
@@ -453,6 +471,17 @@ export default function HomeMap() {
                 }}
               />
             ))}
+            {nudgeCount > 0 ? (
+              <FilterChip
+                label="Friends' picks"
+                icon="people"
+                active={friendsOnly}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setFriendsOnly((v) => !v);
+                }}
+              />
+            ) : null}
           </ScrollView>
           <BalanceChip compact style={styles.balanceChip} testID="map-balance-chip" />
         </View>
@@ -569,6 +598,14 @@ export default function HomeMap() {
                 {rentCount} rent
               </AppText>
             </View>
+            {nudgeCount > 0 ? (
+              <View style={styles.legendItem} testID="map-legend-friends">
+                <Ionicons name="people" size={11} color={colors.brand} />
+                <AppText variant="micro" weight="bold" color={colors.brand} tabular>
+                  {nudgeCount} by friends
+                </AppText>
+              </View>
+            ) : null}
             {zoomLevel < 12 ? (
               <AppText variant="micro" tone="tertiary">
                 Zoom in for pins
@@ -604,27 +641,47 @@ export default function HomeMap() {
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg, opacity: fadeAnim, zIndex: 5 }]} testID="map-fade-curtain" />
 
       <FilterSheet ref={filterSheetRef} value={filters} onApply={setFilters} />
-      <UnlockDialog visible={!!unlockTarget} featureKey="property" targetId={unlockTarget} onClose={() => setUnlockTarget(null)} onUnlocked={onUnlocked} />
+      <UnlockDialog visible={!!unlockTarget} featureKey="property" targetId={unlockTarget} onClose={() => setUnlockTarget(null)} onUnlocked={onUnlocked}>
+        {unlockPin && hasNudge(unlockPin) ? (
+          <View style={[styles.nudge, { backgroundColor: colors.brandSoft }]} accessibilityRole="text" testID="unlock-friend-nudge">
+            <Ionicons name="people" size={16} color={colors.brand} />
+            <AppText variant="bodySm" weight="semibold" color={colors.brand} style={{ flex: 1 }}>
+              {nudgeText(unlockPin)}
+            </AppText>
+          </View>
+        ) : null}
+      </UnlockDialog>
     </View>
   );
 }
 
-/** Category pin — never shows price or title before unlock. */
+/** Category pin — never shows price or title before unlock. A small people badge marks homes friends saved / shared lists hold. */
 function PinMarker({ pin, muted, active }: { pin: Pin; muted: boolean; active: boolean }) {
   const { colors } = useTheme();
   const sale = pin.category === "sale";
   const fill = pin.unlocked ? colors.success : muted ? colors.borderStrong : sale ? colors.primary : colors.info;
   const fg = muted ? colors.textSecondary : pin.unlocked || !sale ? "#fff" : colors.onPrimary;
   const icon: IconName = pin.unlocked ? "lock-open" : muted ? "lock-closed" : sale ? "home" : "key";
+  const nudge = hasNudge(pin);
   return (
     <View style={styles.pinWrap} testID={`pin-${pin.id}`}>
-      <View style={[styles.pin, { backgroundColor: fill, borderColor: active ? colors.brand : "rgba(255,255,255,0.85)", transform: [{ scale: active ? 1.12 : 1 }], opacity: muted ? 0.75 : 1 }]}>
+      <View style={[styles.pin, { backgroundColor: fill, borderColor: active ? colors.brand : nudge ? colors.brand : "rgba(255,255,255,0.85)", transform: [{ scale: active ? 1.12 : 1 }], opacity: muted ? 0.75 : 1 }]}>
         <Ionicons name={icon} size={12} color={fg} />
         <AppText variant="micro" color={fg} weight="extrabold">
           {sale ? "Sale" : "Rent"}
         </AppText>
         {pin.verified && !muted ? <Ionicons name="shield-checkmark" size={11} color={fg} /> : null}
       </View>
+      {nudge ? (
+        <View style={[styles.pinNudge, { backgroundColor: colors.brand, borderColor: "#fff" }]} testID={`pin-nudge-${pin.id}`}>
+          <Ionicons name="people" size={9} color="#fff" />
+          {pin.friendsSaved > 0 ? (
+            <AppText variant="micro" color="#fff" weight="extrabold" style={{ fontSize: 9, lineHeight: 11 }} tabular>
+              {pin.friendsSaved}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
       <View style={[styles.pinTail, { borderTopColor: fill }]} />
     </View>
   );
@@ -665,7 +722,9 @@ const styles = StyleSheet.create({
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   lockedBanner: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radii.lg },
   lockedIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  pinWrap: { alignItems: "center" },
+  pinWrap: { alignItems: "center", paddingTop: 6, paddingHorizontal: 6 },
   pin: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, height: 28, borderRadius: radii.pill, borderWidth: 2 },
+  pinNudge: { position: "absolute", top: 0, right: 0, flexDirection: "row", alignItems: "center", gap: 2, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, borderWidth: 1.5 },
+  nudge: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: radii.sm, marginTop: space[3] },
   pinTail: { width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 6, borderLeftColor: "transparent", borderRightColor: "transparent", marginTop: -1 },
 });
