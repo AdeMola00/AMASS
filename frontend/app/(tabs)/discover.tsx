@@ -59,7 +59,16 @@ export default function Discover() {
       ]);
       setNeighborhoods(nb);
       const list = props.length ? props : await api.listProperties().catch(() => [] as Property[]);
-      setFeatured(list.filter((p) => p.status !== "sold").slice(0, 8));
+      // Feature/Boost promotions take the first cards (paid placement); Promote only affects results ranking.
+      const railRank = (p: Property) => (p.promotion?.tier === "boost" ? 2 : p.promotion?.tier === "feature" ? 1 : 0);
+      setFeatured(
+        list
+          .filter((p) => p.status !== "sold")
+          .map((p, i) => ({ p, i }))
+          .sort((a, b) => railRank(b.p) - railRank(a.p) || a.i - b.i)
+          .map((x) => x.p)
+          .slice(0, 8)
+      );
       setFavIds(new Set(favs.ids));
       if (!nb.length && !list.length) setError(true);
     } catch {

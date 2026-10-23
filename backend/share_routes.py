@@ -25,7 +25,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 AMASS_DOMAIN = "https://amass.africa"
 
 ShareChannel = Literal[
-    "whatsapp", "qr", "copy_link", "native_share", "flyer", "email", "sms"
+    "whatsapp", "qr", "copy_link", "native_share", "flyer", "email", "sms", "story", "story_series"
 ]
 
 
@@ -190,6 +190,72 @@ def register_share_routes(db: AsyncIOMotorDatabase, require_auth):
                 },
             },
         )
+
+    # ═══ 2b) Listing Story — 9:16 WhatsApp-status kit ═══════════════
+    @router.get("/property/{property_id}/story")
+    async def property_story(property_id: str, user: dict = Depends(require_auth)):
+        """Everything the client needs to render swipeable 9:16 story slides.
+        Allowed for the listing agent/owner, admins, and buyers who unlocked the
+        listing (entitlement) — the same people who can already see all photos."""
+        prop = await db.properties.find_one({"id": property_id}, {"_id": 0})
+        if not prop:
+            raise HTTPException(404, "Property not found")
+        is_owner = prop.get("agent_id") == user["id"]
+        allowed = is_owner or bool(user.get("is_admin"))
+        if not allowed:
+            ent = await db.entitlements.find_one(
+                {"user_id": user["id"], "feature_key": "property", "target_id": property_id, "status": "active"}, {"_id": 0, "id": 1}
+            )
+            allowed = bool(ent)
+        if not allowed:
+            try:
+                from monetization import property_fee
+                _, is_free = await property_fee(db, prop)
+                allowed = bool(is_free)
+            except Exception:
+                allowed = False
+        if not allowed:
+            raise HTTPException(403, {"error": "locked", "message": "Unlock this listing to create a story from its photos."})
+        share_url = f"{AMASS_DOMAIN}/property/{property_id}"
+        flyer = await _hydrate_flyer(prop)
+        agent = flyer.get("agent") or {}
+        price = prop.get("price") or 0
+        try:
+            price_fmt = f"₦{int(price):,}"
+        except (TypeError, ValueError):
+            price_fmt = f"₦{price}"
+        where = ", ".join([x for x in (prop.get("city"), prop.get("state")) if x]) or (prop.get("location") or "")
+        specs = [f"{prop['bedrooms']} bed" if prop.get("bedrooms") else None, f"{prop['bathrooms']} bath" if prop.get("bathrooms") else None, f"{prop['size_sqm']} sqm" if prop.get("size_sqm") else None]
+        specs = [x for x in specs if x]
+        caption = "\n".join(
+            [
+                f"{prop.get('title', 'Property on AMASS')} · {price_fmt}",
+                f"{(prop.get('listing_type') or 'for sale').upper()} · {where}" + (f" · {' · '.join(specs)}" if specs else ""),
+                ("✅ Verified by AMASS" if prop.get("verified") else "Listed on AMASS"),
+                f"👉 {share_url}",
+            ]
+        )
+        images = [i for i in (prop.get("images") or []) if isinstance(i, str) and i.startswith("http")][:6]
+        return {
+            "role": "agent" if is_owner else ("admin" if user.get("is_admin") else "buyer"),
+            "share_url": share_url,
+            "caption": caption,
+            "property": {
+                **flyer["property"],
+                "images": images,
+                "description": (prop.get("description") or "")[:220],
+                "ai_valuation": prop.get("ai_valuation"),
+                "status": prop.get("status", "available"),
+            },
+            "agent": {
+                "full_name": agent.get("full_name"),
+                "avatar_url": agent.get("avatar_url") or agent.get("avatar"),
+                "badge": agent.get("badge"),
+                "slug": agent.get("slug"),
+                "agency": agent.get("agency_name") or agent.get("agency"),
+            } if agent else None,
+            "brand": flyer["brand"],
+        }
 
     # ═══ 3) Record a share event (analytics) ══════════════════════
     @router.post("/property/{property_id}/event")

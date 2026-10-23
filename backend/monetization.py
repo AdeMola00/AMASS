@@ -859,7 +859,8 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
         if None not in (min_lat, max_lat, min_lng, max_lng):
             query["latitude"] = {"$gte": min_lat, "$lte": max_lat}
             query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
-        docs = await db.properties.find(query, {"_id": 0, "id": 1, "listing_type": 1, "property_type": 1, "latitude": 1, "longitude": 1, "agent_id": 1, "verified": 1}).limit(min(limit, 500)).to_list(500)
+        docs = await db.properties.find(query, {"_id": 0, "id": 1, "listing_type": 1, "property_type": 1, "latitude": 1, "longitude": 1, "agent_id": 1, "verified": 1, "promotion": 1}).limit(min(limit, 500)).to_list(500)
+        from promotions import active_promotion as _active_promo
         ent_ids = {e["target_id"] for e in await db.entitlements.find({"user_id": user["id"], "feature_key": "property", "status": "active"}, {"_id": 0, "target_id": 1}).to_list(2000)}
         # Friend nudges: counts only (friends who share their saves + my shared lists). Never reveals paid data.
         social = await marker_social_context(db, user["id"], [d["id"] for d in docs])
@@ -876,6 +877,7 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
                 "id": d["id"], "category": property_category(d), "type": d.get("property_type"), "lat": lat, "lng": lng, "unlocked": unlocked,
                 "verified": bool(d.get("verified")), "approx": not unlocked,
                 "friends_saved": int(s.get("friends_saved", 0)), "in_shared_list": bool(s.get("in_shared_list", False)),
+                "promotion_tier": (_active_promo(d) or {}).get("tier"),
             })
         return {"markers": out, "count": len(out), "approx_radius_m": 150}
 

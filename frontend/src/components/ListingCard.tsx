@@ -11,6 +11,7 @@ import { formatMarkerPrice } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { gradients, motion, radii } from "@/src/theme/tokens";
 import { AppText, Badge, FrostedCircle, FrostedLabel, GlassFill, PhotoSheen, PressableScale } from "@/src/ui";
+import { PromotionPhotoLabel } from "@/src/components/PromotionBadge";
 
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 
@@ -92,6 +93,7 @@ export function ListingCard({
           <PhotoSheen radius={radii.lg} strength={0.8} />
           <View style={styles.topRow}>
             <View style={{ flexDirection: "row", gap: 6, flex: 1, flexWrap: "wrap" }}>
+              <PromotionPhotoLabel promotion={property.promotion} />
               {property.verified ? <FrostedLabel label="Verified" icon="shield-checkmark" tone="light" color="#1C5E39" size="xs" /> : null}
               {property.is_amass_exclusive ? <Badge label="AMASS Exclusive" tone="brand" icon="ribbon" /> : null}
               {isSold ? <Badge label="Sold" tone="inverse" icon="lock-closed" /> : null}

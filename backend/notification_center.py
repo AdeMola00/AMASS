@@ -61,6 +61,7 @@ FREQUENCIES = ("immediate", "daily", "weekly")
 KIND_CATEGORY: dict[str, str] = {
     "NEW_MESSAGE": "messages",
     "SAVED_SEARCH_MATCH": "property_matches",
+    "BOOSTED_LISTING": "property_matches",
     "NEARBY_LISTINGS": "nearby_listings",
     "BRAND_OFFER": "brand_offers",
     "MARKET_AD": "marketplace",

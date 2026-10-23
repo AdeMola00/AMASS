@@ -53,11 +53,6 @@ TASK_REWARDS: dict = {
 REFERRAL_BONUS = 50  # tokens for the referrer once referee completes signup
 
 # ─── Agent tool prices ─────────────────────────────────────────
-LISTING_PROMOTE_COSTS = {
-    "promote": {"tokens": 20, "days": 7, "label": "Promote", "perk": "Higher in search results"},
-    "feature": {"tokens": 50, "days": 14, "label": "Feature", "perk": "Large featured card + priority"},
-    "boost": {"tokens": 100, "days": 30, "label": "Boost", "perk": "Top of feed + push to matched buyers"},
-}
 
 LEAD_UNLOCK_COST = 10  # tokens to see a lead's contact
 AI_DESCRIPTION_COST = 5  # tokens per AI generation
@@ -88,11 +83,6 @@ class CompleteProfileIn(BaseModel):
 
 class ReferralApplyIn(BaseModel):
     code: str
-
-
-class PromoteListingIn(BaseModel):
-    property_id: str
-    tier: Literal["promote", "feature", "boost"]
 
 
 class UnlockLeadIn(BaseModel):
@@ -442,66 +432,6 @@ def register_agent_tool_routes(db: AsyncIOMotorDatabase, chat_factory) -> APIRou
     integration library at import time."""
     router = APIRouter(prefix="/api", tags=["agent_tools"])
     svc = WalletService(db)
-
-    # ─── Promote/Feature/Boost ─────────────────────────────
-    @router.get("/agent/promotions/config")
-    async def promotions_config():
-        return LISTING_PROMOTE_COSTS
-
-    @router.post("/agent/promote")
-    async def promote_listing(
-        data: PromoteListingIn,
-        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
-    ):
-        user_id = await _uid(creds)
-        prop = await db.properties.find_one({"id": data.property_id}, {"_id": 0})
-        if not prop:
-            raise HTTPException(404, "Property not found")
-        cfg = LISTING_PROMOTE_COSTS[data.tier]
-        # Debit tokens
-        try:
-            await svc.debit(
-                user_id,
-                cfg["tokens"],
-                "spend_unlock",
-                f"{cfg['label']} listing: {prop.get('title', '')[:40]}",
-                meta={"property_id": data.property_id, "tier": data.tier},
-            )
-        except HTTPException as e:
-            if e.status_code == 402:
-                wallet = await svc.get_or_create(user_id)
-                raise HTTPException(
-                    402,
-                    {
-                        "error": "insufficient_tokens",
-                        "required": cfg["tokens"],
-                        "balance": wallet["balance"] + wallet["bonus_balance"],
-                        "shortfall": cfg["tokens"] - (wallet["balance"] + wallet["bonus_balance"]),
-                    },
-                )
-            raise
-        # Apply promotion on property
-        starts = datetime.now(timezone.utc)
-        expires = starts + timedelta(days=cfg["days"])
-        await db.properties.update_one(
-            {"id": data.property_id},
-            {
-                "$set": {
-                    "promotion": {
-                        "tier": data.tier,
-                        "starts_at": starts,
-                        "expires_at": expires,
-                        "boosted_by": user_id,
-                    }
-                }
-            },
-        )
-        return {
-            "ok": True,
-            "tier": data.tier,
-            "expires_at": expires,
-            "cost": cfg["tokens"],
-        }
 
     # ─── Lead unlock ────────────────────────────────────────
     @router.get("/agent/leads/{property_id}")

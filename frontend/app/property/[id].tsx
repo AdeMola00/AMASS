@@ -32,6 +32,7 @@ import { PriceText } from "@/src/components/PriceText";
 import { ListingCard } from "@/src/components/ListingCard";
 import { HotFlame } from "@/src/components/HotFlame";
 import { TokenIcon } from "@/src/components/TokenIcon";
+import { PromotionBadge } from "@/src/components/PromotionBadge";
 import { useWallet } from "@/src/contexts/wallet";
 import { useAuth } from "@/src/contexts/auth";
 import { recordRecentlyViewed } from "@/src/lib/recently-viewed";
@@ -300,6 +301,7 @@ export default function PropertyDetails() {
         <View style={[styles.sheet, { backgroundColor: colors.bg }]}>
           <View style={styles.badgeRow}>
             <StatusBadge status={property.status} />
+            <PromotionBadge promotion={property.promotion} withDays={isOwnListing} testID="detail-promo-badge" />
             {property.verified && property.status !== "verified" && <Badge label="Verified" tone="success" icon="shield-checkmark" />}
             {property.is_free_amass_sale && (
               <Badge label="Listed by AMASS · Free access" tone="fix" icon="ribbon" />
@@ -616,15 +618,18 @@ export default function PropertyDetails() {
           <>
             <IconButton icon="share-outline" label="Share this property" variant="secondary" size={54} iconSize={22} onPress={onShare} testID="chat-agent-btn" />
             {isOwnListing ? (
-              <Button
-                label="Manage listing"
-                variant="primary"
-                size="lg"
-                iconLeft="briefcase"
-                onPress={() => router.push("/agent-dashboard" as any)}
-                style={{ flex: 1 }}
-                testID="book-tour-btn"
-              />
+              <>
+                <IconButton icon="rocket" label={property.promotion ? "Extend boost" : "Boost listing"} variant="brand" size={54} iconSize={22} onPress={() => router.push(`/agent/boost/${property.id}` as any)} testID="boost-listing-btn" />
+                <Button
+                  label="Manage listing"
+                  variant="primary"
+                  size="lg"
+                  iconLeft="briefcase"
+                  onPress={() => router.push("/agent-dashboard" as any)}
+                  style={{ flex: 1 }}
+                  testID="book-tour-btn"
+                />
+              </>
             ) : (
               <Button
                 label="Chat with Agent · Free"

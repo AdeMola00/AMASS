@@ -44,7 +44,7 @@ const QUICK_FILTERS: ChipConf[] = [
 ];
 
 /** Lean marker → minimal Property shape so the cluster index & markers can reuse it. No price/title is ever prefetched. */
-type Pin = Property & { unlocked: boolean; approx: boolean; category: "sale" | "rent"; friendsSaved: number; inSharedList: boolean };
+type Pin = Property & { unlocked: boolean; approx: boolean; category: "sale" | "rent"; friendsSaved: number; inSharedList: boolean; boosted: boolean };
 const toPin = (m: MapMarker): Pin =>
   ({
     id: m.id,
@@ -58,6 +58,7 @@ const toPin = (m: MapMarker): Pin =>
     category: m.category,
     friendsSaved: m.friends_saved ?? 0,
     inSharedList: !!m.in_shared_list,
+    boosted: m.promotion_tier === "boost",
   }) as unknown as Pin;
 const hasNudge = (p: Pin) => p.friendsSaved > 0 || p.inSharedList;
 /** Attribution for the conversion funnel: a friend's save beats a shared list beats direct. */
@@ -671,9 +672,11 @@ function PinMarker({ pin, muted, active }: { pin: Pin; muted: boolean; active: b
   const fg = muted ? colors.textSecondary : pin.unlocked || !sale ? "#fff" : colors.onPrimary;
   const icon: IconName = pin.unlocked ? "lock-open" : muted ? "lock-closed" : sale ? "home" : "key";
   const nudge = hasNudge(pin);
+  const boosted = pin.boosted && !muted;
   return (
-    <View style={styles.pinWrap} testID={`pin-${pin.id}`}>
-      <View style={[styles.pin, { backgroundColor: fill, borderColor: active ? colors.brand : nudge ? colors.brand : "rgba(255,255,255,0.85)", transform: [{ scale: active ? 1.12 : 1 }], opacity: muted ? 0.75 : 1 }]}>
+    <View style={styles.pinWrap} testID={boosted ? `pin-boosted-${pin.id}` : `pin-${pin.id}`}>
+      <View style={[styles.pin, { backgroundColor: fill, borderColor: active ? colors.brand : boosted ? colors.mass : nudge ? colors.brand : "rgba(255,255,255,0.85)", borderWidth: boosted ? 2.5 : 2, transform: [{ scale: active ? 1.12 : boosted ? 1.06 : 1 }], opacity: muted ? 0.75 : 1 }]}>
+        {boosted ? <Ionicons name="rocket" size={11} color={colors.mass} /> : null}
         <Ionicons name={icon} size={12} color={fg} />
         <AppText variant="micro" color={fg} weight="extrabold">
           {sale ? "Sale" : "Rent"}

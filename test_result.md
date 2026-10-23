@@ -802,3 +802,35 @@ agent_communication:
       fix gradient on slide 1, ink after), onboarding-skip, onboarding-signin → /login. Parallax + floating bob + stagger;
       reduced-motion disables them. Button: brand/fix gradient fills + sheen on primary; selected Chips get a sheen.
       Login/register/forgot/phone/about now show the lockup. Demo: demo@amass.africa / amass2026.
+  - agent: "main"
+    message: |
+      AGENT BOOST TOOLS + LISTING STORIES — first test pass (backend + frontend).
+      Backend new module /app/backend/promotions.py (router registered in server.py): GET /api/agent/promotions/config
+      (tiers promote 20 MASS/7d · feature 50/14d · boost 100/30d — admin-editable via GET/PATCH /api/admin/promotions/config,
+      prices must step up else 422), GET /api/agent/promotions/placements, GET /api/agent/promotions/preview/{property_id}
+      (owner/admin only → balance, balance_after/affordable per tier, reach: views_30d, city_seekers_30d, matched_buyers,
+      competing_listings, current_rank, estimated_views; active promotion), POST /api/agent/promote {property_id, tier}
+      (owner only; debits MASS; same tier while active EXTENDS expiry; boost → BOOSTED_LISTING notifications to buyers with
+      matching saved searches via notification_center.emit; writes `promotions` history), GET /api/agent/promotions/mine.
+      Placements are REAL: /api/properties returns active promotions first (boost>feature>promote), /api/map/markers adds
+      promotion_tier, /api/properties/{id} + /api/agent/listings carry `promotion {tier, expires_at, days_left}` (null when
+      expired). Story kit: GET /api/share/property/{id}/story (auth; owner/admin/unlocked buyer, else 403 {error:"locked"});
+      share channels "story" / "story_series" accepted by POST /share/property/{id}/event.
+      pytest tests/test_promotions_and_stories.py 13/13; test_earn_agent_ads + test_share_routes 44/44 still green.
+      Frontend: NEW /agent/boost/[id] (boost-screen; boost-listing; boost-tier-{promote|feature|boost}; boost-perk;
+      placement-{results|featured|map|alerts} chips (locked ones carry -locked suffix + info toast); preview-{placement}
+      phone mock with mock-hero-row / mock-featured-card / mock-boost-pin / mock-alert; reach-views/rank/buyers/seekers;
+      boost-includes; sticky boost-cost + boost-balance-line + boost-activate (or boost-topup) → ChargeConfirm
+      (boost-confirm, charge-confirm-btn, charge-balance-after) → boost-success panel (success-discover/map/listing/done);
+      boost-active-banner when a promotion is live). NEW /share/story/[id] (story-screen; story-slides horizontal paging with
+      story-slide-{cover|gallery|details}; story-slide-label; story-post → captures PNG 1080×1920 via react-native-view-shot and
+      hands it to expo-sharing (on WEB: info toast + caption copied — capture/share is native only); story-post-series;
+      story-copy-caption; story-error with "View listing" when locked). Entry points: /share/[id] gets a brand gradient
+      card share-story-entry; property detail owner sticky bar gets boost-listing-btn (rocket IconButton) + detail-promo-badge;
+      agent dashboard: Overview "Boosts" card (boosts-card, boosts-cta, active-boost-{id}, boosts-view-all), listing rows
+      show PromotionBadge and the boost-{id} pill (label "Extend" when live) now routes to /agent/boost/{id} (old BoostSheet
+      removed). ListingCard shows promo-label-{tier} frosted gold label; Discover featured rail puts feature/boost first;
+      home map pins with boost get a gold ring + rocket (testID pin-boosted-{id}, native map only). Admin → Monetization →
+      Config tab gets "Agent boost tiers" section (cfg-boost-{tier}-tokens/days, cfg-boost-save).
+      Demo agent demo@amass.africa / amass2026 owns listing 7d769d80-fdf8-4778-932a-f938aa3c27cf (Palatial Ocean-View Duplex)
+      with 12k+ MASS. Note: activating a promotion on the demo listing is a real MASS debit and makes it promoted-first.

@@ -3,6 +3,27 @@ import { storage } from "@/src/utils/storage";
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
 const AUTH_KEY = "amass_auth_token";
 
+export type PromotionTier = "promote" | "feature" | "boost";
+export type PromotionInfo = { tier: PromotionTier; starts_at?: string; expires_at: string | null; days_left: number };
+export type PromotionTierConfig = { tokens: number; days: number; label: string; perk: string; placements: string[]; uplift: number };
+export type PromotionPreview = {
+  property: { id: string; title?: string; price?: number; listing_type?: string; property_type?: string; bedrooms?: number; bathrooms?: number; size_sqm?: number; location?: string; city?: string; verified: boolean; status: string; image?: string | null };
+  balance: number;
+  currency: "MASS";
+  tiers: Record<PromotionTier, PromotionTierConfig & { balance_after: number; affordable: boolean; estimated_views: number; extends_active: boolean }>;
+  placements: Record<string, { label: string; caption: string; icon: string }>;
+  reach: { views_30d: number; city_seekers_30d: number; matched_buyers: number; competing_listings: number; promoted_competitors: number; current_rank: number; estimated_views: Record<string, number>; city: string };
+  active: PromotionInfo | null;
+};
+export type ListingStory = {
+  role: "agent" | "admin" | "buyer";
+  share_url: string;
+  caption: string;
+  property: { id: string; title?: string; price?: number; currency?: string; listing_type?: string; property_type?: string; bedrooms?: number; bathrooms?: number; size_sqm?: number; city?: string; state?: string; location?: string; images: string[]; verified?: boolean; amenities?: string[]; description?: string; ai_valuation?: number | null; status?: string };
+  agent: { full_name?: string | null; avatar_url?: string | null; badge?: { label?: string } | null; slug?: string | null; agency?: string | null } | null;
+  brand: { name: string; tagline: string; domain: string; accent: string; ink: string };
+};
+
 export type Property = {
   id: string;
   title: string;
@@ -44,6 +65,8 @@ export type Property = {
   views_recent?: number;
   favorites_recent?: number;
   created_at?: string;
+  /** Active paid visibility upgrade (null/undefined when none). */
+  promotion?: PromotionInfo | null;
   // Token economy
   is_amass_exclusive?: boolean;
   is_free_amass_sale?: boolean;
@@ -618,6 +641,8 @@ export type MapMarker = {
   friends_saved: number;
   /** Sits in one of my shared lists. */
   in_shared_list: boolean;
+  /** Active paid promotion tier (boost → gold pin). */
+  promotion_tier?: PromotionTier | null;
 };
 export type ProviderPreview = {
   id: string;
@@ -1563,15 +1588,23 @@ export const api = {
     ),
 
   // ─── Agent tools ──────────────────────────────────────
-  promotionsConfig: () =>
-    req<Record<string, { tokens: number; days: number; label: string; perk: string }>>(
-      "/agent/promotions/config"
-    ),
-  promoteListing: (property_id: string, tier: "promote" | "feature" | "boost") =>
-    req<{ ok: boolean; tier: string; expires_at: string; cost: number }>(
+  promotionsConfig: () => req<Record<PromotionTier, PromotionTierConfig>>("/agent/promotions/config"),
+  promotionPreview: (property_id: string) => req<PromotionPreview>(`/agent/promotions/preview/${encodeURIComponent(property_id)}`),
+  promoteListing: (property_id: string, tier: PromotionTier) =>
+    req<{ ok: boolean; tier: PromotionTier; starts_at: string; expires_at: string; cost: number; extended: boolean; alerts_sent: number; balance_after: number }>(
       "/agent/promote",
       { method: "POST", body: JSON.stringify({ property_id, tier }) }
     ),
+  myPromotions: () =>
+    req<{
+      active: (PromotionPreview["property"] & { promotion: PromotionInfo; views_since: number; saves_since: number })[];
+      history: { id: string; property_id: string; tier: PromotionTier; cost: number; days: number; starts_at: string; expires_at: string; extended: boolean; alerts_sent: number; created_at: string }[];
+      tiers: Record<PromotionTier, PromotionTierConfig>;
+      spent_total: number;
+    }>("/agent/promotions/mine"),
+  adminPromotionConfig: () => req<{ tiers: Record<PromotionTier, PromotionTierConfig>; defaults: Record<PromotionTier, PromotionTierConfig> }>("/admin/promotions/config"),
+  adminSetPromotionConfig: (patch: Partial<Record<PromotionTier, { tokens?: number; days?: number }>>) =>
+    req<{ tiers: Record<PromotionTier, PromotionTierConfig> }>("/admin/promotions/config", { method: "PATCH", body: JSON.stringify(patch) }),
   listLeads: (property_id: string) =>
     req<{
       leads: {
@@ -1933,9 +1966,10 @@ export const api = {
       whatsapp_message: string;
       flyer_payload: any;
     }>(`/share/agent/${encodeURIComponent(slug)}`),
+  propertyStory: (property_id: string) => req<ListingStory>(`/share/property/${encodeURIComponent(property_id)}/story`),
   recordPropertyShare: (
     property_id: string,
-    channel: "whatsapp" | "qr" | "copy_link" | "native_share" | "flyer" | "email" | "sms",
+    channel: "whatsapp" | "qr" | "copy_link" | "native_share" | "flyer" | "email" | "sms" | "story" | "story_series",
     context?: string
   ) =>
     req<{ ok: boolean }>(`/share/property/${encodeURIComponent(property_id)}/event`, {

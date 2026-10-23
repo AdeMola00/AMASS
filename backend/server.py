@@ -29,6 +29,7 @@ from marketplace_c2c_seed import C2C_ITEMS as C2C_MARKET_ITEMS
 from fixa_seed import FIXA_PROVIDERS
 from tokens import register_token_routes, compute_token_cost, has_unlocked, is_free_amass_sale, WalletService, FIX_EARN_RULES
 from earn_and_tools import register_earn_routes, register_agent_tool_routes
+from promotions import register_promotion_routes, find_promoted_first, annotate_promotion
 from ads import register_ads_routes
 from marketplace_v2 import register_marketplace_v2_routes
 
@@ -501,7 +502,8 @@ async def list_properties(
             {"city": {"$regex": q, "$options": "i"}},
             {"description": {"$regex": q, "$options": "i"}},
         ]
-    docs = await db.properties.find(query, {"_id": 0}).limit(limit).to_list(limit)
+    # Active promotions first (boost > feature > promote), then standard listings.
+    docs = await find_promoted_first(db, query, limit)
 
     # Determine current user (optional) for personalized unlock flags
     user_id: Optional[str] = None
@@ -534,6 +536,7 @@ async def list_properties(
             p["favorites_recent"] = c["favorites_recent"]
     # Zone/category pricing + entitlements (same source of truth as /unlocks and /map/markers).
     await annotate_properties(db, docs, user_id)
+    annotate_promotion(docs)
     return docs
 
 
@@ -570,6 +573,7 @@ async def get_property(
     doc["agent_contact_cost"] = agent_cost
     doc["unlocked"] = access_unlocked
     doc["agent_unlocked"] = agent_unlocked
+    annotate_promotion([doc])
 
     if not access_unlocked:
         # Public preview only — strip premium info + agent identity.
@@ -617,6 +621,7 @@ async def get_property(
             "agent_contact_cost": agent_cost,
             "unlocked": False,
             "agent_unlocked": False,
+            "promotion": doc.get("promotion"),
         }
 
     # Access unlocked → full basic details + agent PUBLIC identity.
@@ -977,6 +982,7 @@ async def agent_listings_public(user_id: str):
 @api.get("/agent/listings")
 async def agent_listings(user: dict = Depends(get_current_user)):
     docs = await db.properties.find({"agent_id": user["id"]}, {"_id": 0}).to_list(500)
+    annotate_promotion(docs)
     return docs
 
 
@@ -2012,6 +2018,7 @@ def _chat_factory(system: str) -> _ChatWrapper:
 
 app.include_router(register_earn_routes(db))
 app.include_router(register_agent_tool_routes(db, _chat_factory))
+app.include_router(register_promotion_routes(db, get_current_user, require_admin, WalletService(db)))
 app.include_router(register_ads_routes(db))
 app.include_router(register_marketplace_v2_routes(db, get_current_user, require_admin))
 

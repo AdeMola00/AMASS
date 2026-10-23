@@ -14,7 +14,9 @@ import { api } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { fontFamilies, palette, radii, space } from "@/src/theme/tokens";
-import { AppText, Button, EmptyState, Screen, ScreenHeader, Skeleton, useToast, type IconName } from "@/src/ui";
+import { AppText, Button, EmptyState, Gloss, PressableScale, Screen, ScreenHeader, Skeleton, useToast, type IconName } from "@/src/ui";
+import { LinearGradient } from "expo-linear-gradient";
+import { gradients } from "@/src/theme/tokens";
 
 type Bundle = Awaited<ReturnType<typeof api.propertyShareBundle>>;
 
@@ -197,6 +199,29 @@ export default function ShareProperty() {
         contentContainerStyle={{ padding: space[4], paddingBottom: insets.bottom + 40, gap: space[5] }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Listing Story — 9:16 slides for WhatsApp Status */}
+        <PressableScale onPress={() => router.push(`/share/story/${id}` as any)} accessibilityRole="button" accessibilityLabel="Create a WhatsApp story from this listing" style={styles.storyCard} testID="share-story-entry">
+          <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <Gloss />
+          <View style={styles.storyThumbs}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={[styles.storyThumb, { marginLeft: i ? -14 : 0, transform: [{ rotate: `${(i - 1) * 6}deg` }], zIndex: 3 - i }]}>
+                {cover ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+                <LinearGradient colors={["transparent", "rgba(17,17,17,0.7)"]} style={StyleSheet.absoluteFill} />
+              </View>
+            ))}
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <AppText variant="title" color="#fff">
+              Create a listing story
+            </AppText>
+            <AppText variant="caption" color="rgba(255,255,255,0.85)">
+              Three swipeable 9:16 slides from your photos — post to WhatsApp Status in one tap.
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#fff" />
+        </PressableScale>
+
         {/* Flyer preview (captured to PNG on save/share) — fixed palette */}
         <ViewShot ref={flyerRef} options={{ format: "png", quality: 1 }} style={styles.flyer}>
           <View style={styles.flyerBrandBar}>
@@ -320,6 +345,10 @@ const styles = StyleSheet.create({
   flyerFooter: { flexDirection: "row", alignItems: "center", marginTop: space[4], paddingTop: space[4], borderTopWidth: 1, borderTopColor: FLYER.border, gap: space[4] },
   flyerQR: { alignItems: "center", padding: 6, borderWidth: 1, borderColor: FLYER.border, borderRadius: radii.md, backgroundColor: FLYER.bg },
 
+  // Story entry
+  storyCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radii.lg, overflow: "hidden" },
+  storyThumbs: { flexDirection: "row", alignItems: "center", paddingRight: 6 },
+  storyThumb: { width: 30, height: 52, borderRadius: 8, overflow: "hidden", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.9)", backgroundColor: "rgba(255,255,255,0.2)" },
   // Actions
   actionRow: { flexDirection: "row", gap: 10 },
   note: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm },

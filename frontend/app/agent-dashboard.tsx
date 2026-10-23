@@ -6,9 +6,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
-import { api, Property } from "@/src/lib/api";
+import { api, Property, type PromotionInfo } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
-import { useWallet } from "@/src/contexts/wallet";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
@@ -23,16 +22,14 @@ import {
   Screen,
   ScreenHeader,
   SegmentedControl,
-  Sheet,
   SkeletonCard,
   SkeletonRows,
   StatTile,
   PressableScale,
-  useToast,
   type BadgeTone,
   type IconName,
 } from "@/src/ui";
-import { TokenIcon } from "@/src/components/TokenIcon";
+import { PromotionBadge, TIER_META } from "@/src/components/PromotionBadge";
 import { AgentScoreCard } from "@/src/components/AgentScoreCard";
 
 type Tab = "overview" | "listings" | "leads";
@@ -95,7 +92,7 @@ export default function AgentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [boostProperty, setBoostProperty] = useState<Property | null>(null);
+  const [promos, setPromos] = useState<Awaited<ReturnType<typeof api.myPromotions>> | null>(null);
   const [quota, setQuota] = useState<{
     plan_id: string;
     plan_name: string;
@@ -108,18 +105,20 @@ export default function AgentDashboard() {
   const load = useCallback(async () => {
     setError(false);
     try {
-      const [d, l, a, ld, q] = await Promise.all([
+      const [d, l, a, ld, q, pr] = await Promise.all([
         api.agentDashboard(),
         api.agentListings(),
         api.agentListingsAnalytics(),
         api.agentLeads(),
         api.myQuota().catch(() => null),
+        api.myPromotions().catch(() => null),
       ]);
       setDashboard(d);
       setListings(l);
       setAnalytics(a);
       setLeads(ld);
       setQuota(q);
+      setPromos(pr);
     } catch {
       setError(true);
     }
@@ -180,6 +179,8 @@ export default function AgentDashboard() {
           <Overview dashboard={dashboard} onNew={goNew} isDark={isDark} />
 
           <AgentScoreCard />
+
+          <BoostsCard promos={promos} listings={listings} onBoost={(id) => router.push(`/agent/boost/${id}` as any)} onAll={() => setTab("listings")} />
 
           {/* Phase D-5: Verification Task Queue entry */}
           <Card onPress={() => router.push("/agent/tasks" as any)} testID="agent-tasks-entry" tone="soft">
@@ -249,7 +250,7 @@ export default function AgentDashboard() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const a = analytics.find((x) => x.property_id === item.id);
-            return <ListingRow property={item} views={a?.views ?? 0} favorites={a?.favorites ?? 0} onPress={() => router.push(`/property/${item.id}`)} onBoost={() => setBoostProperty(item)} />;
+            return <ListingRow property={item} views={a?.views ?? 0} favorites={a?.favorites ?? 0} onPress={() => router.push(`/property/${item.id}`)} onBoost={() => router.push(`/agent/boost/${item.id}` as any)} />;
           }}
           ListEmptyComponent={
             <EmptyState icon="business-outline" title="No listings yet" body="Publish your first property to start receiving leads." actionLabel="New listing" onAction={goNew} testID="empty-new-listing" />
@@ -282,7 +283,6 @@ export default function AgentDashboard() {
           ListEmptyComponent={<EmptyState icon="people-outline" title="No leads yet" body="Publish a listing to start receiving inquiries." />}
         />
       )}
-      <BoostSheet property={boostProperty} onClose={() => setBoostProperty(null)} onSuccess={load} />
     </Screen>
   );
 }
@@ -353,7 +353,10 @@ function ListingRow({ property, views, favorites, onPress, onBoost }: { property
         <View style={styles.listing}>
           <Image source={{ uri: property.images?.[0] }} style={[styles.listingImg, { backgroundColor: colors.skeleton }]} contentFit="cover" transition={200} />
           <View style={{ flex: 1, gap: 4 }}>
-            <Badge label={status.replace("_", " ")} tone={STATUS_TONE[status] ?? "neutral"} size="xs" />
+            <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+              <Badge label={status.replace("_", " ")} tone={STATUS_TONE[status] ?? "neutral"} size="xs" />
+              <PromotionBadge promotion={property.promotion} withDays />
+            </View>
             <AppText variant="title" numberOfLines={1}>
               {property.title}
             </AppText>
@@ -389,9 +392,9 @@ function ListingRow({ property, views, favorites, onPress, onBoost }: { property
           accessibilityLabel={`Boost ${property.title}`}
           testID={`boost-${property.id}`}
         >
-          <Ionicons name="rocket" size={14} color={colors.textInverse} />
+          <Ionicons name={property.promotion ? TIER_META[property.promotion.tier].icon : "rocket"} size={14} color={colors.textInverse} />
           <AppText variant="micro" color={colors.textInverse}>
-            Boost
+            {property.promotion ? "Extend" : "Boost"}
           </AppText>
         </PressableScale>
       ) : null}
@@ -399,112 +402,50 @@ function ListingRow({ property, views, favorites, onPress, onBoost }: { property
   );
 }
 
-const TIER_ICON: Record<string, IconName> = { promote: "trending-up", feature: "star", boost: "rocket" };
-
-function BoostSheet({ property, onClose, onSuccess }: { property: Property | null; onClose: () => void; onSuccess: () => void }) {
+function BoostsCard({ promos, listings, onBoost, onAll }: { promos: Awaited<ReturnType<typeof api.myPromotions>> | null; listings: Property[]; onBoost: (id: string) => void; onAll: () => void }) {
   const { colors } = useTheme();
-  const toast = useToast();
-  const router = useRouter();
-  const { mass, refresh } = useWallet();
-  const [tiers, setTiers] = useState<Record<string, any>>({});
-  const [selectedTier, setSelectedTier] = useState<"promote" | "feature" | "boost">("promote");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (property) {
-      api.promotionsConfig().then(setTiers).catch(() => {});
-    }
-  }, [property]);
-
-  const balance = mass?.spendable ?? 0;
-  const cost = tiers[selectedTier]?.tokens ?? 0;
-  const canAfford = balance >= cost;
-
-  const submit = async () => {
-    if (!canAfford || !property) return;
-    setBusy(true);
-    try {
-      await api.promoteListing(property.id, selectedTier);
-      await refresh();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      toast.success("Boost activated", `${tiers[selectedTier]?.label} is live on this listing for ${tiers[selectedTier]?.days} days.`);
-      onClose();
-      onSuccess();
-    } catch (e: any) {
-      toast.error("Couldn't boost listing", e?.message ?? "Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
+  const active = promos?.active ?? [];
+  const candidate = listings.find((l) => !l.promotion && l.status !== "sold");
   return (
-    <Sheet visible={!!property} onClose={onClose} headline="boost your listing" testID="boost-sheet">
-      <View style={{ gap: space[3] }}>
-        <AppText variant="bodySm" tone="secondary" numberOfLines={2}>
-          {property?.title}
-        </AppText>
-        <View style={[styles.balanceRow, { backgroundColor: colors.massSoft }]}>
-          <TokenIcon size={16} />
-          <AppText variant="caption" tone="mass" tabular>
-            Balance: {balance.toLocaleString()} MASS
+    <Card tone="soft" style={{ gap: 12 }} testID="boosts-card">
+      <View style={styles.rowCenter}>
+        <LinearGradient colors={[...TIER_META.boost.gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.roundIcon}>
+          <Ionicons name="rocket" size={16} color="#fff" />
+        </LinearGradient>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="title">Boosts</AppText>
+          <AppText variant="caption" tone="secondary">
+            {active.length ? `${active.length} listing${active.length === 1 ? "" : "s"} promoted · ${active.reduce((n, a) => n + a.views_since, 0)} views since` : "Put a listing at the top of results, the Featured rail and the map."}
           </AppText>
         </View>
-
-        <View style={styles.tiersRow}>
-          {(["promote", "feature", "boost"] as const).map((k) => {
-            const t = tiers[k];
-            if (!t) return null;
-            const active = selectedTier === k;
-            return (
-              <PressableScale
-                key={k}
-                onPress={() => setSelectedTier(k)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={[styles.tier, { backgroundColor: active ? colors.surfaceInverse : colors.surfaceAlt }]}
-                testID={`boost-tier-${k}`}
-              >
-                <Ionicons name={TIER_ICON[k]} size={20} color={active ? colors.textInverse : colors.text} />
-                <AppText variant="caption" color={active ? colors.textInverse : colors.text}>
-                  {t.label}
-                </AppText>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                  <TokenIcon size={10} />
-                  <AppText variant="title" tabular color={active ? colors.textInverse : colors.text}>
-                    {t.tokens}
-                  </AppText>
-                </View>
-                <AppText variant="micro" color={active ? "rgba(255,255,255,0.7)" : colors.textTertiary}>
-                  {t.days} days
-                </AppText>
-              </PressableScale>
-            );
-          })}
-        </View>
-
-        {tiers[selectedTier]?.perk ? (
-          <View style={[styles.perk, { backgroundColor: colors.massSoft }]}>
-            <Ionicons name="sparkles" size={14} color={colors.massText} />
-            <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
-              {tiers[selectedTier].perk}
+        {active.length ? (
+          <Pressable onPress={onAll} hitSlop={8} accessibilityRole="button" style={styles.sectionAction} testID="boosts-view-all">
+            <AppText variant="caption" tone="secondary">
+              All
             </AppText>
-          </View>
+            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+          </Pressable>
         ) : null}
-
-        <Button
-          label={canAfford ? `Activate for ${cost} MASS` : `Need ${cost - balance} more MASS`}
-          variant="premium"
-          size="lg"
-          fullWidth
-          iconLeft="rocket"
-          loading={busy}
-          disabled={!canAfford || !cost}
-          onPress={submit}
-          testID="boost-submit"
-        />
-        {!canAfford && cost > 0 ? <Button label="Top up MASS" variant="premium" fullWidth onPress={() => router.push("/buy-tokens")} iconLeft="add" /> : null}
       </View>
-    </Sheet>
+      {active.slice(0, 3).map((a) => (
+        <Pressable key={a.id} onPress={() => onBoost(a.id)} accessibilityRole="button" style={[styles.boostRow, { backgroundColor: colors.surface }]} testID={`active-boost-${a.id}`}>
+          <Image source={{ uri: a.image ?? undefined }} style={[styles.boostImg, { backgroundColor: colors.skeleton }]} contentFit="cover" />
+          <View style={{ flex: 1, gap: 3 }}>
+            <AppText variant="bodyMedium" numberOfLines={1}>
+              {a.title}
+            </AppText>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <PromotionBadge promotion={a.promotion as PromotionInfo} withDays />
+              <AppText variant="micro" tone="tertiary" tabular>
+                {a.views_since} views · {a.saves_since} saves
+              </AppText>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </Pressable>
+      ))}
+      {candidate ? <Button label={active.length ? "Boost another listing" : "Boost a listing"} variant={active.length ? "secondary" : "brand"} size="sm" iconLeft="rocket-outline" onPress={() => onBoost(candidate.id)} testID="boosts-cta" /> : null}
+    </Card>
   );
 }
 
@@ -557,10 +498,8 @@ const styles = StyleSheet.create({
   listingFooter: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   metricPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, height: 20, borderRadius: radii.pill },
   boostBtn: { position: "absolute", right: 12, top: 12, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, height: 28, borderRadius: radii.pill },
-  balanceRow: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 10, height: 30, borderRadius: radii.pill },
-  tiersRow: { flexDirection: "row", gap: 8 },
-  tier: { flex: 1, padding: 12, borderRadius: radii.lg, alignItems: "center", gap: 4, minHeight: 104, justifyContent: "center" },
-  perk: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: radii.sm },
+  boostRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 8, borderRadius: radii.md },
+  boostImg: { width: 44, height: 44, borderRadius: radii.sm },
   leadAvatar: { width: 44, height: 44, borderRadius: 22 },
   leadChannel: { position: "absolute", right: -2, bottom: -2, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   unreadDot: { width: 8, height: 8, borderRadius: 4 },

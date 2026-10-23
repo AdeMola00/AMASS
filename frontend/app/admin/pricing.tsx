@@ -10,7 +10,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { api, ApiError, FeatureKey } from "@/src/lib/api";
+import { api, ApiError, FeatureKey, type PromotionTier, type PromotionTierConfig } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
@@ -537,7 +537,87 @@ function ConfigTab() {
       <View style={{ paddingHorizontal: space[4] }}>
         <Button label="Save config" variant="primary" size="lg" iconLeft="checkmark" onPress={save} loading={saving} disabled={saving} fullWidth testID="cfg-save" />
       </View>
+      <BoostTiersSection />
     </ScrollView>
+  );
+}
+
+/* ─── Agent boost tiers (Promote · Feature · Boost) ───────────────────── */
+const BOOST_TIERS: PromotionTier[] = ["promote", "feature", "boost"];
+function BoostTiersSection() {
+  const toast = useToast();
+  const [tiers, setTiers] = useState<Record<PromotionTier, PromotionTierConfig> | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const hydrate = (t: Record<PromotionTier, PromotionTierConfig>) => {
+    setTiers(t);
+    const f: Record<string, string> = {};
+    BOOST_TIERS.forEach((k) => {
+      f[`${k}_tokens`] = String(t[k].tokens);
+      f[`${k}_days`] = String(t[k].days);
+    });
+    setForm(f);
+  };
+
+  useEffect(() => {
+    api
+      .adminPromotionConfig()
+      .then((r) => hydrate(r.tiers))
+      .catch((e) => toast.error("Couldn't load boost tiers", e?.message));
+  }, [toast]);
+
+  const set = (k: string) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const save = async () => {
+    const patch: Partial<Record<PromotionTier, { tokens: number; days: number }>> = {};
+    for (const k of BOOST_TIERS) {
+      const tokens = Number(form[`${k}_tokens`]);
+      const days = Number(form[`${k}_days`]);
+      if (!Number.isFinite(tokens) || tokens < 0 || !Number.isFinite(days) || days < 1) return toast.error("Check the numbers", "Tokens must be ≥ 0 and days ≥ 1.");
+      patch[k] = { tokens, days };
+    }
+    setSaving(true);
+    try {
+      const r = await api.adminSetPromotionConfig(patch);
+      hydrate(r.tiers);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      toast.success("Boost tiers saved", "Agents see the new prices on their next quote.");
+    } catch (e: any) {
+      toast.error("Couldn't save", e instanceof ApiError && typeof e.detail === "string" ? e.detail : e?.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!tiers) {
+    return (
+      <View style={{ padding: space[4] }}>
+        <SkeletonRows rows={3} />
+      </View>
+    );
+  }
+
+  return (
+    <Section title="Agent boost tiers" caption="MASS price and duration for Promote · Feature · Boost. Prices must step up." testID="cfg-boost-tiers">
+      <Card style={{ gap: 14 }}>
+        {BOOST_TIERS.map((k) => (
+          <View key={k} style={{ gap: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <AppText variant="title">{tiers[k].label}</AppText>
+              <AppText variant="caption" tone="tertiary" style={{ flex: 1 }} numberOfLines={1}>
+                {tiers[k].perk}
+              </AppText>
+            </View>
+            <View style={styles.twoCol}>
+              <Input label="MASS" value={form[`${k}_tokens`]} onChangeText={set(`${k}_tokens`)} keyboardType="number-pad" containerStyle={{ flex: 1 }} testID={`cfg-boost-${k}-tokens`} />
+              <Input label="Days" value={form[`${k}_days`]} onChangeText={set(`${k}_days`)} keyboardType="number-pad" containerStyle={{ flex: 1 }} testID={`cfg-boost-${k}-days`} />
+            </View>
+          </View>
+        ))}
+        <Button label="Save boost tiers" variant="primary" iconLeft="rocket" onPress={save} loading={saving} disabled={saving} fullWidth testID="cfg-boost-save" />
+      </Card>
+    </Section>
   );
 }
 
