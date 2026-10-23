@@ -723,3 +723,38 @@ agent_communication:
       Map marker contract: friends_saved(int) / in_shared_list(bool). Alerts: GET /community/alerts.
       CSV: GET /admin/analytics/funnel.csv?days= (admin only). Frontend testIDs: pin-nudge-{id},
       unlock-friend-nudge, nb-join-alert-{estateId}, nb-admin-export-csv.
+  - agent: "main"
+    message: |
+      SHOP — Instacart-style "Brands" segment of the Market tab (Lagos home-shopping). FIRST TEST PASS.
+      Backend /app/backend/shop.py (router prefix /api/shop, optional auth on browse, auth on
+      saves/basket): GET /home, /retailers?category=&filter=&q=, /retailers/{slug}, /retailers/{slug}/products,
+      /products?category=&q=&brand=&retailer=&sort=&deals=&in_stock=, /products/{id}, /search?q=, /search/suggest?q=,
+      /context?ids=, POST /saves/toggle {kind:product|store,target_id}, GET /saves, GET /basket, GET /basket/count,
+      POST /basket/items {product_id,qty}, PATCH /basket/items/{product_id} {qty} (0 removes), DELETE
+      /basket/retailer/{retailer_id}, POST /basket/retailer/{retailer_id}/handoff {route:website|call|whatsapp,
+      product_id?} → {url,label,note} (records shop_handoffs; NEVER creates an order), GET /assets/logos/{name}.png.
+      Seeded 7 Lagos retailers (fouani, boconcept, furniture-house, slot, pointek, lagom-sweden, orca-deco[no
+      catalogue]) + 101 products; out-of-stock items → 409 on basket add. Baskets are PER RETAILER.
+      Frontend: Market tab → segment "Brands" (mkt-tab-brands) now renders ShopHome (testID shop-home):
+      category row shop-cat-{key}, filter chips shop-filter-{key}, retailer grid shop-retailer-tile-{slug},
+      shop-show-all-stores, banners shop-banner-{key} (+ -cta), sections shop-section-{furnish|deals|popular|
+      electronics|new} with product cards shop-product-{id} (open: shop-product-open-{id}; add: shop-add-{id} →
+      stepper shop-stepper-{id}/shop-minus-/shop-plus-/shop-qty-{id}), floating shop-basket-pill, header
+      shop-saved-btn + shop-basket-btn (badge shop-basket-btn-badge), market-search-bar → /shop/search.
+      Screens: /shop/stores (shop-stores-screen, shop-stores-search, shop-stores-cat-{key}, shop-stores-filter-{key},
+      shop-retailer-row-{slug}), /shop/store/[slug] (shop-store-screen, shop-store-back/share/save/search/info,
+      shop-fulfil-{delivery|pickup|showroom}, shop-promo-{pid}, shop-store-cat-{key}, shop-store-sub-*, shop-store-sort,
+      shop-store-route-website/whatsapp/call → shop-handoff-sheet → shop-handoff-confirm/cancel, orca-deco shows
+      shop-store-no-catalogue), /shop/product/[id] (shop-product-screen, -back/-add-to-list/-share/-save, -name,
+      -price, -promo, -stock, -retailer, -add, -go-basket, shop-product-route-*), /shop/category/[key]?deals=1
+      (shop-browse-screen, shop-browse-deals/instock/retailer-{slug}/brand-*/sort, shop-browse-empty),
+      /shop/search (shop-search-screen, shop-search-input, shop-suggest-{i}, shop-search-all-stores),
+      /shop/basket (shop-basket-screen, shop-basket-group-{slug}, shop-basket-line-{pid}, shop-basket-subtotal-{slug},
+      shop-basket-clear-{slug} → shop-basket-clear-sheet/-confirm, shop-basket-route-{slug}-website|call|whatsapp,
+      signed-out → shop-basket-signin), /shop/saved (shop-saved-screen, shop-saved-tab-products|stores).
+      Shared lists: AddToCollectionSheet now supports kind product|store → "shopping" collections; collections
+      create sheet has a Shopping segment (collection-kind-shopping); collection detail renders
+      collection-product-{id} / collection-store-{id} rows. Banner "Furnishing together?" →
+      /neighbours/collections?create=1&kind=shopping.
+      NOTE web: window.open is used for "website" hand-off (new tab) — assert the handoff POST + sheet rather than
+      the external page. Expo AdModal may pop on Market after ~3s (tap "Skip"). Demo: demo@amass.africa / amass2026.

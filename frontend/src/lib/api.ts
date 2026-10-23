@@ -152,18 +152,62 @@ export type SocialMe = PublicUser & {
   counts: { connections: number; pending_in: number; collections: number; estates: number };
 };
 export type SharedCollection = {
-  id: string; name: string; emoji?: string | null; kind: "homes" | "places"; description?: string | null; owner_id: string; is_owner: boolean;
+  id: string; name: string; emoji?: string | null; kind: "homes" | "places" | "shopping"; description?: string | null; owner_id: string; is_owner: boolean;
   members: PublicUser[]; member_count: number; item_count: number; cover_images: string[]; updated_at?: string; created_at: string;
   last_activity?: { kind: string; user_id: string; label?: string; at: string } | null;
 };
 export type CollectionItem = {
-  id: string; kind: "property" | "place"; target_id: string; note?: string | null; added_by?: PublicUser | null; created_at: string;
+  id: string; kind: "property" | "place" | "product" | "store"; target_id: string; note?: string | null; added_by?: PublicUser | null; created_at: string;
   reactions: { love: number; maybe: number; no: number; mine?: "love" | "maybe" | "no" | null }; comment_count: number;
-  property?: Property | null; place?: Place | null;
+  property?: Property | null; place?: Place | null; product?: ShopProduct | null; store?: ShopRetailer | null;
 };
 export type CollectionComment = { id: string; collection_id: string; item_id?: string | null; user_id: string; text: string; created_at: string; user?: PublicUser | null };
 export type CollectionDetail = SharedCollection & { invite_code?: string | null; items: CollectionItem[]; comments: CollectionComment[] };
 export type PropertySocialContext = Record<string, { saved_by: PublicUser[]; in_collections: { id: string; name: string; emoji?: string | null; shared: boolean }[] }>;
+
+// ─── Shop (Brands → Lagos home-shopping) ───
+export type ShopVerified = { source?: string | null; verified_at?: string | null };
+export type ShopCategory = { key: string; label: string; icon: string; color: string; count?: number };
+export type ShopFilter = { key: string; label: string; icon: string; count: number };
+export type ShopPurchaseRoute = { kind: "website" | "whatsapp" | "call"; label: string; url: string };
+export type ShopFulfilment = { available: boolean | null; note?: string | null } & ShopVerified;
+export type ShopRetailerBrief = { id: string; slug: string; name: string; short_name: string; logo_url: string | null; accent: string; verification_status: "verified" | "partial" | "unverified" };
+export type ShopRetailer = ShopRetailerBrief & {
+  tagline?: string | null; categories: string[]; category_labels: string[]; brands: string[]; area: string; areas: string[];
+  locations: { name: string; address: string; area?: string; phone?: string | null; lat?: number; lng?: number }[]; hours?: string | null;
+  fulfilment: Record<"delivery" | "pickup" | "showroom" | "installation", ShopFulfilment>;
+  fulfilment_lines: ({ key: string; label: string; note?: string | null } & ShopVerified)[];
+  tags: ({ key: string; label: string } & ShopVerified)[];
+  verification: { status: string; last_verified_at?: string | null; sources?: string[]; note?: string | null };
+  website?: string | null; shop_url?: string | null; phone?: string | null; whatsapp?: string | null; email?: string | null;
+  product_count: number; deal_count: number; in_stock_count: number; checkout_connected: boolean; purchase_routes: ShopPurchaseRoute[]; sponsored: boolean; badge?: string | null; saved?: boolean;
+};
+export type ShopPrice = { kind: "fixed" | "from" | "on_request"; amount: number | null; currency: string; rrp?: number | null; note?: string | null; source_url?: string | null; verified_at?: string | null };
+export type ShopPromo = { label: string; previous_price?: number | null; expires_at?: string | null; terms?: string | null; source_url?: string | null; verified_at?: string | null };
+export type ShopProduct = {
+  id: string; retailer: ShopRetailerBrief | null; name: string; brand?: string | null; category: string; subcategory?: string | null; spec?: string | null; specs: Record<string, string>;
+  description?: string | null; images: string[]; price: ShopPrice; promo: ShopPromo | null; stock: { status: "in_stock" | "out_of_stock" | "unknown"; qty?: number | null; verified_at?: string | null };
+  variants: { label: string; note?: string | null }[]; warranty: ({ label: string; url?: string | null } & ShopVerified) | null; tags: string[]; source_url?: string | null; last_verified_at?: string | null;
+  share_url: string; sponsored: boolean; saved: boolean; in_basket_qty: number; friends_saved: number; friends: PublicUser[]; sku?: string | null;
+};
+export type ShopProductDetail = ShopProduct & { retailer_detail: ShopRetailer | null; purchase_routes: ShopPurchaseRoute[]; in_lists: { id: string; name: string; emoji?: string | null; shared: boolean }[]; similar: ShopProduct[] };
+export type ShopSection = { key: string; kind: "retailers" | "products"; title: string; subtitle?: string; see_all?: string; retailers?: ShopRetailer[]; products?: ShopProduct[] };
+export type ShopBanner = { key: string; title: string; body: string; cta: string; route: string; tone: "warning" | "brand" | "info"; image?: string | null };
+export type ShopHome = {
+  area: string; categories: ShopCategory[]; filters: ShopFilter[]; retailers: ShopRetailer[]; retailer_total: number; banners: ShopBanner[]; sections: ShopSection[];
+  basket: { count: number; retailers: number }; saved: { products: string[]; stores: string[] }; generated_at: string;
+};
+export type ShopRetailerDetail = ShopRetailer & {
+  product_categories: ShopCategory[]; subcategories: { key: string; label: string; count: number }[];
+  promotions: { product_id: string; label: string; name: string; price: number | null; previous_price?: number | null; terms?: string | null; expires_at?: string | null; verified_at?: string | null; source_url?: string | null }[];
+  featured: ShopProduct[]; basket: { count: number; subtotal: number }; fees_note: string; catalogue_note?: string;
+};
+export type ShopBasketGroup = {
+  retailer: ShopRetailer; items: { product: ShopProduct; qty: number; line_total: number | null; added_at?: string }[]; item_count: number; subtotal: number; unpriced_count: number; has_from_prices: boolean;
+  fees: null; fees_note: string; purchase_routes: ShopPurchaseRoute[]; checkout_connected: boolean; updated_at?: string;
+};
+export type ShopBasket = { groups: ShopBasketGroup[]; total_items: number; retailer_count: number };
+export type ShopSearchResult = { q: string; stores: ShopRetailer[]; brands: string[]; categories: ShopCategory[]; products: ShopProduct[] };
 
 export type Estate = {
   id: string; name: string; slug: string; city: string; state?: string | null; area?: string | null; description?: string | null; latitude?: number | null; longitude?: number | null;
@@ -462,6 +506,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Query-string builder — skips undefined/null/empty values. */
+function qs(params: Record<string, string | number | boolean | undefined | null>): string {
+  const parts = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && String(v) !== "")
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
+  return parts.length ? `?${parts.join("&")}` : "";
+}
+
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -679,13 +731,35 @@ export const api = {
   socialRecognition: () => req<{ points: number; badges: { key: string; label: string }[]; progress: { key: string; label: string; kind: string; have: number; need: number; earned: boolean }[]; recent: any[]; note: string }>("/social/recognition"),
   socialFeedback: (data: { area?: string; rating?: number; text: string }) => req<{ ok: boolean }>("/social/feedback", { method: "POST", body: JSON.stringify(data) }),
   socialContext: (ids: string[]) => req<PropertySocialContext>(`/social/context/properties?ids=${ids.join(",")}`),
+  // ─── Shop (Brands → Lagos home-shopping) ───
+  shopHome: () => req<ShopHome>("/shop/home"),
+  shopRetailers: (params: { category?: string; filter?: string; q?: string } = {}) => req<{ retailers: ShopRetailer[]; total: number; area: string }>(`/shop/retailers${qs(params)}`),
+  shopRetailer: (key: string) => req<ShopRetailerDetail>(`/shop/retailers/${encodeURIComponent(key)}`),
+  shopRetailerProducts: (key: string, params: { category?: string; subcategory?: string; q?: string; sort?: string; deals?: boolean; in_stock?: boolean } = {}) =>
+    req<{ retailer: ShopRetailerBrief; products: ShopProduct[]; total: number }>(`/shop/retailers/${encodeURIComponent(key)}/products${qs(params)}`),
+  shopProducts: (params: { category?: string; q?: string; retailer?: string; brand?: string; sort?: string; deals?: boolean; in_stock?: boolean; limit?: number } = {}) =>
+    req<{ products: ShopProduct[]; total: number; brands: string[]; retailers: ShopRetailerBrief[]; category: ShopCategory }>(`/shop/products${qs(params)}`),
+  shopProduct: (id: string) => req<ShopProductDetail>(`/shop/products/${id}`),
+  shopSearch: (q: string) => req<ShopSearchResult>(`/shop/search?q=${encodeURIComponent(q)}`),
+  shopSuggest: (q: string) => req<{ suggestions: { kind: "store" | "category" | "brand" | "query"; label: string; slug?: string; key?: string }[] }>(`/shop/search/suggest?q=${encodeURIComponent(q)}`),
+  shopContext: (ids: string[]) => req<Record<string, { friends_saved: number; saved_by: PublicUser[]; saved: boolean; in_basket_qty: number }>>(`/shop/context?ids=${ids.join(",")}`),
+  shopToggleSave: (kind: "product" | "store", target_id: string) => req<{ saved: boolean }>("/shop/saves/toggle", { method: "POST", body: JSON.stringify({ kind, target_id }) }),
+  shopSaves: () => req<{ products: ShopProduct[]; stores: ShopRetailer[] }>("/shop/saves"),
+  shopBasket: () => req<ShopBasket>("/shop/basket"),
+  shopBasketCount: () => req<{ count: number }>("/shop/basket/count"),
+  shopBasketAdd: (product_id: string, qty = 1) => req<{ ok: boolean; qty: number; count: number; retailer_id: string }>("/shop/basket/items", { method: "POST", body: JSON.stringify({ product_id, qty }) }),
+  shopBasketSetQty: (product_id: string, qty: number) => req<ShopBasket>(`/shop/basket/items/${product_id}`, { method: "PATCH", body: JSON.stringify({ qty }) }),
+  shopBasketClearRetailer: (retailer_id: string) => req<ShopBasket>(`/shop/basket/retailer/${retailer_id}`, { method: "DELETE" }),
+  shopHandoff: (retailer_id: string, route: "website" | "call" | "whatsapp", product_id?: string) =>
+    req<{ ok: boolean; url: string; label: string; note: string }>(`/shop/basket/retailer/${retailer_id}/handoff`, { method: "POST", body: JSON.stringify({ route, product_id }) }),
+
   // ─── Social: collections ───
   collections: () => req<SharedCollection[]>("/social/collections"),
-  collectionCreate: (data: { name: string; kind?: "homes" | "places"; emoji?: string; description?: string }) => req<SharedCollection>("/social/collections", { method: "POST", body: JSON.stringify(data) }),
+  collectionCreate: (data: { name: string; kind?: "homes" | "places" | "shopping"; emoji?: string; description?: string }) => req<SharedCollection>("/social/collections", { method: "POST", body: JSON.stringify(data) }),
   collection: (id: string) => req<CollectionDetail>(`/social/collections/${id}`),
   collectionPatch: (id: string, patch: { name?: string; emoji?: string; description?: string }) => req<{ ok: boolean }>(`/social/collections/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   collectionDelete: (id: string) => req<{ ok: boolean; deleted?: boolean; left?: boolean }>(`/social/collections/${id}`, { method: "DELETE" }),
-  collectionAddItem: (id: string, data: { kind?: "property" | "place"; target_id: string; note?: string }) => req<{ ok: boolean; item_id: string; duplicate?: boolean }>(`/social/collections/${id}/items`, { method: "POST", body: JSON.stringify(data) }),
+  collectionAddItem: (id: string, data: { kind?: "property" | "place" | "product" | "store"; target_id: string; note?: string }) => req<{ ok: boolean; item_id: string; duplicate?: boolean }>(`/social/collections/${id}/items`, { method: "POST", body: JSON.stringify(data) }),
   collectionRemoveItem: (id: string, item_id: string) => req<{ ok: boolean }>(`/social/collections/${id}/items/${item_id}`, { method: "DELETE" }),
   collectionReact: (id: string, item_id: string, reaction: "love" | "maybe" | "no" | "clear") => req<{ ok: boolean }>(`/social/collections/${id}/items/${item_id}/react`, { method: "POST", body: JSON.stringify({ reaction }) }),
   collectionComment: (id: string, text: string, item_id?: string) => req<CollectionComment>(`/social/collections/${id}/comments`, { method: "POST", body: JSON.stringify({ text, item_id }) }),

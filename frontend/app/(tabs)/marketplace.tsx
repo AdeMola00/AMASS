@@ -37,6 +37,8 @@ import { AdModal } from "@/src/components/AdModal";
 import { useAdTrigger } from "@/src/hooks/useAdTrigger";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 import { FixaGate } from "@/src/components/fixa/FixaGate";
+import { ShopHome } from "@/src/components/shop/ShopHome";
+import { useShopBasket } from "@/src/contexts/shopBasket";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { Skeleton, SkeletonCard, EmptyState } from "@/src/ui";
@@ -73,13 +75,6 @@ const DECLUTTER_CHIPS = [
   { key: "electronics", label: "Electronics", icon: "laptop-outline" as const },
   { key: "fashion",     label: "Fashion",     icon: "shirt-outline" as const },
   { key: "tools",       label: "Tools",       icon: "construct-outline" as const },
-];
-
-const BRAND_CHIPS = [
-  { key: "appliances",  label: "Appliances",  icon: "home-outline" as const },
-  { key: "furniture",   label: "Furniture",   icon: "bed-outline" as const },
-  { key: "electronics", label: "Electronics", icon: "laptop-outline" as const },
-  { key: "tools",       label: "Hardware",    icon: "construct-outline" as const },
 ];
 
 const CITIES = [
@@ -186,10 +181,10 @@ export default function Marketplace() {
   const [section, setSection] = useState<MarketSection>("brands");
   const [fixaChip, setFixaChip] = useState<string | null>(null);
   const [declutterChip, setDeclutterChip] = useState<string | null>(null);
-  const [brandChip, setBrandChip] = useState<string | null>(null);
   const [headerH, setHeaderH] = useState<number>(insets.top + 176);
   const [sortKey, setSortKey] = useState<SortKey>("nearby");
   const [sortOpen, setSortOpen] = useState(false);
+  const { count: basketCount } = useShopBasket();
   // FIXA gate — FIX balance must be > 0 to browse providers (read live, never cached).
   const [fixAccess, setFixAccess] = useState<{ allowed: boolean; balance: number } | null>(null);
   const { fix: fixWallet } = useWallet();
@@ -227,11 +222,7 @@ export default function Marketplace() {
 
   const buildParams = useCallback((): Record<string, string | number | boolean | undefined> => {
     const p: Record<string, string | number | boolean | undefined> = { limit: 100 };
-    if (section === "brands") {
-      p.seller_type = "brand";
-      p.verified = true;
-      p.category = brandChip ?? filters.category;
-    } else if (section === "fixa") {
+    if (section === "fixa") {
       p.category = "services";
       p.verified = true;
       if (fixaChip) p.q = fixaChip.toLowerCase();
@@ -249,10 +240,16 @@ export default function Marketplace() {
     // Note: city is used for client-side "Nearby first" ranking (not a hard
     // filter) so nothing is hidden — the chosen city just floats to the top.
     return p;
-  }, [filters, query, section, brandChip, fixaChip, declutterChip]);
+  }, [filters, query, section, fixaChip, declutterChip]);
 
   const [loadError, setLoadError] = useState(false);
   const loadItems = useCallback(async () => {
+    // Brands is the Shop (its own data source — see ShopHome); nothing to fetch here.
+    if (section === "brands") {
+      setItems([]);
+      setLoadError(false);
+      return;
+    }
     try {
       const list = await api.marketplace(buildParams());
       setItems(list);
@@ -261,7 +258,7 @@ export default function Marketplace() {
       setItems([]);
       setLoadError(true);
     }
-  }, [buildParams]);
+  }, [buildParams, section]);
 
   useEffect(() => {
     (async () => {
@@ -362,20 +359,6 @@ export default function Marketplace() {
   const chipRail = (
     <View style={styles.catsRail}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catsRow}>
-        {section === "brands" &&
-          BRAND_CHIPS.map((c) => (
-            <ChipTile
-              key={c.key}
-              icon={c.icon}
-              label={c.label}
-              active={brandChip === c.key}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setBrandChip(brandChip === c.key ? null : c.key);
-              }}
-              testID={`brand-chip-${c.key}`}
-            />
-          ))}
         {section === "fixa" &&
           FIXA_CHIPS.map((c) => (
             <ChipTile
@@ -465,14 +448,10 @@ export default function Marketplace() {
       <View style={styles.feedHeader}>
         <View style={{ flex: 1 }}>
           <Text style={styles.feedTitle}>
-            {items.length} {section === "fixa" ? "pros" : section === "brands" ? "stores" : "items"}
+            {items.length} {section === "fixa" ? "pros" : "items"}
           </Text>
           <Text style={styles.feedSub} numberOfLines={1}>
-            {section === "brands"
-              ? "Verified stores & showrooms"
-              : section === "fixa"
-              ? "FIXA verified providers"
-              : "Pre-owned finds near you"}
+            {section === "fixa" ? "FIXA verified providers" : "Pre-owned finds near you"}
             {sortKey === "nearby" && city !== "All of Nigeria"
               ? ` · Near ${city.replace("Lagos - ", "").replace("Abuja - ", "")}`
               : ""}
@@ -510,6 +489,9 @@ export default function Marketplace() {
 
   return (
     <View style={styles.container} testID="marketplace-screen">
+      {section === "brands" ? (
+        <ShopHome headerH={headerH} active />
+      ) : (
       <FlatList
         data={(fixaLocked ? [] : section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems) as any[]}
         keyExtractor={(_, i) => `row-${i}`}
@@ -561,18 +543,13 @@ export default function Marketplace() {
                 <Ionicons name="search-outline" size={30} color={colors.textMuted} />
               </View>
               <Text style={styles.emptyTitle}>
-                {section === "brands"
-                  ? "No stores match your filters"
-                  : section === "fixa"
-                  ? "No pros found in this trade"
-                  : "No pre-owned items right now"}
+                {section === "fixa" ? "No pros found in this trade" : "No pre-owned items right now"}
               </Text>
               <Text style={styles.emptyBody}>Try another category or change your city.</Text>
-              {(activeFilterCount > 0 || brandChip || fixaChip || declutterChip) && (
+              {(activeFilterCount > 0 || fixaChip || declutterChip) && (
                 <Pressable
                   onPress={() => {
                     setFilters({});
-                    setBrandChip(null);
                     setFixaChip(null);
                     setDeclutterChip(null);
                   }}
@@ -611,6 +588,7 @@ export default function Marketplace() {
               )
         }
       />
+      )}
 
       {/* ─── Sticky glass header ─────────────────────────────── */}
       <BlurView
@@ -639,8 +617,17 @@ export default function Marketplace() {
               </Text>
               <Ionicons name="chevron-down" size={13} color={colors.textSecondary} />
             </Pressable>
-            <IconBtn icon="storefront-outline" onPress={() => router.push("/marketplace/my-listings" as any)} label="My listings and offers" testID="market-my-listings-btn" />
-            <IconBtn icon="heart-outline" onPress={() => router.push("/marketplace/saved" as any)} label="Saved items" testID="market-saved-btn" />
+            {section === "brands" ? (
+              <>
+                <IconBtn icon="heart-outline" onPress={() => router.push("/shop/saved" as any)} label="Saved products and stores" testID="shop-saved-btn" />
+                <IconBtn icon="cart-outline" onPress={() => router.push("/shop/basket" as any)} label={`Basket, ${basketCount} items`} badge={basketCount} testID="shop-basket-btn" />
+              </>
+            ) : (
+              <>
+                <IconBtn icon="storefront-outline" onPress={() => router.push("/marketplace/my-listings" as any)} label="My listings and offers" testID="market-my-listings-btn" />
+                <IconBtn icon="heart-outline" onPress={() => router.push("/marketplace/saved" as any)} label="Saved items" testID="market-saved-btn" />
+              </>
+            )}
           </View>
         </View>
 
@@ -648,14 +635,17 @@ export default function Marketplace() {
         <View style={styles.searchRow}>
           <Pressable
             style={styles.searchBar}
-            onPress={() => router.push("/marketplace/search" as any)}
+            onPress={() => router.push((section === "brands" ? "/shop/search" : "/marketplace/search") as any)}
             accessibilityRole="search"
-            accessibilityLabel="Search the marketplace"
+            accessibilityLabel={section === "brands" ? "Search stores, brands and products" : "Search the marketplace"}
             testID="market-search-bar"
           >
             <Ionicons name="search" size={18} color={colors.textSecondary} />
-            <Text style={styles.searchPlaceholder}>Search homes, services, finds…</Text>
+            <Text style={styles.searchPlaceholder}>
+              {section === "brands" ? "Search stores, brands, products…" : "Search homes, services, finds…"}
+            </Text>
           </Pressable>
+          {section !== "brands" && (
           <Pressable
             onPress={() => filterRef.current?.open()}
             style={styles.filterBtn}
@@ -670,6 +660,7 @@ export default function Marketplace() {
               </View>
             )}
           </Pressable>
+          )}
         </View>
 
         {/* Row 3: segmented control */}
@@ -717,7 +708,8 @@ export default function Marketplace() {
         </View>
       )}
 
-      {/* Sell / Join FAB */}
+      {/* Sell / Join FAB (the Shop has its own basket pill) */}
+      {section !== "brands" && (
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -725,14 +717,15 @@ export default function Marketplace() {
         }}
         style={[styles.sellFab, { bottom: 92 + insets.bottom }]}
         accessibilityRole="button"
-        accessibilityLabel={section === "declutter" ? "Sell an item" : section === "fixa" ? "Join FIXA" : "Add a store"}
+        accessibilityLabel={section === "declutter" ? "Sell an item" : "Join FIXA"}
         testID="sell-fab"
       >
         <Ionicons name="add" size={20} color="#fff" />
         <Text style={styles.sellFabText}>
-          {section === "declutter" ? "Sell" : section === "fixa" ? "Join FIXA" : "Add Store"}
+          {section === "declutter" ? "Sell" : "Join FIXA"}
         </Text>
       </Pressable>
+      )}
 
       <MarketFilterSheet ref={filterRef} value={filters} categories={categories} onApply={setFilters} />
       <BookingSheet ref={bookingRef} />
@@ -809,11 +802,13 @@ function IconBtn({
   icon,
   onPress,
   label,
+  badge,
   testID,
 }: {
   icon: IconName;
   onPress: () => void;
   label?: string;
+  badge?: number;
   testID?: string;
 }) {
   const colors = useLegacyColors();
@@ -829,6 +824,11 @@ function IconBtn({
       testID={testID}
     >
       <Ionicons name={icon} size={20} color={colors.text} />
+      {badge ? (
+        <View style={styles.filterDot} testID={testID ? `${testID}-badge` : undefined}>
+          <Text style={styles.filterDotText}>{badge > 99 ? "99+" : badge}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }

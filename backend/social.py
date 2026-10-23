@@ -58,7 +58,7 @@ class ContactMatchIn(BaseModel):
 
 class CollectionIn(BaseModel):
     name: str = Field(min_length=2, max_length=60)
-    kind: Literal["homes", "places"] = "homes"
+    kind: Literal["homes", "places", "shopping"] = "homes"
     emoji: Optional[str] = Field(None, max_length=4)
     description: Optional[str] = Field(None, max_length=200)
 
@@ -70,9 +70,13 @@ class CollectionPatch(BaseModel):
 
 
 class CollectionItemIn(BaseModel):
-    kind: Literal["property", "place"] = "property"
+    kind: Literal["property", "place", "product", "store"] = "property"
     target_id: str
     note: Optional[str] = Field(None, max_length=200)
+
+
+ITEM_COLLECTIONS = {"property": "properties", "place": "places", "product": "shop_products", "store": "shop_retailers"}
+COLLECTION_EMOJI = {"homes": "🏠", "places": "📍", "shopping": "🛒"}
 
 
 class CollectionInviteIn(BaseModel):
@@ -425,7 +429,7 @@ def register_social_routes(db, get_current_user, require_admin, annotate_propert
         n = await db.shared_collections.count_documents({"owner_id": user["id"]})
         ensure(n < 30, 400, "You can have up to 30 collections")
         doc = {
-            "id": new_id(), "name": data.name.strip(), "kind": data.kind, "emoji": data.emoji or ("🏠" if data.kind == "homes" else "📍"),
+            "id": new_id(), "name": data.name.strip(), "kind": data.kind, "emoji": data.emoji or COLLECTION_EMOJI.get(data.kind, "🏠"),
             "description": (data.description or "").strip() or None, "owner_id": user["id"], "member_ids": [user["id"]],
             "invite_code": secrets.token_urlsafe(8), "item_count": 0, "cover_images": [], "created_at": now(), "updated_at": now(), "last_activity": None,
         }
@@ -439,18 +443,27 @@ def register_social_routes(db, get_current_user, require_admin, annotate_propert
         items = await db.collection_items.find({"collection_id": coll_id}, {"_id": 0}).sort("created_at", -1).to_list(MAX_COLLECTION_ITEMS)
         prop_ids = [i["target_id"] for i in items if i["kind"] == "property"]
         place_ids = [i["target_id"] for i in items if i["kind"] == "place"]
+        product_ids = [i["target_id"] for i in items if i["kind"] == "product"]
+        store_ids = [i["target_id"] for i in items if i["kind"] == "store"]
         props = await db.properties.find({"id": {"$in": prop_ids}}, {"_id": 0}).to_list(len(prop_ids)) if prop_ids else []
         # Same paid gate as the map/list endpoints: strips agent contact unless the viewer unlocked it.
         await annotate_properties(db, props, user["id"])
         pby = {p["id"]: p for p in props}
         places = await db.places.find({"id": {"$in": place_ids}}, {"_id": 0}).to_list(len(place_ids)) if place_ids else []
         plby = {p["id"]: p for p in places}
+        # Shopping lists: products/stores from the Lagos retailer catalogue (never paid data).
+        from shop import product_public, retailer_public
+        shop_products = await db.shop_products.find({"id": {"$in": product_ids}}, {"_id": 0}).to_list(len(product_ids)) if product_ids else []
+        shop_retailers = await db.shop_retailers.find({"id": {"$in": list({*store_ids, *(p["retailer_id"] for p in shop_products)})}}, {"_id": 0}).to_list(200) if (store_ids or shop_products) else []
+        rby = {r["id"]: r for r in shop_retailers}
+        prodby = {p["id"]: product_public(p, rby.get(p["retailer_id"])) for p in shop_products}
+        storeby = {r["id"]: retailer_public(r) for r in shop_retailers if r["id"] in store_ids}
         comments = await db.collection_comments.find({"collection_id": coll_id, "status": {"$ne": "hidden"}}, {"_id": 0}).sort("created_at", 1).to_list(500)
         users = await public_users(db, [*c.get("member_ids", []), *(i["added_by"] for i in items), *(cm["user_id"] for cm in comments)])
         muted = await muted_ids_for(db, user["id"])
         out_items = []
         for i in items:
-            target = pby.get(i["target_id"]) if i["kind"] == "property" else plby.get(i["target_id"])
+            target = {"property": pby, "place": plby, "product": prodby, "store": storeby}[i["kind"]].get(i["target_id"])
             if not target:
                 continue
             reactions = i.get("reactions", {})
@@ -461,6 +474,8 @@ def register_social_routes(db, get_current_user, require_admin, annotate_propert
                 "comment_count": sum(1 for cm in comments if cm.get("item_id") == i["id"]),
                 "property": target if i["kind"] == "property" else None,
                 "place": target if i["kind"] == "place" else None,
+                "product": target if i["kind"] == "product" else None,
+                "store": target if i["kind"] == "store" else None,
             })
         return {
             **_coll_summary(c, user["id"], users),
@@ -494,15 +509,15 @@ def register_social_routes(db, get_current_user, require_admin, annotate_propert
     async def add_item(coll_id: str, data: CollectionItemIn, user: dict = Depends(get_current_user)):
         c = await _collection(coll_id, user["id"])
         ensure(c.get("item_count", 0) < MAX_COLLECTION_ITEMS, 400, f"A collection holds up to {MAX_COLLECTION_ITEMS} items")
-        coll = db.properties if data.kind == "property" else db.places
-        target = await coll.find_one({"id": data.target_id}, {"_id": 0, "id": 1, "images": 1, "image": 1, "title": 1, "name": 1})
+        coll = db[ITEM_COLLECTIONS[data.kind]]
+        target = await coll.find_one({"id": data.target_id}, {"_id": 0, "id": 1, "images": 1, "image": 1, "title": 1, "name": 1, "logo": 1})
         ensure(target is not None, 404, "Not found")
         dup = await db.collection_items.find_one({"collection_id": coll_id, "target_id": data.target_id}, {"_id": 0, "id": 1})
         if dup:
             return {"ok": True, "item_id": dup["id"], "duplicate": True}
         item = {"id": new_id(), "collection_id": coll_id, "kind": data.kind, "target_id": data.target_id, "added_by": user["id"], "note": (data.note or "").strip() or None, "reactions": {}, "created_at": now()}
         await db.collection_items.insert_one(item)
-        cover = (target.get("images") or [target.get("image")])[0] if (target.get("images") or target.get("image")) else None
+        cover = (target.get("images") or [target.get("image")])[0] if (target.get("images") or target.get("image")) else (f"/api/shop/assets/logos/{target['logo']}" if target.get("logo") else None)
         upd: dict = {"$inc": {"item_count": 1}, "$set": {"updated_at": now(), "last_activity": {"kind": "added", "user_id": user["id"], "label": target.get("title") or target.get("name"), "at": now()}}}
         if cover:
             upd["$push"] = {"cover_images": {"$each": [cover], "$slice": -4}}

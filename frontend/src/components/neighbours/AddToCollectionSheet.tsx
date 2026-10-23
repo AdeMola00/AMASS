@@ -13,7 +13,12 @@ import { useTheme } from "@/src/theme";
 import { radii } from "@/src/theme/tokens";
 import { AppText, Button, Input, Sheet, SkeletonRows, useToast } from "@/src/ui";
 
-export function AddToCollectionSheet({ visible, onClose, targetId, kind = "property", onAdded }: { visible: boolean; onClose: () => void; targetId: string; kind?: "property" | "place"; onAdded?: (c: SharedCollection) => void }) {
+type ItemKind = "property" | "place" | "product" | "store";
+const COLLECTION_KIND: Record<ItemKind, "homes" | "places" | "shopping"> = { property: "homes", place: "places", product: "shopping", store: "shopping" };
+const TITLE: Record<ItemKind, string> = { property: "Add to a shared list", place: "Save this place", product: "Add to a shopping list", store: "Add store to a shopping list" };
+const PLACEHOLDER: Record<ItemKind, string> = { property: "e.g. Homes to view", place: "e.g. Useful services nearby", product: "e.g. Furnishing the new flat", store: "e.g. Furnishing the new flat" };
+
+export function AddToCollectionSheet({ visible, onClose, targetId, kind = "property", onAdded }: { visible: boolean; onClose: () => void; targetId: string; kind?: ItemKind; onAdded?: (c: SharedCollection) => void }) {
   const { colors } = useTheme();
   const router = useRouter();
   const toast = useToast();
@@ -21,12 +26,13 @@ export function AddToCollectionSheet({ visible, onClose, targetId, kind = "prope
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const collectionKind = COLLECTION_KIND[kind];
 
   useEffect(() => {
     if (!visible) return;
     setList(null);
-    api.collections().then((r) => setList(r.filter((c) => c.kind === (kind === "property" ? "homes" : "places")))).catch(() => setList([]));
-  }, [visible, kind]);
+    api.collections().then((r) => setList(r.filter((c) => c.kind === collectionKind))).catch(() => setList([]));
+  }, [visible, collectionKind]);
 
   const add = async (c: SharedCollection) => {
     setBusy(c.id);
@@ -48,7 +54,7 @@ export function AddToCollectionSheet({ visible, onClose, targetId, kind = "prope
     if (name.trim().length < 2) return;
     setBusy("new");
     try {
-      const c = await api.collectionCreate({ name: name.trim(), kind: kind === "property" ? "homes" : "places" });
+      const c = await api.collectionCreate({ name: name.trim(), kind: collectionKind });
       track("collection_created");
       setName("");
       setCreating(false);
@@ -60,7 +66,7 @@ export function AddToCollectionSheet({ visible, onClose, targetId, kind = "prope
   };
 
   return (
-    <Sheet visible={visible} onClose={onClose} title={kind === "property" ? "Add to a shared list" : "Save this place"} testID="add-to-collection-sheet">
+    <Sheet visible={visible} onClose={onClose} title={TITLE[kind]} testID="add-to-collection-sheet">
       <AppText variant="bodySm" tone="secondary" style={{ marginBottom: 10 }}>
         Lists are private. Only people you invite can see, react and comment.
       </AppText>
@@ -70,7 +76,7 @@ export function AddToCollectionSheet({ visible, onClose, targetId, kind = "prope
         <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ gap: 8 }}>
           {list.map((c) => (
             <Pressable key={c.id} onPress={() => add(c)} disabled={!!busy} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel={`Add to ${c.name}`} testID={`add-to-${c.id}`}>
-              <AppText variant="h3">{c.emoji || "🏠"}</AppText>
+              <AppText variant="h3">{c.emoji || (collectionKind === "shopping" ? "🛒" : "🏠")}</AppText>
               <View style={{ flex: 1 }}>
                 <AppText variant="bodyMedium" numberOfLines={1}>
                   {c.name}
@@ -91,7 +97,7 @@ export function AddToCollectionSheet({ visible, onClose, targetId, kind = "prope
       )}
       {creating ? (
         <View style={{ gap: 8, marginTop: 10 }}>
-          <Input value={name} onChangeText={setName} placeholder={kind === "property" ? "e.g. Homes to view" : "e.g. Useful services nearby"} autoFocus maxLength={60} onSubmitEditing={create} returnKeyType="done" testID="new-collection-name" />
+          <Input value={name} onChangeText={setName} placeholder={PLACEHOLDER[kind]} autoFocus maxLength={60} onSubmitEditing={create} returnKeyType="done" testID="new-collection-name" />
           <Button label="Create & add" fullWidth loading={busy === "new"} disabled={name.trim().length < 2} onPress={create} testID="new-collection-submit" />
         </View>
       ) : (

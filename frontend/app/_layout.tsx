@@ -16,6 +16,7 @@ import { useAppFonts } from "@/src/hooks/use-app-fonts";
 import "@/src/lib/global-font";
 import { AuthProvider } from "@/src/contexts/auth";
 import { CartProvider } from "@/src/contexts/cart";
+import { ShopBasketProvider } from "@/src/contexts/shopBasket";
 import { WalletProvider } from "@/src/contexts/wallet";
 import { ThemeProvider, useTheme } from "@/src/theme";
 import { ToastProvider } from "@/src/ui/Toast";
@@ -125,9 +126,11 @@ export default function RootLayout() {
               <AuthProvider>
                 <WalletProvider>
                   <CartProvider>
-                    <ToastProvider>
-                      <ThemedStack />
-                    </ToastProvider>
+                    <ShopBasketProvider>
+                      <ToastProvider>
+                        <ThemedStack />
+                      </ToastProvider>
+                    </ShopBasketProvider>
                   </CartProvider>
                 </WalletProvider>
               </AuthProvider>

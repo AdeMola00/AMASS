@@ -1,0 +1,36 @@
+{
+  "summary": "AMASS Shop (Market → Brands) feature tested end-to-end. Backend: 34/34 pytest cases pass (/app/backend/tests/test_shop.py). Frontend: core Instacart-style flow verified at 390x844 — Market tab → Brands segment renders shop-home (categories, filters, 7-retailer grid, banners, product rails), shop-add-* adds product to basket producing shop-stepper-{id}, shop-basket-btn-badge count=1 and floating shop-basket-pill; SLOT store page renders shop-store-screen with shop-store-route-website opening shop-handoff-sheet (cancel works); basket screen shows shop-basket-group-slot with shop-basket-subtotal-slot. No in-app payment endpoints exist and /wallet balance is unchanged across handoff. One minor doc discrepancy: review request referred to the SLOT slug as 'property-os-africa' but the actual seed slug is 'slot' — tests updated accordingly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "shop-home with ad modal", "issues": ["Sponsored AdModal fully overlays viewport on first Market tab visit; the only exits are a small 'Skip' link top-right or 'Shop the collection' CTA — the close affordance has no explicit data-testid (e.g. ad-modal-close), which makes automated dismissal fragile. Consider adding testID='ad-modal-close' and/or testID='ad-skip' on the sponsored modal controls."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_shop.py",
+    "/app/test_reports/pytest/pytest_iteration54_shop.xml"
+  ],
+  "action_items": [
+    "Add explicit testID='ad-modal-close' / 'ad-skip' on the sponsored AdModal so test agents and users with accessibility tooling can dismiss it reliably.",
+    "Review-request copy says SLOT slug is 'property-os-africa'; actual seed slug is 'slot'. Confirm which is intended and align either seed or spec/docs."
+  ],
+  "critical_code_review_comments": [
+    "shop.py logo_asset: the `/` guard still allows '..' names when the path has no slash (e.g. '..png' or future variants). The actual OS traversal is caught by FastAPI path normalisation (returning 404), but consider using os.path.basename() + startswith check against LOGO_DIR for defence-in-depth.",
+    "shop.py _sort(newest) accesses p['created_at'].timestamp() but `created_at` may be missing in future seed data — the current `or now()` guards against None but not a non-datetime value."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_shop.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100% (critical flows)"},
+  "seed_data_creation": "None. Only transient state: added one SLOT product to the demo user's basket during tests; tests clean up via DELETE /basket/retailer/{rid}.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login flow requires tapping onboarding 'Sign in' link before login screen; use testID='tab-marketplace' (not tab-market) for Market tab. SLOT retailer slug in seed is 'slot'. Dismiss the sponsored AdModal using get_by_text('Skip') or the Close ✕ (no stable testID currently). Backend pytest file at /app/backend/tests/test_shop.py covers home/retailers/products/search/saves/basket lifecycle/handoff/wallet-safety/logo-asset/no-payment-endpoint.",
+  "rca_of_issue": "N/A — all tested flows pass. One documentation drift: original review mentioned slug 'property-os-africa' for SLOT; actual seed uses 'slot', causing initial 404s in pytest fixtures that were corrected."
+}

@@ -1975,11 +1975,14 @@ from analytics import register_analytics_routes, ensure_analytics_indexes
 from social import register_social_routes, ensure_social_indexes
 from community import register_community_routes, ensure_community_indexes, event_reminder_sweep
 from social_seed import seed_neighbours_pilot
+from shop import register_shop_routes, ensure_shop_indexes
+from shop_seed import seed_shop
 
 app.include_router(register_phone_auth_routes(db, get_current_user, bearer, decode_user_id, create_token, user_to_out, hash_password))
 app.include_router(register_analytics_routes(db, bearer, decode_user_id, require_admin))
 app.include_router(register_social_routes(db, get_current_user, require_admin, annotate_properties))
 app.include_router(register_community_routes(db, get_current_user, require_admin, bearer, decode_user_id))
+app.include_router(register_shop_routes(db, get_current_user, bearer, decode_user_id))
 from intelligence import register_intelligence_routes  # noqa: E402
 app.include_router(register_intelligence_routes(db))
 from apple_auth import register_apple_auth_route  # noqa: E402
@@ -2238,6 +2241,11 @@ async def on_startup():
             logger.info("neighbours pilot seed: %s", _seeded)
         except Exception as _e:  # never block boot
             logger.warning("neighbours seed failed: %s", _e)
+        try:
+            await ensure_shop_indexes(db)
+            logger.info("shop seed: %s", await seed_shop(db))
+        except Exception as _e:  # never block boot
+            logger.warning("shop seed failed: %s", _e)
 
         async def _reminder_loop():
             while True:

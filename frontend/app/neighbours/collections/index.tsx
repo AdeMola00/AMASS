@@ -20,14 +20,14 @@ export default function CollectionsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const toast = useToast();
-  const params = useLocalSearchParams<{ create?: string; invite?: string }>();
+  const params = useLocalSearchParams<{ create?: string; invite?: string; kind?: string }>();
   const [list, setList] = useState<SharedCollection[] | null>(null);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [createOpen, setCreateOpen] = useState(params.create === "1");
-  const [kind, setKind] = useState<"homes" | "places">("homes");
+  const [kind, setKind] = useState<"homes" | "places" | "shopping">(params.kind === "shopping" ? "shopping" : params.kind === "places" ? "places" : "homes");
   const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("🏠");
+  const [emoji, setEmoji] = useState(params.kind === "shopping" ? "🛒" : "🏠");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -46,7 +46,7 @@ export default function CollectionsScreen() {
     }, [load])
   );
   useEffect(() => {
-    setEmoji(kind === "homes" ? "🏠" : "📍");
+    setEmoji(kind === "homes" ? "🏠" : kind === "shopping" ? "🛒" : "📍");
   }, [kind]);
 
   const create = async () => {
@@ -111,7 +111,7 @@ export default function CollectionsScreen() {
                   {c.emoji} {c.name}
                 </AppText>
                 <AppText variant="caption" tone="secondary" numberOfLines={1}>
-                  {c.item_count} {c.kind === "homes" ? (c.item_count === 1 ? "home" : "homes") : c.item_count === 1 ? "place" : "places"} · {c.member_count === 1 ? "Just you" : `${c.member_count} people`}
+                  {c.item_count} {c.kind === "homes" ? (c.item_count === 1 ? "home" : "homes") : c.kind === "shopping" ? (c.item_count === 1 ? "item" : "items") : c.item_count === 1 ? "place" : "places"} · {c.member_count === 1 ? "Just you" : `${c.member_count} people`}
                   {c.is_owner ? "" : " · Shared with you"}
                 </AppText>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -138,8 +138,8 @@ export default function CollectionsScreen() {
 
       <Sheet visible={createOpen} onClose={() => setCreateOpen(false)} title="New shared list" testID="create-collection-sheet">
         <View style={{ gap: 12 }}>
-          <SegmentedControl options={[{ value: "homes" as const, label: "Homes" }, { value: "places" as const, label: "Places" }]} value={kind} onChange={setKind} testIDPrefix="collection-kind" />
-          <Input label="Name" value={name} onChangeText={setName} placeholder={kind === "homes" ? "Homes to view" : "Useful services nearby"} autoFocus maxLength={60} testID="collection-name" />
+          <SegmentedControl options={[{ value: "homes" as const, label: "Homes" }, { value: "places" as const, label: "Places" }, { value: "shopping" as const, label: "Shopping" }]} value={kind} onChange={setKind} testIDPrefix="collection-kind" />
+          <Input label="Name" value={name} onChangeText={setName} placeholder={kind === "homes" ? "Homes to view" : kind === "shopping" ? "Furnishing the new flat" : "Useful services nearby"} autoFocus maxLength={60} testID="collection-name" />
           <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
             {EMOJIS.map((e) => (
               <Pressable key={e} onPress={() => setEmoji(e)} style={[styles.emoji, { backgroundColor: emoji === e ? colors.text : colors.surfaceAlt }]} accessibilityRole="radio" accessibilityState={{ selected: emoji === e }}>

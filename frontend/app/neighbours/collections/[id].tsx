@@ -6,6 +6,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, RefreshControl, Share, TextInput, Platform } from "react-native";
+import { Image } from "expo-image";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
@@ -18,6 +19,8 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Avatar, Badge, Button, Card, EmptyState, IconButton, Screen, ScreenHeader, Sheet, SkeletonCard, useToast } from "@/src/ui";
 import { ListingCard } from "@/src/components/ListingCard";
+import { RetailerRow } from "@/src/components/shop/RetailerCards";
+import { priceLabel } from "@/src/components/shop/shopFormat";
 import { timeAgo } from "@/src/components/neighbours/PostRow";
 
 const ORIGIN = (process.env.EXPO_PUBLIC_BACKEND_URL || "").replace(/\/$/, "");
@@ -196,7 +199,11 @@ export default function CollectionDetailScreen() {
             ) : null}
 
             {c.items.length === 0 ? (
-              <EmptyState icon={c.kind === "homes" ? "home-outline" : "location-outline"} title={c.kind === "homes" ? "No homes saved yet" : "No places saved yet"} body={c.kind === "homes" ? "Tap “Add to list” on any property, or browse the map and save homes here." : "Save useful places from the Local map."} actionLabel={c.kind === "homes" ? "Browse homes" : "Open Local map"} onAction={() => router.push((c.kind === "homes" ? "/(tabs)" : "/neighbours/places") as any)} testID="collection-empty" />
+              c.kind === "shopping" ? (
+                <EmptyState icon="cart-outline" title="Nothing on this list yet" body="Add products or stores from the Shop — everyone on the list can react and comment before you buy." actionLabel="Browse the Shop" onAction={() => router.push("/(tabs)/marketplace" as any)} testID="collection-empty" />
+              ) : (
+                <EmptyState icon={c.kind === "homes" ? "home-outline" : "location-outline"} title={c.kind === "homes" ? "No homes saved yet" : "No places saved yet"} body={c.kind === "homes" ? "Tap “Add to list” on any property, or browse the map and save homes here." : "Save useful places from the Local map."} actionLabel={c.kind === "homes" ? "Browse homes" : "Open Local map"} onAction={() => router.push((c.kind === "homes" ? "/(tabs)" : "/neighbours/places") as any)} testID="collection-empty" />
+              )
             ) : (
               c.items.map((item) => <ItemBlock key={item.id} item={item} collectionId={c.id} me={user?.id} isOwner={c.is_owner} onReact={(r) => react(item, r)} onComment={() => { setCommentFor(item.id); inputRef.current?.focus(); }} onRemove={() => remove(item)} comments={c.comments.filter((cm) => cm.item_id === item.id)} />)
             )}
@@ -225,7 +232,7 @@ export default function CollectionDetailScreen() {
             <Pressable onPress={() => setCommentFor(null)} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }} accessibilityRole="button" accessibilityLabel="Cancel replying to home">
               <Ionicons name="return-down-forward" size={14} color={colors.textTertiary} />
               <AppText variant="micro" tone="tertiary">
-                Commenting on {c.items.find((i) => i.id === commentFor)?.property?.title ?? "an item"} · tap to cancel
+                Commenting on {(() => { const it = c.items.find((i) => i.id === commentFor); return it?.property?.title ?? it?.product?.name ?? it?.store?.name ?? it?.place?.name ?? "an item"; })()} · tap to cancel
               </AppText>
             </Pressable>
           ) : null}
@@ -283,6 +290,8 @@ function ItemBlock({ item, collectionId, me, isOwner, onReact, onComment, onRemo
   const { colors } = useTheme();
   const p = item.property;
   const place = item.place;
+  const product = item.product;
+  const store = item.store;
   const canRemove = isOwner || item.added_by?.id === me;
   const R = ({ k, icon, label, tone }: { k: "love" | "maybe" | "no"; icon: any; label: string; tone: string }) => {
     const active = item.reactions.mine === k;
@@ -309,6 +318,22 @@ function ItemBlock({ item, collectionId, me, isOwner, onReact, onComment, onRemo
             </AppText>
           </View>
         </Pressable>
+      ) : product ? (
+        <Pressable onPress={() => router.push(`/shop/product/${product.id}` as any)} style={[styles.placeCard, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel={product.name} testID={`collection-product-${product.id}`}>
+          <View style={[styles.thumb, { backgroundColor: colors.surfaceAlt }]}>
+            {product.images[0] ? <Image source={{ uri: product.images[0] }} style={{ width: "100%", height: "100%" }} contentFit="contain" accessibilityIgnoresInvertColors /> : <Ionicons name="image-outline" size={22} color={colors.textMuted} />}
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <AppText variant="bodyMedium" numberOfLines={2}>{product.name}</AppText>
+            <AppText variant="title" tabular>{priceLabel(product.price).prefix ? `${priceLabel(product.price).prefix} ` : ""}{priceLabel(product.price).main}</AppText>
+            <AppText variant="micro" tone="tertiary" numberOfLines={1}>
+              {[product.retailer?.short_name, product.brand].filter(Boolean).join(" · ")}
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </Pressable>
+      ) : store ? (
+        <RetailerRow r={store} testID={`collection-store-${store.id}`} />
       ) : null}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
         <R k="love" icon="heart" label="Love it" tone={colors.brand} />
@@ -371,6 +396,7 @@ function CommentRow({ cm, mine, indent }: { cm: CollectionDetail["comments"][num
 const styles = StyleSheet.create({
   react: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, height: 32, borderRadius: radii.pill, borderWidth: 1 },
   placeCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radii.lg, borderWidth: 1 },
+  thumb: { width: 72, height: 72, borderRadius: radii.sm, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   composer: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 12, paddingBottom: 24, borderTopWidth: StyleSheet.hairlineWidth },
   input: { flex: 1, height: 44, borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: 14, fontSize: 15 },
   bubble: { flex: 1, padding: 10, borderRadius: radii.md, gap: 2 },

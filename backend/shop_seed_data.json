@@ -1,0 +1,4534 @@
+{
+ "retailers": [
+  {
+   "slug": "fouani",
+   "name": "Fouani Store",
+   "short_name": "Fouani",
+   "logo": "fouani.png",
+   "accent": "#111111",
+   "tagline": "Official LG & Hisense distributor · COLORS by Fouani online store",
+   "categories": [
+    "electronics",
+    "appliances",
+    "kitchen"
+   ],
+   "brands": [
+    "LG",
+    "Hisense",
+    "Maxi"
+   ],
+   "website": "https://www.fouani.com/ng",
+   "shop_url": "https://fouanistore.com/nigeria-en/shop",
+   "phone": "+2342018884444",
+   "whatsapp": null,
+   "email": "cic@fouani.com",
+   "locations": [
+    {
+     "name": "Victoria Island (LG)",
+     "address": "34 Adeola Odeku Street, Victoria Island",
+     "area": "Victoria Island",
+     "phone": "08107540030"
+    },
+    {
+     "name": "Lekki (LG)",
+     "address": "Plot 283, Block A, Idado, Lekki",
+     "area": "Lekki",
+     "phone": "08107539440"
+    },
+    {
+     "name": "Ikeja City Mall (LG & Hisense)",
+     "address": "Ikeja City Mall, Alausa, Ikeja",
+     "area": "Ikeja",
+     "phone": "08107539353"
+    },
+    {
+     "name": "Ikoyi (LG)",
+     "address": "84 Awolowo Road, Ikoyi",
+     "area": "Ikoyi",
+     "phone": "08107540031"
+    },
+    {
+     "name": "Ajah (COLORS)",
+     "address": "KM25, Lekki-Epe Expressway, Ajah",
+     "area": "Ajah",
+     "phone": "08146049223"
+    }
+   ],
+   "hours": "Mon–Sat 9:30am–7:00pm (most showrooms)",
+   "fulfilment": {
+    "delivery": {
+     "available": null,
+     "note": "Delivery handled per showroom — confirm with the store",
+     "source": "https://www.fouani.com/ng",
+     "verified_at": "2026-10-23"
+    },
+    "pickup": {
+     "available": true,
+     "note": "Buy in any Lagos showroom",
+     "source": "https://fouani.com/ng/outlets/showrooms",
+     "verified_at": "2026-10-23"
+    },
+    "showroom": {
+     "available": true,
+     "note": "50+ showrooms nationwide",
+     "source": "https://fouani.com/ng/outlets/showrooms",
+     "verified_at": "2026-10-23"
+    },
+    "installation": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    }
+   },
+   "tags": [
+    {
+     "key": "official_retailer",
+     "label": "Official LG & Hisense distributor",
+     "source": "https://www.fouani.com/ng",
+     "verified_at": "2026-10-23"
+    }
+   ],
+   "verification": {
+    "status": "verified",
+    "last_verified_at": "2026-10-23",
+    "sources": [
+     "https://fouanistore.com/nigeria-en/shop",
+     "https://fouani.com/ng/outlets/showrooms"
+    ],
+    "note": "Prices and stock read from fouanistore.com (Nigeria) on 2026-10-23"
+   }
+  },
+  {
+   "slug": "pointek",
+   "name": "Pointek",
+   "short_name": "Pointek",
+   "logo": "pointek.png",
+   "accent": "#0C6CCC",
+   "tagline": "Phones, electronics & kitchen appliances · pay on delivery in Lagos",
+   "categories": [
+    "electronics",
+    "appliances",
+    "kitchen"
+   ],
+   "brands": [
+    "Hisense",
+    "Samsung",
+    "LG",
+    "Vaib",
+    "Haier Thermocool"
+   ],
+   "website": "https://www.pointekonline.com/",
+   "shop_url": "https://www.pointekonline.com/",
+   "phone": "+2348077681244",
+   "whatsapp": null,
+   "email": null,
+   "locations": [
+    {
+     "name": "Head office",
+     "address": "6 Simbiat Abiola Way, Ikeja",
+     "area": "Ikeja",
+     "phone": null
+    },
+    {
+     "name": "Ikeja City Mall",
+     "address": "Shop L28, Ikeja City Mall",
+     "area": "Ikeja",
+     "phone": null
+    },
+    {
+     "name": "Victoria Island",
+     "address": "10 Saka Tinubu Street, Victoria Island",
+     "area": "Victoria Island",
+     "phone": null
+    },
+    {
+     "name": "Surulere",
+     "address": "2 Adeniran Ogunsanya Street, Surulere",
+     "area": "Surulere",
+     "phone": null
+    },
+    {
+     "name": "Lagos Island",
+     "address": "118 Broad Street, Lagos Island",
+     "area": "Lagos Island",
+     "phone": null
+    }
+   ],
+   "hours": null,
+   "fulfilment": {
+    "delivery": {
+     "available": true,
+     "note": "Nationwide delivery · pay on delivery (cash/POS) in Lagos",
+     "source": "https://www.pointekonline.com/pay-on-delivery/",
+     "verified_at": "2026-10-23"
+    },
+    "pickup": {
+     "available": true,
+     "note": "Collect from any Pointek store",
+     "source": "https://www.pointekonline.com/ourlocations/",
+     "verified_at": "2026-10-23"
+    },
+    "showroom": {
+     "available": true,
+     "note": "Stores across Lagos",
+     "source": "https://www.pointekonline.com/ourlocations/",
+     "verified_at": "2026-10-23"
+    },
+    "installation": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    }
+   },
+   "tags": [
+    {
+     "key": "warranty",
+     "label": "Manufacturer warranty honoured (varies by brand)",
+     "source": "https://www.pointekonline.com/service-center/",
+     "verified_at": "2026-10-23"
+    },
+    {
+     "key": "pay_on_delivery",
+     "label": "Pay on delivery",
+     "source": "https://www.pointekonline.com/pay-on-delivery/",
+     "verified_at": "2026-10-23"
+    }
+   ],
+   "verification": {
+    "status": "verified",
+    "last_verified_at": "2026-10-23",
+    "sources": [
+     "https://www.pointekonline.com/",
+     "https://www.pointekonline.com/ourlocations/"
+    ],
+    "note": "Prices, sale prices and stock read from pointekonline.com on 2026-10-23"
+   }
+  },
+  {
+   "slug": "slot",
+   "name": "SLOT",
+   "short_name": "SLOT",
+   "logo": "slot.png",
+   "accent": "#E30613",
+   "tagline": "Electronics, TVs & home appliances · 1-year warranty",
+   "categories": [
+    "electronics",
+    "appliances",
+    "kitchen"
+   ],
+   "brands": [
+    "Hisense",
+    "Samsung",
+    "Haier Thermocool",
+    "Scanfrost",
+    "LG"
+   ],
+   "website": "https://slot.ng/",
+   "shop_url": "https://slot.ng/shop",
+   "phone": "07005000050",
+   "whatsapp": null,
+   "email": null,
+   "locations": [
+    {
+     "name": "Head office",
+     "address": "203 Obafemi Awolowo Way, Ikeja",
+     "area": "Ikeja",
+     "phone": "02016335921"
+    }
+   ],
+   "hours": null,
+   "fulfilment": {
+    "delivery": {
+     "available": true,
+     "note": "Lagos: 1–3 working days",
+     "source": "https://slot.ng/terms-and-conditions",
+     "verified_at": "2026-10-23"
+    },
+    "pickup": {
+     "available": true,
+     "note": "In-store pickup at any SLOT branch",
+     "source": "https://slot.ng/faq",
+     "verified_at": "2026-10-23"
+    },
+    "showroom": {
+     "available": true,
+     "note": "Branches nationwide — see store locator",
+     "source": "https://slot.ng/find-a-store",
+     "verified_at": "2026-10-23"
+    },
+    "installation": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    }
+   },
+   "tags": [
+    {
+     "key": "warranty",
+     "label": "1-year standard warranty",
+     "source": "https://slot.ng/warranty-policy",
+     "verified_at": "2026-10-23"
+    }
+   ],
+   "verification": {
+    "status": "verified",
+    "last_verified_at": "2026-10-23",
+    "sources": [
+     "https://slot.ng/",
+     "https://slot.ng/warranty-policy",
+     "https://slot.ng/terms-and-conditions"
+    ],
+    "note": "Prices and stock read from slot.ng on 2026-10-23"
+   }
+  },
+  {
+   "slug": "boconcept",
+   "name": "BoConcept Lagos",
+   "short_name": "BoConcept",
+   "logo": "boconcept.png",
+   "accent": "#1A1A1A",
+   "tagline": "Danish design furniture · interior styling service",
+   "categories": [
+    "furniture",
+    "home_decor",
+    "lighting"
+   ],
+   "brands": [
+    "BoConcept"
+   ],
+   "website": "https://www.boconcept.com/en-ng/",
+   "shop_url": "https://www.boconcept.com/en-ng/",
+   "phone": "+2348165692455",
+   "whatsapp": null,
+   "email": "lagos@boconcept-africa.com",
+   "locations": [
+    {
+     "name": "BoConcept Lagos",
+     "address": "22 Adetokunbo Ademola Street, Victoria Island",
+     "area": "Victoria Island",
+     "phone": "+2348165692455",
+     "lat": 6.436052,
+     "lng": 3.430404
+    }
+   ],
+   "hours": "Mon–Fri 9:00am–6:00pm · Sat 10:00am–6:00pm · Sun closed",
+   "fulfilment": {
+    "delivery": {
+     "available": null,
+     "note": "Arranged by the store — confirm when ordering",
+     "source": null,
+     "verified_at": null
+    },
+    "pickup": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    },
+    "showroom": {
+     "available": true,
+     "note": "Showroom in Victoria Island",
+     "source": "https://www.boconcept.com/en-ng/stores/boconcept-lagos/",
+     "verified_at": "2026-10-23"
+    },
+    "installation": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    }
+   },
+   "tags": [
+    {
+     "key": "official_retailer",
+     "label": "Official BoConcept store",
+     "source": "https://www.boconcept.com/en-ng/stores/boconcept-lagos/",
+     "verified_at": "2026-10-23"
+    },
+    {
+     "key": "interior_design",
+     "label": "Interior design service",
+     "source": "https://www.boconcept.com/en-ng/stores/boconcept-lagos/",
+     "verified_at": "2026-10-23"
+    }
+   ],
+   "verification": {
+    "status": "verified",
+    "last_verified_at": "2026-10-23",
+    "sources": [
+     "https://www.boconcept.com/en-ng/stores/boconcept-lagos/",
+     "https://www.boconcept.com/en-ng/sofas/"
+    ],
+    "note": "NGN 'from' prices and recommended retail prices read from boconcept.com/en-ng on 2026-10-23"
+   }
+  },
+  {
+   "slug": "furniture-house",
+   "name": "Furniture House",
+   "short_name": "Furniture House",
+   "logo": "furniture-house.png",
+   "accent": "#0C0C0C",
+   "tagline": "Furniture manufacturer · sofas, dining, beds, office & outdoor",
+   "categories": [
+    "furniture",
+    "home_decor"
+   ],
+   "brands": [
+    "Furniture House"
+   ],
+   "website": "https://furniturehouse.org/",
+   "shop_url": "https://furniturehouse.org/collections/all",
+   "phone": "+2349099999296",
+   "whatsapp": null,
+   "email": "vi@furniturehouse.org",
+   "locations": [
+    {
+     "name": "Victoria Island showroom",
+     "address": "Adeola Odeku Street, Victoria Island",
+     "area": "Victoria Island",
+     "phone": "+2348099999990"
+    },
+    {
+     "name": "Ikoyi showroom",
+     "address": "39 Awolowo Road, Ikoyi",
+     "area": "Ikoyi",
+     "phone": "+2348188828283"
+    },
+    {
+     "name": "Ikeja showroom",
+     "address": "10 Allen Avenue, Ikeja",
+     "area": "Ikeja",
+     "phone": "+2348188818182"
+    }
+   ],
+   "hours": "Mon–Sat 8:00am–8:00pm · Sun 2:00pm–6:00pm",
+   "fulfilment": {
+    "delivery": {
+     "available": null,
+     "note": "Quoted per order — ask the showroom",
+     "source": null,
+     "verified_at": null
+    },
+    "pickup": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    },
+    "showroom": {
+     "available": true,
+     "note": "3 Lagos showrooms (VI, Ikoyi, Ikeja)",
+     "source": "https://furniturehouse.org/pages/contact",
+     "verified_at": "2026-10-23"
+    },
+    "installation": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    }
+   },
+   "tags": [
+    {
+     "key": "manufacturer",
+     "label": "Manufacturer",
+     "source": "https://furniturehouse.org/pages/about-us",
+     "verified_at": "2026-10-23"
+    }
+   ],
+   "verification": {
+    "status": "verified",
+    "last_verified_at": "2026-10-23",
+    "sources": [
+     "https://furniturehouse.org/pages/contact",
+     "https://furniturehouse.org/products.json"
+    ],
+    "note": "Catalogue read from furniturehouse.org on 2026-10-23; prices are on request (not published online)"
+   }
+  },
+  {
+   "slug": "lagom-sweden",
+   "name": "Lagom Sweden",
+   "short_name": "Lagom",
+   "logo": "lagom-sweden.png",
+   "accent": "#B49C24",
+   "tagline": "Living, dining & bedroom sets · Idea Home Design stores",
+   "categories": [
+    "furniture",
+    "home_decor"
+   ],
+   "brands": [
+    "Lagom"
+   ],
+   "website": "https://www.lagomsweden.com/",
+   "shop_url": "https://www.lagomsweden.com/productsCategories.aspx",
+   "phone": "+2349099991380",
+   "whatsapp": "+2347026810274",
+   "email": "info@lagomsweden.com",
+   "locations": [
+    {
+     "name": "Ikeja (Idea Home Design)",
+     "address": "27/29 Allen Avenue, Ikeja",
+     "area": "Ikeja",
+     "phone": "+2349099991380"
+    },
+    {
+     "name": "Victoria Island",
+     "address": "Adeola Odeku Street, Victoria Island",
+     "area": "Victoria Island",
+     "phone": null
+    }
+   ],
+   "hours": null,
+   "fulfilment": {
+    "delivery": {
+     "available": null,
+     "note": "See the retailer's shipping information page",
+     "source": "https://www.lagomsweden.com/ShippingInformation.aspx",
+     "verified_at": "2026-10-23"
+    },
+    "pickup": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    },
+    "showroom": {
+     "available": true,
+     "note": "Ikeja & Victoria Island showrooms",
+     "source": "https://www.lagomsweden.com/contactus.aspx",
+     "verified_at": "2026-10-23"
+    },
+    "installation": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    }
+   },
+   "tags": [],
+   "verification": {
+    "status": "verified",
+    "last_verified_at": "2026-10-23",
+    "sources": [
+     "https://www.lagomsweden.com/contactus.aspx",
+     "https://www.lagomsweden.com/productsCategories.aspx?cid=39&bid=0&category=LIVING-ROOM"
+    ],
+    "note": "Catalogue read from lagomsweden.com on 2026-10-23; prices not published online"
+   }
+  },
+  {
+   "slug": "orca-deco",
+   "name": "ORCA Deco",
+   "short_name": "ORCA",
+   "logo": null,
+   "accent": "#1F2937",
+   "tagline": "Furniture, décor, kitchenware & lifestyle · ORCA Mall, Eko Atlantic",
+   "categories": [
+    "furniture",
+    "home_decor",
+    "kitchen",
+    "lighting"
+   ],
+   "brands": [
+    "ORCA"
+   ],
+   "website": "https://orcanigeria.com/",
+   "shop_url": null,
+   "phone": "+2348124743919",
+   "whatsapp": "+2349135555588",
+   "email": null,
+   "locations": [
+    {
+     "name": "ORCA Mall",
+     "address": "BD-F 15/16/17, Eko Atlantic Free Zone, Eko Atlantic City, Victoria Island",
+     "area": "Eko Atlantic",
+     "phone": "+2348124743919"
+    }
+   ],
+   "hours": "Daily 10:00am–8:00pm (last entry 7:30pm)",
+   "fulfilment": {
+    "delivery": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    },
+    "pickup": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    },
+    "showroom": {
+     "available": true,
+     "note": "ORCA Mall opened 26 Nov 2025 at Eko Atlantic",
+     "source": "https://guardian.ng/life/events/orca-deco-mall-opens-in-lagos/",
+     "verified_at": "2026-10-23"
+    },
+    "installation": {
+     "available": null,
+     "note": null,
+     "source": null,
+     "verified_at": null
+    }
+   },
+   "tags": [],
+   "verification": {
+    "status": "partial",
+    "last_verified_at": "2026-10-23",
+    "sources": [
+     "https://orcanigeria.com/",
+     "https://guardian.ng/life/events/orca-deco-mall-opens-in-lagos/"
+    ],
+    "note": "Official site is a landing page without a catalogue or logo asset; store details come from press coverage and directories. Confirm with ORCA before relying on them."
+   }
+  }
+ ],
+ "products": [
+  {
+   "source_id": "fouani:273",
+   "retailer_slug": "fouani",
+   "name": "Maxi Kitchen Machine Mixer 600W (MJ-KM6001W)",
+   "brand": "Maxi",
+   "category": "kitchen",
+   "subcategory": "Mixers",
+   "spec": "600W",
+   "specs": {
+    "Rated Power": "600W",
+    "Capacity": "4L"
+   },
+   "description": "Rated Power: 600W · Capacity: 4L · Speed Adjust with Knob Control · Arm Control Button",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/c/c907dafc-b5a9-4274-ae4c-a05aef0acc1a/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 87000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/273",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Maxi Warranty",
+    "url": "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/document/c/c0ab3f54-cba9-4edb-9d2d-50196af13e3c/doc.pdf?_dc=aas1734346211",
+    "source": "https://fouanistore.com/nigeria-en/product/273",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://fouanistore.com/nigeria-en/product/273",
+   "popularity": 0,
+   "sku": "MAXIMIXER6001KM",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:1091",
+   "retailer_slug": "fouani",
+   "name": "LG TV QNED 65 Inch QNED82A6A 4K Smart TV AI Magic remote webOS25",
+   "brand": "LG",
+   "category": "electronics",
+   "subcategory": "Televisions",
+   "spec": "65 inch",
+   "specs": {},
+   "description": "Incredibly rich color palette from All New Dynamic QNED Color · 4K picture quality, upscaled visual and surround sound from the alpha 7 4K AI Processor Gen8 · New AI button, voice controls, drag and drop functions on the AI Magic Remote · Precision dimming ensures the sharpest p",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/7/75be5a17-a93c-427f-863f-7239ac6800dc/image.webp?_dc=1780487103"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 1199000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/1091",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "out_of_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/1091",
+   "popularity": 0,
+   "sku": "LGTV65QNED82A6A",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:839",
+   "retailer_slug": "fouani",
+   "name": "Hisense Soundbar with Subwoofer 500W 3.1CH (AX3100Q)",
+   "brand": "Hisense",
+   "category": "electronics",
+   "subcategory": "Soundbars",
+   "spec": "500W",
+   "specs": {},
+   "description": "500W · Dolby Atmos · 6.5″ Wireless Subwoofer · Hi-Concerto",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/f/f9d61928-093e-4200-a903-9e0b13ea4150/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 199000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/839",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Hisense Warranty",
+    "url": "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/document/1/173687aa-196f-4350-9856-9f889b468e71/doc.pdf?_dc=aas1733478826",
+    "source": "https://fouanistore.com/nigeria-en/product/839",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://fouanistore.com/nigeria-en/product/839",
+   "popularity": 0,
+   "sku": "HISAUD3100Q-AX",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:70",
+   "retailer_slug": "fouani",
+   "name": "Hisense Top Load Twin Tub 5KG (WSPA503) Washing Machine",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Washing machines",
+   "spec": "5KG",
+   "specs": {},
+   "description": "Classical Design · Lint Filter · Adjustable Legs",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/e/eb6480b9-bbb9-4260-8cca-d6403ca7830c/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 149000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/70",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Hisense Warranty",
+    "url": "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/document/1/173687aa-196f-4350-9856-9f889b468e71/doc.pdf?_dc=aas1733478826",
+    "source": "https://fouanistore.com/nigeria-en/product/70",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://fouanistore.com/nigeria-en/product/70",
+   "popularity": 0,
+   "sku": "HISWM503WSPA",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:350",
+   "retailer_slug": "fouani",
+   "name": "Hisense Split AC 1.0 HP Inverter",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Air conditioners",
+   "spec": "1.0 HP",
+   "specs": {},
+   "description": "Super Cooling · Gold Fin · INVERTER",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/5/5b23822d-dec0-4003-bffa-c063aff34086/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 397600,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/350",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Hisense Warranty",
+    "url": "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/document/1/173687aa-196f-4350-9856-9f889b468e71/doc.pdf?_dc=aas1733478826",
+    "source": "https://fouanistore.com/nigeria-en/product/350",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://fouanistore.com/nigeria-en/product/350",
+   "popularity": 0,
+   "sku": "HISSPL10HPINV",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:1108",
+   "retailer_slug": "fouani",
+   "name": "Maxi Tabletop Gas Cooker 4 Burners (BE001) Stainless Steel",
+   "brand": "Maxi",
+   "category": "kitchen",
+   "subcategory": "Gas cookers",
+   "spec": "",
+   "specs": {},
+   "description": "4 gas 60 cm BE Model · Stainless Steel Body · Cast Iron Pan Supports · Flat Enamel Burner Caps",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/a/acb35857-3a25-41ab-a150-8a6f0194b102/image.webp?_dc=1781097362"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 188200,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/1108",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/1108",
+   "popularity": 0,
+   "sku": "MAXIBURNERBE001",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:874",
+   "retailer_slug": "fouani",
+   "name": "LG TV QNED 75 Inch QNED82A6A 4K Smart TV AI Magic remote webOS25",
+   "brand": "LG",
+   "category": "electronics",
+   "subcategory": "Televisions",
+   "spec": "75 inch",
+   "specs": {},
+   "description": "Incredibly rich color palette from All New Dynamic QNED Color · 4K picture quality, upscaled visual and surround sound from the alpha 7 4K AI Processor Gen8 · New AI button, voice controls, drag and drop functions on the AI Magic Remote · Precision dimming ensures the sharpest p",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/b/b72a35f1-5fe4-4471-896b-e3f259dc5936/image.webp?_dc=1788945962"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 1350000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/874",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/874",
+   "popularity": 0,
+   "sku": "LGTV75QNED82A6A",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:278",
+   "retailer_slug": "fouani",
+   "name": "LG Soundbar with Subwoofer 340W 3.1CH (60TS)",
+   "brand": "LG",
+   "category": "electronics",
+   "subcategory": "Soundbars",
+   "spec": "340W",
+   "specs": {},
+   "description": "Take your home theater sound to a new level with this 3 channels, 340W soundbar · Never miss a single detail, no matter where you're watching with Dolby Audio™¹ · All new crest design delivers a sleek and stylish look · Hear clear vocals in live sports and thunderous bass in liv",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/f/fd194a68-d1f7-4370-8de5-272002687883/image.webp?_dc=1759223462"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 226000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/278",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/278",
+   "popularity": 0,
+   "sku": "LGAUD60TS",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:576",
+   "retailer_slug": "fouani",
+   "name": "Hisense Portable AC 1.5 HP",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Air conditioners",
+   "spec": "1.5 HP",
+   "specs": {},
+   "description": "User-Friendly Control and Display · Self-Diagnosis & Auto Protection · Independent Dehumidifier · Self-Evaporative Movement System",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/6/6debaa7b-9769-4612-a14b-9d0530565926/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 394000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/576",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/576",
+   "popularity": 0,
+   "sku": "HISPAC15HP",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:1003",
+   "retailer_slug": "fouani",
+   "name": "Hisense SxS Refrigerator 541L (71WS-RC)",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Refrigerators",
+   "spec": "541L",
+   "specs": {
+    "Total Capacity": "541 L",
+    "Fridge Capacity": "344 L",
+    "Freezer Capacity": "197 L",
+    "Defrosting Fridge/Freezer": "Automatic",
+    "Control System": "electronic"
+   },
+   "description": "Side-by-Side · Total Capacity: 541 L · Fridge Capacity: 344 L · Freezer Capacity: 197 L",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/a/af2409d6-90aa-4010-9370-5cba3fffc2b6/image.webp?_dc=1766492463"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 840000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/1003",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/1003",
+   "popularity": 0,
+   "sku": "HISREF71WS-RC",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:1045",
+   "retailer_slug": "fouani",
+   "name": "Hisense TV FHD 40 Inch A4S Smart",
+   "brand": "Hisense",
+   "category": "electronics",
+   "subcategory": "Televisions",
+   "spec": "40 inch",
+   "specs": {},
+   "description": "Natural Colour Enhancer · Dolby Audio · Share TV from your mobile · Noise reduction",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/d/d0d624d9-66e8-4696-818f-f5f757055db1/image.webp?_dc=1774364162"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 299000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/1045",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/1045",
+   "popularity": 0,
+   "sku": "HISTV40A4S",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:663",
+   "retailer_slug": "fouani",
+   "name": "Maxi Rubi TV Stand 120CM (Off White)",
+   "brand": "Maxi",
+   "category": "furniture",
+   "subcategory": "TV stands",
+   "spec": "120CM",
+   "specs": {
+    "LENGTH": "120CM",
+    "HEIGHT": "65.5CM",
+    "DEPTH": "37.5CM",
+    "COLOR": "OFF WHITE/CINAMOMO"
+   },
+   "description": "LENGTH: 120CM · HEIGHT: 65.5CM · DEPTH: 37.5CM · COLOR: OFF WHITE/CINAMOMO",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/9/92f683c6-926e-418b-a63a-8a21288e2941/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 82000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/663",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/663",
+   "popularity": 0,
+   "sku": "MAXITVSTANDRUBI160",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:791",
+   "retailer_slug": "fouani",
+   "name": "LG TV UHD 55 Inch UT73 4K Smart TV AI Magic remote HDR10 webOS24",
+   "brand": "LG",
+   "category": "electronics",
+   "subcategory": "Televisions",
+   "spec": "55 inch",
+   "specs": {
+    "With webOS Re": "New Program"
+   },
+   "description": "Breathtaking color and detail with 4K HDR10 Pro · Enhanced picture and sound quality with the alpha 5 AI Processor 4K Gen7 · With webOS Re:New Program · Cinema-worthy visuals and sound with FILMMAKER MODE",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/a/a0722b97-186c-4aeb-8c35-3393e005802e/image.webp?_dc=1765186623"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 495000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/791",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "out_of_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/791",
+   "popularity": 0,
+   "sku": "LGTV55UT73006LA",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:775",
+   "retailer_slug": "fouani",
+   "name": "Hisense Front Load 10.5KG (WF3S1043BT) Washing Machine",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Washing machines",
+   "spec": "10.5KG",
+   "specs": {},
+   "description": "Smart Connect · A+++ Energy Efficiency Class · Jet Wash · Allergy Steam and Baby Steam Care",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/0/04a56f92-e570-47a4-bf74-3ce5cb9cb639/image.webp?_dc=1792655703"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 492000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/775",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/775",
+   "popularity": 0,
+   "sku": "HISWM1043BT-WF3S",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:161",
+   "retailer_slug": "fouani",
+   "name": "Hisense Top Freezer Refrigerator 124L (172DR)",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Refrigerators",
+   "spec": "124L",
+   "specs": {},
+   "description": "Low Noise · Environment-Friendly Tech",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/1/10614d11-7439-4ae9-9bc5-51af4a74bf8b/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 279000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/161",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Hisense Warranty",
+    "url": "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/document/1/173687aa-196f-4350-9856-9f889b468e71/doc.pdf?_dc=aas1733478826",
+    "source": "https://fouanistore.com/nigeria-en/product/161",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://fouanistore.com/nigeria-en/product/161",
+   "popularity": 0,
+   "sku": "HISREF172DR",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:113",
+   "retailer_slug": "fouani",
+   "name": "Hisense Top Freezer Refrigerator 504L (RD-66WR)",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Refrigerators",
+   "spec": "504L",
+   "specs": {},
+   "description": "Multi Air Flow System · Low Noise · Super Freeze · Cool Function",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/3/398dea90-34cb-425b-ba40-2de9d80e9aa3/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 709000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/113",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Hisense Warranty",
+    "url": "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/document/1/173687aa-196f-4350-9856-9f889b468e71/doc.pdf?_dc=aas1733478826",
+    "source": "https://fouanistore.com/nigeria-en/product/113",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://fouanistore.com/nigeria-en/product/113",
+   "popularity": 0,
+   "sku": "HISREF66WR-RD",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:658",
+   "retailer_slug": "fouani",
+   "name": "LG Split AC 2.0 HP Dual Inverter - Advanced Features",
+   "brand": "LG",
+   "category": "appliances",
+   "subcategory": "Air conditioners",
+   "spec": "2.0 HP",
+   "specs": {},
+   "description": "Fast Cooling · Energy Saving · Less Noise · DUAL Inverter Compressor™",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/e/e7834ead-459c-4519-90f6-46c82ad137fa/image.webp?_dc=1786540502"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 699000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/658",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "out_of_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "LG Warranty",
+    "url": "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/document/6/6eacf994-deb2-4114-8764-de54a989e471/doc.pdf?_dc=aa1733478810",
+    "source": "https://fouanistore.com/nigeria-en/product/658",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://fouanistore.com/nigeria-en/product/658",
+   "popularity": 0,
+   "sku": "LGSPL20HPINVERTER",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:802",
+   "retailer_slug": "fouani",
+   "name": "Maxi Bladeless Fan 42 Inch Black (150PD-AMS)",
+   "brand": "Maxi",
+   "category": "appliances",
+   "subcategory": "Fans",
+   "spec": "42 inch",
+   "specs": {},
+   "description": "RATED POWER 30W · TIMER 12H · LED SCREEN · MAX NOISE 62dB",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/0/07de4eca-c57a-4ec2-83e9-8e3eba656fb7/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 179000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/802",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/802",
+   "popularity": 0,
+   "sku": "MAXIFAN150PD-AMS",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:160",
+   "retailer_slug": "fouani",
+   "name": "LG Top Freezer Refrigerator 235L  (GN-B212PFNR)",
+   "brand": "LG",
+   "category": "appliances",
+   "subcategory": "Refrigerators",
+   "spec": "235L",
+   "specs": {},
+   "description": "LinearCooling™ · Door Cooling+™ · Multi Air Flow · Smart Inverter Compressor™",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/d/dda66a6a-54ad-4c82-9282-6199e9c73cd0/image.webp?_dc=1767775803"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 514000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/160",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "LG Warranty",
+    "url": "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/document/6/6eacf994-deb2-4114-8764-de54a989e471/doc.pdf?_dc=aa1733478810",
+    "source": "https://fouanistore.com/nigeria-en/product/160",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://fouanistore.com/nigeria-en/product/160",
+   "popularity": 0,
+   "sku": "LGREF212PLGB-B",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:644",
+   "retailer_slug": "fouani",
+   "name": "Maxi Water Heater 15L 2000W (15-20VE)",
+   "brand": "Maxi",
+   "category": "appliances",
+   "subcategory": "Water heaters",
+   "spec": "15L",
+   "specs": {
+    "Capacity": "15 LTR",
+    "Power": "2000 Watts",
+    "Voltage": "230 V",
+    "Frequency": "50/60 HZ",
+    "Max Temp": "105",
+    "Mounting": "Vertical"
+   },
+   "description": "Capacity: 15 LTR · Power: 2000 Watts · Voltage: 230 V · Frequency: 50/60 HZ",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/8/889bc9f9-b1ca-410b-b045-92334885e860/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 69900,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/644",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/644",
+   "popularity": 0,
+   "sku": "MAXIWH15-20VE",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:1162",
+   "retailer_slug": "fouani",
+   "name": "Maxi Split AC 1.5 HP Inverter",
+   "brand": "Maxi",
+   "category": "appliances",
+   "subcategory": "Air conditioners",
+   "spec": "1.5 HP",
+   "specs": {
+    "Capacity": "12000 Btu/h",
+    "Refrigerant type": "R32/0.36",
+    "Indoor Unit Dimension(W*D*H)": "813x201x289",
+    "Outdoor Unit Dimension(W*D*H)": "668x252x469"
+   },
+   "description": "Inverter Compressor · Capacity: 12000 Btu/h · Refrigerant type: R32/0.36 · Indoor Unit Dimension(W*D*H): 813x201x289",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/f/f5cae4fb-eb84-4bff-92c0-677924053c77/image.webp?_dc=1788595023"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 336000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/1162",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/1162",
+   "popularity": 0,
+   "sku": "MAXISPL15INV01-M",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:91",
+   "retailer_slug": "fouani",
+   "name": "LG Top Load Twin Tub 18KG (1861RWNT) Washing Machine",
+   "brand": "LG",
+   "category": "appliances",
+   "subcategory": "Washing machines",
+   "spec": "18KG",
+   "specs": {
+    "3 Wash Program": "Gentle, Normal, and Strong",
+    "Wind Jet Dry": "Air Circulating During Spin Cycle"
+   },
+   "description": "3 Dimension Roller Jet Pulsator for Sparkle Clean Clothes · 3 Wash Program: Gentle, Normal, and Strong · Wind Jet Dry: Air Circulating During Spin Cycle · Pre-Soak",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/6/644011f4-9c39-41c4-b5e8-f1cd5548bb14/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 435000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/91",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/91",
+   "popularity": 0,
+   "sku": "LGWM1861RWNT",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:305",
+   "retailer_slug": "fouani",
+   "name": "LG Dishwasher QuadWas True Steam (DFB512FP)",
+   "brand": "LG",
+   "category": "kitchen",
+   "subcategory": "Dishwashers",
+   "spec": "",
+   "specs": {},
+   "description": "LG QuadWash™ Dishwasher · 14 Place Setting · EasyRack™ Plus · Inverter Direct Drive",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/0/00bd35d3-b2cc-4621-93d3-ab46974c06be/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 779000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/305",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/305",
+   "popularity": 0,
+   "sku": "LGDW512DFB-FP",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:963",
+   "retailer_slug": "fouani",
+   "name": "Hisense Chest Freezer 372L Silver (480SH-FC)",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Freezers",
+   "spec": "372L",
+   "specs": {
+    "Color available": "Silver Only",
+    "Defrosting Fridge/Freezer": "Manual",
+    "Control System": "Mechanical"
+   },
+   "description": "372 Litres · Color available: Silver Only · Defrosting Fridge/Freezer: Manual · Control System: Mechanical",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/e/eb81803b-cbcb-41a7-9542-53a289e8cdd0/image.webp?_dc=1765271042"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 548800,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/963",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/963",
+   "popularity": 0,
+   "sku": "HISFRZ480SH-FC",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "fouani:220",
+   "retailer_slug": "fouani",
+   "name": "LG Microwave 42L 1200W (MH8265CIS)",
+   "brand": "LG",
+   "category": "kitchen",
+   "subcategory": "Microwaves",
+   "spec": "42L",
+   "specs": {},
+   "description": "Smart Inverter · Even Heating · Fast Cooking · Tasty Grilling",
+   "images": [
+    "https://salva.ams3.cdn.digitaloceanspaces.com/production/tenants/fouani/picture/d/dcf64dbb-5f33-4d6f-a166-9a8b73d98239/image.webp?_dc=1758118724"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 239000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://fouanistore.com/nigeria-en/product/220",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": null,
+   "source_url": "https://fouanistore.com/nigeria-en/product/220",
+   "popularity": 0,
+   "sku": "LGMWO8265CIS",
+   "tags": [],
+   "promo": null,
+   "variants": [],
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:41887",
+   "retailer_slug": "pointek",
+   "name": "VAIB 11 IN 1 Multi-functional Steam Air-fryer Oven",
+   "brand": "Vaib",
+   "category": "kitchen",
+   "subcategory": "Air fryers",
+   "spec": "",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2026/08/Brown-Modern-Visit-Our-Website-Video-Instagram-Post-1-1024x1024-1.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 357100,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/vaib-11-in-1-multi-functional-steam-air-fryer-oven/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/vaib-11-in-1-multi-functional-steam-air-fryer-oven/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:41442",
+   "retailer_slug": "pointek",
+   "name": "Vaib Pure Crush Blender – 2ltrs",
+   "brand": "Vaib",
+   "category": "kitchen",
+   "subcategory": "Blenders",
+   "spec": "2ltrs",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2026/02/Vaib-Crush-768x768-1.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 269999,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/vaib-pure-crush-blender-2ltrs/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": {
+    "label": "Reduced price",
+    "previous_price": 294000,
+    "expires_at": null,
+    "terms": "Sale price as listed on pointekonline.com. No end date published — confirm with Pointek before buying.",
+    "source_url": "https://www.pointekonline.com/product/vaib-pure-crush-blender-2ltrs/",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/vaib-pure-crush-blender-2ltrs/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:40850",
+   "retailer_slug": "pointek",
+   "name": "Vaib Pure Crush Blender – 4ltrs",
+   "brand": "Vaib",
+   "category": "kitchen",
+   "subcategory": "Blenders",
+   "spec": "4ltrs",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2026/02/Vaib-Crush-768x768-1.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 295000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/vaib-pure-crush-blender-4ltrs/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": {
+    "label": "Reduced price",
+    "previous_price": 315000,
+    "expires_at": null,
+    "terms": "Sale price as listed on pointekonline.com. No end date published — confirm with Pointek before buying.",
+    "source_url": "https://www.pointekonline.com/product/vaib-pure-crush-blender-4ltrs/",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/vaib-pure-crush-blender-4ltrs/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:40836",
+   "retailer_slug": "pointek",
+   "name": "Vaib Pureblend Smart Blender",
+   "brand": "Vaib",
+   "category": "kitchen",
+   "subcategory": "Blenders",
+   "spec": "",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2026/02/vaib-pureblend-blender.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 155000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/vaib-pureblend-smart-blender/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": {
+    "label": "Reduced price",
+    "previous_price": 180000,
+    "expires_at": null,
+    "terms": "Sale price as listed on pointekonline.com. No end date published — confirm with Pointek before buying.",
+    "source_url": "https://www.pointekonline.com/product/vaib-pureblend-smart-blender/",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/vaib-pureblend-smart-blender/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:40237",
+   "retailer_slug": "pointek",
+   "name": "Vaib PurePress Juicer",
+   "brand": "Vaib",
+   "category": "kitchen",
+   "subcategory": "Juicers",
+   "spec": "",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2025/09/vaib-juicer.jpeg"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 119999,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/vaib-purepress-juicer/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": {
+    "label": "Reduced price",
+    "previous_price": 130000,
+    "expires_at": null,
+    "terms": "Sale price as listed on pointekonline.com. No end date published — confirm with Pointek before buying.",
+    "source_url": "https://www.pointekonline.com/product/vaib-purepress-juicer/",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/vaib-purepress-juicer/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:39424",
+   "retailer_slug": "pointek",
+   "name": "Poolee Power Blender X700 1500W",
+   "brand": "Poolee",
+   "category": "kitchen",
+   "subcategory": "Blenders",
+   "spec": "1500W",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2025/06/Poolee-PowerBlend-600x600-1.jpg"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 149999,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/poolee-power-blender-x700-1500w/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": {
+    "label": "Reduced price",
+    "previous_price": 161250,
+    "expires_at": null,
+    "terms": "Sale price as listed on pointekonline.com. No end date published — confirm with Pointek before buying.",
+    "source_url": "https://www.pointekonline.com/product/poolee-power-blender-x700-1500w/",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/poolee-power-blender-x700-1500w/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:36391",
+   "retailer_slug": "pointek",
+   "name": "HISENSE 43 Inches LED SMART TV 43A4K- with Free wall bracket",
+   "brand": "Hisense",
+   "category": "electronics",
+   "subcategory": "Televisions",
+   "spec": "43 inch",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2024/03/hisense-32a4k-.jpeg"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 360000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/hisense-43-inches-led-smart-tv-43a4k-with-free-wall-bracket/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "out_of_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/hisense-43-inches-led-smart-tv-43a4k-with-free-wall-bracket/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:36413",
+   "retailer_slug": "pointek",
+   "name": "Samsung smart TV UHD 4K 55″ AU7002",
+   "brand": "Samsung",
+   "category": "electronics",
+   "subcategory": "Televisions",
+   "spec": "",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2024/03/samsung-uhd-4k.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 905000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/samsung-smart-tv-uhd-4k-55-au7002/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "out_of_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/samsung-smart-tv-uhd-4k-55-au7002/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:33437",
+   "retailer_slug": "pointek",
+   "name": "Hisense Ref 240 DR 240L",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Refrigerators",
+   "spec": "240L",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2023/02/hisense-ref-240-dr.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 335500,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/hisense-ref-240-dr-240l/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "out_of_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/hisense-ref-240-dr-240l/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:27823",
+   "retailer_slug": "pointek",
+   "name": "LG GENCOOL- SPLIT AC 1.5HP (INVERTER)",
+   "brand": "LG",
+   "category": "appliances",
+   "subcategory": "Air conditioners",
+   "spec": "1.5HP",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2020/08/lg-gencool-ac.jpg"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 547000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/lg-gencool-split-ac-1-5hp-inverter/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "out_of_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/lg-gencool-split-ac-1-5hp-inverter/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:11115",
+   "retailer_slug": "pointek",
+   "name": "Panasonic Microwave Oven NN-SM332",
+   "brand": "Panasonic",
+   "category": "kitchen",
+   "subcategory": "Microwaves",
+   "spec": "",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2018/10/Panasonic-microwave-oven.png"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 30000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/panasonic-microwave-oven-nn-sm332/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": {
+    "label": "Reduced price",
+    "previous_price": 45000,
+    "expires_at": null,
+    "terms": "Sale price as listed on pointekonline.com. No end date published — confirm with Pointek before buying.",
+    "source_url": "https://www.pointekonline.com/product/panasonic-microwave-oven-nn-sm332/",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "out_of_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/panasonic-microwave-oven-nn-sm332/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "pointek:8609",
+   "retailer_slug": "pointek",
+   "name": "Hisense Washing Machine 10kg",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Washing machines",
+   "spec": "10kg",
+   "description": null,
+   "images": [
+    "https://www.pointekonline.com/wp-content/uploads/2018/08/hisense-washing-machine-7.2kg.jpg"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 105000,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.pointekonline.com/product/hisense-washing-machine-10kg/",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "out_of_stock",
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "Manufacturer warranty via Pointek service centre (duration varies by brand)",
+    "url": "https://www.pointekonline.com/service-center/",
+    "source": "https://www.pointekonline.com/service-center/",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.pointekonline.com/product/hisense-washing-machine-10kg/",
+   "popularity": 0,
+   "sku": null,
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KPE3ZH3MY005QDJ8EB99P1QP",
+   "retailer_slug": "slot",
+   "name": "Royal Split 1.5HP Inverter AC With Kit (QK12RSA)",
+   "brand": "Royal",
+   "category": "appliances",
+   "subcategory": "Air conditioners",
+   "spec": "1.5HP",
+   "description": "$9f",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/l7uqdxGlfHeXsC2Dcp2o760dfMPSMYR6KxjJpZWu.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 469800,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/royal-split-15hp-inverter-ac-with-kit-qk12rsa",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 1,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/royal-split-15hp-inverter-ac-with-kit-qk12rsa",
+   "popularity": 0,
+   "sku": "303724",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01M11F9DCQ70YD18WDQVB0NVGD",
+   "retailer_slug": "slot",
+   "name": "Haier Thermocool Double Door Refrigerator Direct Cool Hrf 95BEX R6 Slv",
+   "brand": "Haier Thermocool",
+   "category": "appliances",
+   "subcategory": "Refrigerators",
+   "spec": "",
+   "description": "Capacity: 95 Litres Freezer Capacity: 67 Litres Refrigerator Capacity: 28 Litres Cooling Technology: Direct Cool Energy Saving: Up to 35% Cooling Retention: Up to 100 Hours After Power Cut Cooling Performance: Super Fast Cooling Voltage Ran",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/uU6ktUGMUCCCn1LYOgIJcG68DJ2jyaQan4fH0u6Z.jpg"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 298300,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/haier-thermocool-double-door-refrigerator-direct-cool-hrf-95bex-r6-slv",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 2,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/haier-thermocool-double-door-refrigerator-direct-cool-hrf-95bex-r6-slv",
+   "popularity": 0,
+   "sku": "100101189",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01M11P3HW2AJ7QG389QRPJ1EEP",
+   "retailer_slug": "slot",
+   "name": "MeWe Microwave Oven MW-OV38",
+   "brand": "MeWe",
+   "category": "kitchen",
+   "subcategory": "Microwaves",
+   "spec": "",
+   "description": "Capacity: 38 Litres Power: 1600W Voltage: 220â240V, 50/60Hz Temperature Control: 100â230Â°C Timer: 60 Minutes with Bell Ring & Automatic Shut-Off Control: 4 Knobs Heating Elements: 4 Stainless Steel Heating Elements Door: High-Tempered ",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/EMdea8Wynv4LE4H4t3bzhYLEagGx4dCp7LyYpO4u.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 75700,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/mewe-oven-mw-ov38",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 2,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/mewe-oven-mw-ov38",
+   "popularity": 0,
+   "sku": "303131",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KMGAJXMGCDXMTTWVVNVTT3EJ",
+   "retailer_slug": "slot",
+   "name": "SLOT 10000MAH PD 22.5W Powerbank B728 + SLOT Mini Bluetooth Speaker BTS12",
+   "brand": "SLOT",
+   "category": "electronics",
+   "subcategory": "Speakers",
+   "spec": "10000MAH",
+   "description": "SLOT 10000MAH PD 22.5W POWERBANK B728 + SLOT MINI BLUETOOTH SPEAKER BTS12",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/Uz4wItVe8wunTPX6v6NyrOY8C0HZlAb0MmfMWyfG.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 25500,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/slot-10000mah-pd-225w-powerbank-b728-slot-mini-bluetooth-speaker-bts12",
+    "verified_at": "2026-10-23"
+   },
+   "promo": {
+    "label": "16% off",
+    "previous_price": 30200,
+    "expires_at": null,
+    "terms": "Discount as listed on slot.ng. No end date published — confirm with SLOT before buying.",
+    "source_url": "https://slot.ng/products/slot-10000mah-pd-225w-powerbank-b728-slot-mini-bluetooth-speaker-bts12",
+    "verified_at": "2026-10-23"
+   },
+   "stock": {
+    "status": "in_stock",
+    "qty": 6,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/slot-10000mah-pd-225w-powerbank-b728-slot-mini-bluetooth-speaker-bts12",
+   "popularity": 0,
+   "sku": "305874",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KESJ1A9FTEB5KNZPA9SZ7ZTT",
+   "retailer_slug": "slot",
+   "name": "Scanfrost SFL100 Eco Chest Freezer",
+   "brand": "Scanfrost",
+   "category": "appliances",
+   "subcategory": "Freezers",
+   "spec": "",
+   "description": "$68",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/SmwC1a200cIMTAgz8wK1QH9pBGA0bdN3712ahcGT.png"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 321300,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/scanfrost-sfl100-eco-chest-freezer",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 3,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/scanfrost-sfl100-eco-chest-freezer",
+   "popularity": 0,
+   "sku": "SFL100 ECO",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KYV6P6R31QNCDFZPMP9NDKFP",
+   "retailer_slug": "slot",
+   "name": "Hisense Washing Machine Top Loader 5KG Semi Auto WM-WSPA503",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Washing machines",
+   "spec": "5KG",
+   "description": "Capacity: 5kg Type: Semi-Automatic Twin Tub Loading Type: Top Load Wash Program: Normal & Gentle Wash Spin Function: Yes Control Type: Manual Knob Controls Lint Filter: Yes Body: Durable Plastic Cabinet Colour: White Energy Saving: Yes",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/F2mya7tpPInlKOaJAoYadXuGaIhr3zicZI83bQNB.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 155200,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/hisense-washing-machine-top-loader-5kg-semi-auto-wm-wspa503",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 2,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/hisense-washing-machine-top-loader-5kg-semi-auto-wm-wspa503",
+   "popularity": 0,
+   "sku": "300967",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KEVCZFMCBD3A66EX6RG830FZ",
+   "retailer_slug": "slot",
+   "name": "Hisense Freezer 142L Silver 180SH",
+   "brand": "Hisense",
+   "category": "appliances",
+   "subcategory": "Freezers",
+   "spec": "142L",
+   "description": "$9b",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/ItoKcprJ7wgG8IV6zYv3J7EmSS72o1BGFUDLZ4DC.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 271800,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/hisense-freezer-142l-silver-180sh",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 1,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/hisense-freezer-142l-silver-180sh",
+   "popularity": 0,
+   "sku": "300958",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KKXN6YR0SA1Z0Y0YKCAFN9TV",
+   "retailer_slug": "slot",
+   "name": "Samsung Galaxy Buds 4 Pro",
+   "brand": "SAMSUNG",
+   "category": "electronics",
+   "subcategory": "Audio",
+   "spec": "",
+   "description": "$96",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/N9roC3eJd2632MlBQqatiCFZcmdgGLcrznhYi1hd.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 312500,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/samsung-galaxy-buds-4-pro",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 28,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/samsung-galaxy-buds-4-pro",
+   "popularity": 0,
+   "sku": "305774",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01M11PQCN7MBYJCQZRGXJKR2K9",
+   "retailer_slug": "slot",
+   "name": "Hisense 50 Inch UHD 4K Smart TV 50A6N",
+   "brand": "Hisense",
+   "category": "electronics",
+   "subcategory": "Televisions",
+   "spec": "50 inch",
+   "description": "Display: 50-inch 4K Ultra HD LED Resolution: 3840 Ã 2160 pixels Backlight: DLED Refresh Rate: 60Hz Brightness: 300 nits Contrast Ratio: 5000:1 HDR: HDR, HDR10, HDR10+ Decoding, HLG Dolby Vision: Yes Upscaling: Ultra HD Upscaling Operating ",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/XZuEunz4TwQPX0iiJzoxlOndpCqtTlM6FrUPMaKT.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 454800,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/hisense-50-inch-uhd-4k-smart-tv-50a6n",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 1,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/hisense-50-inch-uhd-4k-smart-tv-50a6n",
+   "popularity": 0,
+   "sku": "303537",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01M122FJV32W7NQNVS7413BJJH",
+   "retailer_slug": "slot",
+   "name": "Midea Blender 1.5L With Glass Jar MJ-BL6006W",
+   "brand": "Midea",
+   "category": "kitchen",
+   "subcategory": "Blenders",
+   "spec": "1.5L",
+   "description": "$9a",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/NQG7Ug8s0rYwV0P9g2CGUcGBnQpi2vWgEwGwRMk3.jpg"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 62300,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/midea-blender-15l-with-glass-jar-mj-bl6006w",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 1,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/midea-blender-15l-with-glass-jar-mj-bl6006w",
+   "popularity": 0,
+   "sku": "304358",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KYV7VXEYT8Q86WASVV640T7Z",
+   "retailer_slug": "slot",
+   "name": "Lontor Rechargeable Table Fan CTL-CF087-4",
+   "brand": "Lontor",
+   "category": "appliances",
+   "subcategory": "Fans",
+   "spec": "",
+   "description": "Fan Size: 4 Inches Battery: 1500mAh Rechargeable Lithium Battery Speed Levels: 3 Adjustable Speeds Runtime: Up to 6 Hours (Depending on Speed) Charging: USB Fast Charging Function: Handheld & Table Fan Power Bank Function: Yes Material: Hig",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/mhWDSq74aBqeNpXbSQIyUFzXKj3ULzI5E8xx6qyO.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 12700,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/lontor-rechargeable-table-fan-ctl-cf087-4",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 3,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/lontor-rechargeable-table-fan-ctl-cf087-4",
+   "popularity": 0,
+   "sku": "302557",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KYVBPZM7TS4XGQFTCK2F3X40",
+   "retailer_slug": "slot",
+   "name": "Hisense LED TV 43A5200",
+   "brand": "Hisense",
+   "category": "electronics",
+   "subcategory": "Televisions",
+   "spec": "",
+   "description": "Screen Size: 43 Inches Display Resolution: Full HD (1920 Ã 1080) Display Technology: LED Audio: Dolby Digital Plus Connectivity: 2 HDMI, 2 USB, 1 AV Media Playback: USB Multimedia Support Mounting: VESA Wall Mount Compatible Design: Slim B",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/cyeUymh7RcBShKeFnrkzG4Q6yyaeEDo6ZbhWOtbL.jpg"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 278200,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/hisense-led-tv-43a5200",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 1,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/hisense-led-tv-43a5200",
+   "popularity": 0,
+   "sku": "303630",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KYVDN3X12JJQ3S9Z8NBGK0DX",
+   "retailer_slug": "slot",
+   "name": "Maxi Table Fan 16\" 40-17NB",
+   "brand": "Maxi",
+   "category": "appliances",
+   "subcategory": "Fans",
+   "spec": "",
+   "description": "Fan Size: 16 Inches Power Consumption: 40W Model: 40-17NB Speed Settings: 3 Speed Levels Oscillation: Wide-Angle Oscillation Tilt Adjustment: Adjustable Fan Head Blade Type: High-Efficiency Aerodynamic Blades Motor: High-Performance Copper ",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/ghdbC75tqyjioQ0qHcpRehAKDXoU1O2mdA4sAK2b.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 38400,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/maxi-table-fan-16-40-17nb",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 3,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/maxi-table-fan-16-40-17nb",
+   "popularity": 0,
+   "sku": "303887",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "slot:01KYVAHYQA76EG86Q5HPMJYSAP",
+   "retailer_slug": "slot",
+   "name": "LG Portable 5W Bluetooth Speaker – Aud 2TBK",
+   "brand": "LG",
+   "category": "electronics",
+   "subcategory": "Speakers",
+   "spec": "5W",
+   "description": "Output Power: 5W Audio: Powerful Bass Battery Life: Up to 10 Hours Water & Dust Resistance: Yes Voice Assistant: Voice Command Support Connectivity: Bluetooth Wireless Portable Design: Yes",
+   "images": [
+    "https://api-prod.slot.ng/storage/uploads/products/IdqYZWl6LxUf4NNDTaFUsbdmqVur5AbCDvsnEqbz.webp"
+   ],
+   "price": {
+    "kind": "fixed",
+    "amount": 56100,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://slot.ng/products/lg-portable-5w-bluetooth-speaker-aud-2tbk",
+    "verified_at": "2026-10-23"
+   },
+   "promo": null,
+   "stock": {
+    "status": "in_stock",
+    "qty": 6,
+    "verified_at": "2026-10-23"
+   },
+   "warranty": {
+    "label": "1-year SLOT standard warranty",
+    "url": "https://slot.ng/warranty-policy",
+    "source": "https://slot.ng/warranty-policy",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://slot.ng/products/lg-portable-5w-bluetooth-speaker-aud-2tbk",
+   "popularity": 0,
+   "sku": "303462",
+   "tags": [],
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:paraggi_4840006-9:0137-14:3502-21:4",
+   "retailer_slug": "boconcept",
+   "name": "Paraggi 2-seater with Chaise longue left",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/d3c0fea6-834d-4c37-9e36-b44c003da348/2944470_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 11389000,
+    "currency": "NGN",
+    "rrp": 19070700,
+    "source_url": "https://www.boconcept.com/en-ng/p/paraggi/4840006-9:0137-14:3502-21:4/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/paraggi/4840006-9:0137-14:3502-21:4/",
+   "tags": [
+    "new"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:salamanca_448aj00-10:448_sofaleg_0075-14:3202-21:4",
+   "retailer_slug": "boconcept",
+   "name": "Salamanca corner sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Metal",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/9d2106c7-3a51-4359-addd-b01c00dbbabf/2076992_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 12389000,
+    "currency": "NGN",
+    "rrp": 16198000,
+    "source_url": "https://www.boconcept.com/en-ng/p/salamanca/448aj00-10:448_sofaleg_0075-14:3202-21:4/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/salamanca/448aj00-10:448_sofaleg_0075-14:3202-21:4/",
+   "tags": [
+    "bestseller"
+   ],
+   "popularity": 1,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:osaka_433ad29-10:40104290_1-14:2274",
+   "retailer_slug": "boconcept",
+   "name": "Osaka 3 seater sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Aluminium",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/2a7ad9a8-8b66-4200-8db4-b21b00aaf370/2775629_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 3629000,
+    "currency": "NGN",
+    "rrp": 5899000,
+    "source_url": "https://www.boconcept.com/en-ng/p/osaka/433ad29-10:40104290_1-14:2274/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/osaka/433ad29-10:40104290_1-14:2274/",
+   "tags": [
+    "bestseller"
+   ],
+   "popularity": 1,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:carmo_412aj00-10:416_sofaleg_1-14:3165-21:4",
+   "retailer_slug": "boconcept",
+   "name": "Carmo corner sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Lacquered",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/0b4b4689-c54e-4c28-8caf-b1a301825922/2740223_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 8329000,
+    "currency": "NGN",
+    "rrp": 10929000,
+    "source_url": "https://www.boconcept.com/en-ng/p/carmo/412aj00-10:416_sofaleg_1-14:3165-21:4/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/carmo/412aj00-10:416_sofaleg_1-14:3165-21:4/",
+   "tags": [
+    "bestseller"
+   ],
+   "popularity": 1,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:modena_4393001-9:0075-14:3091",
+   "retailer_slug": "boconcept",
+   "name": "Modena 3 Seater Sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Metal",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/a3d07514-5376-466b-bda7-ad430180373d/1532553_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 3319000,
+    "currency": "NGN",
+    "rrp": 4919000,
+    "source_url": "https://www.boconcept.com/en-ng/p/modena/4393001-9:0075-14:3091/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/modena/4393001-9:0075-14:3091/",
+   "tags": [
+    "bestseller"
+   ],
+   "popularity": 1,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:carmo_4122501-10:416_sofaleg_1-14:3165",
+   "retailer_slug": "boconcept",
+   "name": "Carmo 2.5 seater sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Lacquered",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/489c99c0-ecdd-41cd-ba94-b1a200d57773/2735423_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 4029000,
+    "currency": "NGN",
+    "rrp": 5229000,
+    "source_url": "https://www.boconcept.com/en-ng/p/carmo/4122501-10:416_sofaleg_1-14:3165/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/carmo/4122501-10:416_sofaleg_1-14:3165/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:indivi_422af30-10:422_sofaleg_high_0075-14:3160",
+   "retailer_slug": "boconcept",
+   "name": "Indivi 3 seater sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Metal",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/47a48f28-87ae-4c8c-b55a-b1a801116f86/2704387_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 3129000,
+    "currency": "NGN",
+    "rrp": 4299000,
+    "source_url": "https://www.boconcept.com/en-ng/p/indivi/422af30-10:422_sofaleg_high_0075-14:3160/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/indivi/422af30-10:422_sofaleg_high_0075-14:3160/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:indivi_422ao30-10:422_sofaleg_high_0075-14:3160-21:4",
+   "retailer_slug": "boconcept",
+   "name": "Indivi corner sofa left",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Metal",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/05e22136-7238-4770-8622-b1ad01391f94/2714899_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 6259000,
+    "currency": "NGN",
+    "rrp": 8499000,
+    "source_url": "https://www.boconcept.com/en-ng/p/indivi/422ao30-10:422_sofaleg_high_0075-14:3160-21:4/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/indivi/422ao30-10:422_sofaleg_high_0075-14:3160-21:4/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:modena_439ac00-9:0075-14:3091-21:4",
+   "retailer_slug": "boconcept",
+   "name": "Modena corner sofa with lounging unit",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/c526ba19-6471-46b0-976b-ad430180c477/1533964_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 6189000,
+    "currency": "NGN",
+    "rrp": 9179000,
+    "source_url": "https://www.boconcept.com/en-ng/p/modena/439ac00-9:0075-14:3091-21:4/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/modena/439ac00-9:0075-14:3091-21:4/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:salamanca_448al00-10:448_sofaleg_0075-14:3202-21:4",
+   "retailer_slug": "boconcept",
+   "name": "Salamanca 4 seater lounge sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Metal",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/b8be3714-e77b-474d-a77b-b01c011dcc99/2077556_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 12499000,
+    "currency": "NGN",
+    "rrp": 16318000,
+    "source_url": "https://www.boconcept.com/en-ng/p/salamanca/448al00-10:448_sofaleg_0075-14:3202-21:4/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/salamanca/448al00-10:448_sofaleg_0075-14:3202-21:4/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:modena_4392501-9:0075-14:3091",
+   "retailer_slug": "boconcept",
+   "name": "Modena 2,5 seater sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Metal",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/7d239e96-1af0-45e7-ad56-ad4301800915/1532089_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 2969000,
+    "currency": "NGN",
+    "rrp": 4469000,
+    "source_url": "https://www.boconcept.com/en-ng/p/modena/4392501-9:0075-14:3091/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/modena/4392501-9:0075-14:3091/",
+   "tags": [
+    "bestseller"
+   ],
+   "popularity": 1,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:paraggi_4840003-9:0137-14:3502",
+   "retailer_slug": "boconcept",
+   "name": "Paraggi 3-seater sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/279b55f3-9bc0-4ef6-833d-b44c0031f2f8/2938278_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 7079000,
+    "currency": "NGN",
+    "rrp": 11799000,
+    "source_url": "https://www.boconcept.com/en-ng/p/paraggi/4840003-9:0137-14:3502/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/paraggi/4840003-9:0137-14:3502/",
+   "tags": [
+    "new"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:carmo_4123001-10:416_sofaleg_1-14:3165",
+   "retailer_slug": "boconcept",
+   "name": "Carmo 3 seater sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Lacquered",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/25ddc6f3-83df-44eb-a36e-b1a200610713/2734463_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 4539000,
+    "currency": "NGN",
+    "rrp": 5869000,
+    "source_url": "https://www.boconcept.com/en-ng/p/carmo/4123001-10:416_sofaleg_1-14:3165/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/carmo/4123001-10:416_sofaleg_1-14:3165/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:indivi_422ab00-10:422_sofaleg_high_0708-14:3160",
+   "retailer_slug": "boconcept",
+   "name": "Indivi 2 seater sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Oak",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/3a1d9fe9-eef2-490a-aa31-b1a900ea46bf/2698839_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 2399000,
+    "currency": "NGN",
+    "rrp": 3339000,
+    "source_url": "https://www.boconcept.com/en-ng/p/indivi/422ab00-10:422_sofaleg_high_0708-14:3160/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/indivi/422ab00-10:422_sofaleg_high_0708-14:3160/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:paraggi_4840008-9:0137-14:3502",
+   "retailer_slug": "boconcept",
+   "name": "Paraggi corner sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/0696c282-f8aa-4a56-9838-b44c00484787/2943866_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 16199200,
+    "currency": "NGN",
+    "rrp": 27237900,
+    "source_url": "https://www.boconcept.com/en-ng/p/paraggi/4840008-9:0137-14:3502/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/paraggi/4840008-9:0137-14:3502/",
+   "tags": [
+    "new"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:modena_4392001-9:0075-14:3091",
+   "retailer_slug": "boconcept",
+   "name": "Modena 2 seater sofa",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Metal",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/7b8aaaaa-69a3-4be2-b17b-ad43017fde9c/1531629_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 2599000,
+    "currency": "NGN",
+    "rrp": 3899000,
+    "source_url": "https://www.boconcept.com/en-ng/p/modena/4392001-9:0075-14:3091/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/modena/4392001-9:0075-14:3091/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:indivi_422ar20-10:422_sofaleg_low_0075-14:3160-21:5",
+   "retailer_slug": "boconcept",
+   "name": "Indivi corner sofa right",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Metal",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/c18399d8-72a6-4674-b997-b1ae0106bad7/2717819_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 6259000,
+    "currency": "NGN",
+    "rrp": 8499000,
+    "source_url": "https://www.boconcept.com/en-ng/p/indivi/422ar20-10:422_sofaleg_low_0075-14:3160-21:5/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/indivi/422ar20-10:422_sofaleg_low_0075-14:3160-21:5/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:modena_439aa00-9:0075-14:3091-21:4",
+   "retailer_slug": "boconcept",
+   "name": "Modena sofa with resting unit",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/9876db79-9d30-422b-b0ee-ad430180633c/1533029_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 4749000,
+    "currency": "NGN",
+    "rrp": 7319000,
+    "source_url": "https://www.boconcept.com/en-ng/p/modena/439aa00-9:0075-14:3091-21:4/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/modena/439aa00-9:0075-14:3091-21:4/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:bolzano_4463001-14:3096",
+   "retailer_slug": "boconcept",
+   "name": "Bolzano 3-seater",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/3ac01b5c-664a-4108-b4af-af84017f864b/2063700_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 5059000,
+    "currency": "NGN",
+    "rrp": 7499000,
+    "source_url": "https://www.boconcept.com/en-ng/p/bolzano/4463001-14:3096/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/bolzano/4463001-14:3096/",
+   "tags": [
+    "bestseller"
+   ],
+   "popularity": 1,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:carmo_4120300-2:383-10:416_sofaleg_1-14:3091",
+   "retailer_slug": "boconcept",
+   "name": "Carmo pouffe",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Lacquered",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/87616e6f-1735-4f67-a1d5-b1a10159b1f9/2688392_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 1759000,
+    "currency": "NGN",
+    "rrp": 2969000,
+    "source_url": "https://www.boconcept.com/en-ng/p/carmo/4120300-2:383-10:416_sofaleg_1-14:3091/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/carmo/4120300-2:383-10:416_sofaleg_1-14:3091/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:modena_439aj00-9:0075-14:3091-21:5",
+   "retailer_slug": "boconcept",
+   "name": "Modena sofa with lounging unit",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/67b3eaf1-9475-4721-9465-ad4301820d96/1537210_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 4239000,
+    "currency": "NGN",
+    "rrp": 6199000,
+    "source_url": "https://www.boconcept.com/en-ng/p/modena/439aj00-9:0075-14:3091-21:5/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/modena/439aj00-9:0075-14:3091-21:5/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:bolzano_4462501-14:3096",
+   "retailer_slug": "boconcept",
+   "name": "Bolzano 2.5-seater",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/5e877119-a345-491f-a01d-af84017feeeb/2063704_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 4559000,
+    "currency": "NGN",
+    "rrp": 6669000,
+    "source_url": "https://www.boconcept.com/en-ng/p/bolzano/4462501-14:3096/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/bolzano/4462501-14:3096/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "boconcept:carmo_412aa00-10:416_sofaleg_1-14:3165-21:4",
+   "retailer_slug": "boconcept",
+   "name": "Carmo sofa with resting unit",
+   "brand": "BoConcept",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Fabric • Lacquered",
+   "description": null,
+   "images": [
+    "https://assets.boconcept.com/1a4dc90e-4be4-4eb2-8b0e-b1a30110b17b/2739263_PNG-Web%2072dpi.png?format=webply&fit=bounds&width=900&quality=80"
+   ],
+   "price": {
+    "kind": "from",
+    "amount": 6799000,
+    "currency": "NGN",
+    "rrp": 8899000,
+    "source_url": "https://www.boconcept.com/en-ng/p/carmo/412aa00-10:416_sofaleg_1-14:3165-21:4/",
+    "verified_at": "2026-10-23",
+    "note": "'From' price is the lowest configuration; recommended retail price shown for reference. Not a discount."
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "Fabric, colour & leg options",
+     "note": "Configured in store"
+    }
+   ],
+   "source_url": "https://www.boconcept.com/en-ng/p/carmo/412aa00-10:416_sofaleg_1-14:3165-21:4/",
+   "tags": [],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10898500452657",
+   "retailer_slug": "furniture-house",
+   "name": "Tkok Larissa Classic Sofa Set",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Sofa Set",
+   "description": "The Tkok Larissa Classic Sofa Set showcases timeless elegance with ornate detailing, refined craftsmanship, and luxurious upholstery. Its rich black, ivory, and gold tones, combined with beautifully structured silhouettes, create a sophisti",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-10-19104134.png?v=1792674081"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/tkok-larissa-classic-sofa-set",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/tkok-larissa-classic-sofa-set",
+   "tags": [
+    "classic sofa",
+    "classic sofa set",
+    "sofa set"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10898457362737",
+   "retailer_slug": "furniture-house",
+   "name": "Tkok Kardelen Classic Sofa Set",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Sofa Set",
+   "description": "The Tkok Kardelen Classic Sofa Set combines timeless elegance with refined craftsmanship. Featuring beautifully curved silhouettes, luxurious upholstery, and intricate gold detailing, this collection brings sophistication, comfort, and trad",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-10-19111554.png?v=1792672609",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-10-19111449.png?v=1792672610"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/tkok-kardelen-classic-sofa-set",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/tkok-kardelen-classic-sofa-set",
+   "tags": [
+    "classic sofa set",
+    "classic tkok kardelen sofa",
+    "sofa set"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10898428297521",
+   "retailer_slug": "furniture-house",
+   "name": "Tkok Efsun Classic Dining Room Set",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Dining",
+   "spec": "Dining Set",
+   "description": "The Tkok Efsun Classic Dining Room Set showcases timeless elegance with intricate decorative carvings, a sophisticated glossy finish, and beautifully upholstered dining chairs. Its traditional design and refined detailing bring classic char",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-10-19112625.png?v=1792671400",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-10-19112647.png?v=1792671399",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-10-19112640.png?v=1792671399",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-10-19112635.png?v=1792671399"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/tkok-efsun-classic-dining-room-set",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/tkok-efsun-classic-dining-room-set",
+   "tags": [
+    "classic dining set",
+    "dining set",
+    "tkon efsun classic"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10898083905841",
+   "retailer_slug": "furniture-house",
+   "name": "Tkpar Prag Classic Sofa Set",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Sofas",
+   "spec": "Sofa Set",
+   "description": "The Tkpar Prag Classic Sofa Set showcases timeless elegance with rich dark wood frames, beautifully upholstered seating, and refined curved silhouettes. Its traditional design and sophisticated detailing bring warmth, comfort, and classic c",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/NEK-3762.jpg?v=1792660262",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/NEK-3763.jpg?v=1792660262",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/NEK-3764.jpg?v=1792660262",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/NEK-3765.jpg?v=1792660262"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/tkpar-prag-luxury-sofa-set",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/tkpar-prag-luxury-sofa-set",
+   "tags": [
+    "classic sofa",
+    "classic sofa set",
+    "sofa set"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10898079416625",
+   "retailer_slug": "furniture-house",
+   "name": "Tkpar Prag Luxury Dining Room Set",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Dining",
+   "spec": "Dining Set",
+   "description": "The Tkpar Prag Luxury Dining Room Set combines timeless classic elegance with refined craftsmanship. Featuring rich dark wood finishes, beautifully upholstered dining chairs, and sophisticated decorative detailing, this collection brings wa",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/NEK-3800.jpg?v=1792660168",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/NEK-3801.jpg?v=1792660168",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/NEK-3808.jpg?v=1792660168",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/NEK-005026copy.jpg?v=1792660168"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/tkpar-prag-luxury-dining-room-set",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/tkpar-prag-luxury-dining-room-set",
+   "tags": [
+    "luxury dining furniture",
+    "luxury dining room",
+    "luxury dining set"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10860360007985",
+   "retailer_slug": "furniture-house",
+   "name": "Prag Modern Bedroom Set",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Beds",
+   "spec": "Bed Set",
+   "description": "The Prag Modern Bedroom Set brings soft architectural curves, elegant proportions, and refined contemporary luxury into the bedroom. Designed in a warm neutral palette, the collection creates a calm and sophisticated atmosphere while mainta",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-09-23093238.png?v=1791031030",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-09-23093231.png?v=1791031030"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/prag-modern-bedroom-set",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/prag-modern-bedroom-set",
+   "tags": [
+    "bed set",
+    "bedroom furniture",
+    "bedroom modern"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10860356174129",
+   "retailer_slug": "furniture-house",
+   "name": "Nelly Modern Bedroom Set",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Beds",
+   "spec": "Bed Set",
+   "description": "The Nelly Modern Bedroom Set combines soft contemporary styling with sculptural details and a warm neutral palette, creating a calm and sophisticated bedroom atmosphere. The upholstered bed features a gently curved headboard with soft verti",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-09-23093853.png?v=1791030398",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-09-23093900.png?v=1791030399",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-09-23093843.png?v=1791030400"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/nelly-modern-bedroom-set",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/nelly-modern-bedroom-set",
+   "tags": [
+    "modern bed set",
+    "modern bedroom furniture",
+    "modern bedroom set"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10860356731185",
+   "retailer_slug": "furniture-house",
+   "name": "Pablo Modern TV Unit",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "TV stands",
+   "spec": "TV Stand",
+   "description": "The Pablo Modern TV Unit combines warm wood finishes with sleek contemporary storage for a refined living-room centerpiece. Its wide low-profile base keeps the design visually clean, while the upper wall unit frames the television with bala",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-09-23093631.png?v=1791030578"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/pablo-modern-tv-unit",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/pablo-modern-tv-unit",
+   "tags": [
+    "pablo tv stand",
+    "tv stand"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10860346966321",
+   "retailer_slug": "furniture-house",
+   "name": "Vita Modern TV Stand",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "TV stands",
+   "spec": "TV Stand",
+   "description": "The Vita Modern TV Stand brings together warm walnut tones, soft rounded lines, and a luxurious stone-effect top for a refined contemporary look. Designed with a long, low-profile silhouette, the unit features a beautifully curved body with",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/WhatsAppImage2026-09-21at1.27.18PM_1.jpg?v=1791029086",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/WhatsAppImage2026-09-21at1.27.15PM.jpg?v=1791029087"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/vita-modern-tv-stand",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/vita-modern-tv-stand",
+   "tags": [
+    "modern tv stand",
+    "tv stand",
+    "Vita tv stand"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10637715013937",
+   "retailer_slug": "furniture-house",
+   "name": "K11-14 Modern Office Desk",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Office",
+   "spec": "Office Desk",
+   "description": "Modern 1.4M ,1.2M office desk with built-in storage cabinet, designed for functionality and a clean professional workspace. Key Features: • Model: K11-14,K11-12 • Size: 1.4M and 1.2M desk surface • Built-in storage cabinet • Modern wood fin",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/ChatGPTImageMar27_2026_05_07_48PM_Large_Medium_afd28550-c09b-4f68-928c-5dd86c26a05f.png?v=1774711742"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/k11-14-modern-office-desk",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "1.2m"
+    },
+    {
+     "label": "1.4m"
+    }
+   ],
+   "source_url": "https://furniturehouse.org/products/k11-14-modern-office-desk",
+   "tags": [
+    "desk with storage",
+    "modern desk",
+    "new"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10637698367793",
+   "retailer_slug": "furniture-house",
+   "name": "CHOF-1201 Modern Office Desk",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Office",
+   "spec": "Office Desk",
+   "description": "Modern office desk with built-in storage cabinet, designed for functionality and a clean professional workspace. Key Features: • Model: CHOF-1201 • Built-in storage cabinet • Modern wood finish design • Clean front panel detailing • Strong ",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/ChatGPTImageMar27_2026_03_36_47PM_Large_Medium_1edae795-d2ef-42bd-813f-1d5c86ff4d4f.png?v=1774710068"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/chof-1201-modern-office-desk",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "1.2m"
+    },
+    {
+     "label": "1.4m"
+    }
+   ],
+   "source_url": "https://furniturehouse.org/products/chof-1201-modern-office-desk",
+   "tags": [
+    "desk with storage",
+    "modern desk",
+    "new"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10707656606001",
+   "retailer_slug": "furniture-house",
+   "name": "LEO Outdoor Dining",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Outdoor",
+   "spec": "Outdoor",
+   "description": "Modern Outdoor Dining Set Bring refined elegance to your outdoor dining experience with this contemporary 6-seater dining set. Combining sleek architectural lines with premium comfort, the collection features a spacious rectangular dining t",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-06-25115634.png?v=1791044408",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/2f2934ff-f47d-4c48-91e2-78a3986c55c5.png?v=1791044557",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/1cc51613-4106-4a2b-bf03-7eb108dd63a5.png?v=1791044665"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/leo-outdoor-dining",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/leo-outdoor-dining",
+   "tags": [
+    "modern sofa set",
+    "outdoor sofa set",
+    "sofa set"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10707594379569",
+   "retailer_slug": "furniture-house",
+   "name": "LEO Outdoor Sofa",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Outdoor",
+   "spec": "Outdoor",
+   "description": "Modern Outdoor Lounge Set Create a sophisticated outdoor retreat with this elegant contemporary lounge set, designed to combine comfort, durability, and timeless style. Featuring a spacious three-seater sofa, two generously cushioned armcha",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-06-25115616.png?v=1791044789",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-06-25115608.png?v=1791046658",
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/Screenshot2026-06-25115625.png?v=1791046678"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/leo-outdoor-sofa",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/leo-outdoor-sofa",
+   "tags": [
+    "3 seater sofa",
+    "4 seater sofa",
+    "outdoor sofa set"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10636311920945",
+   "retailer_slug": "furniture-house",
+   "name": "Doo1 Full Black Visitor Chair",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Office",
+   "spec": "Office Chair",
+   "description": "The Doo1 Full Black Visitor Chair offers a modern and comfortable seating solution for professional environments. Upholstered in black material with supportive armrests, it provides a clean and refined look for offices and reception areas. ",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/chaire1234.jpg?v=1774543747"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/doo1-full-black-visitor-chair",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/doo1-full-black-visitor-chair",
+   "tags": [
+    "black office chair",
+    "meeting room chair",
+    "office chair"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10636311429425",
+   "retailer_slug": "furniture-house",
+   "name": "Do12 Full Black Visitor Chair",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Office",
+   "spec": "Office Chair",
+   "description": "The Do12 Full Black Visitor Chair offers a modern design with comfortable seating for professional environments. Upholstered in full black material, it provides a clean and refined look for reception areas and offices. Built with a chrome s",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/D012-VISITOR-FULL-BLACK.jpg?v=1774543645"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/do12-full-black-visitor-chair",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/do12-full-black-visitor-chair",
+   "tags": [
+    "black office chair",
+    "meeting room chair",
+    "office chair"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10637692928305",
+   "retailer_slug": "furniture-house",
+   "name": "NGR165-23 Modern Office Bookshelf 3-Part with Storage – 2.6M",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Storage",
+   "spec": "Bookshelf",
+   "description": "Modern 3-part office bookshelf with built-in storage cabinets, designed for organization and a clean professional workspace. Key Features: • Model: NGR165-23 • Size: 2.6M height • 3-part shelving design with multiple compartments • Combinat",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/ChatGPTImageMar27_2026_04_25_35PM_Small_142bb3cb-8f40-481e-a8b5-bbf34adacefe.png?v=1774707102"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/ngr165-23-modern-office-bookshelf-3-part-with-storage-2-6m",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [],
+   "source_url": "https://furniturehouse.org/products/ngr165-23-modern-office-bookshelf-3-part-with-storage-2-6m",
+   "tags": [
+    "bookshelf",
+    "large bookshelf",
+    "new"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "furniture-house:10637650559281",
+   "retailer_slug": "furniture-house",
+   "name": "YD319S20E Modern Office Bookshelf",
+   "brand": "Furniture House",
+   "category": "furniture",
+   "subcategory": "Storage",
+   "spec": "Bookshelf",
+   "description": "Modern 2M office bookshelf with built-in storage cabinets, designed for organization and a clean professional workspace. Key Features: • Model: YD319S24E-H ,YD319S20E-H • Size: 2M • Multiple open shelves with closed storage cabinets • Moder",
+   "images": [
+    "https://cdn.shopify.com/s/files/1/0981/9173/7137/files/ChatGPTImageMar27_2026_04_23_29PM_Large_Medium_0f2d5987-8eae-48bb-a567-7b2dde085d1b.png?v=1774704474"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://furniturehouse.org/products/yd319s20e-modern-office-bookshelf-2m",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "variants": [
+    {
+     "label": "2.0m"
+    },
+    {
+     "label": "2.4m"
+    }
+   ],
+   "source_url": "https://furniturehouse.org/products/yd319s20e-modern-office-bookshelf-2m",
+   "tags": [
+    "bookshelf",
+    "file cabinet",
+    "new"
+   ],
+   "popularity": 0,
+   "promo": null,
+   "warranty": null,
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:902",
+   "retailer_slug": "lagom-sweden",
+   "name": "Nora Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/1500-750638059246785856816.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=902&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=NORA-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=902&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=NORA-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:376",
+   "retailer_slug": "lagom-sweden",
+   "name": "Quarry Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/QUARRY-LIVING-1500-750637934037886165190.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=376&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=QUARRY-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=376&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=QUARRY-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:241",
+   "retailer_slug": "lagom-sweden",
+   "name": "Voga Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/v1500-750.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=241&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=VOGA-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=241&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=VOGA-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:232",
+   "retailer_slug": "lagom-sweden",
+   "name": "Boss Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/BOSS-LIVING-1500-750.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=232&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=BOSS-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=232&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=BOSS-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:237",
+   "retailer_slug": "lagom-sweden",
+   "name": "Fendi Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/FENDI-LIVING1500-750637920636961448085.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=237&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=FENDI-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=237&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=FENDI-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:806",
+   "retailer_slug": "lagom-sweden",
+   "name": "Adonis Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/ADONIS-SOFA-LIV1500-750.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=806&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=ADONIS-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=806&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=ADONIS-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:235",
+   "retailer_slug": "lagom-sweden",
+   "name": "Puzzle Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/PUZZEL-LIVING-1500-750.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=235&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=PUZZLE-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=235&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=PUZZLE-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:182",
+   "retailer_slug": "lagom-sweden",
+   "name": "Delfina Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/DELFINA-LIVING-1500-750.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=182&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=DELFINA-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=182&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=DELFINA-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:266",
+   "retailer_slug": "lagom-sweden",
+   "name": "Griffino Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/GRIFFINO-LIVING1500-750.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=266&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=GRIFFINO-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=266&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=GRIFFINO-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  },
+  {
+   "source_id": "lagom:386",
+   "retailer_slug": "lagom-sweden",
+   "name": "Giza Living Room",
+   "brand": "Lagom",
+   "category": "furniture",
+   "subcategory": "Living room sets",
+   "spec": "Living room set",
+   "description": null,
+   "images": [
+    "https://www.lagomsweden.com/imagesdb/Products/Thumbnail/giza-living1500-750637934047452801833.jpg"
+   ],
+   "price": {
+    "kind": "on_request",
+    "amount": null,
+    "currency": "NGN",
+    "rrp": null,
+    "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=386&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=GIZA-LIVING-ROOM",
+    "verified_at": "2026-10-23",
+    "note": "Price not published online — ask the showroom"
+   },
+   "stock": {
+    "status": "unknown",
+    "verified_at": "2026-10-23"
+   },
+   "source_url": "https://www.lagomsweden.com/productsdetails.aspx?pid=386&cid=23&scid=39&bid=0&category=LIVING-ROOM&product=GIZA-LIVING-ROOM",
+   "popularity": 0,
+   "tags": [],
+   "promo": null,
+   "warranty": null,
+   "variants": [],
+   "specs": {},
+   "last_verified_at": "2026-10-23"
+  }
+ ]
+}
