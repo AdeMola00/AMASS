@@ -854,3 +854,32 @@ agent_communication:
       shop-handoff-cancel). Search: ShopSearchField shop-search-input, ShopChip suggestions shop-suggest-{i}.
       Dark mode supported (toggle on Profile: theme-toggle). Demo: demo@amass.africa / amass2026. The Market tab shows a
       Sponsored AdModal on open — dismiss via ad-close / ad-skip.
+  - agent: "main"
+    message: |
+      SOCIAL TAB (Nextdoor-inspired, FIXA-themed) — replaces Discover. First test pass. Backend NEW backend/social_feed.py
+      (router /api/social/*): GET /social/posts/meta, GET /social/feed?scope=estate|area|city&kind=give|sell&category&q&cursor,
+      GET /social/posts/mine, POST /social/posts, GET/PATCH/DELETE /social/posts/{id} (PATCH accepts status active|reserved|gone|paused),
+      POST /social/posts/{id}/like (toggle), GET/POST /social/posts/{id}/comments, DELETE .../comments/{cid},
+      POST /social/posts/{id}/contact {channel: chat|whatsapp|phone, message} → chat returns conversation_id,
+      POST/DELETE /social/posts/{id}/hide, POST /social/posts/{id}/report, POST /social/posts/uploads {data_url} → public URL.
+      Seeded ~19 demo posts (backend/social_feed_seed.py); demo user owns 3 (2 active, 1 gone).
+      Frontend: tab "social" (testID tab-social) replaces discover; (tabs)/social.tsx (social-screen; header social-scope-btn →
+      social-scope-sheet with social-scope-{estate|area|city}; social-inbox; social-notifications; social-mine-btn → /social/mine;
+      social-search; welcome card social-welcome (+ social-welcome-dismiss, social-step-*); chips social-kind-{give|sell},
+      social-cat-{key}; cards social-post-{id} with social-post-author-{id} / social-post-open-{id} → /social/post/{id},
+      social-like-{id}, social-reply-{id}, social-share-{id}, social-more-{id} / social-post-more-{id} → PostMenuSheet
+      (social-post-menu: viewer = social-menu-share/hide/report; owner = social-menu-edit/gone/reserved/pause/resume/delete →
+      social-delete-sheet social-delete-confirm); social-fab → /social/compose; states social-loading/social-empty/social-error).
+      /social/post/[id] (social-post-screen; social-post-back/share/menu; social-post-title/body/author; social-post-like;
+      social-post-replies; social-reply-input + social-reply-send; social-comment-{id} (+ social-comment-remove-{id});
+      social-similar-{id}; sticky bar social-post-bar with social-post-contact (viewer → ContactSheet social-contact-sheet:
+      social-quick-{i} quick messages, social-contact-text + social-contact-send → /chat/{conversation_id}, social-contact-whatsapp/
+      phone, social-contact-cancel) or social-post-manage (owner → menu)).
+      /social/compose (?id= edits) (social-compose-screen; social-compose-cancel; social-compose-submit (header) and
+      social-compose-submit-bottom; social-compose-add-photos (system picker → base64 → /social/posts/uploads);
+      social-compose-kind-{give|sell}; social-compose-price (sell only) + social-compose-negotiable; social-compose-title/body;
+      rows social-compose-category → social-category-sheet social-category-{key}; social-compose-condition → social-condition-{key};
+      social-compose-visibility → social-visibility-{estate|area|city}; toggles social-compose-contact-chat/whatsapp/phone;
+      social-compose-pickup; social-compose-crosslist (sell only). On success → router.replace(/social/post/{id}) + toast.
+      /social/mine (social-mine-screen; social-mine-back; social-mine-new; social-mine-stats; social-mine-filter-{all|active|
+      reserved|gone|paused}; same PostCard + menu). Web: photo upload via file chooser — can be skipped. Demo demo@amass.africa / amass2026.

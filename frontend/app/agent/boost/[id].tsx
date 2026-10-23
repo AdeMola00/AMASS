@@ -125,7 +125,7 @@ export default function BoostStudio() {
       <Screen testID="boost-screen">
         <Stack.Screen options={{ headerShown: false }} />
         <ScreenHeader title="Boost listing" />
-        <SuccessPanel result={done} preview={data} onViewListing={() => router.replace(`/property/${id}` as any)} onDiscover={() => router.replace("/(tabs)/discover" as any)} onMap={() => router.replace("/(tabs)" as any)} onDone={() => router.back()} />
+        <SuccessPanel result={done} preview={data} onViewListing={() => router.replace(`/property/${id}` as any)} onMap={() => router.replace("/(tabs)" as any)} onDone={() => router.back()} />
       </Screen>
     );
   }
@@ -427,13 +427,13 @@ function FeaturedMock({ p, label }: { p: PromotionPreview["property"]; label: st
   const { colors } = useTheme();
   return (
     <View style={{ flex: 1, padding: 10, gap: 8 }}>
-      <MockBar title="Discover" />
+      <MockBar title="Search results" />
       <View style={{ gap: 2 }}>
         <AppText variant="caption" weight="bold" color={colors.text}>
           Featured homes
         </AppText>
         <AppText variant="micro" color={colors.textTertiary}>
-          Verified listings, hand-checked by AMASS
+          Gold badge · first in every results list
         </AppText>
       </View>
       <View style={{ flexDirection: "row", gap: 8, flex: 1 }}>
@@ -539,7 +539,7 @@ function AlertsMock({ p, buyers }: { p: PromotionPreview["property"]; buyers: nu
 }
 
 /* ─── Success ───────────────────────────────────────────────────────────── */
-function SuccessPanel({ result, preview, onViewListing, onDiscover, onMap, onDone }: { result: NonNullable<Awaited<ReturnType<typeof api.promoteListing>>>; preview: PromotionPreview; onViewListing: () => void; onDiscover: () => void; onMap: () => void; onDone: () => void }) {
+function SuccessPanel({ result, preview, onViewListing, onMap, onDone }: { result: NonNullable<Awaited<ReturnType<typeof api.promoteListing>>>; preview: PromotionPreview; onViewListing: () => void; onMap: () => void; onDone: () => void }) {
   const { colors } = useTheme();
   const m = TIER_META[result.tier];
   const cfg = preview.tiers[result.tier];
@@ -570,8 +570,7 @@ function SuccessPanel({ result, preview, onViewListing, onDiscover, onMap, onDon
       </LinearGradient>
       <Card tone="soft" style={{ gap: 10 }}>
         <AppText variant="title">See it live</AppText>
-        <Button label="Open Discover" variant="secondary" iconLeft="compass-outline" fullWidth onPress={onDiscover} testID="success-discover" />
-        {(cfg.placements as Placement[]).includes("map") ? <Button label="Open the map" variant="secondary" iconLeft="map-outline" fullWidth onPress={onMap} testID="success-map" /> : null}
+        <Button label="Open the map" variant="secondary" iconLeft="map-outline" fullWidth onPress={onMap} testID="success-map" />
         <Button label="View listing" variant="secondary" iconLeft="home-outline" fullWidth onPress={onViewListing} testID="success-listing" />
       </Card>
       <AppText variant="caption" tone="tertiary" align="center">

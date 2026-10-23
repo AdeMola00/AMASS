@@ -1,0 +1,41 @@
+{
+  "summary": "Full backend + frontend smoke of the new Social tab (replacing Discover). Backend: 18/18 pytest cases pass covering meta, feed cursor pagination (no duplicates across pages), scope/kind/category/q filters, mine, create (give w/o price OK; sell w/o price → 422; invalid category → 422), detail (comments/similar/can_contact/is_mine/author_stats), edit title + status transitions active→reserved→gone→active→paused (paused removed from feed), like toggle, comment add/list/delete, hide + restore, report scam hides for reporter, contact chat on another user's post returns conversation_id, contact on own post rejected (400), upload tiny PNG data_url returns public URL that is fetchable and returns real PNG bytes, delete then GET→404. Frontend (390x844 web preview, demo@amass.africa / amass2026): tab bar is Home · Social · Market · Neighbours · Profile (Discover removed). Social screen renders FIXA lime welcome, search, Free/For sale + category chips, feed cards with photos. Scope sheet works and 'Estate' changes header to 'Lekki Gardens Phase 2'. Give filter narrows to 6 free posts; sell+furniture+'sofa' narrows feed to 1 card. Post detail opens with title/price/author/pickup/contact. Like on feed card goes 4→5 optimistically and persists after reload. Comment add + remove on another user's post works. Contact sheet opens and quick-0 navigates to /chat/{id}. Compose from direct route creates post, navigates to detail with correct title and manage button. Owner menu shows all 5 items (edit/reserved/gone/pause/delete). Mark reserved shows 'Reserved' tag; edit updates title and shows 'Edited' flag. Mine screen shows stats (4 posts, 1 given away, 170 views) and All/Live/Reserved/Gone filter chips (all/active/gone testIDs present). All other tabs load without red screen. No console errors about nested <button>.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PostMenuSheet (non-owner)", "issue": "Tapping social-more-{id} on a seeded post did not surface a visible social-post-menu testID in one browser run (menu DOM not found after click). Could be transient animation/overlay timing. Owner menu via social-post-manage works perfectly.", "testID": "social-post-menu", "priority": "LOW"},
+      {"component": "social-post-manage (post detail)", "issue": "After the edit→save round-trip, 2 elements match [data-testid=\"social-post-manage\"] (sheet backdrop + sticky bar), and the first one Playwright targets reports 'not visible'. Not blocking users (second click works) but duplicate testID is a flaky-automation risk — consider rendering only one at a time or giving the sheet trigger a unique testID.", "testID": "social-post-manage", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Social compose", "issues": ["Minor: the 'Pause' owner-menu label is spelled as 'pause' in testID social-menu-pause but the user-facing status is 'paused' — functionally fine."]}
+    ],
+    "react_native_issues": [
+      {"component": "web runtime warnings", "issue": "Non-blocking web console warnings on login: '\"shadow*\" style props are deprecated. Use \"boxShadow\"' and 'props.pointerEvents is deprecated. Use style.pointerEvents'. Not Social-specific — appears across the app on web. Reference: global."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_social_feed.py",
+    "/app/test_reports/pytest/pytest_iteration61_social.xml"
+  ],
+  "action_items": [
+    "Investigate duplicate social-post-manage element on post detail after edit (sheet backdrop lingering) — tighten the testID uniqueness or ensure the overlay version is unmounted.",
+    "Confirm social-post-menu modal mounts promptly (add a short animation finish listener) so automated tests can find it after social-more-{id}; current behaviour works for users via the sheet, but headless Playwright didn't always see it in one run.",
+    "Optional cleanup: migrate RN Web deprecation warnings (shadow* → boxShadow, pointerEvents → style.pointerEvents) to silence console noise."
+  ],
+  "critical_code_review_comments": [
+    "social_feed.py cleanly separates visibility/scope filtering and uses UUID ids; _out() correctly excludes _id. Idempotent uploads via amass/public/ prefix work and public-files endpoint caches 24h — looks correct.",
+    "Status 'paused' and 'gone' are correctly excluded from FEED_STATUSES; verified via test that a paused post disappears from feed.",
+    "Contact chat path reuses chat.conversations with kind='social' and sorts participant_ids — good for dedupe.",
+    "File 567 lines total; still inside 700-line soft limit but close — consider splitting admin moderation + uploads into a sub-router before further growth."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_social_feed.py (new)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "≈95% (all critical flows green; 2 minor UI quirks noted)"},
+  "seed_data_creation": "None persisted. Pytest creates and deletes TEST_* posts and auto-registers one TEST_social_* user via /api/auth/register (left behind, but harmless). One compose-created post from browser test was manually deleted via API; demo now has only the 3 seeded posts.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend Social endpoints all stable. For UI retests, prefer launching compose directly via /social/compose when the FAB click flakes (it did briefly on one run). Also note Market tab shows an AdModal — dismiss via data-testid=ad-close before further taps.",
+  "rca_of_issue": "N/A — all critical flows functional. Minor duplicate testID on post-detail Manage button is caused by both the sticky bottom bar and the sheet trigger rendering with the same testID='social-post-manage'; fix by giving the sheet trigger a distinct testID or conditionally rendering."
+}

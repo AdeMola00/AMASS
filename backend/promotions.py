@@ -3,7 +3,7 @@
 A promotion is a timed, MASS-paid visibility upgrade on one listing:
 
   • promote  → ranked above standard listings in list / filter results
-  • feature  → + first cards in the Discover "Featured homes" rail
+  • feature  → + "Featured" badge and first cards wherever listings are ranked (search results, AI search)
   • boost    → + gold highlighted map pin + alerts to buyers whose saved
                searches match the listing
 
@@ -58,7 +58,7 @@ DEFAULT_TIERS: dict[str, dict[str, Any]] = {
 
 PLACEMENTS: dict[str, dict[str, str]] = {
     "results": {"label": "Search results", "caption": "Ranked above standard listings in every list and filter result", "icon": "list"},
-    "featured": {"label": "Featured homes", "caption": "First cards in the Discover rail every buyer sees", "icon": "star"},
+    "featured": {"label": "Featured homes", "caption": "Gold Featured badge and first place in every results list", "icon": "star"},
     "map": {"label": "Map pin", "caption": "Gold highlighted pin that stands out at every zoom level", "icon": "location"},
     "alerts": {"label": "Buyer alerts", "caption": "One-time alert to buyers whose saved searches match", "icon": "notifications"},
 }

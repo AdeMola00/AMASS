@@ -22,7 +22,7 @@ export default function TabsLayout() {
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <FloatingBottomBar {...props} />}>
       <Tabs.Screen name="index" options={{ title: "Home" }} />
-      <Tabs.Screen name="discover" options={{ title: "Discover" }} />
+      <Tabs.Screen name="social" options={{ title: "Social" }} />
       <Tabs.Screen name="marketplace" options={{ title: "Market" }} />
       <Tabs.Screen name="neighbours" options={{ title: "Neighbours" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
@@ -138,8 +138,8 @@ function tabConfig(routeName: string): { label: string; icon: IconName; iconActi
   switch (routeName) {
     case "index":
       return { label: "Home", icon: "map-outline", iconActive: "map" };
-    case "discover":
-      return { label: "Discover", icon: "compass-outline", iconActive: "compass" };
+    case "social":
+      return { label: "Social", icon: "chatbubbles-outline", iconActive: "chatbubbles" };
     case "marketplace":
       return { label: "Market", icon: "grid-outline", iconActive: "grid" };
     case "neighbours":

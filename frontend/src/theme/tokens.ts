@@ -124,6 +124,13 @@ export const fontFamilies = {
   display: "DMSerifDisplay",
 } as const;
 
+/** Heavy sans faces for the loud, scannable sections (Shop, Social) — headings, prices, labels only. */
+export const boldFont = {
+  semibold: "PlusJakartaSans-600",
+  bold: "PlusJakartaSans-700",
+  black: "PlusJakartaSans-800",
+} as const;
+
 /** Type scale — tight, consistent line heights (1.1 display → 1.5 body) */
 export const typeScale = {
   /** Editorial serif — onboarding hero, sheet headlines, wallet balances. Never for prices in lists. */

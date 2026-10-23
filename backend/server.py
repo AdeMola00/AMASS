@@ -2036,6 +2036,11 @@ app.include_router(register_analytics_routes(db, bearer, decode_user_id, require
 app.include_router(register_social_routes(db, get_current_user, require_admin, annotate_properties))
 app.include_router(register_community_routes(db, get_current_user, require_admin, bearer, decode_user_id))
 app.include_router(register_shop_routes(db, get_current_user, bearer, decode_user_id))
+from social_feed import register_social_feed_routes, ensure_social_feed_indexes  # noqa: E402
+from social_feed_seed import seed_social_feed  # noqa: E402
+_sf_router, _sf_files = register_social_feed_routes(db, get_current_user, require_admin)
+app.include_router(_sf_router)
+app.include_router(_sf_files)
 from intelligence import register_intelligence_routes  # noqa: E402
 app.include_router(register_intelligence_routes(db))
 from apple_auth import register_apple_auth_route  # noqa: E402
@@ -2304,6 +2309,12 @@ async def on_startup():
             logger.info("shop seed: %s", await seed_shop(db))
         except Exception as _e:  # never block boot
             logger.warning("shop seed failed: %s", _e)
+        try:
+            await ensure_social_feed_indexes(db)
+            _demo_sf = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0, "id": 1})
+            logger.info("social feed seed: %s", await seed_social_feed(db, (_demo_sf or {}).get("id"), hash_password))
+        except Exception as _e:  # never block boot
+            logger.warning("social feed seed failed: %s", _e)
 
         async def _reminder_loop():
             while True:

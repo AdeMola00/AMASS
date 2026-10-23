@@ -440,6 +440,7 @@ export default function ConversationScreen() {
   const other = conv?.participants?.find((p: any) => p.id !== user?.id);
   const property = conv?.property;
   const marketItem = conv?.item;
+  const socialPost = conv?.social_post as { id: string; title: string; kind: "give" | "sell"; price?: number | null; photo?: string | null; status: string; location_label: string } | null | undefined;
   const otherName = conv?.kind === "group" ? (conv?.title || "Group chat") : (other?.full_name || "Neighbour");
   const isOnline = presence.typing || (presence.last_seen ? (Date.now() - new Date(presence.last_seen).getTime()) / 1000 < 60 : false);
 
@@ -587,6 +588,38 @@ export default function ConversationScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
+            ) : socialPost ? (
+              <Pressable
+                onPress={() => router.push(`/social/post/${socialPost.id}` as any)}
+                style={({ pressed }) => [
+                  styles.propCard,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  shadows.xs,
+                  pressed && { opacity: 0.92 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`View post ${socialPost.title}`}
+                testID="chat-social-post-card"
+              >
+                {socialPost.photo ? (
+                  <Image source={{ uri: socialPost.photo.startsWith("http") ? socialPost.photo : `${process.env.EXPO_PUBLIC_BACKEND_URL ?? ""}${socialPost.photo}` }} style={[styles.propImg, { backgroundColor: colors.surfaceAlt }]} />
+                ) : (
+                  <View style={[styles.propImg, { backgroundColor: colors.fixSoft, alignItems: "center", justifyContent: "center" }]}>
+                    <Ionicons name="gift-outline" size={20} color={colors.fix} />
+                  </View>
+                )}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="label" tone="tertiary" uppercase>From Social</AppText>
+                  <AppText variant="title" numberOfLines={1}>{socialPost.title}</AppText>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>{socialPost.status === "gone" ? (socialPost.kind === "give" ? "Given away" : "Sold") : socialPost.location_label}</AppText>
+                    <AppText variant="caption" weight="bold" color={colors.fixText} tabular>
+                      {socialPost.kind === "give" ? "FREE" : formatNaira(socialPost.price ?? 0)}
+                    </AppText>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </Pressable>
             ) : null
           }
           ListEmptyComponent={
@@ -594,7 +627,7 @@ export default function ConversationScreen() {
               <Avatar name={otherName} size={64} verified={!!other?.verified} tone="soft" />
               <AppText variant="h3" align="center" style={{ marginTop: 12 }}>{otherName}</AppText>
               <AppText variant="bodySm" tone="tertiary" align="center" style={{ maxWidth: 280 }}>
-                {property ? "Say hello and ask anything about this property — viewings, price, documents." : marketItem ? "Ask about condition, pickup or delivery — and agree a price before you meet." : "This is the start of your conversation. Messages are private between you two."}
+                {property ? "Say hello and ask anything about this property — viewings, price, documents." : marketItem ? "Ask about condition, pickup or delivery — and agree a price before you meet." : socialPost ? "Agree on a pickup time and place — share your exact address only once you're comfortable." : "This is the start of your conversation. Messages are private between you two."}
               </AppText>
             </View>
           }
@@ -765,6 +798,8 @@ export default function ConversationScreen() {
             <MenuRow icon="home-outline" label="View property" caption={property.title} onPress={() => { setMenuOpen(false); router.push(`/property/${property.id}` as any); }} testID="menu-view-property" />
           ) : marketItem ? (
             <MenuRow icon="pricetag-outline" label="View listing" caption={marketItem.name} onPress={() => { setMenuOpen(false); router.push(`/marketplace/${marketItem.id}` as any); }} testID="menu-view-item" />
+          ) : socialPost ? (
+            <MenuRow icon="gift-outline" label="View post" caption={socialPost.title} onPress={() => { setMenuOpen(false); router.push(`/social/post/${socialPost.id}` as any); }} testID="menu-view-social-post" />
           ) : null}
           <MenuRow icon="flag-outline" label="Report user or message" caption="Flag harassment, spam or fraud" onPress={openReport} testID="menu-report" />
           <MenuRow icon="ban-outline" label="Block user" caption="They won't be able to message you" onPress={openBlock} destructive testID="menu-block" />

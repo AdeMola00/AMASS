@@ -111,17 +111,18 @@ def _guess_ext(content_type: str) -> str:
     return "bin"
 
 
-async def upload_photo_bytes(user_id: str, data: bytes, content_type: str) -> str:
-    """Uploads bytes and returns the storage path (persist this)."""
+async def upload_photo_bytes(user_id: str, data: bytes, content_type: str, public: bool = False) -> str:
+    """Uploads bytes and returns the storage path (persist this).
+    `public=True` stores under `amass/public/…`, served without auth by /api/public-files."""
     if len(data) > 15 * 1024 * 1024:
         raise HTTPException(413, "File too large (max 15 MB)")
     ext = _guess_ext(content_type)
-    path = f"{APP_NAME}/uploads/{user_id}/{uuid.uuid4().hex}.{ext}"
+    path = f"{APP_NAME}/{'public' if public else 'uploads'}/{user_id}/{uuid.uuid4().hex}.{ext}"
     await put_object(path, data, content_type or "application/octet-stream")
     return path
 
 
-async def upload_photo_base64(user_id: str, data_url_or_b64: str) -> str:
+async def upload_photo_base64(user_id: str, data_url_or_b64: str, public: bool = False) -> str:
     """Accepts `data:image/jpeg;base64,...` or raw base64 → returns storage path."""
     s = data_url_or_b64.strip()
     content_type = "image/jpeg"
@@ -139,7 +140,7 @@ async def upload_photo_base64(user_id: str, data_url_or_b64: str) -> str:
             raw = base64.b64decode(s)
         except Exception:
             raise HTTPException(400, "Invalid base64 payload")
-    return await upload_photo_bytes(user_id, raw, content_type)
+    return await upload_photo_bytes(user_id, raw, content_type, public=public)
 
 
 async def upload_file_base64(user_id: str, data_url_or_b64: str, extension: str = "bin") -> str:

@@ -2831,6 +2831,68 @@ export const api = {
       `/admin/passport/${encodeURIComponent(amass_id)}/visibility`,
       { method: "PATCH", body: JSON.stringify(updates) }
     ),
+
+  // ─── Social feed (Social tab) ───
+  socialMeta: () => req<SocialMeta>("/social/posts/meta"),
+  socialFeed: (params: { scope?: SocialScope; kind?: SocialPostKind; category?: string; q?: string; cursor?: string; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => v !== undefined && v !== null && v !== "" && qs.set(k, String(v)));
+    const s = qs.toString();
+    return req<SocialFeed>(`/social/feed${s ? `?${s}` : ""}`);
+  },
+  socialMine: () => req<{ items: SocialPost[]; counts: Record<string, number> }>("/social/posts/mine"),
+  socialPost: (id: string) => req<SocialPostDetail>(`/social/posts/${encodeURIComponent(id)}`),
+  socialCreatePost: (body: SocialPostInput) => req<{ ok: boolean; post: SocialPost }>("/social/posts", { method: "POST", body: JSON.stringify(body) }),
+  socialEditPost: (id: string, body: Partial<SocialPostInput> & { status?: SocialPostStatus }) => req<{ ok: boolean; post: SocialPost }>(`/social/posts/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) }),
+  socialDeletePost: (id: string) => req<{ ok: boolean }>(`/social/posts/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  socialToggleLike: (id: string) => req<{ liked: boolean; like_count: number }>(`/social/posts/${encodeURIComponent(id)}/like`, { method: "POST" }),
+  socialComments: (id: string) => req<{ items: SocialComment[] }>(`/social/posts/${encodeURIComponent(id)}/comments`),
+  socialAddComment: (id: string, body: string) => req<{ ok: boolean; comment: SocialComment }>(`/social/posts/${encodeURIComponent(id)}/comments`, { method: "POST", body: JSON.stringify({ body }) }),
+  socialDeleteComment: (id: string, comment_id: string) => req<{ ok: boolean }>(`/social/posts/${encodeURIComponent(id)}/comments/${encodeURIComponent(comment_id)}`, { method: "DELETE" }),
+  socialContact: (id: string, channel: "chat" | "whatsapp" | "phone", message?: string) =>
+    req<{ channel: string; conversation_id?: string; number?: string; url?: string }>(`/social/posts/${encodeURIComponent(id)}/contact`, { method: "POST", body: JSON.stringify({ channel, message }) }),
+  socialHidePost: (id: string) => req<{ ok: boolean }>(`/social/posts/${encodeURIComponent(id)}/hide`, { method: "POST" }),
+  socialUnhidePost: (id: string) => req<{ ok: boolean }>(`/social/posts/${encodeURIComponent(id)}/hide`, { method: "DELETE" }),
+  socialReportPost: (id: string, reason: string, details?: string) => req<{ ok: boolean }>(`/social/posts/${encodeURIComponent(id)}/report`, { method: "POST", body: JSON.stringify({ reason, details }) }),
+  socialUpload: (data_url: string) => req<{ url: string; path: string }>("/social/posts/uploads", { method: "POST", body: JSON.stringify({ data_url }) }),
+};
+
+// ─── Social feed types ───
+export type SocialScope = "estate" | "area" | "city";
+export type SocialPostKind = "give" | "sell";
+export type SocialPostStatus = "active" | "reserved" | "gone" | "paused";
+export type SocialCategory = { key: string; label: string; icon: string; color: string };
+export type SocialMeta = {
+  categories: SocialCategory[];
+  conditions: { key: string; label: string }[];
+  quick_messages: string[];
+  scopes: { estates: { id: string; name: string; area?: string | null; city?: string | null }[]; areas: string[]; city: string };
+  defaults: { visibility: SocialScope; estate_id?: string | null; has_phone: boolean };
+  counts: { mine_active: number };
+};
+export type SocialPost = {
+  id: string; title: string; body: string; kind: SocialPostKind; price?: number | null; negotiable: boolean;
+  category: string; category_label: string; condition: string; condition_label: string;
+  photos: string[]; cover?: string | null;
+  visibility: SocialScope; location_label: string; estate_id?: string | null; estate_name?: string | null; area?: string | null; city?: string | null; pickup_note?: string | null;
+  contact: { chat: boolean; whatsapp: boolean; phone: boolean };
+  status: SocialPostStatus | "removed"; like_count: number; comment_count: number; view_count: number;
+  created_at: string; updated_at?: string | null; edited: boolean;
+  author: PublicUser & { same_estate?: boolean };
+  liked: boolean; is_mine: boolean; market_item_id?: string | null;
+};
+export type SocialFeed = { items: SocialPost[]; next_cursor: string | null; scope: SocialScope; scope_label: string; scopes: SocialMeta["scopes"] };
+export type SocialComment = { id: string; body: string; created_at: string; author?: PublicUser | null; is_mine: boolean; is_poster: boolean };
+export type SocialPostDetail = SocialPost & {
+  comments: SocialComment[];
+  author_stats: { posts: number; given: number };
+  can_contact: boolean;
+  quick_messages: string[];
+  similar: SocialPost[];
+};
+export type SocialPostInput = {
+  title: string; body?: string; kind: SocialPostKind; price?: number | null; negotiable?: boolean; category: string; condition: string; photos: string[];
+  visibility: SocialScope; estate_id?: string | null; pickup_note?: string | null; contact_chat?: boolean; contact_whatsapp?: boolean; contact_phone?: boolean; cross_list_market?: boolean;
 };
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;

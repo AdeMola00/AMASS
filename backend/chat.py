@@ -105,6 +105,19 @@ async def _hydrate_item(db, item_id: Optional[str]) -> Optional[Dict[str, Any]]:
     return it
 
 
+async def _hydrate_social_post(db, post_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Social post preview for post-linked (neighbour ↔ poster) conversations."""
+    if not post_id: return None
+    p = await db.social_posts.find_one(
+        {"id": post_id},
+        {"_id": 0, "id": 1, "title": 1, "kind": 1, "price": 1, "photos": 1, "status": 1, "author_id": 1, "location_label": 1, "estate_name": 1, "area": 1, "city": 1},
+    )
+    if not p: return None
+    return {"id": p["id"], "title": p["title"], "kind": p.get("kind", "give"), "price": p.get("price"), "photo": (p.get("photos") or [None])[0],
+            "status": p.get("status", "active"), "author_id": p.get("author_id"), "location_label": p.get("estate_name") or p.get("area") or p.get("city") or "Nearby"}
+
+
+
 async def _is_blocked(db, a: str, b: str) -> bool:
     return await db.chat_blocks.find_one({"$or": [{"blocker_id": a, "blocked_id": b}, {"blocker_id": b, "blocked_id": a}]}, {"_id": 0}) is not None
 
@@ -348,6 +361,7 @@ def register_chat_routes(db, get_current_user, require_admin):
             c["other_participants"] = [by_id.get(oid) for oid in other_ids if by_id.get(oid)]
             c["property"] = await _hydrate_property(db, c.get("property_id"))
             c["item"] = await _hydrate_item(db, c.get("item_id"))
+            c["social_post"] = await _hydrate_social_post(db, c.get("social_post_id"))
             c["unread_count"] = await _unread_count_for(db, c["id"], user["id"])
             # Phase-2 filters
             if verified_only:
@@ -374,6 +388,7 @@ def register_chat_routes(db, get_current_user, require_admin):
         conv["participants"] = await _hydrate_participants(db, conv["participant_ids"])
         conv["property"] = await _hydrate_property(db, conv.get("property_id"))
         conv["item"] = await _hydrate_item(db, conv.get("item_id"))
+        conv["social_post"] = await _hydrate_social_post(db, conv.get("social_post_id"))
         conv["unread_count"] = await _unread_count_for(db, conv_id, user["id"])
         return conv
 

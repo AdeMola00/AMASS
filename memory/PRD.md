@@ -625,3 +625,21 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - `RetailerCards` / `RetailerLogo`: bordered + elevated white logo tiles, bold names, yellow deal tags, bordered white rows with chevron.
 - Screens: `ShopHome` (chips, red Show-all circle, banners, bold sections, soft footer note), `store/[slug]` (Gloss on accent hero, 20px/800 name, white search, white info strip + fulfilment track w/ ink active, green open dot, "Deals at X" rail, "Shop the range" chips, "Buy from X" card), `product/[id]` (white gallery + -N% tag + active dot pill, bordered retailer tile w/ "Visit store", 24px/800 title, 30px/800 price card w/ yellow-tinted promo box, white bordered blocks, red gradient "Add to basket"), `stores`, `category/[key]`, `search`, `basket` (bordered groups, 20px/800 subtotal).
 - Verified: tsc + lint clean; testing_agent iteration_60 PASS (all shop flows, dark mode, FIXA/Declutter regression; 34 screenshots in `test_reports/screenshots_iter60/`).
+
+## Social tab — Nextdoor-inspired neighbourhood feed (replaces Discover) (Jun 2026)
+- **Tab bar**: Home · **Social** · Market · Neighbours · Profile. `(tabs)/discover.tsx` deleted; Boost studio success panel no longer links to Discover.
+- **Backend** `/app/backend/social_feed.py` (router `/api/social/*`) + `social_feed_seed.py` (~19 demo posts, demo user owns 3):
+  `GET /social/posts/meta` (categories, conditions, quick messages, my scopes estate→area→city, defaults, counts) ·
+  `GET /social/feed?scope=estate|area|city&kind=give|sell&category&q&cursor&limit` (visibility rules, hidden/blocked/muted excluded, cursor pagination) ·
+  `GET /social/posts/mine` · `POST /social/posts` · `GET/PATCH/DELETE /social/posts/{id}` (PATCH also sets status active|reserved|gone|paused; sold/paused mirrors to a cross-listed Declutter item) ·
+  `POST .../like` (toggle) · `GET/POST .../comments` + `DELETE .../comments/{cid}` · `POST .../contact {channel: chat|whatsapp|phone}` (viewer-initiated only; chat → conversation with `social_post_id`; numbers only returned on tap for enabled channels; own post → 400) ·
+  `POST/DELETE .../hide` · `POST .../report` (hides for reporter) · `POST /social/posts/uploads` (base64 → PUBLIC object-storage prefix served by `/api/public-files`) · admin `GET /social/posts/admin/reports` + resolve.
+  Notification kinds `SOCIAL_POST_LIKE`, `SOCIAL_POST_COMMENT` (social), `SOCIAL_POST_REMOVED` (admin). Chat conversations hydrate `social_post` preview.
+- **Frontend** (FIXA theme via `src/components/social/socialTheme.ts`: lime #7ED958 surfaces with ink text, `colors.fix` green buttons, `colors.fixSoft` washes):
+  - `(tabs)/social.tsx` — header with FIXA mark + scope picker (`social-scope-btn`/`social-scope-sheet`), inbox + notifications badges, avatar → My posts; search, dismissible 3-step welcome card, Free/For sale + category chips, feed `PostCard`s, green "Post" FAB, skeleton/empty/error states, infinite scroll, pull-to-refresh, refetch-on-focus via `socialFeedSignal`.
+  - `social/post/[id].tsx` — full-bleed photo pager, title + FREE/₦ tag, poster card, pickup/contact/payment info, like/reply/share pills, inline replies, "More like this nearby", sticky `Message {name}` (→ `ContactSheet`: quick messages / custom → `/chat/{id}`, WhatsApp, Call) or owner `Manage post` (→ `PostMenuSheet`). Refetches on refocus after edits.
+  - `social/compose.tsx` — create/edit (`?id=`): photo strip (system picker → base64 → uploads; cover/remove), Free/For sale + price + negotiable, title/body, category/condition/visibility sheets, contact toggles (chat/WhatsApp/phone), pickup note, optional Declutter cross-list. Edit pops back to the detail; create replaces composer with the new post.
+  - `social/mine.tsx` — My posts with stats (posts / given away / views), status filter chips, same cards + manage menu.
+  - Components `src/components/social/`: `PostCard`, `PostMenuSheet` (viewer: share/hide/report · owner: edit/reserved/gone/pause/resume/delete w/ confirm), `ContactSheet`, `SocialBits` (FixaMark/Lockup, PriceTag, StatusTag, ActionPill, SocialChip, PostPhotos collage, ScopeSheet, ReportSheet), `socialFeedSignal`.
+  - Chat thread shows a "From Social" post card header + "View post" menu row for post-linked conversations.
+- Tests: `backend/tests/test_social_feed.py` 18/18 · testing_agent iteration_61 all frontend flows green.
