@@ -180,7 +180,7 @@ export default function AgentPlansScreen() {
 
                 <Button
                   label={isCurrent ? "Current plan" : p.cta}
-                  variant={p.highlight ? "primary" : "secondary"}
+                  variant={p.highlight ? "premium" : "secondary"}
                   size="lg"
                   fullWidth
                   disabled={isCurrent || subscribing !== null}

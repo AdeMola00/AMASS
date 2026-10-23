@@ -105,7 +105,7 @@ export default function ImproveHub() {
               </View>
             ))}
           </View>
-          <Button label="Start an improvement" variant="brand" size="md" iconLeft="add" onPress={() => router.push("/property-picker" as any)} testID="start-improvement" style={{ marginTop: 14 }} />
+          <Button label="Start an improvement" variant="primary" size="md" iconLeft="add" onPress={() => router.push("/property-picker" as any)} testID="start-improvement" style={{ marginTop: 14 }} />
         </Animated.View>
 
         <SegmentedControl<Tab>

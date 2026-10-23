@@ -281,7 +281,7 @@ export default function BecomeAgent() {
 
           <View style={{ gap: 10, alignSelf: "stretch" }}>
             {existing.status === "approved" ? (
-              <Button label="List a property" iconLeft="add-circle" variant="brand" size="lg" fullWidth onPress={() => router.push("/agent/onboarding" as any)} testID="start-onboarding-btn" />
+              <Button label="List a property" iconLeft="add-circle" variant="primary" size="lg" fullWidth onPress={() => router.push("/agent/onboarding" as any)} testID="start-onboarding-btn" />
             ) : (
               <Button
                 label={existing.status === "rejected" ? "Update & resubmit" : "Edit application"}

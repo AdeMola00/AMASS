@@ -205,6 +205,7 @@ export default function SubscribeScreen() {
         <View style={[styles.sticky, { backgroundColor: colors.bgElevated, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + 4 }, shadows.lg]}>
           <Button
             label={plan.id === "enterprise" ? "Contact sales" : activePlanId === plan.id ? "Current plan" : `Subscribe to ${plan.name}`}
+            variant={plan.id === "enterprise" ? "primary" : "premium"}
             size="lg"
             fullWidth
             iconLeft={plan.id === "enterprise" ? "chatbubbles" : "star"}

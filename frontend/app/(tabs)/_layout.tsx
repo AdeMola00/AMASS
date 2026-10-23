@@ -51,10 +51,12 @@ function useUnreadCount(active: boolean) {
   return unread;
 }
 
+/* Edge-to-edge glass tab bar — no border, Ink Black active state, soft-grey
+   sliding pill under the active tab. */
 function FloatingBottomBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { colors, shadows, isDark } = useTheme();
-  const bottomInset = Math.max(insets.bottom, 12);
+  const bottomInset = Math.max(insets.bottom, 10);
   const [barW, setBarW] = useState(0);
   const count = state.routes.length;
   const tabW = barW > 0 ? (barW - 16) / count : 0;
@@ -67,19 +69,15 @@ function FloatingBottomBar({ state, navigation }: any) {
   const pill = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
 
   return (
-    <View style={[styles.container, { bottom: bottomInset }]} pointerEvents="box-none" testID="floating-bottom-nav">
+    <View style={styles.container} pointerEvents="box-none" testID="floating-bottom-nav">
       <View
-        style={[
-          styles.barShadow,
-          shadows.lg,
-          { backgroundColor: colors.tabBar, borderColor: isDark ? colors.tabBarBorder : "rgba(255,255,255,0.7)" },
-        ]}
+        style={[styles.barShadow, shadows.lg, { backgroundColor: colors.tabBar, paddingBottom: bottomInset }]}
         onLayout={(e: LayoutChangeEvent) => setBarW(e.nativeEvent.layout.width)}
       >
-        {Platform.OS === "ios" ? <BlurView intensity={80} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : null}
+        {Platform.OS !== "web" ? <BlurView intensity={isDark ? 60 : 80} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : null}
         <View style={styles.bar} accessibilityRole="tablist">
           {tabW > 0 ? (
-            <Animated.View pointerEvents="none" style={[styles.pill, { width: tabW, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(10,10,10,0.05)" }, pill]} />
+            <Animated.View pointerEvents="none" style={[styles.pill, { width: tabW, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : colors.surfaceAlt }, pill]} />
           ) : null}
           {state.routes.map((r: any, i: number) => (
             <TabButton
@@ -120,7 +118,7 @@ function TabButton({ route, active, onPress, badge }: any) {
       accessibilityLabel={`${cfg.label} tab${badge ? `, ${badge} unread` : ""}`}
     >
       <Animated.View style={[styles.iconWrap, anim]}>
-        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={23} color={active ? colors.text : colors.textTertiary} />
+        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={23} color={active ? colors.text : colors.textSecondary} />
         {badge > 0 ? (
           <View style={[styles.badge, { backgroundColor: colors.brand, borderColor: colors.tabBar }]}>
             <AppText variant="micro" color="#fff" tabular>
@@ -129,7 +127,7 @@ function TabButton({ route, active, onPress, badge }: any) {
           </View>
         ) : null}
       </Animated.View>
-      <AppText variant="micro" weight={active ? "extrabold" : "semibold"} color={active ? colors.text : colors.textTertiary} style={styles.tabLabel}>
+      <AppText variant="micro" color={active ? colors.text : colors.textSecondary} style={styles.tabLabel}>
         {cfg.label}
       </AppText>
     </Pressable>
@@ -154,10 +152,10 @@ function tabConfig(routeName: string): { label: string; icon: IconName; iconActi
 }
 
 const styles = StyleSheet.create({
-  container: { position: "absolute", left: 12, right: 12, alignItems: "center" },
-  barShadow: { borderRadius: 32, overflow: "hidden", width: "100%", maxWidth: 560, borderWidth: 1 },
-  bar: { flexDirection: "row", height: 66, alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8, position: "relative" },
-  pill: { position: "absolute", left: 8, top: 7, bottom: 7, borderRadius: 24 },
+  container: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  barShadow: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: "hidden", width: "100%" },
+  bar: { flexDirection: "row", height: 64, alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8, position: "relative" },
+  pill: { position: "absolute", left: 8, top: 8, bottom: 8, borderRadius: 24 },
   tab: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3, height: "100%" },
   iconWrap: { width: 28, height: 26, alignItems: "center", justifyContent: "center" },
   tabLabel: { letterSpacing: 0, fontSize: 11, lineHeight: 13 },

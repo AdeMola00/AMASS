@@ -223,7 +223,7 @@ export default function AdDetailScreen() {
             {suggestions?.used_ai && <Badge label="AI" tone="premium" icon="sparkles" size="xs" />}
           </View>
           {!suggestions ? (
-            <Button label={`Get AI suggestions · ${AI_SUGGESTION_COST} MASS`} variant="brand" fullWidth iconLeft="sparkles" onPress={() => setConfirmAi(true)} testID="ask-ai-btn" />
+            <Button label={`Get AI suggestions · ${AI_SUGGESTION_COST} MASS`} variant="premium" fullWidth iconLeft="sparkles" onPress={() => setConfirmAi(true)} testID="ask-ai-btn" />
           ) : (
             <View style={{ gap: 8 }}>
               {suggestions.suggestions.map((s, i) => {

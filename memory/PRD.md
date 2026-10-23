@@ -534,3 +534,31 @@ Admin-configurable, two separately-disclosed charges to progressively reveal a p
 - Screens `app/shop/`: `stores` (Choose a store), `store/[slug]` (accent header, search-in-store, fulfilment selector with unconfirmed options disabled, info sheet, store offers, category/subcategory chips, product grid, purchase routes), `product/[id]` (gallery, verified price + promo terms + stock + source, friends-saved nudge, in-lists, options/details/warranty, buying-from, where-to-buy, similar, sticky add/stepper bar), `category/[key]` (cross-retailer browse; deals/in-stock/retailer/brand chips; honest empty → stores for category), `search` (suggest chips, stores/brands/products), `basket` (per-retailer groups, subtotal from fixed/from prices only, fees note, routes, clear group; signed-out prompt), `saved` (products/stores tabs).
 - Shared lists: `AddToCollectionSheet` accepts `kind="product"|"store"` → "shopping" collections; collections create sheet gains a Shopping segment (`?kind=shopping` preselects); collection detail renders product/store rows.
 - Verified: testing_agent iteration_54 — backend 34/34, all frontend flows green (home → add → stepper/badge/pill → store → hand-off sheet → basket). ORCA logo: site uses a text logo, initials fallback shown.
+
+## App-wide UI/UX Reskin — Corner-inspired editorial direction (Jun 2026)
+**Brief**: off-white canvas, soft-grey tiles, Ink Black fully-rounded pill CTAs, Plus Jakarta Sans capped at 500, DM Serif Display only for expressive large headlines + wallet balances, micro-animations, no changes to routes / logic / APIs / testIDs. Blueprint: `/app/design_guidelines.json`. User decisions: blue→violet gradient (`premium`) ONLY for paid gates; hand-polish the 12 key screens, cascade elsewhere.
+
+### Foundation (cascades to ~114 theme consumers + 66 legacy `constants/theme` importers)
+- `src/theme/tokens.ts`: new stone palette (bg `#F7F6F3`, surfaceAlt `#EAE8E3`, ink `#111111`), muted gold (MASS `#D4AF37`) / sea-green (FIX `#2E8B57`), `gradients.premium` + `gradients.scrim`, `fontFamilies.semibold|bold|extrabold` → all resolve to `PlusJakartaSans-500`, serif variants `heroLg/hero/heroSm`, `motion.stagger/pressScale/pressScaleSmall/springPop`.
+- `src/theme/themes.ts`: light + dark maps copied from the guidelines; shadow tier 1 (barely-there).
+- `src/constants/theme.ts` (static legacy), `src/theme/legacy.ts`, `src/lib/global-font.ts` (weight ≥500 → Medium) aligned.
+- UI kit: `Button` (ink pill, 500 label, no shadow; new `variant="premium"` gradient; IconButton press 0.93), `Card` (borderless; `tone="white"|"soft"|"ink"`, press-scale 0.97), `Chip` (soft-grey, ink when selected, no border), `Input` (soft-grey, border only on focus/error), `Sheet` (`headline` serif prop + `SheetLink` "maybe later" link), `ChargeConfirm`/`UnlockDialog` (serif headline, premium CTAs), `RowGroup`/`StatTile`/`SkeletonCard` borderless soft tiles, `AnimatedNumber` accepts any type variant.
+- New `src/ui/Motion.tsx`: `PressableScale`, `Appear` (50ms stagger, reduced-motion → cross-fade), `usePop` (heart/add overshoot).
+- Tab bar `(tabs)/_layout.tsx`: edge-to-edge glass bar (BlurView on native), no border, ink active / textSecondary inactive, soft-grey sliding pill. Same testIDs.
+
+### Screens hand-polished
+- `onboarding.tsx` rewritten: photo-led hero with scrim + rotated listing-photo tiles, lowercase serif headline per slide, stacked ink pill CTA, same testIDs (`onboarding-next/skip/signin`, new `onboarding-title-{i}`).
+- Auth (`login/register/phone/verify/forgot-password`): lowercase serif heroes; Sign In → ink primary.
+- Discover: serif lowercase greeting, soft-grey category tiles with white icon wells (staggered `Appear`), trend cards with scrim + press-scale, soft journey cards.
+- Home map: quick-filter chips inside a glass pill row, glass search bar, borderless legend, Get MASS → premium.
+- Market: borderless off-white glass header, pill search + ink filter, soft-grey chips, ink Sell FAB, FIXA banner ink.
+- Neighbours: serif title, soft quick tiles (staggered), ink pill estate CTA, soft collection/help tiles.
+- Profile: serif name, ink wallet card with `heroLg` serif balance, premium Top up, soft stat tiles.
+- Wallet: MASS ink card + FIX soft-grey card both with serif `heroLg` balances; Buy MASS/FIX quick actions gradient; others soft tiles.
+- Property detail: ink scrim, 32pt sheet radius, borderless social row, chat CTAs → ink, unlock CTA → gradient pill, sticky bar elevated white with top radii.
+- `ListingCard`: borderless soft-grey body, scrim gradient, heart `springPop`, press-scale. `AdModal`: white CTA row, ink CTA, serif title. `FilterChip`/`FilterSheet` apply → ink.
+- Bulk: every `<Button variant="brand">` → `primary` (19 files); paid gates (`Activate for N MASS`, `Top up MASS`, `Get AI suggestions · N MASS`, `Upgrade plan`, TokenPurchaseScreen pay, Subscribe, highlighted agent plan) → `premium`.
+
+### Verification
+- `tsc` clean; testing_agent iteration_55 — PASS (onboarding, auth, all 5 tabs, wallet, settings, property detail, buy-tokens, agent-plans, fixa; dark mode toggle; no red screens). Manual check: locked listing → gradient unlock CTA → serif UnlockDialog with fee/balance/after rows.
+- Not changed: routes, backend, auth, data models, payment flows, testIDs.

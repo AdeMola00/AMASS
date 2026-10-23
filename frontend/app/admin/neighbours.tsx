@@ -293,7 +293,7 @@ function FunnelView({ funnel, days, onDays, onExport, exporting }: { funnel: Adm
           </AppText>
         </View>
         <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 12 }}>
-          <AppText variant="display" color={colors.onPrimary} tabular testID="nb-admin-paid">
+          <AppText variant="heroLg" color={colors.onPrimary} tabular testID="nb-admin-paid">
             {fmt(cur.payments_completed)}
           </AppText>
           {delta(cur.payments_completed, prev.payments_completed) ? (

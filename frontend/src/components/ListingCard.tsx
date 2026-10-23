@@ -9,8 +9,8 @@ import { useRouter } from "expo-router";
 import { api, Property } from "@/src/lib/api";
 import { formatMarkerPrice } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
-import { motion, radii } from "@/src/theme/tokens";
-import { AppText, Badge } from "@/src/ui";
+import { gradients, motion, radii } from "@/src/theme/tokens";
+import { AppText, Badge, PressableScale } from "@/src/ui";
 
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 
@@ -41,7 +41,7 @@ export function ListingCard({
   /** Shows a second overlay button that lets the user drop the home into a shared list. */
   onAddToList?: (property: Property) => void;
 }) {
-  const { colors, shadows, isDark } = useTheme();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [localSaved, setLocalSaved] = useState(!!saved);
   const isSaved = saved ?? localSaved;
@@ -52,7 +52,7 @@ export function ListingCard({
   const toggle = async () => {
     const next = !isSaved;
     setLocalSaved(next);
-    heart.value = withSequence(withSpring(1.35, motion.spring), withSpring(1, motion.spring));
+    heart.value = withSequence(withSpring(1.3, motion.springPop), withSpring(1, motion.spring));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onToggleSave?.(property.id, next);
     try {
@@ -72,20 +72,12 @@ export function ListingCard({
 
   return (
     <View style={[{ width }, style]}>
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {});
-          router.push((via ? `/property/${property.id}?via=${encodeURIComponent(via)}` : `/property/${property.id}`) as any);
-        }}
+      <PressableScale
+        onPress={() => router.push((via ? `/property/${property.id}?via=${encodeURIComponent(via)}` : `/property/${property.id}`) as any)}
         accessibilityRole="button"
         accessibilityLabel={`${property.title}, ${formatMarkerPrice(property.price, property.listing_type)}, ${property.location}`}
         testID={testID ?? `listing-card-${property.id}`}
-        style={({ pressed }) => [
-          styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-          shadows.sm,
-          pressed && { transform: [{ scale: 0.985 }] },
-        ]}
+        style={[styles.card, { backgroundColor: colors.surfaceAlt }]}
       >
         <View style={{ height: imgH }}>
           <Image
@@ -96,7 +88,7 @@ export function ListingCard({
             placeholder={{ blurhash: BLUR_HASH }}
             accessibilityLabel={`Photo of ${property.title}`}
           />
-          <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.55)"]} style={styles.scrim} />
+          <LinearGradient colors={[...gradients.scrim]} style={styles.scrim} />
           <View style={styles.topRow}>
             <View style={{ flexDirection: "row", gap: 6, flex: 1, flexWrap: "wrap" }}>
               {property.verified ? <Badge label="Verified" tone="success" icon="shield-checkmark" /> : null}
@@ -134,7 +126,7 @@ export function ListingCard({
             </View>
           ) : null}
         </View>
-      </Pressable>
+      </PressableScale>
       {/* Heart lives outside the card Pressable (no nested buttons on web). */}
       <Animated.View style={[styles.heartWrap, heartAnim]}>
         <Pressable
@@ -144,7 +136,7 @@ export function ListingCard({
           accessibilityLabel={isSaved ? "Remove from saved" : "Save property"}
           accessibilityState={{ selected: isSaved }}
           testID={`save-${property.id}`}
-          style={[styles.heart, { backgroundColor: isDark ? "rgba(23,21,19,0.8)" : "rgba(255,255,255,0.9)" }]}
+          style={[styles.heart, { backgroundColor: isDark ? "rgba(28,28,26,0.85)" : "rgba(255,255,255,0.92)" }]}
         >
           <Ionicons name={isSaved ? "heart" : "heart-outline"} size={18} color={isSaved ? colors.brand : colors.text} />
         </Pressable>
@@ -159,7 +151,7 @@ export function ListingCard({
           accessibilityRole="button"
           accessibilityLabel="Add to a shared list"
           testID={`add-to-list-${property.id}`}
-          style={[styles.heart, styles.listBtn, { backgroundColor: isDark ? "rgba(23,21,19,0.8)" : "rgba(255,255,255,0.9)" }]}
+          style={[styles.heart, styles.listBtn, { backgroundColor: isDark ? "rgba(28,28,26,0.85)" : "rgba(255,255,255,0.92)" }]}
         >
           <Ionicons name="albums-outline" size={17} color={colors.text} />
         </Pressable>
@@ -169,14 +161,14 @@ export function ListingCard({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: radii.lg, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
+  card: { borderRadius: radii.lg, overflow: "hidden" },
   scrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: "60%" },
   topRow: { position: "absolute", top: 10, left: 10, right: 50, flexDirection: "row", alignItems: "flex-start" },
   heartWrap: { position: "absolute", top: 10, right: 10 },
   heart: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   listBtn: { position: "absolute", top: 10, right: 50 },
   priceWrap: { position: "absolute", left: 12, bottom: 10 },
-  body: { padding: 12, gap: 4 },
+  body: { padding: 14, gap: 4 },
   locRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   specRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
   dot: { width: 3, height: 3, borderRadius: 2 },

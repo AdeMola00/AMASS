@@ -443,7 +443,7 @@ function OfferCard({ offer, role, busy, onOpenItem, onAccept, onDecline, onCount
             <Button label="Withdraw offer" variant="outline" size="sm" iconLeft="close" onPress={onWithdraw} loading={busy} testID={`offer-withdraw-${offer.id}`} style={{ flex: 1 }} />
           </View>
         ) : offer.status === "accepted" ? (
-          <Button label={role === "seller" ? "Chat with buyer to arrange pickup" : "Chat with seller to arrange pickup"} size="sm" variant="brand" iconLeft="chatbubble-ellipses" fullWidth onPress={onChat} disabled={!offer.conversation_id} testID={`offer-chat-${offer.id}`} />
+          <Button label={role === "seller" ? "Chat with buyer to arrange pickup" : "Chat with seller to arrange pickup"} size="sm" variant="primary" iconLeft="chatbubble-ellipses" fullWidth onPress={onChat} disabled={!offer.conversation_id} testID={`offer-chat-${offer.id}`} />
         ) : role === "buyer" && offer.status === "declined" && offer.item?.status !== "sold" ? (
           <Button label="Make a new offer" size="sm" variant="secondary" iconLeft="pricetag" fullWidth onPress={onOpenItem} testID={`offer-again-${offer.id}`} />
         ) : null}

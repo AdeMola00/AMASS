@@ -195,7 +195,7 @@ export default function EarnScreen() {
                   Your MASS balance
                 </AppText>
                 <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                  <AnimatedNumber value={balance} variant="display" color="#fff" style={{ fontSize: 40, lineHeight: 46 }} testID="earn-balance" />
+                  <AnimatedNumber value={balance} variant="heroLg" color="#fff" testID="earn-balance" />
                   <AppText variant="title" color={colors.mass}>
                     MASS
                   </AppText>

@@ -1,51 +1,51 @@
 import React from "react";
-import { Pressable, StyleSheet, View, ViewProps, ViewStyle } from "react-native";
+import { StyleSheet, View, ViewProps, ViewStyle } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText } from "./Text";
+import { PressableScale } from "./Motion";
 
 import type { IconName } from "./icons";
 
-/* ─── Card ──────────────────────────────────────────────────────────── */
+/* ─── Card ──────────────────────────────────────────────────────────────
+   Borderless tiles on the off-white canvas.
+   tone="white" (default) — white card, whisper of shadow.
+   tone="soft"            — soft-grey tile, no shadow (Corner-style).
+   tone="ink"             — Ink Black contrast card (wallet, promos).      */
+export type CardTone = "white" | "soft" | "ink";
+
 export function Card({
   children,
   style,
-  elevation = "sm",
+  elevation = "xs",
   padded = true,
   onPress,
   testID,
+  tone = "white",
   ...rest
 }: ViewProps & {
   elevation?: "none" | "xs" | "sm" | "md" | "lg";
   padded?: boolean;
   onPress?: () => void;
   testID?: string;
+  tone?: CardTone;
 }) {
   const { colors, shadows } = useTheme();
+  const bg = tone === "soft" ? colors.surfaceAlt : tone === "ink" ? colors.surfaceInverse : colors.surface;
   const base: ViewStyle[] = [
     styles.card,
-    { backgroundColor: colors.surface, borderColor: colors.border },
+    { backgroundColor: bg },
     padded && { padding: space[4] },
-    elevation !== "none" && shadows[elevation],
+    tone === "white" && elevation !== "none" && shadows[elevation],
     style as ViewStyle,
   ].filter(Boolean) as ViewStyle[];
   if (onPress) {
     return (
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {});
-          onPress();
-        }}
-        style={({ pressed }) => [base, pressed && { opacity: 0.92, transform: [{ scale: 0.995 }] }]}
-        accessibilityRole="button"
-        testID={testID}
-        {...(rest as any)}
-      >
+      <PressableScale onPress={onPress} style={base} accessibilityRole="button" testID={testID} {...(rest as any)}>
         {children}
-      </Pressable>
+      </PressableScale>
     );
   }
   return (
@@ -179,28 +179,17 @@ export function Chip({
 }) {
   const { colors } = useTheme();
   const selBg = tone === "brand" ? colors.brand : tone === "fix" ? colors.fix : tone === "mass" ? colors.mass : colors.primary;
-  const selFg = tone === "fix" ? "#052E1F" : tone === "mass" ? "#1A1200" : colors.onPrimary;
+  const selFg = tone === "fix" ? "#FFFFFF" : tone === "mass" ? "#1A1200" : colors.onPrimary;
   return (
-    <Pressable
-      onPress={() => {
-        Haptics.selectionAsync().catch(() => {});
-        onPress?.();
-      }}
+    <PressableScale
+      onPress={() => onPress?.()}
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
       testID={testID}
-      style={({ pressed }) => [
-        styles.chip,
-        {
-          backgroundColor: selected ? selBg : colors.surface,
-          borderColor: selected ? selBg : colors.border,
-        },
-        pressed && { opacity: 0.85 },
-        style,
-      ]}
+      style={[styles.chip, { backgroundColor: selected ? selBg : colors.surfaceAlt }, style]}
     >
       {icon ? <Ionicons name={icon} size={14} color={selected ? selFg : colors.textSecondary} /> : null}
-      <AppText variant="caption" weight="semibold" color={selected ? selFg : colors.text}>
+      <AppText variant="caption" color={selected ? selFg : colors.textSecondary}>
         {label}
       </AppText>
       {typeof count === "number" ? (
@@ -210,7 +199,7 @@ export function Chip({
           </AppText>
         </View>
       ) : null}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -248,7 +237,7 @@ export function ProgressBar({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  card: { borderRadius: radii.lg, overflow: "hidden" },
   badge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: radii.pill, alignSelf: "flex-start" },
   avatarFallback: { alignItems: "center", justifyContent: "center" },
   avatarBadge: { position: "absolute", right: -2, bottom: -2, alignItems: "center", justifyContent: "center", borderWidth: 2 },
@@ -259,7 +248,6 @@ const styles = StyleSheet.create({
     height: 36,
     paddingHorizontal: 14,
     borderRadius: radii.pill,
-    borderWidth: 1,
   },
   chipCount: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
 });

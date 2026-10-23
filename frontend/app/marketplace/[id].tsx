@@ -375,7 +375,7 @@ export default function ItemDetail() {
             <Button label="Call" variant="primary" iconLeft="call" size="md" onPress={openCall} testID="action-call" style={{ flex: 1 }} />
             <Button label="WhatsApp" iconLeft="logo-whatsapp" size="md" onPress={openWhatsApp} testID="action-whatsapp" style={{ flex: 1.2, backgroundColor: WHATSAPP }} />
           </View>
-          <Button label={`Make an offer · ${formatNaira(item.price)}`} variant="brand" size="lg" fullWidth iconLeft="pricetag" onPress={() => offerRef.current?.open(item)} testID="action-offer" />
+          <Button label={`Make an offer · ${formatNaira(item.price)}`} variant="primary" size="lg" fullWidth iconLeft="pricetag" onPress={() => offerRef.current?.open(item)} testID="action-offer" />
         </View>
       )}
 

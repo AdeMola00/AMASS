@@ -16,12 +16,16 @@ export function Sheet({
   onClose,
   children,
   title,
+  headline,
   testID,
 }: {
   visible: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  /** Compact sans title with a close affordance. */
   title?: string;
+  /** Expressive lowercase editorial headline (DM Serif) — premium touchpoints only. */
+  headline?: string;
   testID?: string;
 }) {
   const { colors, shadows } = useTheme();
@@ -55,6 +59,11 @@ export function Sheet({
           ]}
         >
           <View style={[styles.grabber, { backgroundColor: colors.borderStrong }]} />
+          {headline ? (
+            <AppText variant="heroSm" style={styles.headline}>
+              {headline}
+            </AppText>
+          ) : null}
           {title ? (
             <View style={styles.sheetHead}>
               <AppText variant="h3">{title}</AppText>
@@ -129,7 +138,7 @@ export function ChargeConfirm({
 
       {children}
 
-      <View style={[styles.ledger, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+      <View style={[styles.ledger, { backgroundColor: colors.surfaceAlt }]}>
         <LedgerRow label="Cost" value={`${cost.toLocaleString()} ${currency}`} strong color={accentText} />
         <LedgerRow label="Your balance now" value={`${balance.toLocaleString()} ${currency}`} />
         <View style={[styles.ledgerDivider, { backgroundColor: colors.border }]} />
@@ -168,7 +177,7 @@ export function ChargeConfirm({
         {canAfford ? (
           <Button
             label={confirmLabel ?? `Confirm · ${cost.toLocaleString()} ${currency}`}
-            variant={isMass ? "primary" : "fix"}
+            variant="premium"
             size="lg"
             fullWidth
             loading={loading}
@@ -177,12 +186,24 @@ export function ChargeConfirm({
             testID="charge-confirm-btn"
           />
         ) : onTopUp ? (
-          <Button label={`Top up ${currency}`} variant={isMass ? "mass" : "fix"} size="lg" fullWidth onPress={onTopUp} iconLeft="add" testID="charge-topup-btn" />
+          <Button label={`Top up ${currency}`} variant="premium" size="lg" fullWidth onPress={onTopUp} iconLeft="add" testID="charge-topup-btn" />
         ) : null}
-        <Button label="Not now" variant="ghost" size="md" fullWidth onPress={onClose} testID="charge-cancel-btn" />
+        <SheetLink label="not now" onPress={onClose} testID="charge-cancel-btn" />
       </View>
       <View style={{ height: 2, backgroundColor: accent, opacity: 0, width: 1 }} />
     </Sheet>
+  );
+}
+
+/** Subtle text link under a sheet CTA — the "maybe later" affordance. */
+export function SheetLink({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button" testID={testID} style={({ pressed }) => [styles.link, pressed && { opacity: 0.6 }]}>
+      <AppText variant="bodyMedium" color={colors.textTertiary}>
+        {label}
+      </AppText>
+    </Pressable>
   );
 }
 
@@ -211,13 +232,15 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? { maxWidth: 640, width: "100%", alignSelf: "center" } : null),
   },
   grabber: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: 14 },
+  headline: { marginBottom: 12, marginTop: 4 },
+  link: { alignSelf: "center", paddingVertical: 12, paddingHorizontal: 16, minHeight: 44, justifyContent: "center" },
   sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   close: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   chargeHead: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 16 },
   chargeIcon: { width: 52, height: 52, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  ledger: { borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth, padding: 14, gap: 10 },
+  ledger: { borderRadius: radii.md, padding: 14, gap: 10 },
   ledgerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   ledgerDivider: { height: StyleSheet.hairlineWidth },
   notice: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm, marginTop: 12 },
-  actions: { gap: 8, marginTop: 16 },
+  actions: { gap: 4, marginTop: 16 },
 });

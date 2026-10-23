@@ -99,7 +99,7 @@ export default function VerifyCode() {
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </Pressable>
         <View style={{ gap: 6, marginBottom: space[6] }}>
-          <AppText variant="display">Enter the code</AppText>
+          <AppText variant="hero">enter the code</AppText>
           <AppText variant="body" tone="secondary">
             We sent a 6-digit code to <AppText variant="bodyMedium">{p.masked || p.phone}</AppText>.
           </AppText>

@@ -163,7 +163,7 @@ export default function AiSearch() {
                         </View>
                         <Button
                           label="Apply to map"
-                          variant="brand"
+                          variant="primary"
                           size="sm"
                           iconLeft="map"
                           onPress={() =>

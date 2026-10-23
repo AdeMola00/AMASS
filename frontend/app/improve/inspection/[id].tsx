@@ -190,7 +190,7 @@ export default function InspectionView() {
             ) : null}
 
             <View style={styles.ctaRow}>
-              <Button label="Apply for financing" variant="brand" size="lg" iconLeft="cash" onPress={() => router.push(`/improve/finance/apply/${doc.property_id}?inspection=${doc.id}` as any)} testID="apply-loan" style={{ flex: 1 }} />
+              <Button label="Apply for financing" variant="primary" size="lg" iconLeft="cash" onPress={() => router.push(`/improve/finance/apply/${doc.property_id}?inspection=${doc.id}` as any)} testID="apply-loan" style={{ flex: 1 }} />
               <Button label="Start project" size="lg" iconLeft="construct" onPress={() => router.push(`/improve/project/new?property=${doc.property_id}&inspection=${doc.id}` as any)} testID="start-project" style={{ flex: 1 }} />
             </View>
           </>

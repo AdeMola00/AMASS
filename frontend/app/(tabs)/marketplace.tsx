@@ -403,7 +403,7 @@ export default function Marketplace() {
             <Text style={styles.fixaSub}>Vetted pros — background-checked, rated & insured.</Text>
           </View>
           <View style={styles.fixaShield}>
-            <Ionicons name="shield-checkmark" size={18} color="#0A0A0A" />
+            <Ionicons name="shield-checkmark" size={18} color="#111111" />
           </View>
         </View>
       )}
@@ -594,7 +594,7 @@ export default function Marketplace() {
       <BlurView
         intensity={40}
         tint={isDark ? "dark" : "light"}
-        style={[styles.header, { paddingTop: insets.top + 6, backgroundColor: isDark ? "rgba(23,21,19,0.86)" : "rgba(255,255,255,0.80)" }]}
+        style={[styles.header, { paddingTop: insets.top + 6, backgroundColor: isDark ? "rgba(17,17,17,0.86)" : "rgba(247,246,243,0.86)" }]}
         onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
       >
         {/* Row 1: brand + location + actions */}
@@ -677,7 +677,7 @@ export default function Marketplace() {
                 testID={`mkt-tab-${s.key}`}
               >
                 {s.key === "fixa" && (
-                  <View style={[styles.segDot, active && { backgroundColor: "#22C55E" }]} />
+                  <View style={[styles.segDot, active && { backgroundColor: "#2E8B57" }]} />
                 )}
                 <Text style={[styles.segText, active && styles.segTextActive]}>{s.label}</Text>
               </Pressable>
@@ -787,7 +787,7 @@ function ChipTile({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chipTile, active && { backgroundColor: fill, borderColor: fill }]}
+      style={[styles.chipTile, active && { backgroundColor: fill }]}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       testID={testID}
@@ -847,8 +847,6 @@ const makeStyles = (colors: LegacyColors) =>
     paddingHorizontal: spacing.lg,
     paddingBottom: 10,
     gap: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
   },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -882,18 +880,15 @@ const makeStyles = (colors: LegacyColors) =>
     alignItems: "center",
     gap: 8,
     height: 46,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    ...shadows.soft,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSecondary,
+    paddingHorizontal: 16,
   },
   searchPlaceholder: { fontSize: 14, color: colors.textTertiary, fontFamily: F.regular, flex: 1 },
   filterBtn: {
     width: 46,
     height: 46,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
@@ -962,9 +957,7 @@ const makeStyles = (colors: LegacyColors) =>
     height: 38,
     paddingHorizontal: 14,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceSecondary,
   },
   chipTileText: { fontSize: 13, fontFamily: F.semibold, color: colors.textSecondary },
 
@@ -977,20 +970,18 @@ const makeStyles = (colors: LegacyColors) =>
     marginTop: 10,
     padding: 14,
     borderRadius: radius.lg,
-    backgroundColor: "#0A0A0A",
-    borderWidth: 1,
-    borderColor: "rgba(34,197,94,0.30)",
+    backgroundColor: "#111111",
   },
   fixaLogoImg: { width: 54, height: 54, borderRadius: 12, backgroundColor: "#000" },
   fixaShield: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "#22C55E",
+    backgroundColor: "#2E8B57",
     alignItems: "center",
     justifyContent: "center",
   },
-  fixaTitle: { color: "#22C55E", fontSize: 15, fontFamily: F.bold, letterSpacing: -0.2 },
+  fixaTitle: { color: "#40B575", fontSize: 15, fontFamily: F.bold, letterSpacing: -0.2 },
   fixaSub: { color: "rgba(255,255,255,0.72)", fontSize: 12, fontFamily: F.regular, marginTop: 2 },
 
   // Section header
@@ -1081,7 +1072,7 @@ const makeStyles = (colors: LegacyColors) =>
     height: 52,
     paddingHorizontal: 20,
     borderRadius: 26,
-    backgroundColor: colors.red,
+    backgroundColor: colors.ink,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,

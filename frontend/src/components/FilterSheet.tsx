@@ -368,9 +368,9 @@ const makeStyles = (colors: LegacyColors) =>
   applyBtn: {
     height: 54,
     borderRadius: radius.pill,
-    backgroundColor: colors.red,
+    backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
   },
-  applyText: { color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: -0.2 },
+  applyText: { color: "#fff", fontSize: 16, fontWeight: "500", letterSpacing: -0.2 },
 });

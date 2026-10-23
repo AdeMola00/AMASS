@@ -424,8 +424,9 @@ export default function HomeMap() {
 
       {/* Floating glass search + filters */}
       <View style={[styles.topOverlay, { top: searchTop }]} pointerEvents="box-none">
-        <View style={[styles.searchBar, shadows.md, { borderColor: isDark ? colors.border : "rgba(255,255,255,0.7)" }]}>
-          {Platform.OS === "ios" ? <BlurView intensity={80} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(23,21,19,0.96)" : "rgba(255,255,255,0.97)" }]} />}
+        <View style={[styles.searchBar, shadows.md]}>
+          {Platform.OS !== "web" ? <BlurView intensity={85} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : null}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(28,28,26,0.9)" : "rgba(255,255,255,0.88)" }]} />
           <AmassLogo size={22} showWordmark={false} style={{ marginLeft: -2 }} />
           <TextInput
             placeholder="Search city, area or landmark"
@@ -458,6 +459,8 @@ export default function HomeMap() {
           ) : null}
         </View>
         <View style={styles.chipsRowWrap}>
+          <View style={[styles.chipsGlass, shadows.sm]}>
+            {Platform.OS !== "web" ? <BlurView intensity={70} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.glass }]} />}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow} style={{ flex: 1 }}>
             {QUICK_FILTERS.map((f) => (
               <FilterChip
@@ -483,6 +486,7 @@ export default function HomeMap() {
               />
             ) : null}
           </ScrollView>
+          </View>
           <BalanceChip compact style={styles.balanceChip} testID="map-balance-chip" />
         </View>
       </View>
@@ -585,7 +589,7 @@ export default function HomeMap() {
       {/* Bottom stack: legend + locked banner */}
       <View style={[styles.bottomStack, { bottom: bottomStack }]} pointerEvents="box-none">
         {!loading && pins.length > 0 ? (
-          <View style={[styles.legend, shadows.md, { backgroundColor: colors.glass, borderColor: colors.border }]} testID="map-legend" accessibilityLabel={`${saleCount} for sale, ${rentCount} to rent in view`}>
+          <View style={[styles.legend, shadows.sm, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.9)" }]} testID="map-legend" accessibilityLabel={`${saleCount} for sale, ${rentCount} to rent in view`}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
               <AppText variant="micro" weight="bold" tabular>
@@ -633,7 +637,7 @@ export default function HomeMap() {
                 Your MASS balance is 0. Top up to unlock any property.
               </AppText>
             </View>
-            <Button label="Get MASS" variant="brand" size="sm" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="get-mass-btn" />
+            <Button label="Get MASS" variant="premium" size="sm" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="get-mass-btn" />
           </View>
         ) : null}
       </View>
@@ -699,12 +703,13 @@ function ActionBtn({ icon, onPress, testID, highlight = false, label, iconRotati
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topOverlay: { position: "absolute", left: space[3], right: space[3], gap: 10 },
-  searchBar: { flexDirection: "row", alignItems: "center", gap: 8, height: 54, paddingHorizontal: 12, borderRadius: radii.pill, overflow: "hidden", borderWidth: 1 },
+  searchBar: { flexDirection: "row", alignItems: "center", gap: 8, height: 54, paddingHorizontal: 12, borderRadius: radii.pill, overflow: "hidden" },
   searchInput: { flex: 1, fontSize: 15, fontFamily: "PlusJakartaSans-500", paddingVertical: 0 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   filterDot: { position: "absolute", top: -3, right: -3, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   chipsRowWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
-  chipsRow: { gap: 8, paddingRight: 8 },
+  chipsGlass: { flex: 1, borderRadius: radii.pill, overflow: "hidden", paddingVertical: 5, paddingHorizontal: 5 },
+  chipsRow: { gap: 6, paddingRight: 4 },
   balanceChip: { flexShrink: 0 },
   compassWrap: { position: "absolute", right: space[3] },
   rightActions: { position: "absolute", right: space[3], gap: 10 },
@@ -713,11 +718,11 @@ const styles = StyleSheet.create({
   statusPill: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, height: 44, borderRadius: radii.pill },
   statusCard: { alignItems: "center", gap: 8, padding: space[5], borderRadius: radii.lg, maxWidth: 320 },
   searchAreaWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
-  expoGoHint: { position: "absolute", left: space[3], flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(10,10,10,0.72)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill },
+  expoGoHint: { position: "absolute", left: space[3], flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(17,17,17,0.72)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill },
   permBanner: { position: "absolute", left: space[3], right: 72, flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth },
   permIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   bottomStack: { position: "absolute", left: space[3], right: space[3], gap: 10, alignItems: "flex-start" },
-  legend: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, height: 34, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth },
+  legend: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, height: 34, borderRadius: radii.pill },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   lockedBanner: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radii.lg },

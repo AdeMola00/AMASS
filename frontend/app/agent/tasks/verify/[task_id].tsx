@@ -238,7 +238,7 @@ export default function VerifyWizardScreen() {
               <Button
                 label={coords ? "Refresh GPS" : "Capture GPS now"}
                 iconLeft="locate"
-                variant="brand"
+                variant="primary"
                 size="lg"
                 fullWidth
                 loading={locBusy}
@@ -379,7 +379,7 @@ export default function VerifyWizardScreen() {
               <Button
                 label="Submit verification"
                 iconLeft="cloud-upload"
-                variant="brand"
+                variant="primary"
                 size="lg"
                 fullWidth
                 loading={submitting}

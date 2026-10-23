@@ -297,7 +297,7 @@ export default function ProjectTracker() {
         ) : null}
 
         <View style={{ paddingHorizontal: space[4] }}>
-          <Button label="Shop the Market" variant="brand" size="lg" fullWidth iconLeft="storefront" onPress={() => router.push("/(tabs)/marketplace" as any)} testID="shop-marketplace" />
+          <Button label="Shop the Market" variant="primary" size="lg" fullWidth iconLeft="storefront" onPress={() => router.push("/(tabs)/marketplace" as any)} testID="shop-marketplace" />
         </View>
       </ScrollView>
     </Screen>

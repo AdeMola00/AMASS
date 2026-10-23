@@ -24,8 +24,8 @@ import { api, Property } from "@/src/lib/api";
 import { formatNaira, formatMarkerPrice } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { useTheme } from "@/src/theme";
-import { motion, radii, space } from "@/src/theme/tokens";
-import { AppText, Avatar, Badge, Button, Card, EmptyState, IconButton, Skeleton, UnlockDialog, useToast } from "@/src/ui";
+import { gradients, motion, radii, space } from "@/src/theme/tokens";
+import { AppText, Avatar, Badge, Button, Card, EmptyState, IconButton, PressableScale, Skeleton, UnlockDialog, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { PropertyMarker } from "@/src/components/PropertyMarker";
 import { PriceText } from "@/src/components/PriceText";
@@ -236,8 +236,8 @@ export default function PropertyDetails() {
               )}
             />
           </Pressable>
-          <LinearGradient colors={["rgba(0,0,0,0.55)", "transparent"]} style={styles.topScrim} pointerEvents="none" />
-          <LinearGradient colors={["transparent", "rgba(0,0,0,0.45)"]} style={styles.bottomScrim} pointerEvents="none" />
+          <LinearGradient colors={["rgba(17,17,17,0.5)", "transparent"]} style={styles.topScrim} pointerEvents="none" />
+          <LinearGradient colors={[...gradients.scrim]} style={styles.bottomScrim} pointerEvents="none" />
           <SafeAreaView edges={["top"]} style={styles.topBar} pointerEvents="box-none">
             <Pressable
               onPress={() => router.back()}
@@ -319,7 +319,7 @@ export default function PropertyDetails() {
           </View>
 
           {/* Decide together — social context (never reveals paid info) */}
-          <View style={[styles.socialRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]} testID="social-row">
+          <View style={[styles.socialRow, { backgroundColor: colors.surfaceAlt }]} testID="social-row">
             {social?.saved_by?.length ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
                 <View style={{ flexDirection: "row" }}>
@@ -531,7 +531,7 @@ export default function PropertyDetails() {
                   {/* Contact Agent — opens in-app chat (always free, no number exposed) */}
                   <Button
                     label="Chat with Agent"
-                    variant="brand"
+                    variant="primary"
                     iconLeft="chatbubbles"
                     fullWidth
                     loading={chatBusy}
@@ -562,7 +562,7 @@ export default function PropertyDetails() {
             <View style={styles.improveActions}>
               <Button
                 label="Request Inspection"
-                variant="brand"
+                variant={isDark ? "primary" : "inverse"}
                 size="sm"
                 iconLeft="clipboard"
                 onPress={() => router.push(`/improve/request/${property.id}` as any)}
@@ -598,7 +598,7 @@ export default function PropertyDetails() {
       </ScrollView>
 
       {/* Sticky CTA */}
-      <View style={[styles.stickyCta, { paddingBottom: ctaBottomPad, backgroundColor: colors.glass, borderTopColor: colors.border }, shadows.lg]}>
+      <View style={[styles.stickyCta, { paddingBottom: ctaBottomPad, backgroundColor: colors.bgElevated }, shadows.lg]}>
         <Animated.View style={heartAnim}>
           <IconButton
             icon={favorited ? "heart" : "heart-outline"}
@@ -627,7 +627,7 @@ export default function PropertyDetails() {
             ) : (
               <Button
                 label="Chat with Agent · Free"
-                variant="brand"
+                variant="primary"
                 size="lg"
                 iconLeft="chatbubbles"
                 loading={chatBusy}
@@ -638,13 +638,14 @@ export default function PropertyDetails() {
             )}
           </>
         ) : (
-          <Pressable
-            style={({ pressed }) => [styles.unlockCta, { backgroundColor: pressed ? colors.brandPressed : colors.brand }, shadows.brand]}
+          <PressableScale
+            style={[styles.unlockCta, shadows.md]}
             onPress={openUnlock}
             testID="unlock-cta-btn"
             accessibilityRole="button"
             accessibilityLabel={`Unlock for ${accessCost} MASS. You have ${wallet?.spendable ?? 0} MASS`}
           >
+            <LinearGradient colors={[...gradients.premium]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
             <TokenIcon size={18} tone="white" />
             <View>
               <AppText variant="title" color="#fff">
@@ -654,7 +655,7 @@ export default function PropertyDetails() {
                 You have {(wallet?.spendable ?? 0).toLocaleString()} MASS · confirm before paying
               </AppText>
             </View>
-          </Pressable>
+          </PressableScale>
         )}
       </View>
       <UnlockDialog visible={unlockOpen} featureKey="property" targetId={property.id} onClose={() => setUnlockOpen(false)} onUnlocked={onUnlocked} />
@@ -813,7 +814,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(0,0,0,0.42)",
+    backgroundColor: "rgba(17,17,17,0.4)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -827,7 +828,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(17,17,17,0.55)",
   },
   dots: {
     position: "absolute",
@@ -842,14 +843,14 @@ const styles = StyleSheet.create({
   dot: { height: 6, borderRadius: 3, backgroundColor: "#fff" },
   heroBadge: { position: "absolute", top: 64, left: space[4] },
   sheet: {
-    marginTop: -28,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    marginTop: -32,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
     padding: space[5],
   },
   badgeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   locRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
-  socialRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, padding: 10, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth },
+  socialRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, padding: 10, borderRadius: radii.md },
   valPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -961,7 +962,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     padding: space[4],
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
   },
   unlockCta: {
     flex: 1,
@@ -972,6 +974,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingHorizontal: 16,
+    overflow: "hidden",
   },
   fullscreen: { flex: 1, backgroundColor: "#000" },
   fullscreenTopBar: {

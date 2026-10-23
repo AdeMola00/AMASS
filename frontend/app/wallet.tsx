@@ -8,8 +8,8 @@ import * as Haptics from "expo-haptics";
 import { api, Currency, WalletTransaction } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
-import { radii, space } from "@/src/theme/tokens";
-import { AnimatedNumber, AppText, Badge, Card, Chip, EmptyState, IconButton, ListRow, RowGroup, Screen, ScreenHeader, Section, SkeletonRows, StatTile, useToast, type IconName } from "@/src/ui";
+import { gradients, radii, space } from "@/src/theme/tokens";
+import { AnimatedNumber, AppText, Badge, Card, Chip, EmptyState, IconButton, ListRow, PressableScale, RowGroup, Screen, ScreenHeader, Section, SkeletonRows, StatTile, useToast, type IconName } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 type TxFilter = "all" | "MASS" | "FIX";
@@ -132,7 +132,7 @@ export default function WalletScreen() {
       >
         {/* MASS hero */}
         <View style={{ paddingHorizontal: space[4], gap: space[3] }}>
-          <LinearGradient colors={isDark ? ["#1F1D1A", "#141210"] : ["#1A1816", "#0A0A0A"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="mass-card">
+          <LinearGradient colors={isDark ? ["#292926", "#1C1C1A"] : ["#1C1C1A", "#111111"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="mass-card">
             <View style={styles.heroCoin}>
               <TokenIcon size={150} animated />
             </View>
@@ -147,7 +147,7 @@ export default function WalletScreen() {
               </AppText>
             </View>
             <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
-              <AnimatedNumber value={massBalance} variant="display" color="#fff" style={{ fontSize: 48, lineHeight: 54 }} testID="mass-balance" />
+              <AnimatedNumber value={massBalance} variant="heroLg" color="#fff" style={{ fontSize: 52, lineHeight: 58 }} testID="mass-balance" />
               <AppText variant="title" color={colors.mass}>
                 MASS
               </AppText>
@@ -165,7 +165,7 @@ export default function WalletScreen() {
           </LinearGradient>
 
           <View style={styles.actions}>
-            <QuickAction icon="add" label="Buy MASS" tone="brand" onPress={() => router.push("/buy-tokens")} />
+            <QuickAction icon="add" label="Buy MASS" tone="premium" onPress={() => router.push("/buy-tokens")} />
             <QuickAction icon="star" label="Subscribe" onPress={() => router.push("/subscribe")} />
             <QuickAction icon="gift" label="Earn" onPress={() => router.push("/earn")} />
           </View>
@@ -191,39 +191,39 @@ export default function WalletScreen() {
 
         {/* FIX card */}
         <View style={{ paddingHorizontal: space[4], gap: space[3] }}>
-          <LinearGradient colors={isDark ? ["#0F2A1D", "#0A1F16"] : ["#0B3B2A", "#052E1F"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { borderColor: "rgba(34,197,94,0.25)" }]} testID="fix-card">
-            <View style={[styles.heroCoin, { opacity: 0.12 }]}>
-              <Ionicons name="construct" size={120} color="#22C55E" />
+          <View style={[styles.hero, { backgroundColor: colors.surfaceAlt, borderWidth: 0 }]} testID="fix-card">
+            <View style={[styles.heroCoin, { opacity: 0.1 }]}>
+              <Ionicons name="construct" size={120} color={colors.fix} />
             </View>
             <View style={styles.heroTop}>
               <View style={[styles.ccyTag, { backgroundColor: colors.fix, flexDirection: "row", gap: 4 }]}>
-                <Ionicons name="shield-checkmark" size={10} color="#052E1F" />
-                <AppText variant="micro" color="#052E1F">
+                <Ionicons name="shield-checkmark" size={10} color="#fff" />
+                <AppText variant="micro" color="#fff">
                   FIX
                 </AppText>
               </View>
-              <AppText variant="caption" color="rgba(255,255,255,0.6)">
+              <AppText variant="caption" tone="tertiary">
                 FIXA service tokens
               </AppText>
             </View>
             <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
-              <AnimatedNumber value={fixBalance} variant="display" color="#fff" style={{ fontSize: 48, lineHeight: 54 }} testID="fix-balance" />
-              <AppText variant="title" color={colors.fix}>
+              <AnimatedNumber value={fixBalance} variant="heroLg" color={colors.text} style={{ fontSize: 52, lineHeight: 58 }} testID="fix-balance" />
+              <AppText variant="title" color={colors.fixText}>
                 FIX
               </AppText>
             </View>
-            <AppText variant="caption" color="rgba(255,255,255,0.65)" tabular testID="fix-balance-ngn">
+            <AppText variant="caption" tone="tertiary" tabular testID="fix-balance-ngn">
               {ngn(fixBalance, "FIX")} · 1 FIX = ₦{conversion.FIX_ngn}
             </AppText>
-            <View style={styles.heroSplit}>
-              <HeroStat label="Earned lifetime" value={fixEarned} />
-              <View style={styles.heroDivider} />
-              <HeroStat label="Spent lifetime" value={fixUsed} />
+            <View style={[styles.heroSplit, { borderTopColor: colors.border }]}>
+              <HeroStat label="Earned lifetime" value={fixEarned} tone="ink" />
+              <View style={[styles.heroDivider, { backgroundColor: colors.border }]} />
+              <HeroStat label="Spent lifetime" value={fixUsed} tone="ink" />
             </View>
-          </LinearGradient>
+          </View>
 
           <View style={styles.actions}>
-            <QuickAction icon="add" label="Buy FIX" tone="fix" onPress={() => router.push("/buy-fix" as any)} />
+            <QuickAction icon="add" label="Buy FIX" tone="premium" onPress={() => router.push("/buy-fix" as any)} />
             <QuickAction icon="trending-up" label="Earn FIX" onPress={() => router.push("/earn-fix" as any)} />
             <QuickAction icon="construct" label="Browse FIXA" onPress={() => router.push("/fixa" as any)} />
           </View>
@@ -350,53 +350,52 @@ export default function WalletScreen() {
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: number }) {
+function HeroStat({ label, value, tone = "inverse" }: { label: string; value: number; tone?: "inverse" | "ink" }) {
+  const { colors } = useTheme();
+  const inverse = tone === "inverse";
   return (
     <View style={{ flex: 1, gap: 2 }}>
-      <AppText variant="micro" color="rgba(255,255,255,0.55)" uppercase>
+      <AppText variant="micro" color={inverse ? "rgba(255,255,255,0.55)" : colors.textTertiary} uppercase>
         {label}
       </AppText>
-      <AppText variant="title" color="#fff" tabular>
+      <AppText variant="title" color={inverse ? "#fff" : colors.text} tabular>
         {value.toLocaleString()}
       </AppText>
     </View>
   );
 }
 
-function QuickAction({ icon, label, onPress, tone = "default" }: { icon: IconName; label: string; onPress: () => void; tone?: "default" | "brand" | "fix" }) {
-  const { colors, shadows } = useTheme();
-  const bg = tone === "brand" ? colors.brand : tone === "fix" ? colors.fix : colors.surface;
-  const fg = tone === "brand" ? "#fff" : tone === "fix" ? "#052E1F" : colors.text;
+function QuickAction({ icon, label, onPress, tone = "default" }: { icon: IconName; label: string; onPress: () => void; tone?: "default" | "premium" }) {
+  const { colors } = useTheme();
+  const premium = tone === "premium";
   return (
-    <Pressable
-      onPress={() => {
-        Haptics.selectionAsync().catch(() => {});
-        onPress();
-      }}
+    <PressableScale
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
       testID={`wallet-action-${label.toLowerCase().replace(/\s+/g, "-")}`}
-      style={({ pressed }) => [styles.quick, { backgroundColor: bg, borderColor: tone === "default" ? colors.border : "transparent" }, shadows.xs, pressed && { transform: [{ scale: 0.97 }] }]}
+      style={[styles.quick, { backgroundColor: premium ? "transparent" : colors.surfaceAlt }]}
     >
-      <View style={[styles.quickIcon, { backgroundColor: tone === "default" ? colors.surfaceAlt : "rgba(255,255,255,0.18)" }]}>
-        <Ionicons name={icon} size={20} color={fg} />
+      {premium ? <LinearGradient colors={[...gradients.premium]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} /> : null}
+      <View style={[styles.quickIcon, { backgroundColor: premium ? "rgba(255,255,255,0.2)" : colors.surface }]}>
+        <Ionicons name={icon} size={20} color={premium ? "#fff" : colors.text} />
       </View>
-      <AppText variant="caption" weight="bold" color={fg}>
+      <AppText variant="caption" color={premium ? "#fff" : colors.text}>
         {label}
       </AppText>
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: { borderRadius: radii.xl, padding: 20, gap: 14, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  hero: { borderRadius: radii.xl, padding: 20, gap: 14, overflow: "hidden" },
   heroCoin: { position: "absolute", right: -36, top: -36, opacity: 0.16 },
   heroTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   ccyTag: { paddingHorizontal: 8, height: 20, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
   heroSplit: { flexDirection: "row", gap: 14, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.1)", paddingTop: 14 },
   heroDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.1)" },
   actions: { flexDirection: "row", gap: space[3] },
-  quick: { flex: 1, alignItems: "center", gap: 8, paddingVertical: 14, borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth },
+  quick: { flex: 1, alignItems: "center", gap: 8, paddingVertical: 14, borderRadius: radii.lg, overflow: "hidden" },
   quickIcon: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   rowCenter: { flexDirection: "row", alignItems: "center", gap: 14 },
   roundIcon: { width: 44, height: 44, borderRadius: 16, alignItems: "center", justifyContent: "center" },

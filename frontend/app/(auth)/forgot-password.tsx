@@ -100,7 +100,7 @@ export default function ForgotPassword() {
         <View style={styles.header}>
           <AmassLogo size="lg" />
           <View style={{ gap: 6 }}>
-            <AppText variant="display">{step === "request" ? "Reset your password" : "Enter reset code"}</AppText>
+            <AppText variant="hero">{step === "request" ? "reset your password" : "enter reset code"}</AppText>
             <AppText variant="body" tone="secondary">
               {step === "request" ? "Enter your account email and we'll send you a 6-digit reset code." : `We sent a code to ${email}. It expires in 15 minutes.`}
             </AppText>

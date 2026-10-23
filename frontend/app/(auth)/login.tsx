@@ -60,7 +60,7 @@ export default function Login() {
         <View style={styles.header}>
           <AmassLogo size="xl" />
           <View style={{ gap: 6 }}>
-            <AppText variant="display">Welcome back</AppText>
+            <AppText variant="hero">welcome back</AppText>
             <AppText variant="body" tone="secondary">
               Sign in to continue exploring properties across Africa.
             </AppText>
@@ -106,7 +106,7 @@ export default function Login() {
           <View style={styles.forgotRow}>
             <Link href="/(auth)/forgot-password" asChild>
               <Pressable hitSlop={8} testID="forgot-password-link" accessibilityRole="link">
-                <AppText variant="caption" weight="bold">
+                <AppText variant="caption">
                   Forgot password?
                 </AppText>
               </Pressable>
@@ -121,7 +121,7 @@ export default function Login() {
             </View>
           )}
 
-          <Button label="Sign In" size="lg" fullWidth variant="secondary" loading={loading} onPress={submit} testID="login-submit-button" />
+          <Button label="Sign In" size="lg" fullWidth loading={loading} onPress={submit} testID="login-submit-button" />
 
           <View style={styles.divider}>
             <Divider style={{ flex: 1 }} />
@@ -142,7 +142,7 @@ export default function Login() {
             </AppText>
             <Link href="/(auth)/register" asChild>
               <Pressable testID="go-to-register" accessibilityRole="link" hitSlop={8}>
-                <AppText variant="bodySm" weight="bold">
+                <AppText variant="bodySm">
                   Create an account
                 </AppText>
               </Pressable>

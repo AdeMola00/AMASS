@@ -166,7 +166,7 @@ export default function AgentWorkspace() {
               <AppText variant="label" color="rgba(255,255,255,0.6)" uppercase>
                 Paid lifetime
               </AppText>
-              <AppText variant="display" color="#fff" tabular numberOfLines={1} adjustsFontSizeToFit>
+              <AppText variant="heroLg" color="#fff" tabular numberOfLines={1} adjustsFontSizeToFit>
                 {formatNaira(summary?.paid_ngn ?? 0)}
               </AppText>
               <View style={styles.heroPill}>

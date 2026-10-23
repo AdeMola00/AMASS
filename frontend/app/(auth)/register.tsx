@@ -70,7 +70,7 @@ export default function Register() {
         <View style={styles.header}>
           <AmassLogo size="lg" />
           <View style={{ gap: 6 }}>
-            <AppText variant="display">Create your account</AppText>
+            <AppText variant="hero">create your account</AppText>
             <AppText variant="body" tone="secondary">
               Join thousands discovering premium properties across Africa.
             </AppText>

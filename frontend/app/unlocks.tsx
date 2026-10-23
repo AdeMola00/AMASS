@@ -169,7 +169,7 @@ export default function UnlocksScreen() {
           <Button label="Not now" variant="secondary" size="lg" onPress={() => setReport(null)} disabled={reporting} style={{ flex: 1 }} testID="report-cancel" />
           <Button
             label={report ? `Credit ${report.entitlement.amount_paid} MASS` : "Credit"}
-            variant="brand"
+            variant="primary"
             size="lg"
             iconLeft="refresh-circle"
             onPress={submitReport}

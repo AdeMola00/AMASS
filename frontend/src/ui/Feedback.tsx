@@ -12,7 +12,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { useTheme } from "@/src/theme";
-import { radii, space, motion } from "@/src/theme/tokens";
+import { radii, space, motion, TypeVariant } from "@/src/theme/tokens";
 import { AppText } from "./Text";
 import { Button } from "./Button";
 
@@ -66,7 +66,7 @@ export function SkeletonRows({ rows = 4, style }: { rows?: number; style?: ViewS
 export function SkeletonCard({ imageHeight = 160, style }: { imageHeight?: number; style?: ViewStyle }) {
   const { colors } = useTheme();
   return (
-    <View style={[{ borderRadius: radii.lg, overflow: "hidden", backgroundColor: colors.surface }, style]}>
+    <View style={[{ borderRadius: radii.lg, overflow: "hidden", backgroundColor: colors.surfaceAlt }, style]}>
       <Skeleton height={imageHeight} radius={0} />
       <View style={{ padding: 14, gap: 8 }}>
         <Skeleton height={20} width="55%" />
@@ -150,7 +150,7 @@ export function AnimatedNumber({
   format?: (n: number) => string;
   style?: any;
   color?: string;
-  variant?: "display" | "h1" | "h2" | "h3" | "title";
+  variant?: TypeVariant;
   testID?: string;
 }) {
   const reduce = useReducedMotion();
@@ -216,9 +216,9 @@ export function StatTile({
   testID?: string;
   animate?: boolean;
 }) {
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   const map = {
-    default: { bg: colors.surfaceAlt, fg: colors.text },
+    default: { bg: colors.surface, fg: colors.text },
     brand: { bg: colors.brandSoft, fg: colors.brand },
     mass: { bg: colors.massSoft, fg: colors.massText },
     fix: { bg: colors.fixSoft, fg: colors.fixText },
@@ -256,7 +256,7 @@ export function StatTile({
       </AppText>
     </>
   );
-  const base = [styles.stat, { backgroundColor: colors.surface, borderColor: colors.border }, shadows.xs, style];
+  const base = [styles.stat, { backgroundColor: colors.surfaceAlt }, style];
   if (onPress) {
     return (
       <Pressable
@@ -280,7 +280,7 @@ export function StatTile({
 const styles = StyleSheet.create({
   empty: { alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: space[10], paddingHorizontal: space[6] },
   emptyIcon: { width: 72, height: 72, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 6 },
-  stat: { flex: 1, padding: 14, borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, gap: 6, minHeight: 100, justifyContent: "space-between" },
+  stat: { flex: 1, padding: 14, borderRadius: radii.lg, gap: 6, minHeight: 100, justifyContent: "space-between" },
   statTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   statIcon: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   delta: { flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 6, height: 18, borderRadius: 9 },

@@ -130,7 +130,7 @@ export default function ProviderDashboard() {
                 Available FIX
               </AppText>
               <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
-                <AnimatedNumber value={fixBalance} variant="display" color="#fff" testID="provider-fix-balance" />
+                <AnimatedNumber value={fixBalance} variant="heroLg" color="#fff" testID="provider-fix-balance" />
                 <AppText variant="title" color={colors.fix}>
                   FIX
                 </AppText>

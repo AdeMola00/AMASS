@@ -54,7 +54,7 @@ export default function AgentScoreScreen() {
         <ScrollView contentContainerStyle={{ padding: space[4], paddingBottom: insets.bottom + 40, gap: space[4] }} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <View style={[styles.scoreRing, { backgroundColor: colors.surfaceInverse }]} accessibilityLabel={`Score ${data.score} out of 100`}>
-              <AnimatedNumber value={data.score} variant="display" color={colors.textInverse} testID="score-value" />
+              <AnimatedNumber value={data.score} variant="heroLg" color={colors.textInverse} testID="score-value" />
               <AppText variant="caption" color={colors.textMuted}>
                 out of 100
               </AppText>

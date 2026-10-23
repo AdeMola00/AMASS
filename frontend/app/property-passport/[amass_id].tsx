@@ -387,7 +387,7 @@ export default function PropertyPassportScreen() {
           <Button
             label="Enquire about this property"
             iconLeft="chatbubbles"
-            variant="brand"
+            variant="primary"
             size="lg"
             fullWidth
             onPress={() => {

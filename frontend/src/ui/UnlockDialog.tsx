@@ -150,7 +150,7 @@ export function UnlockDialog({
           {isMass ? <TokenIcon size={30} /> : <Ionicons name="construct" size={24} color={accentText} />}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <AppText variant="h3">{isMass ? "Unlock property details" : "Unlock provider contact"}</AppText>
+          <AppText variant="heroSm">{isMass ? "unlock this home" : "unlock this provider"}</AppText>
           <AppText variant="bodySm" tone="secondary" numberOfLines={2} testID="unlock-item-label">
             {loading || !quote ? "Checking the live price…" : quote.label}
           </AppText>
@@ -167,7 +167,7 @@ export function UnlockDialog({
         </View>
       ) : (
         <>
-          <View style={[styles.ledger, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]} accessibilityRole="summary">
+          <View style={[styles.ledger, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="summary">
             <Row label="Fee" value={`${fmt(quote.fee)} ${currency}`} sub={`≈ ₦${fmt(quote.fee_ngn)}`} strong color={accentText} testID="unlock-fee" />
             <Row label="Your balance" value={`${fmt(quote.balance)} ${currency}`} sub={`≈ ₦${fmt(quote.balance * quote.token_ngn)}`} testID="unlock-balance" />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -208,7 +208,7 @@ export function UnlockDialog({
             {canAfford ? (
               <Button
                 label={confirming ? "Unlocking…" : "Confirm and View"}
-                variant="brand"
+                variant="premium"
                 size="lg"
                 onPress={confirm}
                 disabled={confirming}
@@ -217,7 +217,7 @@ export function UnlockDialog({
                 testID="unlock-confirm"
               />
             ) : (
-              <Button label={`Fund Wallet · ${currency}`} variant="brand" size="lg" iconLeft="add-circle" onPress={fund} style={{ flex: 1.4 }} testID="unlock-fund" />
+              <Button label={`Fund Wallet · ${currency}`} variant="premium" size="lg" iconLeft="add-circle" onPress={fund} style={{ flex: 1.4 }} testID="unlock-fund" />
             )}
           </View>
         </>
@@ -251,7 +251,7 @@ function Row({ label, value, sub, strong, color, testID }: { label: string; valu
 const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: space[3] },
   icon: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
-  ledger: { borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth, padding: space[3], gap: 12 },
+  ledger: { borderRadius: radii.md, padding: space[3], gap: 12 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 36 },
   divider: { height: StyleSheet.hairlineWidth },
   noteRow: { flexDirection: "row", gap: 8, alignItems: "flex-start", marginTop: space[3] },

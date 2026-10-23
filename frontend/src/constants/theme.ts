@@ -4,50 +4,50 @@ import { Platform } from "react-native";
 
 export const colors = {
   // Surfaces — mirror src/theme lightTheme (warm stone neutrals)
-  bg: "#FAFAF9",
-  bgAlt: "#F5F5F4",
+  bg: "#F7F6F3",
+  bgAlt: "#EAE8E3",
   surface: "#FFFFFF",
-  surfaceSecondary: "#F5F5F4",
-  surfaceTertiary: "#E9E8E6",
-  surfaceInverse: "#0A0A0A",
+  surfaceSecondary: "#EAE8E3",
+  surfaceTertiary: "#E3E1DC",
+  surfaceInverse: "#111111",
 
   // Text
-  text: "#0A0A0A",
-  textSecondary: "#57534E",
-  textTertiary: "#7A756E",
-  textMuted: "#A8A49E",
+  text: "#111111",
+  textSecondary: "#5C5C59",
+  textTertiary: "#8A8A85",
+  textMuted: "#A3A39E",
   textInverse: "#FFFFFF",
 
   // BRAND — driven by the logo
   red: "#E11B22",         // AMASS red (pin)
-  redDark: "#C4161C",
-  redLight: "#FDE3E3",
-  redSurface: "#FEF2F2",
+  redDark: "#B8151A",
+  redLight: "#FAD4D6",
+  redSurface: "#FCE8E9",
 
   // Charcoal black — used as premium primary/interactive alongside red
-  ink: "#0A0A0A",
-  inkSoft: "#1A1816",
-  inkSurface: "#171513",
+  ink: "#111111",
+  inkSoft: "#292926",
+  inkSurface: "#1C1C1A",
 
   // Legacy accent kept for success chips only
-  gold: "#D99A06",
-  goldLight: "#FEF3C7",
+  gold: "#D4AF37",
+  goldLight: "#FAF5E5",
 
   // Semantic state colors
-  success: "#16A34A",
-  warning: "#D97706",
-  error: "#C4161C",
-  info: "#2563EB",
+  success: "#2E8B57",
+  warning: "#C99E0E",
+  error: "#E11B22",
+  info: "#4F46E5",
 
   // Borders
-  border: "#E9E8E6",
-  borderStrong: "#D6D4D1",
-  divider: "#F5F5F4",
+  border: "#E5E3DE",
+  borderStrong: "#CCC9C2",
+  divider: "#EAE8E3",
 
   // Status ring colors for map markers
-  statusAvailable: "#0A0A0A",
+  statusAvailable: "#111111",
   statusComingSoon: "#F59E0B",
-  statusVerified: "#0A0A0A",
+  statusVerified: "#111111",
   statusPremium: "#8B5CF6",
   statusSold: "#71717A",
   statusHot: "#E11B22",
@@ -55,16 +55,16 @@ export const colors = {
   statusReduced: "#B45309",
 
   // Glass
-  glassLight: "rgba(255,255,255,0.78)",
-  glassDark: "rgba(10,10,10,0.55)",
+  glassLight: "rgba(255,255,255,0.75)",
+  glassDark: "rgba(17,17,17,0.55)",
   scrim: "rgba(0,0,0,0.35)",
 
   // ─── LEGACY ALIASES (kept so existing imports still compile) ───
   // These map former "emerald" / "info" tokens to the new red-black identity.
-  emerald: "#0A0A0A",         // was primary green → now premium black
-  emeraldDark: "#000000",
-  emeraldLight: "#F5F5F4",
-  emeraldSurface: "#F5F5F4",
+  emerald: "#111111",         // was primary green → now premium black
+  emeraldDark: "#111111",
+  emeraldLight: "#EAE8E3",
+  emeraldSurface: "#EAE8E3",
 } as const;
 
 export const spacing = {
@@ -89,24 +89,24 @@ export const radius = {
 export const shadows = {
   card: {
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 18,
+    elevation: 4,
   },
   soft: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   floating: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.16,
-    shadowRadius: 32,
-    elevation: 12,
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    elevation: 8,
   },
   pin: {
     shadowColor: "#E11B22",
@@ -118,14 +118,14 @@ export const shadows = {
 } as const;
 
 export const typography = {
-  display: { fontSize: 34, fontWeight: "800" as const, letterSpacing: -1 },
-  h1: { fontSize: 28, fontWeight: "800" as const, letterSpacing: -0.6 },
-  h2: { fontSize: 22, fontWeight: "700" as const, letterSpacing: -0.4 },
-  h3: { fontSize: 18, fontWeight: "700" as const, letterSpacing: -0.2 },
+  display: { fontSize: 34, fontWeight: "500" as const, letterSpacing: -1 },
+  h1: { fontSize: 28, fontWeight: "500" as const, letterSpacing: -0.8 },
+  h2: { fontSize: 22, fontWeight: "500" as const, letterSpacing: -0.5 },
+  h3: { fontSize: 18, fontWeight: "500" as const, letterSpacing: -0.3 },
   body: { fontSize: 15, fontWeight: "500" as const },
-  bodyBold: { fontSize: 15, fontWeight: "700" as const },
+  bodyBold: { fontSize: 15, fontWeight: "500" as const },
   caption: { fontSize: 13, fontWeight: "500" as const },
-  micro: { fontSize: 11, fontWeight: "600" as const, letterSpacing: 0.4 },
+  micro: { fontSize: 11, fontWeight: "500" as const, letterSpacing: 0.4 },
 } as const;
 
 // Premium serif font stack — for prices & luxury headlines (magazine feel).
@@ -148,20 +148,20 @@ export const fonts = {  serif: Platform.select({
 export const fontFamily = {
   regular: "PlusJakartaSans-400",
   medium: "PlusJakartaSans-500",
-  semibold: "PlusJakartaSans-600",
-  bold: "PlusJakartaSans-700",
-  extrabold: "PlusJakartaSans-800",
+  semibold: "PlusJakartaSans-500",
+  bold: "PlusJakartaSans-500",
+  extrabold: "PlusJakartaSans-500",
 } as const;
 
 // Currency accents — MASS (gold) and FIX (FIXA green) so users can always tell
 // the two wallets apart at a glance. Mirrors src/theme tokens for legacy screens.
 export const currency = {
-  mass: "#F5B301",
-  massText: "#A16207",
-  massSoft: "#FEF3C7",
-  fix: "#22C55E",
-  fixText: "#15803D",
-  fixSoft: "#DCFCE7",
+  mass: "#D4AF37",
+  massText: "#8A6D14",
+  massSoft: "#FAF5E5",
+  fix: "#2E8B57",
+  fixText: "#1C5E39",
+  fixSoft: "#EAF4ED",
 } as const;
 
 // Format naira nicely: ₦145M, ₦8.5M, ₦65k

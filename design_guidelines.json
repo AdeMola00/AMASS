@@ -1,39 +1,135 @@
 {
-  "app_name": "AMASS Market",
-  "personality": "1 iOS-Native Clean",
-  "personality_one_liner": "A premium, minimalist, and highly readable marketplace that lets the property and service content be the undeniable hero.",
+  "app_name": "Amass",
+  "personality": "3 Editorial structure with 1 iOS-Native Clean utility",
+  "personality_one_liner": "Warm, premium, photo-led real estate marketplace with editorial elegance and ink-black tactility.",
   "color": {
     "surface": "#FFFFFF",
-    "onSurface": "#0A0A0A",
-    "surfaceSecondary": "#F5F5F5",
-    "onSurfaceSecondary": "#3F3F46",
-    "surfaceTertiary": "#FAFAFA",
-    "onSurfaceTertiary": "#71717A",
-    "surfaceInverse": "#0A0A0A",
+    "onSurface": "#111111",
+    "surfaceSecondary": "#EAE8E3",
+    "onSurfaceSecondary": "#111111",
+    "surfaceTertiary": "#E3E1DC",
+    "onSurfaceTertiary": "#5C5C59",
+    "surfaceInverse": "#111111",
     "onSurfaceInverse": "#FFFFFF",
     "brand": "#E11B22",
-    "onBrand": "#FFFFFF",
-    "brandPrimary": "#E11B22",
+    "brandPrimary": "#111111",
     "onBrandPrimary": "#FFFFFF",
-    "brandSecondary": "#B7141A",
-    "onBrandSecondary": "#FFFFFF",
-    "brandTertiary": "#FEF2F2",
+    "brandSecondary": "#EAE8E3",
+    "onBrandSecondary": "#111111",
+    "brandTertiary": "#FCE8E9",
     "onBrandTertiary": "#E11B22",
-    "success": "#22C55E",
+    "success": "#2E8B57",
     "onSuccess": "#FFFFFF",
-    "warning": "#F59E0B",
-    "onWarning": "#FFFFFF",
-    "error": "#EF4444",
+    "warning": "#E8B815",
+    "onWarning": "#111111",
+    "error": "#E11B22",
     "onError": "#FFFFFF",
-    "info": "#3B82F6",
+    "info": "#4F46E5",
     "onInfo": "#FFFFFF",
-    "border": "#EAEAEA",
-    "borderStrong": "#D4D4D8",
-    "divider": "#F4F4F5",
-    "muted": "#A1A1AA"
+    "border": "#E5E3DE",
+    "borderStrong": "#CCC9C2",
+    "divider": "#EAE8E3",
+    "muted": "#A3A39E",
+    "onBrand": "#FFFFFF"
+  },
+  "lightTheme": {
+    "bg": "#F7F6F3",
+    "bgElevated": "#FFFFFF",
+    "surface": "#FFFFFF",
+    "surfaceAlt": "#EAE8E3",
+    "surfaceSunken": "#E3E1DC",
+    "surfaceInverse": "#111111",
+    "overlay": "rgba(17, 17, 17, 0.4)",
+    "scrim": "rgba(17, 17, 17, 0.7)",
+    "glass": "rgba(255, 255, 255, 0.75)",
+    "text": "#111111",
+    "textSecondary": "#5C5C59",
+    "textTertiary": "#8A8A85",
+    "textMuted": "#A3A39E",
+    "textInverse": "#FFFFFF",
+    "primary": "#111111",
+    "primaryPressed": "#2A2A2A",
+    "primarySoft": "#EAE8E3",
+    "onPrimary": "#FFFFFF",
+    "brand": "#E11B22",
+    "brandPressed": "#B8151A",
+    "brandSoft": "#FCE8E9",
+    "onBrand": "#FFFFFF",
+    "mass": "#D4AF37",
+    "massText": "#8A6D14",
+    "massSoft": "#FAF5E5",
+    "fix": "#2E8B57",
+    "fixText": "#1C5E39",
+    "fixSoft": "#EAF4ED",
+    "success": "#2E8B57",
+    "successSoft": "#EAF4ED",
+    "warning": "#E8B815",
+    "warningSoft": "#FCF7E6",
+    "error": "#E11B22",
+    "errorSoft": "#FCE8E9",
+    "info": "#4F46E5",
+    "infoSoft": "#EEF2FF",
+    "premium": "#4F46E5",
+    "premiumSoft": "#EEF2FF",
+    "border": "#E5E3DE",
+    "borderStrong": "#CCC9C2",
+    "divider": "#EAE8E3",
+    "focusRing": "rgba(225, 27, 34, 0.3)",
+    "skeleton": "#E5E3DE",
+    "skeletonHighlight": "#F7F6F3",
+    "tabBar": "rgba(247, 246, 243, 0.9)",
+    "tabBarBorder": "transparent"
+  },
+  "darkTheme": {
+    "bg": "#111111",
+    "bgElevated": "#1C1C1A",
+    "surface": "#1C1C1A",
+    "surfaceAlt": "#292926",
+    "surfaceSunken": "#0A0A09",
+    "surfaceInverse": "#F7F6F3",
+    "overlay": "rgba(0, 0, 0, 0.6)",
+    "scrim": "rgba(0, 0, 0, 0.8)",
+    "glass": "rgba(28, 28, 26, 0.8)",
+    "text": "#F7F6F3",
+    "textSecondary": "#A3A39E",
+    "textTertiary": "#7A7A75",
+    "textMuted": "#5C5C59",
+    "textInverse": "#111111",
+    "primary": "#F7F6F3",
+    "primaryPressed": "#E0DFDC",
+    "primarySoft": "#292926",
+    "onPrimary": "#111111",
+    "brand": "#E11B22",
+    "brandPressed": "#FA3D44",
+    "brandSoft": "#3D1012",
+    "onBrand": "#FFFFFF",
+    "mass": "#E8C95C",
+    "massText": "#F2E3A3",
+    "massSoft": "#362E10",
+    "fix": "#40B575",
+    "fixText": "#9EE6C0",
+    "fixSoft": "#123321",
+    "success": "#40B575",
+    "successSoft": "#123321",
+    "warning": "#E8C95C",
+    "warningSoft": "#362E10",
+    "error": "#FA3D44",
+    "errorSoft": "#3D1012",
+    "info": "#6366F1",
+    "infoSoft": "#23224F",
+    "premium": "#6366F1",
+    "premiumSoft": "#23224F",
+    "border": "#333330",
+    "borderStrong": "#4D4D47",
+    "divider": "#292926",
+    "focusRing": "rgba(225, 27, 34, 0.5)",
+    "skeleton": "#292926",
+    "skeletonHighlight": "#3D3D39",
+    "tabBar": "rgba(17, 17, 17, 0.9)",
+    "tabBarBorder": "transparent"
   },
   "typography": {
-    "displayFontFamily": "Plus Jakarta Sans",
+    "displayFontFamily": "DM Serif Display",
     "textFontFamily": "Plus Jakarta Sans",
     "scale": {
       "sm": 12,
@@ -43,8 +139,13 @@
       "2xl": 24
     }
   },
+  "typography_adjustments": {
+    "editorial_usage": "Use lowercase DM Serif Display exclusively for expressive large bottom sheet headlines and onboarding primary questions. Everything else uses Plus Jakarta Sans.",
+    "weight_restrictions": "Cap font weight at 500. Use typography scale instead of heavy weights to establish hierarchy. Bolder variants from the old theme should map to 500, tighter tracking for headers.",
+    "serif_usage": "Keep DM Serif Display ONLY for 'premium' touchpoints: onboarding hero text, massive numeric stats (wallet balance), and bottom sheet expressive titles."
+  },
   "spacing": {
-    "rule": "Generous vertical padding, comfortable touch targets. Minimal nesting. Use flex gaps over margins.",
+    "rule": "Generous spacing. Off-white canvas acts as a breathing frame around soft grey cards. Minimum md (12pt) padding inside cards, xl (24pt) between distinct sections.",
     "xs": 4,
     "sm": 8,
     "md": 12,
@@ -56,22 +157,25 @@
   "radius_tokens": {
     "sm": 6,
     "md": 12,
-    "lg": 16,
+    "lg": 20,
+    "xl": 24,
+    "xxl": 32,
     "pill": 999
   },
-  "shadow_tier": 1,
+  "shadow_tier": "1",
   "navigation": "bottom_tabs",
-  "icon_set": "Feather",
+  "icon_set": "Ionicons",
   "glassmorphism": {
-    "enabled": true,
+    "enabled": "true",
     "do's": [
-      "Use blur on the sticky top header (search and segmented controls).",
-      "Use blur on the bottom tab bar.",
-      "Use blur on the floating action button (FAB) background."
+      "Floating map filters",
+      "Tab bar (edge-to-edge)",
+      "Sticky bottom sheets"
     ],
     "dont's": [
-      "Do not use blur on standard cards or list items.",
-      "Do not blur images directly without a solid or tinted underlay for text contrast."
+      "Dense form inputs",
+      "Data-heavy wallet lists",
+      "Standard cards"
     ]
   },
   "platform_libraries": {
@@ -86,43 +190,99 @@
     "animation": "react-native-reanimated",
     "gesture": "react-native-gesture-handler"
   },
+  "component_treatments": {
+    "buttons": "Primary buttons are pill radius (999), Ink Black (primary) background, white text. Secondary/ghost buttons use surfaceAlt or transparent.",
+    "chips": "Soft-grey (surfaceAlt) background, ink text (textSecondary). Selected state is Ink Black (primary) background with white text.",
+    "photo_led_cards": "Image is on the left (rounded square) OR full-bleed cover with vertical scrim (transparent to 70% black). Bold Plus Jakarta title. Small context line. Avatar stack + 'N saves' bottom aligned.",
+    "bottom_sheets": "White (bgElevated) background, generous 28-32pt top radii. Visible handle. Expressive lowercase editorial headline (DM Serif). Pill CTA + subtle text link ('maybe later').",
+    "map_markers": "Selected/Saved/Friends: Circular photo markers with thin white border. Default/Unselected: simple pill with bold price/label in primary (black).",
+    "floating_filters": "Floating pill row docked at the bottom or top of the map. Blur/glass container with soft-grey chips inside.",
+    "tab_bar": "Floating pill or edge-to-edge glass container. Ink Black active state icons, textSecondary inactive. No borders.",
+    "skeletons": "Use skeleton (soft grey) and skeletonHighlight. Do not use generic spinners for cards."
+  },
+  "motion_spec": {
+    "durations": "fast: 150ms (micro-interactions), base: 220ms (standard), slow: 300ms (sheets/page transitions).",
+    "stagger": "List and card grids enter with a 50ms stagger per item.",
+    "press_scale": "0.97 scale on Cards and Pill buttons. 0.93 for smaller icon buttons.",
+    "pops": "Heart (save) and Add actions get a quick overshoot spring (tension 200, friction 10).",
+    "sheets": "iOS native-feeling spring for bottom sheets. Gentle, non-bouncy settling.",
+    "reduced_motion": "Fallback to opacity cross-fades (150ms) for all structural layout shifts and sheet presentations."
+  },
+  "onboarding_blueprint": {
+    "concept": "Immersive, photo-led preferences.",
+    "flow": "Non-blocking. 1-2 screens maximum.",
+    "imagery": "Use ONLY real listing photos from the property API, the AMASS emblem, and FIXA logo. No unbranded stock.",
+    "layout": "Large editorial headline (lowercase DM Serif). Full-width black pill buttons stacked for single-choice questions. Selectable interest/housing-preference tiles in a grid.",
+    "actions": "Blue-to-violet gradient pill (premium token) CTA for completion/premium gates, otherwise primary Ink Black pill."
+  },
   "screens": [
     {
-      "name": "Market",
-      "purpose": "A multi-vertical marketplace to browse brand stores, book FIXA home services, and buy/sell pre-owned items.",
+      "name": "Auth / Onboarding",
+      "purpose": "Immersive preference gathering and access.",
       "states": {
-        "loading": "Skeleton loaders matching the grid (Brands/Declutter) or list (FIXA) layout.",
-        "empty": "A clean illustration with a brief message ('No items found in this category') and a CTA to clear filters or try another city.",
-        "error": "Readable error message with a 'Try Again' button."
+        "loading": "Skeleton preference tiles.",
+        "empty": "N/A",
+        "error": "Standard inline error messages."
       },
-      "layout": "Sticky Header: Glass background. Top row has AMASS logo, FIXA brand integration (shield/text), and persistent Location selector dropdown. Second row: Airbnb-style floating search input and a distinct Filter icon button next to it (with active count badge). Third row: Segmented control (Brands, FIXA Services, Declutter) full width. ScrollView Body: 1. Horizontal Category Chips rail (`surfaceSecondary` bg). 2. 'Featured' horizontal rail for boosted items. 3. Main Feed: 2-column grid for Brands & Declutter, 1-column list for FIXA ProviderCards. Floating CTA FAB pinned at bottom right (safe area aware)."
+      "layout": "Off-white canvas, full-bleed property imagery, stacked pill buttons, bold lowercase serif questions."
+    },
+    {
+      "name": "Home / Map",
+      "purpose": "Map-first discovery and quick filtering.",
+      "states": {
+        "loading": "Skeleton markers and card previews.",
+        "empty": "Empty state illustration for 'no homes found'.",
+        "error": "Map reload prompt."
+      },
+      "layout": "Spacious map, photo-markers for saved properties, floating pill filter row, white bottom sheet for quick unlocks."
+    },
+    {
+      "name": "Property Detail",
+      "purpose": "Detailed exploration and social context.",
+      "states": {
+        "loading": "Skeleton gallery and text lines.",
+        "empty": "N/A",
+        "error": "Card overlay with retry."
+      },
+      "layout": "Layered panels. Full-bleed gallery with gradient scrim, social context row, paid access (MASS) floating gate, clear save/share affordances."
+    },
+    {
+      "name": "Market / Shop",
+      "purpose": "Marketplace for brands and services.",
+      "states": {
+        "loading": "Skeleton logo grids.",
+        "empty": "No deals illustration.",
+        "error": "Reload section."
+      },
+      "layout": "Grey tiles on off-white canvas. Instacart-style retailer logo grid (real PNGs), deal banners, product rails."
+    },
+    {
+      "name": "Neighbours Hub",
+      "purpose": "Community interaction and shared collections.",
+      "states": {
+        "loading": "Skeleton feed items.",
+        "empty": "Prompt to invite friends.",
+        "error": "Retry feed fetch."
+      },
+      "layout": "Social feed with avatar stacks, friends-saved context, soft-grey shared collection cards."
+    },
+    {
+      "name": "Wallet",
+      "purpose": "Manage balances and transactions.",
+      "states": {
+        "loading": "Skeleton balances.",
+        "empty": "No transactions state.",
+        "error": "Retry fetch."
+      },
+      "layout": "Ink black and Off-white contrast cards. DM Serif Display for large token balances (MASS/FIX). Clean ledger lists."
     }
   ],
-  "components": {
-    "ClassifiedCard": "For Brands/Declutter. Vertical layout, `surface` bg, `md` radius, 1px `border`. Image top (50-60% height) with vertical gradient scrim at bottom. Price pill floating bottom-left of image (`surfaceInverse` bg). Text below: Title (`base`, `onSurface`), City/Time (`sm`, `muted`). Heart icon top-right floating.",
-    "ProviderCard": "For FIXA services. Horizontal list layout. Avatar left (circular) with verify badge overlapping. Right side: Name, Trade chip (`brandTertiary` bg, `onBrandTertiary` text), Rating/Jobs stats, and a 'Book Now' primary action button."
-  },
-  "images": {
-    "modern_furniture": {
-      "url": "https://images.unsplash.com/photo-1724582586529-62622e50c0b3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBmdXJuaXR1cmUlMjBsaXZpbmclMjByb29tfGVufDB8fHx8MTc5MTU4MTQ0OXww&ixlib=rb-4.1.0&q=85",
-      "alt": "A modern living room with a large window"
-    },
-    "plumber_working": {
-      "url": "https://images.unsplash.com/photo-1676210134188-4c05dd172f89?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwxfHxwbHVtYmVyJTIwd29ya2luZyUyMGZpeGluZyUyMHBpcGVzfGVufDB8fHx8MTc5MTU4MTQ0OXww&ixlib=rb-4.1.0&q=85",
-      "alt": "Plumber fixing pipes under a sink"
-    },
-    "vintage_camera": {
-      "url": "https://images.unsplash.com/photo-1495121553079-4c61bcce1894?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDF8MHwxfHNlYXJjaHwxfHxwcmUlMjBvd25lZCUyMHZpbnRhZ2UlMjBjYW1lcmF8ZW58MHx8fHwxNzkxNTgxNDQ5fDA&ixlib=rb-4.1.0&q=85",
-      "alt": "Pre-owned vintage black and silver camera"
-    }
-  },
+  "images": {},
   "instructions_to_main_agent": [
-    "Strictly follow the '1 iOS-Native Clean' personality. The UI should prioritize content over chrome, using generous spacing and clean typography (max weight 500).",
-    "Replace legacy 800/900 weight system fonts with `Plus Jakarta Sans` for a highly readable, Redfin-inspired accessible hierarchy.",
-    "Implement Airbnb's minimal search block layout: Use a sticky glass header (`expo-blur`) containing the location, floating search bar, and segmented control.",
-    "The filter flow should use a hybrid approach (learned from research): Keep category chips horizontally scrollable for instant access, while complex filters live inside a Bottom Sheet accessed via a dedicated filter button.",
-    "Design the `ClassifiedCard` to be information-dense yet visually clean. Ensure the image has a top-to-bottom gradient scrim (transparent to surfaceInverse) so the overlapping price/badges remain legible (WCAG AA).",
-    "Integrate the FIXA branding smoothly inside the 'FIXA Services' section without causing clutter. Use the FIXA Green (`#22C55E`) selectively for relevant badges and verification marks.",
-    "Keep the Sell/Join CTA anchored as a Floating Action Button (FAB) at the bottom right, with its label changing dynamically depending on the active segment."
+    "Reskin the UI strictly using the provided lightTheme and darkTheme hex maps directly into your theme.ts override.",
+    "No generic indigo/purple unless specifically tied to the 'premium' token gradient CTA.",
+    "Base background must be off-white (bg: #F7F6F3), cards must be soft-grey (surfaceAlt: #EAE8E3) or white for contrast.",
+    "Typography: Use Plus Jakarta Sans up to 500 weight. DM Serif Display ONLY for expressive large headers and wallet balances.",
+    "Convert all primary CTAs to Ink Black (primary: #111111 in light mode) fully rounded pill buttons."
   ]
 }

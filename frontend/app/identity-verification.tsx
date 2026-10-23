@@ -112,7 +112,7 @@ export default function IdentityVerification() {
             </AppText>
           </View>
 
-          {!mandateDone ? <Button label={idDone ? "Continue verification" : "Verify my identity"} variant="brand" size="lg" fullWidth iconLeft="shield-checkmark" onPress={() => router.push("/become-agent")} testID="idv-cta" /> : null}
+          {!mandateDone ? <Button label={idDone ? "Continue verification" : "Verify my identity"} variant="primary" size="lg" fullWidth iconLeft="shield-checkmark" onPress={() => router.push("/become-agent")} testID="idv-cta" /> : null}
         </ScrollView>
       )}
     </Screen>

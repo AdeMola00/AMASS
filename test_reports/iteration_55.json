@@ -1,0 +1,32 @@
+{
+  "summary": "AMASS app-wide RESKIN visual + regression sanity (frontend only, 390x844 web preview). Core flows verified: onboarding (lowercase DM Serif Display 'find your next place from the sky' + onboarding-next/skip/signin + 4 dots), /login (ink black pill submit) with demo@amass.africa / amass2026, tabs (floating-bottom-nav + tab-index/tab-discover/tab-marketplace/tab-neighbours/tab-profile) rendering as edge-to-edge glass bar with labels, Discover (lowercase serif greeting 'ada', 6 category tiles as soft-grey tiles, 8 featured listing-card-* opening /property/[id], save-* heart toggles, discover-search + discover-notifications), Home map (home-search-input, filter-chip-for-sale/to-rent toggling ink-active, open-filter-sheet opens FilterSheet, map-balance-chip, fab-zoom-in/out/locate, map-legend, M/P balance pills), Market (mkt-tab-brands/fixa/declutter + market-search-bar; Brands view renders retailers; AdModal pops after ~3s and is dismissible via 'Skip' text), Neighbours (serif 'neighbours' title, all 4 nb-quick-* tiles, nb-inbox/nb-ask/nb-report-issue, nb-estate-* card), Profile (ink wallet-card, profile-topup gradient pill, stat-saved, stat-unlocked, theme-toggle switches light↔dark, sign-out-button, all 6 spot-checked menu-* rows present), Wallet (mass-balance + fix-balance serif numerals, wallet-action-buy-mass gradient, wallet-action-subscribe, wallet-action-earn, wallet-daily-bonus, wallet-history, 60 tx-* rows), Settings (segmented theme control works), /register ('create your account' lowercase serif), /forgot-password, /phone?purpose=signin, /notifications, /earn, /buy-tokens, /agent-plans, /fixa — all load without red-screen. Dark mode toggle produces near-black (#111) bg. No PageError/console red screen on any screen. Fonts (Plus Jakarta Sans + DMSerifDisplay) load.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Settings · theme segmented control", "issue": "Review-request spec asked for testIDs 'segment-system/segment-light/segment-dark'; actual implementation uses 'theme-system/theme-light/theme-dark' (SegmentedControl called with testIDPrefix='theme' from settings.tsx). Control itself works. Either align spec or rename prefix.", "testID": "theme-system|theme-light|theme-dark (actual) vs segment-* (spec)", "priority": "LOW"},
+      {"component": "AdModal (Market)", "issue": "No stable testID for Skip / Close controls on the sponsored modal (same gap flagged in iteration_54). Only a 'Skip' text node and a close ✕ IconButton are available; automated dismissal is fragile.", "testID": "ad-skip / ad-close MISSING", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Property/[id]", "issues": ["On non-owned, locked listings we expected unlock-cta-btn + unlock-dialog. On the one property visited the sticky bar renders 'Manage listing' because demo user is an agent/admin. Could not force an unlocked state in web test to re-verify the dialog's unlock-fee/unlock-balance/unlock-balance-after/unlock-confirm(gradient)/unlock-cancel chain for this iteration; dialog code paths and tokens remain in /app/frontend/src/ui/UnlockDialog.tsx but need manual spot check by main agent."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_55.json"],
+  "action_items": [
+    "Decide canonical name for the Appearance segmented control testID: either rename settings.tsx SegmentedControl testIDPrefix from 'theme' to 'segment' (matches review spec) or update the design spec/docs. Current app ships 'theme-system/light/dark'.",
+    "Add testID='ad-skip' / testID='ad-close' on AdModal controls (recurring request from iteration_54) so test agents and accessibility users can dismiss reliably.",
+    "Confirm (via manual tap or an alt test user) that UnlockDialog (unlock-dialog + unlock-fee/balance/balance-after + unlock-confirm gradient + unlock-cancel) still renders after reskin. Verified from source that /app/frontend/src/ui/UnlockDialog.tsx remains wired; just not exercised in this run because the demo user resolves to agent/manage-listing on first-row listings."
+  ],
+  "critical_code_review_comments": [
+    "/app/frontend/app/(tabs)/marketplace.tsx L718 — the sell-fab correctly hides on 'brands' section and renders ink-black on Declutter / FIXA; selector in test was blocked by AdModal overlay, not a code bug.",
+    "/app/frontend/src/theme/tokens.ts — fontFamilies maps 'semibold', 'bold', 'extrabold' all to PlusJakartaSans-500 which matches the spec cap at 500. Any legacy call-site still asking for a heavier face silently resolves to Medium. Safe but worth a one-line note so devs don't try to override."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only pass)", "frontend": "~95% — all 11 flow categories in the review request rendered and were interactive; 2 low-priority testID gaps and 1 unverifiable path (unlock dialog on a non-owned locked listing)"},
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login demo@amass.africa / amass2026 lands on home map tab (/). Onboarding appears for anonymous sessions; onboarding-signin or onboarding-skip link to /login. Appearance segmented control uses testIDPrefix='theme' (NOT 'segment'). AdModal on Market has no stable close testID — use get_by_text('Skip') or wait for auto-close. Demo user is admin+agent so first listings in /api/properties show 'Manage listing' instead of the unlock CTA; iterate through a few property IDs to find one that genuinely requires unlocking before testing unlock-dialog. /api/properties returns 50 listings publicly without auth, but /api/auth/me only works with the SecureStore token (not accessible from pure JS fetch in web preview).",
+  "rca_of_issue": "N/A — this was a pure visual/regression sanity pass after the theme/component reskin. No functional regressions found."
+}

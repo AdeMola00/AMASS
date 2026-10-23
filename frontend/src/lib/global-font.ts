@@ -14,13 +14,11 @@ import { Text, TextInput, StyleSheet } from "react-native";
 import { fontFamily } from "@/src/constants/theme";
 
 function weightToFamily(weight?: string | number): string {
-  if (weight === "bold") return fontFamily.bold;
+  // Weight is capped at 500 app-wide — hierarchy comes from size/tracking.
+  if (weight === "bold") return fontFamily.medium;
   const n = typeof weight === "string" ? parseInt(weight, 10) : weight;
   if (!n || Number.isNaN(n) || n <= 400) return fontFamily.regular;
-  if (n <= 500) return fontFamily.medium;
-  if (n <= 600) return fontFamily.semibold;
-  if (n <= 700) return fontFamily.bold;
-  return fontFamily.extrabold;
+  return fontFamily.medium;
 }
 
 function patch(Component: any) {

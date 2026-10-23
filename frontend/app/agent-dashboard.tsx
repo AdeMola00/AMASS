@@ -295,7 +295,7 @@ function Overview({ dashboard, onNew, isDark }: { dashboard: Dashboard | null; o
         <AppText variant="label" color="rgba(255,255,255,0.6)" uppercase>
           Portfolio value
         </AppText>
-        <AppText variant="display" color="#fff" tabular numberOfLines={1} adjustsFontSizeToFit>
+        <AppText variant="heroLg" color="#fff" tabular numberOfLines={1} adjustsFontSizeToFit>
           {s ? formatNaira(s.total_value) : "—"}
         </AppText>
         <View style={styles.heroFooter}>
@@ -492,7 +492,7 @@ function BoostSheet({ property, onClose, onSuccess }: { property: Property | nul
 
         <Button
           label={canAfford ? `Activate for ${cost} MASS` : `Need ${cost - balance} more MASS`}
-          variant="brand"
+          variant="premium"
           size="lg"
           fullWidth
           iconLeft="rocket"
@@ -501,7 +501,7 @@ function BoostSheet({ property, onClose, onSuccess }: { property: Property | nul
           onPress={submit}
           testID="boost-submit"
         />
-        {!canAfford && cost > 0 ? <Button label="Top up MASS" variant="mass" fullWidth onPress={() => router.push("/buy-tokens")} iconLeft="add" /> : null}
+        {!canAfford && cost > 0 ? <Button label="Top up MASS" variant="premium" fullWidth onPress={() => router.push("/buy-tokens")} iconLeft="add" /> : null}
       </View>
     </Sheet>
   );

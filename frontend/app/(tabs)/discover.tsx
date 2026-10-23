@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, RefreshControl, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
@@ -8,8 +9,8 @@ import { api, Neighborhood, Property } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
 import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
-import { radii, space } from "@/src/theme/tokens";
-import { AppText, BalanceChip, Card, EmptyState, IconButton, ProgressBar, Screen, Section, Skeleton, SkeletonCard, type IconName } from "@/src/ui";
+import { gradients, radii, space } from "@/src/theme/tokens";
+import { Appear, AppText, BalanceChip, Card, EmptyState, IconButton, PressableScale, ProgressBar, Screen, Section, Skeleton, SkeletonCard, type IconName } from "@/src/ui";
 import { ListingCard } from "@/src/components/ListingCard";
 import { getRecentlyViewedIds } from "@/src/lib/recently-viewed";
 import { AmassPinIcon } from "@/src/components/AmassLogo";
@@ -111,15 +112,15 @@ export default function Discover() {
                 {greeting()}
                 {firstName ? "," : ""}
               </AppText>
-              <AppText variant="h1" numberOfLines={1}>
-                {firstName ?? "Welcome"}
+              <AppText variant="hero" numberOfLines={1}>
+                {(firstName ?? "welcome").toLowerCase()}
               </AppText>
             </View>
             <BalanceChip />
             <IconButton icon="notifications-outline" label="Notifications" badge={unread} onPress={() => router.push("/notifications")} testID="discover-notifications" />
           </View>
 
-          <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }, shadows.md]}>
+          <View style={[styles.search, { backgroundColor: colors.surface }, shadows.sm]}>
             <Pressable
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
@@ -155,8 +156,10 @@ export default function Discover() {
 
         {/* Category entry points */}
         <View style={styles.tiles}>
-          {CATEGORIES.map((c) => (
-            <CategoryTile key={c.key} c={c} width={tileW} onPress={() => router.push(c.route as any)} />
+          {CATEGORIES.map((c, i) => (
+            <Appear key={c.key} index={i}>
+              <CategoryTile c={c} width={tileW} onPress={() => router.push(c.route as any)} />
+            </Appear>
           ))}
         </View>
 
@@ -203,19 +206,19 @@ export default function Discover() {
           ) : trending.length ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.railScroll} contentContainerStyle={styles.rail}>
               {trending.map((n) => (
-                <Pressable
+                <PressableScale
                   key={n.id}
                   accessibilityRole="button"
                   accessibilityLabel={`${n.name}, average ${formatNaira(n.avg_price)}, up ${n.price_change_pct}%`}
                   onPress={() => router.push(`/(tabs)?ai_filters=${encodeURIComponent(JSON.stringify({ city: n.name }))}` as any)}
-                  style={({ pressed }) => [styles.trend, shadows.sm, pressed && { opacity: 0.92 }]}
+                  style={[styles.trend, { backgroundColor: colors.surfaceAlt }]}
                   testID={`trend-${n.id}`}
                 >
                   <Image source={{ uri: n.image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.38)" }]} />
-                  <View style={[styles.trendBadge, { backgroundColor: colors.success }]}>
-                    <Ionicons name="trending-up" size={11} color="#fff" />
-                    <AppText variant="micro" color="#fff" tabular>
+                  <LinearGradient colors={[...gradients.scrim]} locations={[0.35, 1]} style={StyleSheet.absoluteFill} />
+                  <View style={[styles.trendBadge, { backgroundColor: "rgba(255,255,255,0.92)" }]}>
+                    <Ionicons name="trending-up" size={11} color="#1C5E39" />
+                    <AppText variant="micro" color="#1C5E39" tabular>
                       +{n.price_change_pct}%
                     </AppText>
                   </View>
@@ -227,7 +230,7 @@ export default function Discover() {
                       Avg {formatNaira(n.avg_price)} · {n.state}
                     </AppText>
                   </View>
-                </Pressable>
+                </PressableScale>
               ))}
             </ScrollView>
           ) : (
@@ -310,28 +313,25 @@ export default function Discover() {
 }
 
 function CategoryTile({ c, width, onPress }: { c: Category; width: number; onPress: () => void }) {
-  const { colors, shadows } = useTheme();
-  const tone = {
-    default: { bg: colors.surfaceAlt, fg: colors.text },
-    brand: { bg: colors.brandSoft, fg: colors.brand },
-    fix: { bg: colors.fixSoft, fg: colors.fixText },
-    mass: { bg: colors.massSoft, fg: colors.massText },
-    info: { bg: colors.infoSoft, fg: colors.info },
-    premium: { bg: colors.premiumSoft, fg: colors.premium },
+  const { colors } = useTheme();
+  const fg = {
+    default: colors.text,
+    brand: colors.brand,
+    fix: colors.fixText,
+    mass: colors.massText,
+    info: colors.info,
+    premium: colors.premium,
   }[c.tone];
   return (
-    <Pressable
-      onPress={() => {
-        Haptics.selectionAsync().catch(() => {});
-        onPress();
-      }}
+    <PressableScale
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${c.label}: ${c.caption}`}
       testID={`category-${c.key}`}
-      style={({ pressed }) => [styles.tile, { width, backgroundColor: colors.surface, borderColor: colors.border }, shadows.xs, pressed && { transform: [{ scale: 0.97 }] }]}
+      style={[styles.tile, { width, backgroundColor: colors.surfaceAlt }]}
     >
-      <View style={[styles.tileIcon, { backgroundColor: tone.bg }]}>
-        <Ionicons name={c.icon} size={20} color={tone.fg} />
+      <View style={[styles.tileIcon, { backgroundColor: colors.surface }]}>
+        <Ionicons name={c.icon} size={20} color={fg} />
       </View>
       <AppText variant="bodyMedium" numberOfLines={1}>
         {c.label}
@@ -339,7 +339,7 @@ function CategoryTile({ c, width, onPress }: { c: Category; width: number; onPre
       <AppText variant="micro" tone="tertiary" numberOfLines={2} style={{ letterSpacing: 0 }}>
         {c.caption}
       </AppText>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -391,11 +391,11 @@ function ScoreCard({ n }: { n: Neighborhood }) {
 
 function JourneyCard({ icon, tone, title, body, cta, onPress, testID }: { icon: IconName; tone: "premium" | "info"; title: string; body: string; cta: string; onPress: () => void; testID: string }) {
   const { colors } = useTheme();
-  const t = tone === "premium" ? { bg: colors.premiumSoft, fg: colors.premium } : { bg: colors.infoSoft, fg: colors.info };
+  const t = tone === "premium" ? { fg: colors.premium } : { fg: colors.info };
   return (
-    <Card onPress={onPress} testID={testID}>
+    <Card onPress={onPress} testID={testID} tone="soft">
       <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
-        <View style={[styles.journeyIcon, { backgroundColor: t.bg }]}>
+        <View style={[styles.journeyIcon, { backgroundColor: colors.surface }]}>
           <Ionicons name={icon} size={22} color={t.fg} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
@@ -404,7 +404,7 @@ function JourneyCard({ icon, tone, title, body, cta, onPress, testID }: { icon: 
             {body}
           </AppText>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 2, marginTop: 4 }}>
-            <AppText variant="caption" weight="bold" color={t.fg}>
+            <AppText variant="caption" color={t.fg}>
               {cta}
             </AppText>
             <Ionicons name="arrow-forward" size={12} color={t.fg} />
@@ -418,12 +418,12 @@ function JourneyCard({ icon, tone, title, body, cta, onPress, testID }: { icon: 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: space[4], paddingTop: space[2], gap: space[4] },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  search: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, paddingLeft: 12, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, minHeight: 60 },
+  search: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, paddingLeft: 12, borderRadius: radii.pill, minHeight: 60 },
   searchMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
   searchIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   mapBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   tiles: { flexDirection: "row", flexWrap: "wrap", gap: space[3], paddingHorizontal: space[4] },
-  tile: { padding: 12, borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, gap: 6, minHeight: 112 },
+  tile: { padding: 12, borderRadius: radii.lg, gap: 6, minHeight: 112 },
   tileIcon: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center", marginBottom: 2 },
   railScroll: { marginHorizontal: -space[4] },
   rail: { gap: space[3], paddingHorizontal: space[4] },

@@ -67,7 +67,7 @@ export function RoleGate({
           </View>
         )}
 
-        <Button label={ctaLabel} variant="brand" size="lg" fullWidth onPress={onCta} testID="role-gate-cta" style={{ marginTop: space[2] }} />
+        <Button label={ctaLabel} variant="primary" size="lg" fullWidth onPress={onCta} testID="role-gate-cta" style={{ marginTop: space[2] }} />
         {secondaryLabel ? (
           <Button label={secondaryLabel} variant="ghost" fullWidth onPress={onSecondary ?? (() => router.back())} testID="role-gate-secondary" />
         ) : null}

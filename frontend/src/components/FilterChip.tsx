@@ -53,20 +53,16 @@ const makeStyles = (colors: LegacyColors) =>
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   chipActive: {
     backgroundColor: colors.ink,
-    borderColor: colors.ink,
   },
   chipSolidActive: {
     backgroundColor: colors.red,
-    borderColor: colors.red,
   },
   label: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "500",
     color: colors.textSecondary,
     letterSpacing: -0.1,
   },

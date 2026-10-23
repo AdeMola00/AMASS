@@ -132,7 +132,7 @@ export default function FinanceDetail() {
             <View style={{ paddingHorizontal: space[4] }}>
               <Button
                 label="Start renovation project"
-                variant="brand"
+                variant="primary"
                 size="lg"
                 fullWidth
                 iconLeft="construct"

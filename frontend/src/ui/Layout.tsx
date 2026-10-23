@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, View, ViewStyle, Platform } from "react-native";
+import { Pressable, StyleSheet, View, ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -163,10 +163,10 @@ export function Section({
         </View>
         {actionLabel && onAction ? (
           <Pressable onPress={onAction} hitSlop={8} accessibilityRole="button" style={styles.sectionAction}>
-            <AppText variant="caption" weight="bold" color={colors.text}>
+            <AppText variant="caption" color={colors.textSecondary}>
               {actionLabel}
             </AppText>
-            <Ionicons name="chevron-forward" size={14} color={colors.text} />
+            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
           </Pressable>
         ) : null}
       </View>
@@ -272,7 +272,7 @@ export function RowGroup({ children, title, style, testID }: { children: React.R
           {title}
         </AppText>
       ) : null}
-      <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }, shadows.xs]}>{children}</View>
+      <View style={[styles.group, { backgroundColor: colors.surface }, shadows.xs]}>{children}</View>
     </View>
   );
 }
@@ -291,5 +291,5 @@ const styles = StyleSheet.create({
   sectionAction: { flexDirection: "row", alignItems: "center", gap: 2, paddingVertical: 4 },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: space[4], paddingVertical: 14, minHeight: 56 },
   rowIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  group: { borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, overflow: Platform.OS === "web" ? "hidden" : "hidden" },
+  group: { borderRadius: radii.lg, overflow: "hidden" },
 });

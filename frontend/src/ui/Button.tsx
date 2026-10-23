@@ -2,13 +2,15 @@ import React from "react";
 import { ActivityIndicator, Pressable, PressableProps, StyleSheet, View, ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import Ionicons from "@react-native-vector-icons/ionicons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/theme";
-import { fontFamilies, motion, radii } from "@/src/theme/tokens";
+import { fontFamilies, gradients, motion, radii } from "@/src/theme/tokens";
 import { AppText } from "./Text";
 
 import type { IconName } from "./icons";
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "brand" | "mass" | "fix" | "outline" | "inverse";
+/** `premium` = blue→violet gradient pill — reserved for paid / premium gates (unlocks, top-ups, subscriptions). */
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "brand" | "mass" | "fix" | "outline" | "inverse" | "premium";
 export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 export type ButtonProps = Omit<PressableProps, "style" | "children"> & {
@@ -47,23 +49,25 @@ export function Button({
   onPress,
   ...rest
 }: ButtonProps) {
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   const scale = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const s = SIZES[size];
   const isDisabled = disabled || loading;
 
   const palette: Record<ButtonVariant, { bg: string; fg: string; border?: string; shadow?: object }> = {
-    primary: { bg: colors.primary, fg: colors.onPrimary, shadow: shadows.sm },
-    brand: { bg: colors.brand, fg: colors.onBrand, shadow: shadows.brand },
+    primary: { bg: colors.primary, fg: colors.onPrimary },
+    brand: { bg: colors.brand, fg: colors.onBrand },
     secondary: { bg: colors.surfaceAlt, fg: colors.text },
     outline: { bg: "transparent", fg: colors.text, border: colors.borderStrong },
-    ghost: { bg: "transparent", fg: colors.text },
+    ghost: { bg: "transparent", fg: colors.textSecondary },
     destructive: { bg: colors.errorSoft, fg: colors.error },
     mass: { bg: colors.mass, fg: "#1A1200" },
-    fix: { bg: colors.fix, fg: "#052E1F" },
+    fix: { bg: colors.fix, fg: "#FFFFFF" },
     /** Translucent white on dark hero surfaces (identical in both themes). */
     inverse: { bg: "rgba(255,255,255,0.14)", fg: "#FFFFFF" },
+    /** Gradient is painted by a LinearGradient layer below. */
+    premium: { bg: "transparent", fg: "#FFFFFF" },
   };
   const p = palette[variant];
 
@@ -74,7 +78,7 @@ export function Button({
       accessibilityLabel={label}
       disabled={isDisabled}
       onPressIn={() => {
-        scale.value = withSpring(0.97, motion.spring);
+        scale.value = withSpring(motion.pressScale, motion.spring);
       }}
       onPressOut={() => {
         scale.value = withSpring(1, motion.spring);
@@ -94,6 +98,7 @@ export function Button({
           borderWidth: p.border ? 1.5 : 0,
           opacity: isDisabled ? 0.5 : 1,
           borderRadius: radii.pill,
+          overflow: "hidden",
         },
         fullWidth && styles.full,
         !isDisabled && p.shadow,
@@ -101,13 +106,16 @@ export function Button({
         style,
       ]}
     >
+      {variant === "premium" ? (
+        <LinearGradient colors={[...gradients.premium]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+      ) : null}
       {loading ? (
         <ActivityIndicator color={p.fg} />
       ) : (
         <View style={[styles.row, { gap: s.gap }]}>
           {iconLeft && <Ionicons name={iconLeft} size={s.icon} color={p.fg} />}
           <AppText
-            style={{ fontSize: s.fs, lineHeight: s.fs + 4, fontFamily: fontFamilies.bold, letterSpacing: -0.1 }}
+            style={{ fontSize: s.fs, lineHeight: s.fs + 4, fontFamily: fontFamilies.medium, letterSpacing: -0.1 }}
             color={p.fg}
             numberOfLines={1}
           >
@@ -177,7 +185,7 @@ export function IconButton({
       disabled={disabled}
       testID={testID}
       onPressIn={() => {
-        scale.value = withSpring(0.9, motion.spring);
+        scale.value = withSpring(motion.pressScaleSmall, motion.spring);
       }}
       onPressOut={() => {
         scale.value = withSpring(1, motion.spring);
@@ -189,7 +197,7 @@ export function IconButton({
       style={[
         styles.iconBtn,
         { width: size, height: size, borderRadius: size / 2, backgroundColor: bg, opacity: disabled ? 0.5 : 1 },
-        variant === "glass" && [shadows.sm, { borderWidth: 1, borderColor: isDark ? colors.border : "rgba(255,255,255,0.6)" }],
+        variant === "glass" && [shadows.sm, { borderWidth: 1, borderColor: isDark ? colors.border : "rgba(255,255,255,0.5)" }],
         anim,
         style,
       ]}

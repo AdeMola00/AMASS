@@ -164,7 +164,7 @@ export default function AgentTaskDetail() {
 
         {/* Actions */}
         <View style={{ gap: 8 }}>
-          {canVerify && <Button label="Start on-site verification" size="lg" variant="brand" fullWidth iconLeft="location" onPress={() => router.push(`/agent/tasks/verify/${t.id}` as any)} testID="btn-start-verify" />}
+          {canVerify && <Button label="Start on-site verification" size="lg" variant="primary" fullWidth iconLeft="location" onPress={() => router.push(`/agent/tasks/verify/${t.id}` as any)} testID="btn-start-verify" />}
           {isOpen && !isMine && <Button label="Claim this task" size="lg" variant="fix" fullWidth iconLeft="checkmark-circle" loading={busy} onPress={claim} testID="btn-claim-here" />}
           {isMine && active && <Button label="Release task" variant="secondary" fullWidth iconLeft="arrow-undo" disabled={busy} onPress={() => setConfirmRelease(true)} testID="btn-release" />}
           {p?.amass_property_id && <Button label="View property passport" variant="outline" fullWidth iconLeft="eye" onPress={() => router.push(`/property-passport/${p.amass_property_id}` as any)} testID="btn-passport" />}

@@ -39,7 +39,7 @@ export function Input({
 }: InputProps) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
-  const borderColor = error ? colors.error : focused ? colors.text : colors.border;
+  const borderColor = error ? colors.error : focused ? colors.text : "transparent";
   const h = size === "lg" ? 56 : 50;
   const multiline = !!rest.multiline;
 
@@ -57,7 +57,7 @@ export function Input({
           {
             backgroundColor: focused ? colors.surface : colors.surfaceAlt,
             borderColor,
-            borderWidth: focused || error ? 1.5 : 1,
+            borderWidth: 1.5,
             opacity: editable ? 1 : 0.6,
           },
         ]}

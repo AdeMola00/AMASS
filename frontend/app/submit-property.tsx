@@ -286,7 +286,7 @@ export default function SubmitProperty() {
             : "You've reached your listing limit. Upgrade to add more."}
         </AppText>
         <View style={{ gap: 8 }}>
-          <Button label="Upgrade plan" iconLeft="pricetags" variant="brand" size="lg" fullWidth onPress={() => { setLimitSheet(null); router.push("/agent-plans"); }} testID="limit-upgrade" />
+          <Button label="Upgrade plan" iconLeft="pricetags" variant="premium" size="lg" fullWidth onPress={() => { setLimitSheet(null); router.push("/agent-plans"); }} testID="limit-upgrade" />
           <Button label="Not now" variant="ghost" fullWidth onPress={() => setLimitSheet(null)} />
         </View>
       </Sheet>

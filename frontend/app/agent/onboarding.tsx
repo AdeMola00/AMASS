@@ -559,7 +559,7 @@ export default function AgentOnboardingWizard() {
           </AppText>
         </View>
         <View style={{ gap: 8, marginTop: 20 }}>
-          <Button label="Upload mandate documents" iconLeft="ribbon" variant="brand" size="lg" fullWidth onPress={() => router.replace("/agent/representations" as any)} testID="wiz-success-reps" />
+          <Button label="Upload mandate documents" iconLeft="ribbon" variant="primary" size="lg" fullWidth onPress={() => router.replace("/agent/representations" as any)} testID="wiz-success-reps" />
           <Button label="View property passport" iconLeft="document-text-outline" variant="ghost" fullWidth onPress={() => successSheet && router.replace(`/property-passport/${successSheet.amass_property_id}` as any)} testID="wiz-success-passport" />
         </View>
       </Sheet>
@@ -1363,9 +1363,9 @@ const makeStyles = (colors: LegacyColors) =>
     gap: 8,
     height: 48,
     borderRadius: radius.pill,
-    backgroundColor: colors.red,
+    backgroundColor: colors.ink,
   },
-  gpsBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  gpsBtnText: { color: "#fff", fontSize: 14, fontWeight: "500" },
   mapWrap: {
     height: 220,
     borderRadius: radius.md,

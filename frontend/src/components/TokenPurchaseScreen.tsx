@@ -393,7 +393,7 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
           </View>
           <Button
             label={`Pay & get ${config.currency}`}
-            variant={isMass ? "primary" : "fix"}
+            variant="premium"
             size="lg"
             iconLeft="lock-closed"
             loading={processing}
@@ -418,7 +418,7 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
         />
         <Button
           label={config.onSuccessRoute ? "Continue" : "Go to wallet"}
-          variant={isMass ? "primary" : "fix"}
+          variant="premium"
           size="lg"
           fullWidth
           iconRight="arrow-forward"

@@ -94,7 +94,7 @@ export default function PhoneSignIn() {
             </Pressable>
             <AmassLogo size="lg" />
             <View style={{ gap: 6 }}>
-              <AppText variant="display">{title}</AppText>
+              <AppText variant="hero">{title.toLowerCase()}</AppText>
               <AppText variant="body" tone="secondary">
                 {sub}
               </AppText>

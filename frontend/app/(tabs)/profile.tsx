@@ -107,7 +107,7 @@ export default function Profile() {
           <View style={styles.identity}>
             <Avatar name={user?.full_name} uri={user?.avatar_url} size={72} verified={!!user?.is_agent} />
             <View style={{ flex: 1, gap: 4 }}>
-              <AppText variant="h2" numberOfLines={1}>
+              <AppText variant="heroSm" numberOfLines={1}>
                 {user?.full_name || "AMASS Member"}
               </AppText>
               <AppText variant="bodySm" tone="tertiary" numberOfLines={1}>
@@ -135,7 +135,7 @@ export default function Profile() {
 
         {/* Wallet hero — Top-up button is a sibling of the card pressable (no nested buttons on web) */}
         <View style={styles.walletWrap} testID="wallet-card-wrap">
-          <LinearGradient colors={isDark ? ["#1F1D1A", "#171513"] : ["#141210", "#0A0A0A"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wallet}>
+          <LinearGradient colors={isDark ? ["#292926", "#1C1C1A"] : ["#1C1C1A", "#111111"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wallet}>
             <View style={styles.walletCoin}>
               <TokenIcon size={120} animated />
             </View>
@@ -155,8 +155,8 @@ export default function Profile() {
                     MASS balance
                   </AppText>
                   <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                    <AnimatedNumber value={mass?.spendable ?? 0} variant="display" color="#fff" testID="profile-mass" />
-                    <AppText variant="caption" color={colors.mass} weight="bold">
+                    <AnimatedNumber value={mass?.spendable ?? 0} variant="heroLg" color="#fff" testID="profile-mass" />
+                    <AppText variant="caption" color={colors.mass}>
                       MASS
                     </AppText>
                   </View>
@@ -164,9 +164,9 @@ export default function Profile() {
                 <View style={{ width: 96 }} />
               </View>
               <View style={styles.walletFooter}>
-                <View style={[styles.fixPill, { backgroundColor: "rgba(34,197,94,0.16)" }]}>
+                <View style={[styles.fixPill, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
                   <View style={[styles.coinDot, { backgroundColor: colors.fix }]} />
-                  <AppText variant="caption" color="#fff" tabular weight="bold">
+                  <AppText variant="caption" color="#fff" tabular>
                     {(fix?.spendable ?? 0).toLocaleString()} FIX
                   </AppText>
                 </View>
@@ -180,7 +180,7 @@ export default function Profile() {
               </View>
             </Pressable>
             <View style={styles.walletTopup}>
-              <Button label="Top up" variant="brand" size="sm" iconLeft="add" onPress={() => router.push("/buy-tokens")} testID="profile-topup" />
+              <Button label="Top up" variant="premium" size="sm" iconLeft="add" onPress={() => router.push("/buy-tokens")} testID="profile-topup" />
             </View>
           </LinearGradient>
         </View>

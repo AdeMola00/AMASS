@@ -151,7 +151,7 @@ export default function AdminMergeScreen() {
 
             <Button
               label={`Merge ${loser} into ${winner}`}
-              variant="brand"
+              variant="primary"
               size="lg"
               fullWidth
               iconLeft="git-merge"
@@ -171,7 +171,7 @@ export default function AdminMergeScreen() {
           </AppText>
         </View>
         <View style={{ gap: 8 }}>
-          <Button label="Confirm merge" variant="brand" size="lg" fullWidth iconLeft="git-merge" loading={merging} onPress={doMerge} testID="merge-confirm-final" />
+          <Button label="Confirm merge" variant="primary" size="lg" fullWidth iconLeft="git-merge" loading={merging} onPress={doMerge} testID="merge-confirm-final" />
           <Button label="Cancel" variant="ghost" fullWidth onPress={() => setConfirmOpen(false)} />
         </View>
       </Sheet>

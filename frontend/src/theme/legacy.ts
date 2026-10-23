@@ -56,7 +56,7 @@ export function useLegacyColors(): LegacyColors {
   return useMemo<LegacyColors>(() => {
     // "ink" is used as a dark fill with hard-coded white text in legacy code,
     // so in dark mode it must stay a dark (lifted) neutral — never inverted.
-    const ink = isDark ? palette.neutral[700] : palette.neutral[1000];
+    const ink = isDark ? palette.neutral[700] : palette.neutral[950];
     return {
       bg: colors.bg,
       bgAlt: colors.surfaceAlt,
@@ -75,7 +75,7 @@ export function useLegacyColors(): LegacyColors {
       redSurface: colors.brandSoft,
       ink,
       inkSoft: isDark ? palette.neutral[600] : palette.neutral[900],
-      inkSurface: isDark ? colors.surfaceAlt : "#171513",
+      inkSurface: isDark ? colors.surfaceAlt : palette.neutral[900],
       gold: colors.mass,
       goldLight: colors.massSoft,
       success: colors.success,
@@ -86,16 +86,16 @@ export function useLegacyColors(): LegacyColors {
       borderStrong: colors.borderStrong,
       divider: colors.divider,
       // Map-marker status colours are identical in both themes (sit on imagery).
-      statusAvailable: "#0A0A0A",
+      statusAvailable: "#111111",
       statusComingSoon: "#F59E0B",
-      statusVerified: "#0A0A0A",
+      statusVerified: "#111111",
       statusPremium: "#8B5CF6",
       statusSold: "#71717A",
       statusHot: "#E11B22",
       statusNew: "#0369A1",
       statusReduced: "#B45309",
       glassLight: colors.glass,
-      glassDark: "rgba(10,10,10,0.55)",
+      glassDark: "rgba(17,17,17,0.55)",
       scrim: colors.scrim,
       emerald: ink,
       emeraldDark: ink,
