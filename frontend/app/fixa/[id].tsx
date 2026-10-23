@@ -4,13 +4,13 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
 import { api, ApiError, MarketplaceItem, ProviderPreview, UnlockResult } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
-import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, Card, EmptyState, Screen, ScreenHeader, Skeleton, UnlockDialog, useToast } from "@/src/ui";
+import { LinearGradient } from "expo-linear-gradient";
+import { gradients, radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, EmptyState, PressableScale, Screen, ScreenHeader, Skeleton, UnlockDialog, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { FixaGate } from "@/src/components/fixa/FixaGate";
 import { BookingSheet, BookingSheetRef } from "@/src/components/marketplace/BookingSheet";
@@ -153,7 +153,7 @@ export default function FixaProviderScreen() {
             )}
             {preview.verified ? (
               <View style={[styles.verifyDot, { backgroundColor: colors.fix, borderColor: colors.bg }]}>
-                <Ionicons name="shield-checkmark" size={14} color="#052E1F" />
+                <Ionicons name="shield-checkmark" size={14} color="#fff" />
               </View>
             ) : null}
           </View>
@@ -240,9 +240,9 @@ export default function FixaProviderScreen() {
             ) : null}
           </Card>
         ) : (
-          <Card style={[styles.lockedCard, { backgroundColor: colors.surfaceInverse }]} testID="fixa-contact-locked">
+          <Card tone="ink" style={styles.lockedCard} testID="fixa-contact-locked">
             <View style={[styles.lockIcon, { backgroundColor: colors.fix }]}>
-              <Ionicons name="lock-closed" size={18} color="#052E1F" />
+              <Ionicons name="lock-closed" size={18} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
               <AppText variant="title" color={colors.textInverse}>
@@ -279,33 +279,31 @@ export default function FixaProviderScreen() {
       </ScrollView>
 
       {/* Sticky CTA */}
-      <View style={[styles.sticky, shadows.lg, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: colors.glass, borderTopColor: colors.border }]}>
+      <View style={[styles.sticky, shadows.lg, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: colors.bgElevated }]}>
         {unlocked ? (
           <>
             <Button label="Call" variant="secondary" size="lg" iconLeft="call" onPress={call} style={{ flex: 1 }} testID="fixa-cta-call" />
-            <Button label="Book a visit" variant="fix" size="lg" iconLeft="calendar" onPress={() => details && bookingRef.current?.open(details)} style={{ flex: 1.4 }} testID="fixa-cta-book" />
+            <Button label="Book a visit" variant="primary" size="lg" iconLeft="calendar" onPress={() => details && bookingRef.current?.open(details)} style={{ flex: 1.4 }} testID="fixa-cta-book" />
           </>
         ) : (
-          <Pressable
-            style={({ pressed }) => [styles.unlockCta, { backgroundColor: colors.fix, opacity: pressed ? 0.9 : 1 }]}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              setUnlockOpen(true);
-            }}
+          <PressableScale
+            style={[styles.unlockCta, shadows.md]}
+            onPress={() => setUnlockOpen(true)}
             accessibilityRole="button"
             accessibilityLabel={`Unlock contact${fee ? ` for ${fee} FIX` : ""}. You have ${fix?.spendable ?? 0} FIX`}
             testID="fixa-unlock-cta"
           >
-            <Ionicons name="lock-open" size={18} color="#052E1F" />
+            <LinearGradient colors={[...gradients.premium]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+            <Ionicons name="lock-open" size={18} color="#fff" />
             <View>
-              <AppText variant="title" color="#052E1F">
+              <AppText variant="title" color="#fff">
                 {fee != null ? `Unlock contact · ${fee.toLocaleString()} FIX` : "Unlock contact"}
               </AppText>
-              <AppText variant="micro" color="#052E1F" style={{ opacity: 0.8, marginTop: 1 }} tabular testID="fixa-unlock-balance">
+              <AppText variant="micro" color="rgba(255,255,255,0.8)" style={{ marginTop: 1 }} tabular testID="fixa-unlock-balance">
                 You have {(fix?.spendable ?? 0).toLocaleString()} FIX · confirm before paying
               </AppText>
             </View>
-          </Pressable>
+          </PressableScale>
         )}
       </View>
 
@@ -333,13 +331,13 @@ function Stat({ icon, value, label }: { icon: IconName; value: string; label: st
 function ContactLine({ icon, value, onPress, testID, brand }: { icon: IconName; value: string; onPress: () => void; testID?: string; brand?: boolean }) {
   const { colors } = useTheme();
   return (
-    <Pressable style={({ pressed }) => [styles.contact, { borderColor: colors.border, backgroundColor: colors.surface }, pressed && { opacity: 0.85 }]} onPress={onPress} accessibilityRole="button" accessibilityLabel={`${brand ? "WhatsApp" : "Call"} ${value}`} testID={testID}>
+    <PressableScale style={[styles.contact, { backgroundColor: colors.surfaceAlt }]} onPress={onPress} accessibilityRole="button" accessibilityLabel={`${brand ? "WhatsApp" : "Call"} ${value}`} testID={testID}>
       <Ionicons name={icon} size={18} color={brand ? "#25D366" : colors.success} />
       <AppText variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1} tabular>
         {value}
       </AppText>
       <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -353,7 +351,7 @@ const styles = StyleSheet.create({
   badge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, height: 28, borderRadius: radii.pill },
   lockedCard: { flexDirection: "row", alignItems: "center", gap: 12 },
   lockIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  contact: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth },
-  sticky: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: space[4], paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  unlockCta: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12, height: 60, paddingHorizontal: 18, borderRadius: radii.lg },
+  contact: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md },
+  sticky: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: space[4], paddingTop: 12, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl },
+  unlockCta: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12, height: 60, paddingHorizontal: 18, borderRadius: radii.pill, overflow: "hidden" },
 });

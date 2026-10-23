@@ -13,7 +13,7 @@ import { api, ShopProduct, ShopRetailerDetail } from "@/src/lib/api";
 import { track } from "@/src/lib/analytics";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, Chip, EmptyState, IconButton, Input, Sheet, Skeleton, useToast } from "@/src/ui";
+import { AppText, Badge, Button, Chip, EmptyState, IconButton, Input, PressableScale, Sheet, Skeleton, useToast } from "@/src/ui";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { RetailerLogo } from "@/src/components/shop/RetailerLogo";
 import { ShopProductCard } from "@/src/components/shop/ShopProductCard";
@@ -32,7 +32,7 @@ export default function StoreScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
   const { width } = useWindowDimensions();
   const toast = useToast();
   const basket = useShopBasket();
@@ -136,7 +136,7 @@ export default function StoreScreen() {
       </View>
 
       {/* Fee / verification strip */}
-      <Pressable onPress={() => setInfoOpen(true)} style={[styles.strip, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel="Store information" testID="shop-store-info">
+      <Pressable onPress={() => setInfoOpen(true)} style={[styles.strip, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel="Store information" testID="shop-store-info">
         <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
           No AMASS fees · {store.product_count ? `${store.product_count} products` : "Catalogue not connected"} · details verified {fmtDate(store.verification.last_verified_at)}
         </AppText>
@@ -145,14 +145,14 @@ export default function StoreScreen() {
 
       {/* Fulfilment selector — only real options are enabled */}
       <View style={[styles.fulfilRow, { paddingHorizontal: gutter }]}>
-        <View style={[styles.fulfilTrack, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]} accessibilityRole="radiogroup">
+        <View style={[styles.fulfilTrack, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="radiogroup">
           {FULFIL.map((f) => {
             const avail = store.fulfilment?.[f.key]?.available === true;
             const active = fulfil === f.key;
             return (
-              <Pressable key={f.key} disabled={!avail} onPress={() => setFulfil(f.key)} style={[styles.fulfilItem, active && { backgroundColor: colors.surface, borderColor: colors.text }]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled: !avail }} testID={`shop-fulfil-${f.key}`}>
+              <Pressable key={f.key} disabled={!avail} onPress={() => setFulfil(f.key)} style={[styles.fulfilItem, active && [{ backgroundColor: colors.surface }, shadows.xs]]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled: !avail }} testID={`shop-fulfil-${f.key}`}>
                 <Ionicons name={f.icon} size={15} color={avail ? colors.text : colors.textMuted} />
-                <AppText variant="caption" weight={active ? "bold" : "medium"} color={avail ? colors.text : colors.textMuted}>
+                <AppText variant="caption" color={avail ? (active ? colors.text : colors.textSecondary) : colors.textMuted}>
                   {avail ? f.label : `${f.label} unconfirmed`}
                 </AppText>
               </Pressable>
@@ -204,7 +204,7 @@ export default function StoreScreen() {
           </AppText>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter, gap: 10, paddingTop: 10 }}>
             {store.promotions.map((pr) => (
-              <Pressable key={pr.product_id} onPress={() => router.push(`/shop/product/${pr.product_id}` as any)} style={[styles.promo, { backgroundColor: colors.massSoft, borderColor: colors.mass }]} accessibilityRole="button" testID={`shop-promo-${pr.product_id}`}>
+              <PressableScale key={pr.product_id} onPress={() => router.push(`/shop/product/${pr.product_id}` as any)} style={[styles.promo, { backgroundColor: colors.massSoft }]} accessibilityRole="button" testID={`shop-promo-${pr.product_id}`}>
                 <Badge label={pr.label} tone="mass" size="xs" />
                 <AppText variant="bodySm" numberOfLines={2} style={{ marginTop: 6 }}>
                   {pr.name}
@@ -222,7 +222,7 @@ export default function StoreScreen() {
                 <AppText variant="micro" tone="tertiary" numberOfLines={2}>
                   {pr.expires_at ? `Ends ${fmtDate(pr.expires_at)}` : "No end date published"} · verified {fmtDate(pr.verified_at)}
                 </AppText>
-              </Pressable>
+              </PressableScale>
             ))}
           </ScrollView>
         </View>
@@ -246,7 +246,7 @@ export default function StoreScreen() {
           ) : null}
           <View style={[styles.feedHead, { paddingHorizontal: gutter }]}>
             <AppText variant="title">{products ? `${products.length} products` : "Products"}</AppText>
-            <Pressable onPress={() => setSort(sort === "relevance" ? "price_asc" : sort === "price_asc" ? "price_desc" : "relevance")} style={[styles.sortPill, { borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel={`Sort: ${sort}. Change`} testID="shop-store-sort">
+            <Pressable onPress={() => setSort(sort === "relevance" ? "price_asc" : sort === "price_asc" ? "price_desc" : "relevance")} style={[styles.sortPill, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={`Sort: ${sort}. Change`} testID="shop-store-sort">
               <Ionicons name="swap-vertical" size={14} color={colors.text} />
               <AppText variant="caption">{sort === "relevance" ? "Relevance" : sort === "price_asc" ? "Price ↑" : "Price ↓"}</AppText>
             </Pressable>
@@ -338,7 +338,7 @@ export default function StoreScreen() {
                 <View key={k} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
                   <Ionicons name={f?.available === true ? "checkmark-circle" : f?.available === false ? "close-circle" : "help-circle-outline"} size={16} color={f?.available === true ? colors.success : f?.available === false ? colors.error : colors.textMuted} />
                   <AppText variant="bodySm" style={{ flex: 1 }}>
-                    <AppText variant="bodySm" weight="bold">{k[0].toUpperCase() + k.slice(1)}: </AppText>
+                    <AppText variant="bodySm" tone="primary">{k[0].toUpperCase() + k.slice(1)}: </AppText>
                     {f?.available === true ? f.note ?? "Available" : f?.available === false ? "Not offered" : f?.note ?? "Not confirmed — ask the store"}
                   </AppText>
                 </View>
@@ -357,14 +357,14 @@ export default function StoreScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { borderBottomLeftRadius: radii.xl, borderBottomRightRadius: radii.xl },
+  hero: { borderBottomLeftRadius: radii.xxl, borderBottomRightRadius: radii.xxl },
   heroRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingBottom: 12 },
-  strip: { marginTop: 10, marginHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, height: 36, borderRadius: radii.sm, borderWidth: StyleSheet.hairlineWidth },
+  strip: { marginTop: 12, marginHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, height: 38, borderRadius: radii.pill },
   fulfilRow: { marginTop: 10 },
-  fulfilTrack: { flexDirection: "row", borderRadius: radii.pill, borderWidth: 1, padding: 3, gap: 2 },
-  fulfilItem: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, height: 36, borderRadius: radii.pill, borderWidth: 1, borderColor: "transparent", paddingHorizontal: 4 },
-  promo: { width: 200, padding: 12, borderRadius: radii.md, borderWidth: 1, gap: 4 },
+  fulfilTrack: { flexDirection: "row", borderRadius: radii.pill, padding: 4, gap: 2 },
+  fulfilItem: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, height: 36, borderRadius: radii.pill, paddingHorizontal: 4 },
+  promo: { width: 200, padding: 14, borderRadius: radii.lg, gap: 4 },
   feedHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 },
-  sortPill: { flexDirection: "row", alignItems: "center", gap: 5, height: 32, paddingHorizontal: 10, borderRadius: radii.pill, borderWidth: 1 },
+  sortPill: { flexDirection: "row", alignItems: "center", gap: 5, height: 34, paddingHorizontal: 12, borderRadius: radii.pill },
   noCat: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md },
 });

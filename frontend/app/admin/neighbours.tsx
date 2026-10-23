@@ -520,7 +520,7 @@ function ReportCard({ report, busy, onAction, onOpen }: { report: SocialReport; 
         </AppText>
       ) : null}
       {report.target_preview || report.target_user ? (
-        <View style={[styles.preview, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+        <View style={[styles.preview, { backgroundColor: colors.surfaceAlt }]}>
           {report.target_user ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Avatar name={report.target_user.full_name} uri={report.target_user.avatar_url} size={24} tone="soft" />
@@ -570,5 +570,5 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   tile: { minWidth: "46%", flex: 1 },
   actions: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 2 },
-  preview: { padding: 10, borderRadius: radii.sm, borderWidth: StyleSheet.hairlineWidth },
+  preview: { padding: 12, borderRadius: radii.md },
 });

@@ -74,7 +74,7 @@ export default function ShopSearchScreen() {
               Browse by category
             </AppText>
             <CategoryRow categories={[{ key: "furniture", label: "Furniture", icon: "bed", color: "#F59E0B" }, { key: "electronics", label: "Electronics", icon: "tv", color: "#3B82F6" }, { key: "appliances", label: "Appliances", icon: "snow", color: "#10B981" }, { key: "home_decor", label: "Home décor", icon: "color-palette", color: "#EC4899" }, { key: "kitchen", label: "Kitchen", icon: "restaurant", color: "#EF4444" }, { key: "lighting", label: "Lighting", icon: "bulb", color: "#8B5CF6" }]} />
-            <Pressable onPress={() => router.push("/shop/stores" as any)} style={[styles.row, { marginHorizontal: space[4], borderColor: colors.border, backgroundColor: colors.surface }]} accessibilityRole="button" testID="shop-search-all-stores">
+            <Pressable onPress={() => router.push("/shop/stores" as any)} style={[styles.row, { marginHorizontal: space[4], backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" testID="shop-search-all-stores">
               <Ionicons name="storefront-outline" size={18} color={colors.text} />
               <AppText variant="bodyMedium" style={{ flex: 1 }}>
                 All stores in Lagos
@@ -130,6 +130,6 @@ export default function ShopSearchScreen() {
 
 const styles = StyleSheet.create({
   chips: { paddingHorizontal: 16, gap: 8, paddingVertical: 10 },
-  row: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: radii.md, borderWidth: 1, marginTop: 10 },
+  row: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: radii.lg, marginTop: 10 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 12 },
 });

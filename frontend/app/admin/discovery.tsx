@@ -128,7 +128,7 @@ export default function AdminDiscoveryScreen() {
       >
         {/* Pending duplicate review — Phase D-4 */}
         {pendingReview.length > 0 && (
-          <Card elevation="xs" style={{ gap: 10, borderColor: colors.warning, borderWidth: 1 }}>
+          <Card tone="soft" style={{ gap: 10, backgroundColor: colors.warningSoft }}>
             <View style={styles.rowBetween}>
               <AppText variant="h3">Pending duplicate review</AppText>
               <Badge label={String(pendingReview.length)} tone="warning" size="md" />
@@ -166,7 +166,7 @@ export default function AdminDiscoveryScreen() {
         {statusLoading ? (
           <Skeleton height={140} radius={radii.lg} />
         ) : status ? (
-          <Card elevation="xs" style={{ gap: 12, borderColor: isMock ? colors.warning : colors.border, borderWidth: isMock ? 1 : StyleSheet.hairlineWidth }}>
+          <Card tone={isMock ? "soft" : "white"} style={[{ gap: 12 }, isMock && { backgroundColor: colors.warningSoft }]}>
             <View style={styles.rowBetween}>
               <Badge label={isMock ? "Mock mode" : "Live Google"} tone={isMock ? "warning" : "success"} icon={isMock ? "flask" : "cloud-done"} size="md" />
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>

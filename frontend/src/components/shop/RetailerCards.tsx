@@ -1,12 +1,12 @@
 /** Retailer grid tile (home) + list row (Choose a store) — Instacart-style density, AMASS styling. */
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import type { ShopRetailer } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
 import { radii } from "@/src/theme/tokens";
-import { AppText, Badge } from "@/src/ui";
+import { AppText, Badge, PressableScale } from "@/src/ui";
 import { RetailerLogo } from "./RetailerLogo";
 
 export function RetailerTile({ r, width = 80 }: { r: ShopRetailer; width?: number }) {
@@ -14,7 +14,7 @@ export function RetailerTile({ r, width = 80 }: { r: ShopRetailer; width?: numbe
   const { colors } = useTheme();
   const highlight = r.deal_count > 0 ? `${r.deal_count} deal${r.deal_count === 1 ? "" : "s"}` : r.product_count === 0 ? "Showroom" : r.fulfilment_lines.find((l) => l.key === "delivery") ? "Delivery" : r.fulfilment_lines[0]?.label;
   return (
-    <Pressable onPress={() => router.push(`/shop/store/${r.slug}` as any)} style={({ pressed }) => [styles.tile, { width, opacity: pressed ? 0.85 : 1 }]} accessibilityRole="button" accessibilityLabel={`${r.name}. ${highlight ?? ""}`} testID={`shop-retailer-tile-${r.slug}`}>
+    <PressableScale onPress={() => router.push(`/shop/store/${r.slug}` as any)} style={[styles.tile, { width }]} accessibilityRole="button" accessibilityLabel={`${r.name}. ${highlight ?? ""}`} testID={`shop-retailer-tile-${r.slug}`}>
       <View>
         <RetailerLogo name={r.short_name} uri={r.logo_url} accent={r.accent} size={width} />
         {r.verification_status === "partial" ? (
@@ -29,7 +29,7 @@ export function RetailerTile({ r, width = 80 }: { r: ShopRetailer; width?: numbe
       {highlight ? (
         r.deal_count > 0 ? (
           <View style={[styles.dealTag, { backgroundColor: colors.massSoft }]}>
-            <AppText variant="micro" color={colors.massText} weight="bold">
+            <AppText variant="micro" color={colors.massText}>
               {highlight}
             </AppText>
           </View>
@@ -39,7 +39,7 @@ export function RetailerTile({ r, width = 80 }: { r: ShopRetailer; width?: numbe
           </AppText>
         )
       ) : null}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -50,7 +50,7 @@ export function RetailerRow({ r, onPress, testID }: { r: ShopRetailer; onPress?:
   const pickup = r.fulfilment_lines.find((l) => l.key === "pickup");
   const showroom = r.fulfilment_lines.find((l) => l.key === "showroom");
   return (
-    <Pressable onPress={onPress ?? (() => router.push(`/shop/store/${r.slug}` as any))} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.85 : 1 }]} accessibilityRole="button" accessibilityLabel={`${r.name}, ${r.category_labels.join(", ")}, ${r.area}`} testID={testID ?? `shop-retailer-row-${r.slug}`}>
+    <PressableScale onPress={onPress ?? (() => router.push(`/shop/store/${r.slug}` as any))} style={[styles.row, { backgroundColor: colors.surface }]} accessibilityRole="button" accessibilityLabel={`${r.name}, ${r.category_labels.join(", ")}, ${r.area}`} testID={testID ?? `shop-retailer-row-${r.slug}`}>
       <RetailerLogo name={r.short_name} uri={r.logo_url} accent={r.accent} size={64} />
       <View style={{ flex: 1, gap: 3 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -82,7 +82,7 @@ export function RetailerRow({ r, onPress, testID }: { r: ShopRetailer; onPress?:
           </AppText>
         ) : null}
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -101,5 +101,5 @@ const styles = StyleSheet.create({
   tile: { alignItems: "center" },
   corner: { position: "absolute", top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   dealTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: radii.xs, marginTop: 2 },
-  row: { flexDirection: "row", gap: 14, alignItems: "flex-start", paddingVertical: 12 },
+  row: { flexDirection: "row", gap: 14, alignItems: "flex-start", padding: 12, borderRadius: radii.lg, marginBottom: 8 },
 });

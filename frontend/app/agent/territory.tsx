@@ -149,12 +149,12 @@ export default function AgentTerritoryScreen() {
               ) : null}
             </Card>
 
-            <Card elevation="xs" style={{ gap: 12 }}>
+            <Card tone="soft" style={{ gap: 12 }}>
               <Input label="LGAs (comma-separated)" value={lgasText} onChangeText={setLgasText} placeholder="Ikoyi, Victoria Island, Lekki" testID="input-lgas" />
               <Input label="Areas (optional)" value={areasText} onChangeText={setAreasText} placeholder="Parkview, Banana Island, Osborne" testID="input-areas" />
             </Card>
 
-            <Card elevation="xs" style={{ gap: 12 }}>
+            <Card tone="soft" style={{ gap: 12 }}>
               <View style={{ gap: 2 }}>
                 <AppText variant="title">Radius from your base (optional)</AppText>
                 <AppText variant="caption" tone="secondary">

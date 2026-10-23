@@ -102,7 +102,7 @@ export default function AgentOnboardingWizard() {
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors: tc } = useTheme();
+  const { colors: tc, shadows: tshadows } = useTheme();
 
   const [draft, setDraft] = useState<OnboardingDraft | null>(null);
   const [loading, setLoading] = useState(true);
@@ -430,7 +430,7 @@ export default function AgentOnboardingWizard() {
       </KeyboardAwareScrollView>
 
       {/* Sticky bottom bar */}
-      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: tc.bgElevated, borderTopColor: tc.border }]}>
+      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: tc.bgElevated }, tshadows.lg]}>
         <Button
           label={step === 4 ? "Check & submit" : "Continue"}
           iconRight={step === 4 ? "shield-checkmark" : "arrow-forward"}
@@ -481,7 +481,7 @@ export default function AgentOnboardingWizard() {
 
           <ScrollView style={{ maxHeight: 340 }} contentContainerStyle={{ gap: 10, paddingVertical: 4 }} showsVerticalScrollIndicator={false}>
             {duplicateSheet.result?.candidates.slice(0, 3).map((c) => (
-              <View key={c.amass_property_id} style={[styles.candidateCard, { backgroundColor: tc.surfaceAlt, borderColor: tc.border }]}>
+              <View key={c.amass_property_id} style={[styles.candidateCard, { backgroundColor: tc.surfaceAlt }]}>
                 <View style={styles.candidateHeader}>
                   <AppText variant="title" tabular>{c.amass_property_id}</AppText>
                   <Badge label={`${c.score}/100`} tone={c.score >= 80 ? "error" : "warning"} />
@@ -745,7 +745,7 @@ function StageLocation({
       </View>
 
       {draft.location && (
-        <View style={[styles.gpsChip, { borderColor: gpsQualityColor }]}>
+        <View style={styles.gpsChip}>
           <View style={[styles.gpsChipDot, { backgroundColor: gpsQualityColor }]} />
           <Text style={styles.gpsChipText}>{gpsMessage}</Text>
         </View>
@@ -1331,28 +1331,24 @@ const makeStyles = (colors: LegacyColors) =>
     alignItems: "center",
     gap: 4,
     height: 38,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSecondary,
   },
-  chipOn: { backgroundColor: colors.ink, borderColor: colors.ink },
+  chipOn: { backgroundColor: colors.ink },
   chipText: { fontSize: 12, fontWeight: "600", color: colors.textSecondary },
 
   grid2: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   gridCard: {
     width: "48%",
     padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    borderRadius: radius.lg,
     gap: 6,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSecondary,
     minHeight: 100,
     justifyContent: "flex-end",
   },
-  gridCardActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  gridCardActive: { backgroundColor: colors.ink },
   gridLabel: { fontSize: 15, fontWeight: "800", color: colors.text },
   gridCaption: { fontSize: 11, color: colors.textTertiary, fontWeight: "500" },
 
@@ -1387,10 +1383,9 @@ const makeStyles = (colors: LegacyColors) =>
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    padding: 10,
+    padding: 12,
     borderRadius: radius.md,
-    borderWidth: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSecondary,
   },
   gpsChipDot: { width: 8, height: 8, borderRadius: 4 },
   gpsChipText: { flex: 1, fontSize: 12, fontWeight: "700", color: colors.text },
@@ -1429,10 +1424,8 @@ const makeStyles = (colors: LegacyColors) =>
   pickerBtn: {
     flex: 1,
     height: 48,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSecondary,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1525,12 +1518,12 @@ const makeStyles = (colors: LegacyColors) =>
     right: 0,
     bottom: 0,
     padding: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
   },
   candidateCard: {
     padding: spacing.md,
     borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
     gap: 6,
   },
   candidateHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },

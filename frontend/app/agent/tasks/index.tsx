@@ -127,7 +127,7 @@ export default function AgentTasksScreen() {
           ListHeaderComponent={
             <View style={{ gap: 12 }}>
               {!hasTerritory && (
-                <Card onPress={() => router.push("/agent/territory" as any)} testID="banner-set-territory" elevation="xs" style={{ backgroundColor: colors.massSoft, borderColor: colors.mass }}>
+                <Card onPress={() => router.push("/agent/territory" as any)} testID="banner-set-territory" tone="soft" style={{ backgroundColor: colors.massSoft }}>
                   <View style={styles.rowCenter}>
                     <View style={[styles.roundIcon, { backgroundColor: colors.mass }]}>
                       <Ionicons name="map" size={16} color="#1A1200" />
@@ -143,7 +143,7 @@ export default function AgentTasksScreen() {
                 </Card>
               )}
               {hasTerritory && (
-                <Pressable onPress={() => router.push("/agent/territory" as any)} accessibilityRole="button" accessibilityLabel="Edit territory" style={[styles.territoryChip, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="territory-chip">
+                <Pressable onPress={() => router.push("/agent/territory" as any)} accessibilityRole="button" accessibilityLabel="Edit territory" style={[styles.territoryChip, { backgroundColor: colors.surfaceAlt }]} testID="territory-chip">
                   <Ionicons name="location" size={14} color={colors.success} />
                   <AppText variant="caption" weight="semibold" style={{ flex: 1 }} numberOfLines={1}>
                     {territory.state}
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   rowCenter: { flexDirection: "row", alignItems: "center", gap: 12 },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   roundIcon: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
-  territoryChip: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, height: 40, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth },
+  territoryChip: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, height: 40, borderRadius: radii.pill },
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center" },
   metaChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, height: 22, borderRadius: radii.pill },
   actionsRow: { position: "absolute", right: space[4], bottom: space[4] },

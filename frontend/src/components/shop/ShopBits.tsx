@@ -4,14 +4,13 @@ import { Pressable, ScrollView, StyleSheet, View, ViewStyle } from "react-native
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import type { ShopBanner, ShopCategory, ShopPurchaseRoute, ShopRetailer } from "@/src/lib/api";
 import { api } from "@/src/lib/api";
 import { track } from "@/src/lib/analytics";
 import { useTheme } from "@/src/theme";
 import { radii } from "@/src/theme/tokens";
-import { AppText, Button, Sheet, useToast } from "@/src/ui";
+import { AppText, Button, PressableScale, Sheet, SheetLink, useToast } from "@/src/ui";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { CATEGORY_FALLBACK_ICON, fmtDate, openRoute } from "./shopFormat";
 
@@ -24,25 +23,22 @@ export function CategoryRow({ categories, selected, onSelect, size = 60, style }
       {categories.map((c) => {
         const active = selected === c.key;
         return (
-          <Pressable
+          <PressableScale
             key={c.key}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              onSelect ? onSelect(c.key) : router.push(`/shop/category/${c.key}` as any);
-            }}
-            style={({ pressed }) => [styles.cat, { opacity: pressed ? 0.8 : 1, width: size + 16 }]}
+            onPress={() => (onSelect ? onSelect(c.key) : router.push(`/shop/category/${c.key}` as any))}
+            style={[styles.cat, { width: size + 16 }]}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={`${c.label}${c.count !== undefined ? `, ${c.count} products` : ""}`}
             testID={`shop-cat-${c.key}`}
           >
-            <View style={[styles.catIcon, { width: size, height: size, borderRadius: size * 0.36, backgroundColor: c.color + "22", borderColor: active ? c.color : "transparent" }]}>
-              <Ionicons name={(c.icon || CATEGORY_FALLBACK_ICON[c.key] || "pricetag") as any} size={size * 0.46} color={c.color} />
+            <View style={[styles.catIcon, { width: size, height: size, borderRadius: size * 0.36, backgroundColor: active ? colors.primary : colors.surfaceAlt }]}>
+              <Ionicons name={(c.icon || CATEGORY_FALLBACK_ICON[c.key] || "pricetag") as any} size={size * 0.44} color={active ? colors.onPrimary : c.color} />
             </View>
-            <AppText variant="caption" align="center" numberOfLines={1} weight={active ? "bold" : "medium"} color={active ? colors.text : colors.textSecondary}>
+            <AppText variant="caption" align="center" numberOfLines={1} color={active ? colors.text : colors.textSecondary}>
               {c.label}
             </AppText>
-          </Pressable>
+          </PressableScale>
         );
       })}
     </ScrollView>
@@ -53,7 +49,11 @@ export function CategoryRow({ categories, selected, onSelect, size = 60, style }
 export function DealBanner({ b, onDismiss }: { b: ShopBanner; onDismiss?: () => void }) {
   const router = useRouter();
   const { colors } = useTheme();
-  const palette = { warning: { bg: colors.mass, fg: "#1F1300", btn: "#1F1300", btnFg: "#FFFFFF" }, brand: { bg: colors.brand, fg: colors.onBrand, btn: "#FFFFFF", btnFg: colors.brand }, info: { bg: colors.info, fg: "#FFFFFF", btn: "#FFFFFF", btnFg: colors.info } }[b.tone];
+  const palette = {
+    warning: { bg: colors.massSoft, fg: colors.text, btn: colors.primary, btnFg: colors.onPrimary },
+    brand: { bg: colors.surfaceInverse, fg: colors.textInverse, btn: colors.bg, btnFg: colors.text },
+    info: { bg: colors.infoSoft, fg: colors.text, btn: colors.primary, btnFg: colors.onPrimary },
+  }[b.tone];
   return (
     <View style={[styles.banner, { backgroundColor: palette.bg }]} testID={`shop-banner-${b.key}`}>
       <View style={{ flex: 1, gap: 6 }}>
@@ -63,15 +63,15 @@ export function DealBanner({ b, onDismiss }: { b: ShopBanner; onDismiss?: () => 
         <AppText variant="bodySm" color={palette.fg} style={{ opacity: 0.9 }}>
           {b.body}
         </AppText>
-        <Pressable onPress={() => router.push(b.route as any)} style={[styles.bannerBtn, { backgroundColor: palette.btn }]} accessibilityRole="button" accessibilityLabel={b.cta} testID={`shop-banner-cta-${b.key}`}>
-          <AppText variant="caption" weight="bold" color={palette.btnFg}>
+        <PressableScale onPress={() => router.push(b.route as any)} style={[styles.bannerBtn, { backgroundColor: palette.btn }]} accessibilityRole="button" accessibilityLabel={b.cta} testID={`shop-banner-cta-${b.key}`}>
+          <AppText variant="caption" color={palette.btnFg}>
             {b.cta}
           </AppText>
-        </Pressable>
+        </PressableScale>
       </View>
       {b.image ? <Image source={{ uri: b.image }} style={styles.bannerImg} contentFit="contain" accessibilityIgnoresInvertColors /> : null}
       {onDismiss ? (
-        <Pressable onPress={onDismiss} hitSlop={10} style={[styles.bannerX, { backgroundColor: "rgba(0,0,0,0.18)" }]} accessibilityRole="button" accessibilityLabel="Dismiss">
+        <Pressable onPress={onDismiss} hitSlop={10} style={[styles.bannerX, { backgroundColor: b.tone === "brand" ? "rgba(255,255,255,0.16)" : "rgba(17,17,17,0.08)" }]} accessibilityRole="button" accessibilityLabel="Dismiss">
           <Ionicons name="close" size={14} color={palette.fg} />
         </Pressable>
       ) : null}
@@ -86,22 +86,22 @@ export function BasketPill({ bottom = 100, label }: { bottom?: number; label?: s
   const { count } = useShopBasket();
   if (count === 0) return null;
   return (
-    <Pressable onPress={() => router.push("/shop/basket" as any)} style={[styles.pill, { bottom, backgroundColor: colors.success }, shadows.lg]} accessibilityRole="button" accessibilityLabel={`Open basket, ${count} items`} testID="shop-basket-pill">
-      <AppText variant="bodySm" color="#fff" numberOfLines={1} style={{ flex: 1 }}>
+    <PressableScale onPress={() => router.push("/shop/basket" as any)} style={[styles.pill, { bottom, backgroundColor: colors.primary }, shadows.lg]} accessibilityRole="button" accessibilityLabel={`Open basket, ${count} items`} testID="shop-basket-pill">
+      <AppText variant="bodySm" color={colors.onPrimary} numberOfLines={1} style={{ flex: 1, opacity: 0.8 }}>
         {label ?? "Hand-off to the retailer when you're ready"}
       </AppText>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <Ionicons name="cart" size={18} color="#fff" />
-        <AppText variant="title" color="#fff">
+        <Ionicons name="cart" size={18} color={colors.onPrimary} />
+        <AppText variant="title" color={colors.onPrimary}>
           Basket
         </AppText>
-        <View style={[styles.count, { backgroundColor: "#fff" }]}>
-          <AppText variant="micro" weight="bold" color={colors.success} tabular>
+        <View style={[styles.count, { backgroundColor: colors.onPrimary }]}>
+          <AppText variant="micro" color={colors.primary} tabular>
             {count}
           </AppText>
         </View>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -165,7 +165,7 @@ export function PurchaseRoutes({ retailer, routes, productId, compact, testIDPre
           You're leaving AMASS to buy directly from the retailer. Prices, stock, delivery, installation and warranty are confirmed by them — AMASS adds no fee and doesn't take payment for this store.
         </AppText>
         <Button label={confirm?.label ?? "Open"} size="lg" fullWidth loading={busy} iconLeft="open-outline" onPress={() => confirm && go(confirm)} testID="shop-handoff-confirm" />
-        <Button label="Stay here" variant="ghost" fullWidth onPress={() => setConfirm(null)} style={{ marginTop: 6 }} testID="shop-handoff-cancel" />
+        <SheetLink label="stay here" onPress={() => setConfirm(null)} testID="shop-handoff-cancel" />
       </Sheet>
     </View>
   );
@@ -174,8 +174,8 @@ export function PurchaseRoutes({ retailer, routes, productId, compact, testIDPre
 const styles = StyleSheet.create({
   catRow: { paddingHorizontal: 12, gap: 4 },
   cat: { alignItems: "center", gap: 6, paddingVertical: 6 },
-  catIcon: { alignItems: "center", justifyContent: "center", borderWidth: 2 },
-  banner: { flexDirection: "row", gap: 12, padding: 16, borderRadius: radii.lg, alignItems: "center", overflow: "hidden" },
+  catIcon: { alignItems: "center", justifyContent: "center" },
+  banner: { flexDirection: "row", gap: 12, padding: 18, borderRadius: radii.xl, alignItems: "center", overflow: "hidden" },
   bannerBtn: { alignSelf: "flex-start", paddingHorizontal: 14, height: 36, borderRadius: radii.pill, alignItems: "center", justifyContent: "center", marginTop: 4 },
   bannerImg: { width: 92, height: 92, borderRadius: radii.md },
   bannerX: { position: "absolute", top: 10, right: 10, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },

@@ -14,7 +14,7 @@ import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Card, EmptyState, Screen, ScreenHeader, SkeletonRows, StatTile, type IconName } from "@/src/ui";
+import { Appear, AppText, Badge, Card, EmptyState, Screen, ScreenHeader, SkeletonRows, StatTile, type IconName } from "@/src/ui";
 
 type Dash = Awaited<ReturnType<typeof api.adminDashboard>>;
 type Tone = "default" | "brand" | "mass" | "fix" | "success" | "warning" | "info" | "premium";
@@ -63,7 +63,7 @@ export default function AdminCockpitHub() {
   return (
     <Screen testID="admin-cockpit">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title="Admin Cockpit" subtitle="Operations · Trust & safety" />
+      <ScreenHeader title="Cockpit" subtitle="Operations · Trust & safety" />
       <ScrollView
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: 60 + insets.bottom }}
         showsVerticalScrollIndicator={false}
@@ -92,7 +92,7 @@ export default function AdminCockpitHub() {
               <StatTile icon="git-merge" tone="premium" value={dash.merged_properties} label="Merged" animate />
             </View>
 
-            <View style={{ gap: 12 }}>
+            <View style={{ gap: 10 }}>
               <Tile title="Duplicate review queue" caption={`${dash.pending_duplicate_review} propert${dash.pending_duplicate_review === 1 ? "y" : "ies"} flagged`} icon="git-compare-outline" badge={dash.pending_duplicate_review} tone="mass" onPress={() => router.push("/admin/duplicate-queue" as any)} testID="tile-dup-queue" />
               <Tile title="Representation reviews" caption={`${dash.pending_representations} pending · ${dash.docs_requested} docs requested`} icon="ribbon-outline" badge={dash.pending_representations + dash.docs_requested} tone="success" onPress={() => router.push("/admin/representations" as any)} testID="tile-rep-queue" />
               <Tile title="Neighbours & community" caption="Social → paid funnel · estate approvals · report moderation" icon="people-outline" badge={(dash.pending_estates ?? 0) + (dash.open_social_reports ?? 0)} tone="brand" onPress={() => router.push("/admin/neighbours" as any)} testID="tile-neighbours" />
@@ -115,24 +115,26 @@ export default function AdminCockpitHub() {
   );
 }
 
+let tileIndex = 0;
 function Tile({ title, caption, icon, badge, tone = "default", onPress, testID }: { title: string; caption: string; icon: IconName; badge?: number; tone?: Tone; onPress: () => void; testID?: string }) {
   const { colors } = useTheme();
-  const map: Record<Tone, { bg: string; fg: string }> = {
-    default: { bg: colors.surfaceAlt, fg: colors.text },
-    brand: { bg: colors.brandSoft, fg: colors.brand },
-    mass: { bg: colors.massSoft, fg: colors.massText },
-    fix: { bg: colors.fixSoft, fg: colors.fixText },
-    success: { bg: colors.successSoft, fg: colors.success },
-    warning: { bg: colors.warningSoft, fg: colors.warning },
-    info: { bg: colors.infoSoft, fg: colors.info },
-    premium: { bg: colors.premiumSoft, fg: colors.premium },
+  const fg: Record<Tone, string> = {
+    default: colors.text,
+    brand: colors.brand,
+    mass: colors.massText,
+    fix: colors.fixText,
+    success: colors.success,
+    warning: colors.warning,
+    info: colors.info,
+    premium: colors.premium,
   };
-  const t = map[tone];
+  const [idx] = React.useState(() => tileIndex++ % 10);
   return (
-    <Card onPress={onPress} testID={testID} elevation="xs">
+    <Appear index={idx}>
+    <Card onPress={onPress} testID={testID} tone="soft">
       <View style={styles.tileRow}>
-        <View style={[styles.tileIcon, { backgroundColor: t.bg }]}>
-          <Ionicons name={icon} size={20} color={t.fg} />
+        <View style={[styles.tileIcon, { backgroundColor: colors.surface }]}>
+          <Ionicons name={icon} size={20} color={fg[tone]} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="title">{title}</AppText>
@@ -140,15 +142,16 @@ function Tile({ title, caption, icon, badge, tone = "default", onPress, testID }
             {caption}
           </AppText>
         </View>
-        {badge ? <Badge label={String(badge)} tone="brand" /> : null}
+        {badge ? <Badge label={String(badge)} tone="inverse" /> : null}
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </View>
     </Card>
+    </Appear>
   );
 }
 
 const styles = StyleSheet.create({
   statRow: { flexDirection: "row", gap: space[3] },
   tileRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  tileIcon: { width: 44, height: 44, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" },
+  tileIcon: { width: 44, height: 44, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
 });

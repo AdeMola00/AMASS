@@ -9,11 +9,9 @@ import { api, WalletTransaction } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AnimatedNumber, AppText, Avatar, Badge, Button, Card, EmptyState, ListRow, RowGroup, Screen, ScreenHeader, Section, Sheet, SkeletonRows, StatTile, useToast, type BadgeTone } from "@/src/ui";
+import { AnimatedNumber, AppText, Avatar, Badge, Button, Card, EmptyState, ListRow, RowGroup, Screen, ScreenHeader, Section, Sheet, SheetLink, SkeletonRows, StatTile, useToast, type BadgeTone } from "@/src/ui";
 
 // FIXA brand surface — identical in light and dark (brand colour).
-const FIXA_DEEP = "#052E1F";
-const FIXA_MID = "#0B3B2A";
 
 type Booking = {
   id: string;
@@ -35,7 +33,7 @@ const STATUS_TONE: Record<Booking["status"], BadgeTone> = { pending: "mass", con
 export default function ProviderDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const toast = useToast();
   const { fix, refresh } = useWallet();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -101,7 +99,7 @@ export default function ProviderDashboard() {
   return (
     <Screen testID="provider-dashboard-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title="Provider Dashboard" subtitle="FIXA · bookings & FIX earnings" right={<Button label="Boost" size="sm" variant="fix" iconLeft="rocket" onPress={() => router.push("/fix-features")} testID="boost-btn" />} />
+      <ScreenHeader title="Provider Dashboard" subtitle="FIXA · bookings & FIX earnings" right={<Button label="Boost" size="sm" variant="premium" iconLeft="rocket" onPress={() => router.push("/fix-features")} testID="boost-btn" />} />
 
       {loading ? (
         <View style={{ padding: space[4], gap: space[4] }}>
@@ -114,14 +112,14 @@ export default function ProviderDashboard() {
         <ScrollView contentContainerStyle={{ paddingBottom: 40 + insets.bottom, gap: space[5] }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />} showsVerticalScrollIndicator={false}>
           <View style={{ paddingHorizontal: space[4], gap: space[3] }}>
             {/* Hero FIX balance */}
-            <LinearGradient colors={[FIXA_DEEP, FIXA_MID, FIXA_DEEP]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="fix-hero">
+            <LinearGradient colors={isDark ? ["#292926", "#1C1C1A"] : ["#1C1C1A", "#111111"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="fix-hero">
               <View style={styles.heroTop}>
                 <View style={styles.heroBadge}>
-                  <Ionicons name="construct" size={22} color="#fff" />
+                  <Ionicons name="construct" size={22} color={colors.fix} />
                 </View>
                 <View style={[styles.fixPill, { backgroundColor: colors.fix }]}>
-                  <Ionicons name="shield-checkmark" size={11} color="#052E1F" />
-                  <AppText variant="micro" color="#052E1F">
+                  <Ionicons name="shield-checkmark" size={11} color="#fff" />
+                  <AppText variant="micro" color="#fff">
                     FIXA VERIFIED
                   </AppText>
                 </View>
@@ -140,8 +138,8 @@ export default function ProviderDashboard() {
               </AppText>
 
               <View style={styles.quickRow}>
-                <Button label="Earn more" size="sm" variant="fix" iconLeft="trending-up" style={styles.quickBtn} onPress={() => router.push("/earn-fix")} testID="quick-earn" />
-                <Button label="Boost profile" size="sm" variant="inverse" iconLeft="rocket" style={styles.quickBtn} onPress={() => router.push("/fix-features")} testID="quick-boost" />
+                <Button label="Earn more" size="sm" variant="inverse" iconLeft="trending-up" style={styles.quickBtn} onPress={() => router.push("/earn-fix")} testID="quick-earn" />
+                <Button label="Boost profile" size="sm" variant="premium" iconLeft="rocket" style={styles.quickBtn} onPress={() => router.push("/fix-features")} testID="quick-boost" />
               </View>
             </LinearGradient>
 
@@ -176,7 +174,7 @@ export default function ProviderDashboard() {
                     label={tx.description}
                     caption={new Date(tx.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     trailing={
-                      <AppText variant="bodyMedium" weight="bold" tone="fix" tabular>
+                      <AppText variant="bodyMedium" tone="fix" tabular>
                         +{tx.amount} FIX
                       </AppText>
                     }
@@ -190,7 +188,7 @@ export default function ProviderDashboard() {
       )}
 
       {/* Complete booking sheet */}
-      <Sheet visible={!!toComplete} onClose={() => setToComplete(null)} title="Mark booking complete?" testID="complete-sheet">
+      <Sheet visible={!!toComplete} onClose={() => setToComplete(null)} headline="mark this booking complete?" testID="complete-sheet">
         <View style={{ gap: space[3] }}>
           <AppText variant="body" tone="secondary">
             {toComplete?.provider_name || toComplete?.trade} · {toComplete?.customer_name}
@@ -201,9 +199,9 @@ export default function ProviderDashboard() {
               Marking complete auto-awards FIX to the provider (job + 5-star bonus if applicable).
             </AppText>
           </View>
-          <Button label="Confirm with 5★ rating" variant="fix" size="lg" fullWidth iconLeft="star" loading={!!completing} onPress={() => doComplete(5)} testID="complete-5star" />
+          <Button label="Confirm with 5★ rating" variant="primary" size="lg" fullWidth iconLeft="star" loading={!!completing} onPress={() => doComplete(5)} testID="complete-5star" />
           <Button label="Confirm (no rating)" variant="secondary" fullWidth disabled={!!completing} onPress={() => doComplete()} testID="complete-norating" />
-          <Button label="Cancel" variant="ghost" fullWidth onPress={() => setToComplete(null)} />
+          <SheetLink label="cancel" onPress={() => setToComplete(null)} />
         </View>
       </Sheet>
     </Screen>
@@ -213,7 +211,7 @@ export default function ProviderDashboard() {
 function BookingRow({ b, onComplete, busy }: { b: Booking; onComplete: () => void; busy: boolean }) {
   const { colors } = useTheme();
   return (
-    <Card elevation="xs" style={{ gap: 12 }} testID={`booking-${b.id}`}>
+    <Card style={{ gap: 12 }} testID={`booking-${b.id}`}>
       <View style={{ flexDirection: "row", gap: 12 }}>
         <Avatar name={b.provider_name} uri={b.provider_avatar} size={48} tone="soft" />
         <View style={{ flex: 1, gap: 4 }}>
@@ -247,7 +245,7 @@ function BookingRow({ b, onComplete, busy }: { b: Booking; onComplete: () => voi
           </View>
         </View>
       </View>
-      {b.status !== "completed" && b.status !== "cancelled" && <Button label="Mark complete (award FIX)" variant="fix" fullWidth iconLeft="checkmark-done" loading={busy} onPress={onComplete} testID={`complete-${b.id}`} />}
+      {b.status !== "completed" && b.status !== "cancelled" && <Button label="Mark complete (award FIX)" variant="primary" fullWidth iconLeft="checkmark-done" loading={busy} onPress={onComplete} testID={`complete-${b.id}`} />}
       {b.status === "completed" && (
         <View style={[styles.notice, { backgroundColor: colors.fixSoft }]}>
           <Ionicons name="shield-checkmark" size={14} color={colors.fixText} />

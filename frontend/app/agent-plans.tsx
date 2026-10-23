@@ -100,7 +100,7 @@ export default function AgentPlansScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ padding: space[4], paddingBottom: insets.bottom + 40, gap: space[4] }} showsVerticalScrollIndicator={false}>
           <View style={{ gap: 6 }}>
-            <AppText variant="h1">List. Get discovered. Close more deals.</AppText>
+            <AppText variant="hero">list. get discovered. close more deals.</AppText>
             <AppText variant="body" tone="secondary">
               Build your professional property profile on AMASS, showcase listings on our intelligent marketplace and connect with serious buyers.
             </AppText>
@@ -125,8 +125,9 @@ export default function AgentPlansScreen() {
             return (
               <Card
                 key={p.id}
+                tone={p.highlight ? "white" : "soft"}
                 elevation={p.highlight ? "md" : "xs"}
-                style={[{ gap: 10 }, p.highlight && { borderColor: colors.text, borderWidth: 1.5 }, isCurrent && { borderColor: colors.success, borderWidth: 1.5 }]}
+                style={[{ gap: 10, padding: space[5] }, isCurrent && { borderColor: colors.success, borderWidth: 1.5 }]}
                 testID={`plan-${p.id}`}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
@@ -135,7 +136,7 @@ export default function AgentPlansScreen() {
                 </View>
 
                 <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
-                  <AppText variant="display" tabular>
+                  <AppText variant="heroSm" tabular>
                     {formatNaira(p.effective_price_ngn)}
                   </AppText>
                   {p.effective_price_ngn > 0 && (
@@ -203,7 +204,7 @@ export default function AgentPlansScreen() {
           <View style={[styles.successIcon, { backgroundColor: colors.successSoft }]}>
             <Ionicons name="checkmark-circle" size={36} color={colors.success} />
           </View>
-          <AppText variant="h2" align="center">
+          <AppText variant="heroSm" align="center">
             {activated?.title}
           </AppText>
           <AppText variant="body" tone="secondary" align="center">

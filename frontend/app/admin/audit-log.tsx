@@ -308,7 +308,7 @@ function JsonBlock({ label, value }: { label: string; value: any }) {
   return (
     <View style={{ gap: 6 }}>
       <AppText variant="label" tone="tertiary" uppercase>{label}</AppText>
-      <View style={[styles.json, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+      <View style={[styles.json, { backgroundColor: colors.surfaceAlt }]}>
         <AppText variant="caption" style={styles.mono} selectable>{JSON.stringify(value, null, 2)}</AppText>
       </View>
     </View>
@@ -321,6 +321,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: StyleSheet.hairlineWidth, minHeight: 60 },
   rowIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   actionChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  json: { padding: 12, borderRadius: radii.sm, borderWidth: StyleSheet.hairlineWidth },
+  json: { padding: 12, borderRadius: radii.md },
   mono: { fontFamily: "monospace" as any, letterSpacing: 0 },
 });

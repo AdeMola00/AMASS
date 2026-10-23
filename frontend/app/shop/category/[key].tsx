@@ -91,7 +91,7 @@ export default function ShopCategoryScreen() {
       ) : null}
       <View style={[styles.feedHead, { paddingHorizontal: gutter }]}>
         <AppText variant="title">{data ? `${data.products.length} products` : "Products"}</AppText>
-        <Pressable onPress={() => setSort(SORTS[(SORTS.findIndex((s) => s.key === sort) + 1) % SORTS.length].key)} style={[styles.sortPill, { borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel={`Sort: ${SORTS.find((s) => s.key === sort)?.label}. Change`} testID="shop-browse-sort">
+        <Pressable onPress={() => setSort(SORTS[(SORTS.findIndex((s) => s.key === sort) + 1) % SORTS.length].key)} style={[styles.sortPill, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={`Sort: ${SORTS.find((s) => s.key === sort)?.label}. Change`} testID="shop-browse-sort">
           <Ionicons name="swap-vertical" size={14} color={colors.text} />
           <AppText variant="caption">{SORTS.find((s) => s.key === sort)?.label}</AppText>
         </Pressable>
@@ -149,5 +149,5 @@ export default function ShopCategoryScreen() {
 const styles = StyleSheet.create({
   chips: { paddingHorizontal: 16, gap: 8, paddingVertical: 10 },
   feedHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
-  sortPill: { flexDirection: "row", alignItems: "center", gap: 5, height: 32, paddingHorizontal: 10, borderRadius: radii.pill, borderWidth: 1 },
+  sortPill: { flexDirection: "row", alignItems: "center", gap: 5, height: 34, paddingHorizontal: 12, borderRadius: radii.pill },
 });

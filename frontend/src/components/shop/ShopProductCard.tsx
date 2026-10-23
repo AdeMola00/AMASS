@@ -12,7 +12,7 @@ import * as Haptics from "expo-haptics";
 import type { ShopProduct } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
 import { radii } from "@/src/theme/tokens";
-import { AppText, Badge, useToast } from "@/src/ui";
+import { AppText, Badge, PressableScale, useToast } from "@/src/ui";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { discountPct, naira, priceLabel, stockLabel } from "./shopFormat";
 
@@ -26,9 +26,9 @@ export function ShopProductCard({ p, width, variant = "grid", showRetailer = tru
   const w = width ?? (variant === "rail" ? 164 : undefined);
   return (
     <View style={[styles.card, w ? { width: w } : { flex: 1 }, style]} testID={testID ?? `shop-product-${p.id}`}>
-    <Pressable
+    <PressableScale
       onPress={() => router.push(`/shop/product/${p.id}` as any)}
-      style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
+      haptic={false}
       accessibilityRole="button"
       accessibilityLabel={`${p.name}${p.brand ? `, ${p.brand}` : ""}. ${price.prefix ?? ""} ${price.main}. ${stock.label}.`}
       testID={`shop-product-open-${p.id}`}
@@ -43,7 +43,7 @@ export function ShopProductCard({ p, width, variant = "grid", showRetailer = tru
         )}
         {pct ? (
           <View style={[styles.pct, { backgroundColor: colors.mass }]}>
-            <AppText variant="micro" weight="bold" color="#1F1300">
+            <AppText variant="micro" color="#1F1300">
               -{pct}%
             </AppText>
           </View>
@@ -114,7 +114,7 @@ export function ShopProductCard({ p, width, variant = "grid", showRetailer = tru
           </AppText>
         ) : null}
       </View>
-    </Pressable>
+    </PressableScale>
     {/* Sibling of the card pressable (not nested) so "+" never also opens the product. */}
     <AddControl p={p} />
     </View>
@@ -147,32 +147,34 @@ export function AddControl({ p, size = 36, inline }: { p: ShopProduct; size?: nu
   const pos: ViewStyle = inline ? {} : { position: "absolute", top: 8, right: 8 };
   if (qty > 0) {
     return (
-      <View style={[styles.stepper, pos, { backgroundColor: colors.success, height: size, borderRadius: size / 2 }, shadows.sm]} testID={`shop-stepper-${p.id}`}>
+      <View style={[styles.stepper, pos, { backgroundColor: colors.primary, height: size, borderRadius: size / 2 }, shadows.sm]} testID={`shop-stepper-${p.id}`}>
         <Pressable onPress={() => set(qty - 1)} hitSlop={8} style={[styles.stepBtn, { width: size }]} accessibilityRole="button" accessibilityLabel="Remove one" testID={`shop-minus-${p.id}`}>
-          <Ionicons name={qty === 1 ? "trash-outline" : "remove"} size={16} color="#fff" />
+          <Ionicons name={qty === 1 ? "trash-outline" : "remove"} size={16} color={colors.onPrimary} />
         </Pressable>
-        <AppText variant="bodyMedium" color="#fff" tabular testID={`shop-qty-${p.id}`}>
+        <AppText variant="bodyMedium" color={colors.onPrimary} tabular testID={`shop-qty-${p.id}`}>
           {qty}
         </AppText>
         <Pressable onPress={() => set(Math.min(20, qty + 1))} hitSlop={8} style={[styles.stepBtn, { width: size }]} accessibilityRole="button" accessibilityLabel="Add one more" testID={`shop-plus-${p.id}`}>
-          <Ionicons name="add" size={18} color="#fff" />
+          <Ionicons name="add" size={18} color={colors.onPrimary} />
         </Pressable>
       </View>
     );
   }
   return (
-    <Pressable
+    <PressableScale
       onPress={oos ? undefined : add}
       disabled={oos}
       hitSlop={6}
-      style={({ pressed }) => [styles.addBtn, pos, { width: size, height: size, borderRadius: size / 2, backgroundColor: oos ? colors.surfaceSunken : colors.success, opacity: pressed ? 0.85 : 1 }, !oos && shadows.sm]}
+      scaleTo={0.9}
+      haptic={false}
+      style={[styles.addBtn, pos, { width: size, height: size, borderRadius: size / 2, backgroundColor: oos ? colors.surfaceSunken : colors.primary }, !oos && shadows.sm]}
       accessibilityRole="button"
       accessibilityLabel={oos ? "Out of stock at the retailer" : `Add ${p.name} to basket`}
       accessibilityState={{ disabled: oos }}
       testID={`shop-add-${p.id}`}
     >
-      <Ionicons name={oos ? "close" : "add"} size={22} color={oos ? colors.textMuted : "#fff"} />
-    </Pressable>
+      <Ionicons name={oos ? "close" : "add"} size={22} color={oos ? colors.textMuted : colors.onPrimary} />
+    </PressableScale>
   );
 }
 

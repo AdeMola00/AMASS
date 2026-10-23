@@ -12,7 +12,7 @@ import { api, ShopBasket, ShopBasketGroup } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, EmptyState, IconButton, Screen, ScreenHeader, Sheet, SkeletonCard, useToast } from "@/src/ui";
+import { AppText, Badge, Button, EmptyState, IconButton, PressableScale, Screen, ScreenHeader, Sheet, SheetLink, SkeletonCard, useToast } from "@/src/ui";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { RetailerLogo } from "@/src/components/shop/RetailerLogo";
 import { AddControl } from "@/src/components/shop/ShopProductCard";
@@ -85,7 +85,7 @@ export default function BasketScreen() {
       <ScrollView
         contentContainerStyle={{ padding: space[4], paddingBottom: 120, gap: 16 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.brand} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.text} />}
       >
         {!user ? (
           authLoading ? (
@@ -131,7 +131,7 @@ export default function BasketScreen() {
           This removes {clearing?.item_count} item{clearing?.item_count === 1 ? "" : "s"} from your {clearing?.retailer.short_name} basket. Your other baskets aren&apos;t affected.
         </AppText>
         <Button label="Clear basket" variant="destructive" size="lg" fullWidth loading={busy} onPress={clearGroup} testID="shop-basket-clear-confirm" />
-        <Button label="Keep items" variant="ghost" fullWidth onPress={() => setClearing(null)} style={{ marginTop: 6 }} />
+        <SheetLink label="keep items" onPress={() => setClearing(null)} />
       </Sheet>
     </Screen>
   );
@@ -139,10 +139,10 @@ export default function BasketScreen() {
 
 function GroupCard({ g, onClear }: { g: ShopBasketGroup; onClear: () => void }) {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
   const r = g.retailer;
   return (
-    <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }]} testID={`shop-basket-group-${r.slug}`}>
+    <View style={[styles.group, { backgroundColor: colors.surface }, shadows.xs]} testID={`shop-basket-group-${r.slug}`}>
       <View style={styles.groupHead}>
         <Pressable onPress={() => router.push(`/shop/store/${r.slug}` as any)} style={[styles.groupHead, { flex: 1 }]} accessibilityRole="button" accessibilityLabel={`Open ${r.name}`} testID={`shop-basket-store-${r.slug}`}>
           <RetailerLogo name={r.short_name} uri={r.logo_url} accent={r.accent} size={44} radius={radii.sm} />
@@ -164,9 +164,9 @@ function GroupCard({ g, onClear }: { g: ShopBasketGroup; onClear: () => void }) 
           const price = priceLabel(p.price);
           return (
             <View key={p.id} style={styles.line} testID={`shop-basket-line-${p.id}`}>
-              <Pressable onPress={() => router.push(`/shop/product/${p.id}` as any)} style={[styles.thumb, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={p.name}>
+              <PressableScale onPress={() => router.push(`/shop/product/${p.id}` as any)} style={[styles.thumb, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={p.name}>
                 {p.images[0] ? <Image source={{ uri: p.images[0] }} style={{ width: "100%", height: "100%" }} contentFit="contain" accessibilityIgnoresInvertColors /> : <Ionicons name="image-outline" size={22} color={colors.textMuted} />}
-              </Pressable>
+              </PressableScale>
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="bodySm" numberOfLines={2}>
                   {p.name}
@@ -216,9 +216,9 @@ function GroupCard({ g, onClear }: { g: ShopBasketGroup; onClear: () => void }) 
 
 const styles = StyleSheet.create({
   note: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md },
-  group: { padding: 14, borderRadius: radii.lg, borderWidth: 1, gap: 14 },
+  group: { padding: 16, borderRadius: radii.xl, gap: 14 },
   groupHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   line: { flexDirection: "row", alignItems: "center", gap: 10 },
-  thumb: { width: 64, height: 64, borderRadius: radii.sm, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  thumb: { width: 64, height: 64, borderRadius: radii.md, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   totals: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 4 },
 });

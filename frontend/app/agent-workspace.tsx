@@ -162,7 +162,7 @@ export default function AgentWorkspace() {
           showsVerticalScrollIndicator={false}
         >
           <View style={{ paddingHorizontal: space[4], gap: space[3] }}>
-            <LinearGradient colors={isDark ? ["#1F1D1A", "#141210"] : ["#1A1816", "#0A0A0A"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="workspace-hero">
+            <LinearGradient colors={isDark ? ["#292926", "#1C1C1A"] : ["#1C1C1A", "#111111"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="workspace-hero">
               <AppText variant="label" color="rgba(255,255,255,0.6)" uppercase>
                 Paid lifetime
               </AppText>
@@ -206,7 +206,7 @@ export default function AgentWorkspace() {
       )}
 
       {/* Qualify sheet */}
-      <Sheet visible={!!qualifying} onClose={() => setQualifying(null)} title="Qualify referral" testID="qualify-sheet">
+      <Sheet visible={!!qualifying} onClose={() => setQualifying(null)} headline="qualify this referral" testID="qualify-sheet">
         <View style={{ gap: space[3] }}>
           <AppText variant="bodySm" tone="secondary">
             Enter the agreed deal value to compute the commission for {qualifying?.client_name ?? "this client"}.
@@ -227,7 +227,7 @@ export default function AgentWorkspace() {
       </Sheet>
 
       {/* Payout sheet */}
-      <Sheet visible={!!payingOut} onClose={() => setPayingOut(null)} title="Payout commission" testID="payout-sheet">
+      <Sheet visible={!!payingOut} onClose={() => setPayingOut(null)} headline="pay out your commission" testID="payout-sheet">
         <View style={{ gap: space[3] }}>
           <AppText variant="bodySm" tone="secondary">
             Pay out {formatNaira(payingOut?.commission_amount_ngn || 0)} — choose where it should go.
@@ -246,7 +246,7 @@ function ReferralCard({ r, busy, onQualify, onPayout }: { r: Referral; busy: boo
   const { colors } = useTheme();
   const rate = (r.commission_rate ?? 0.02) * 100;
   return (
-    <Card elevation="xs" style={{ gap: 12 }} testID={`referral-${r.id}`}>
+    <Card style={{ gap: 12 }} testID={`referral-${r.id}`}>
       <View style={{ flexDirection: "row", gap: 12 }}>
         {r.property_snapshot?.images?.[0] ? (
           <Image source={{ uri: r.property_snapshot.images[0] }} style={[styles.propImg, { backgroundColor: colors.skeleton }]} contentFit="cover" />
@@ -287,7 +287,7 @@ function ReferralCard({ r, busy, onQualify, onPayout }: { r: Referral; busy: boo
       </View>
 
       {r.commission_status === "pending" && <Button label="Qualify with deal value" variant="secondary" fullWidth iconLeft="checkmark-done" loading={busy} onPress={onQualify} testID={`qualify-${r.id}`} />}
-      {r.commission_status === "approved" && <Button label={`Payout ${formatNaira(r.commission_amount_ngn ?? 0)}`} variant="fix" fullWidth iconLeft="cash" loading={busy} onPress={onPayout} testID={`payout-${r.id}`} />}
+      {r.commission_status === "approved" && <Button label={`Payout ${formatNaira(r.commission_amount_ngn ?? 0)}`} variant="primary" fullWidth iconLeft="cash" loading={busy} onPress={onPayout} testID={`payout-${r.id}`} />}
       {r.commission_status === "paid" && (
         <View style={[styles.paidBanner, { backgroundColor: colors.successSoft }]}>
           <Ionicons name="shield-checkmark" size={14} color={colors.success} />
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   hero: { borderRadius: radii.xl, padding: space[5], gap: 6, overflow: "hidden" },
   heroPill: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 10, height: 28, borderRadius: radii.pill, backgroundColor: "rgba(255,255,255,0.12)", marginTop: 8 },
   kpiRow: { flexDirection: "row", gap: space[3] },
-  propImg: { width: 64, height: 64, borderRadius: radii.sm },
-  moneyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, borderRadius: radii.sm },
-  paidBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: radii.sm },
+  propImg: { width: 64, height: 64, borderRadius: radii.md },
+  moneyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderRadius: radii.md },
+  paidBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: radii.md },
 });

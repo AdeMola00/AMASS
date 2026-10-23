@@ -27,6 +27,7 @@ import {
   SkeletonCard,
   SkeletonRows,
   StatTile,
+  PressableScale,
   useToast,
   type BadgeTone,
   type IconName,
@@ -148,7 +149,7 @@ export default function AgentDashboard() {
     <Screen testID="agent-dashboard-screen">
       <Stack.Screen options={{ headerShown: false }} />
       <ScreenHeader
-        title="Agent Dashboard"
+        title="Dashboard"
         subtitle={`Welcome back, ${user?.full_name?.split(" ")[0] || "Agent"}`}
         backTestID="dashboard-back"
         right={<IconButton icon="add" variant="primary" label="New listing" onPress={goNew} testID="dashboard-new-listing" />}
@@ -181,10 +182,10 @@ export default function AgentDashboard() {
           <AgentScoreCard />
 
           {/* Phase D-5: Verification Task Queue entry */}
-          <Card onPress={() => router.push("/agent/tasks" as any)} testID="agent-tasks-entry" elevation="xs">
+          <Card onPress={() => router.push("/agent/tasks" as any)} testID="agent-tasks-entry" tone="soft">
             <View style={styles.rowCenter}>
-              <View style={[styles.roundIcon, { backgroundColor: colors.brand }]}>
-                <Ionicons name="checkmark-done" size={18} color={colors.onBrand} />
+              <View style={[styles.roundIcon, { backgroundColor: colors.surface }]}>
+                <Ionicons name="checkmark-done" size={18} color={colors.text} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="title">Verification tasks</AppText>
@@ -200,12 +201,12 @@ export default function AgentDashboard() {
             <Card
               onPress={() => router.push("/agent-plans")}
               testID="agent-quota-card"
-              elevation="xs"
-              style={[{ gap: 12 }, quota.at_limit && { borderColor: colors.brand, backgroundColor: colors.brandSoft }]}
+              tone="soft"
+              style={[{ gap: 12 }, quota.at_limit && { backgroundColor: colors.brandSoft }]}
             >
               <View style={styles.rowCenter}>
-                <View style={[styles.roundIcon, { backgroundColor: quota.at_limit ? colors.brand : colors.surfaceInverse }]}>
-                  <Ionicons name="business" size={14} color={quota.at_limit ? colors.onBrand : colors.textInverse} />
+                <View style={[styles.roundIcon, { backgroundColor: quota.at_limit ? colors.brand : colors.surface }]}>
+                  <Ionicons name="business" size={14} color={quota.at_limit ? colors.onBrand : colors.text} />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <AppText variant="title" tabular>
@@ -226,10 +227,10 @@ export default function AgentDashboard() {
               <View style={styles.sectionHead}>
                 <AppText variant="h3">Recent listings</AppText>
                 <Pressable onPress={() => setTab("listings")} hitSlop={8} accessibilityRole="button" style={styles.sectionAction}>
-                  <AppText variant="caption" weight="bold">
+                  <AppText variant="caption" tone="secondary">
                     View all
                   </AppText>
-                  <Ionicons name="chevron-forward" size={14} color={colors.text} />
+                  <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
                 </Pressable>
               </View>
               {dashboard.recent.slice(0, 3).map((p) => {
@@ -263,10 +264,10 @@ export default function AgentDashboard() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => <LeadRow lead={item} />}
           ListHeaderComponent={
-            <Card onPress={() => router.push("/crm")} testID="open-crm-cta" elevation="xs" style={{ marginBottom: space[1] }}>
+            <Card onPress={() => router.push("/crm")} testID="open-crm-cta" tone="soft" style={{ marginBottom: space[1] }}>
               <View style={styles.rowCenter}>
-                <View style={[styles.roundIcon, { backgroundColor: colors.surfaceInverse }]}>
-                  <Ionicons name="briefcase" size={16} color={colors.textInverse} />
+                <View style={[styles.roundIcon, { backgroundColor: colors.surface }]}>
+                  <Ionicons name="briefcase" size={16} color={colors.text} />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <AppText variant="title">Open the full Leads CRM</AppText>
@@ -291,7 +292,7 @@ function Overview({ dashboard, onNew, isDark }: { dashboard: Dashboard | null; o
   const s = dashboard?.stats;
   return (
     <View style={{ gap: space[4] }}>
-      <LinearGradient colors={isDark ? ["#1F1D1A", "#141210"] : ["#1A1816", "#0A0A0A"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="portfolio-hero">
+      <LinearGradient colors={isDark ? ["#292926", "#1C1C1A"] : ["#1C1C1A", "#111111"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="portfolio-hero">
         <AppText variant="label" color="rgba(255,255,255,0.6)" uppercase>
           Portfolio value
         </AppText>
@@ -323,18 +324,20 @@ function Overview({ dashboard, onNew, isDark }: { dashboard: Dashboard | null; o
         <StatTile icon="shield-checkmark" tone="success" value={s?.verified ?? 0} label="Verified" />
       </View>
 
-      <Card onPress={onNew} testID="quick-new-listing" elevation="sm">
+      <Card onPress={onNew} testID="quick-new-listing" tone="ink">
         <View style={styles.rowCenter}>
-          <View style={[styles.roundIcon, { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brand }]}>
-            <Ionicons name="add" size={22} color={colors.onBrand} />
+          <View style={[styles.roundIcon, { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.14)" }]}>
+            <Ionicons name="add" size={22} color={colors.textInverse} />
           </View>
           <View style={{ flex: 1, gap: 2 }}>
-            <AppText variant="title">List a new property</AppText>
-            <AppText variant="caption" tone="secondary">
+            <AppText variant="title" color={colors.textInverse}>
+              List a new property
+            </AppText>
+            <AppText variant="caption" color={colors.textInverse} style={{ opacity: 0.7 }}>
               5-minute guided flow with GPS verification
             </AppText>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={20} color={colors.textInverse} />
         </View>
       </Card>
     </View>
@@ -358,7 +361,7 @@ function ListingRow({ property, views, favorites, onPress, onBoost }: { property
               {property.location}
             </AppText>
             <View style={styles.listingFooter}>
-              <AppText variant="bodyMedium" tabular weight="bold" style={{ flex: 1 }} numberOfLines={1}>
+              <AppText variant="title" tabular style={{ flex: 1 }} numberOfLines={1}>
                 {formatNaira(property.price)}
               </AppText>
               <View style={[styles.metricPill, { backgroundColor: colors.surfaceAlt }]}>
@@ -378,9 +381,10 @@ function ListingRow({ property, views, favorites, onPress, onBoost }: { property
         </View>
       </Card>
       {onBoost ? (
-        <Pressable
+        <PressableScale
           onPress={onBoost}
-          style={({ pressed }) => [styles.boostBtn, { backgroundColor: colors.surfaceInverse }, pressed && { opacity: 0.85 }]}
+          scaleTo={0.93}
+          style={[styles.boostBtn, { backgroundColor: colors.surfaceInverse }]}
           accessibilityRole="button"
           accessibilityLabel={`Boost ${property.title}`}
           testID={`boost-${property.id}`}
@@ -389,7 +393,7 @@ function ListingRow({ property, views, favorites, onPress, onBoost }: { property
           <AppText variant="micro" color={colors.textInverse}>
             Boost
           </AppText>
-        </Pressable>
+        </PressableScale>
       ) : null}
     </View>
   );
@@ -434,14 +438,14 @@ function BoostSheet({ property, onClose, onSuccess }: { property: Property | nul
   };
 
   return (
-    <Sheet visible={!!property} onClose={onClose} title="Boost your listing" testID="boost-sheet">
+    <Sheet visible={!!property} onClose={onClose} headline="boost your listing" testID="boost-sheet">
       <View style={{ gap: space[3] }}>
         <AppText variant="bodySm" tone="secondary" numberOfLines={2}>
           {property?.title}
         </AppText>
         <View style={[styles.balanceRow, { backgroundColor: colors.massSoft }]}>
           <TokenIcon size={16} />
-          <AppText variant="caption" tone="mass" tabular weight="bold">
+          <AppText variant="caption" tone="mass" tabular>
             Balance: {balance.toLocaleString()} MASS
           </AppText>
         </View>
@@ -452,37 +456,34 @@ function BoostSheet({ property, onClose, onSuccess }: { property: Property | nul
             if (!t) return null;
             const active = selectedTier === k;
             return (
-              <Pressable
+              <PressableScale
                 key={k}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setSelectedTier(k);
-                }}
+                onPress={() => setSelectedTier(k)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                style={[styles.tier, { backgroundColor: active ? colors.surfaceInverse : colors.surface, borderColor: active ? colors.surfaceInverse : colors.border }]}
+                style={[styles.tier, { backgroundColor: active ? colors.surfaceInverse : colors.surfaceAlt }]}
                 testID={`boost-tier-${k}`}
               >
                 <Ionicons name={TIER_ICON[k]} size={20} color={active ? colors.textInverse : colors.text} />
-                <AppText variant="caption" weight="bold" color={active ? colors.textInverse : colors.text}>
+                <AppText variant="caption" color={active ? colors.textInverse : colors.text}>
                   {t.label}
                 </AppText>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
                   <TokenIcon size={10} />
-                  <AppText variant="bodyMedium" weight="bold" tabular color={active ? colors.textInverse : colors.text}>
+                  <AppText variant="title" tabular color={active ? colors.textInverse : colors.text}>
                     {t.tokens}
                   </AppText>
                 </View>
                 <AppText variant="micro" color={active ? "rgba(255,255,255,0.7)" : colors.textTertiary}>
                   {t.days} days
                 </AppText>
-              </Pressable>
+              </PressableScale>
             );
           })}
         </View>
 
         {tiers[selectedTier]?.perk ? (
-          <View style={[styles.perk, { backgroundColor: colors.surfaceAlt }]}>
+          <View style={[styles.perk, { backgroundColor: colors.massSoft }]}>
             <Ionicons name="sparkles" size={14} color={colors.massText} />
             <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
               {tiers[selectedTier].perk}
@@ -558,7 +559,7 @@ const styles = StyleSheet.create({
   boostBtn: { position: "absolute", right: 12, top: 12, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, height: 28, borderRadius: radii.pill },
   balanceRow: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 10, height: 30, borderRadius: radii.pill },
   tiersRow: { flexDirection: "row", gap: 8 },
-  tier: { flex: 1, padding: 12, borderRadius: radii.md, borderWidth: 1.5, alignItems: "center", gap: 4, minHeight: 104, justifyContent: "center" },
+  tier: { flex: 1, padding: 12, borderRadius: radii.lg, alignItems: "center", gap: 4, minHeight: 104, justifyContent: "center" },
   perk: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: radii.sm },
   leadAvatar: { width: 44, height: 44, borderRadius: 22 },
   leadChannel: { position: "absolute", right: -2, bottom: -2, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", borderWidth: 2 },

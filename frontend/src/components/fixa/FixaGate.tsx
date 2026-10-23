@@ -18,10 +18,10 @@ export function FixaGate({ balance = 0, compact, testID = "fixa-gate" }: { balan
     <View style={[styles.wrap, compact && { paddingVertical: space[4] }]} testID={testID}>
       <View style={[styles.card, shadows.md, { backgroundColor: colors.surfaceInverse }]}>
         <View style={[styles.icon, { backgroundColor: colors.fix }]}>
-          <Ionicons name="construct" size={26} color="#052E1F" />
+          <Ionicons name="construct" size={26} color="#fff" />
         </View>
-        <AppText variant="h2" color={colors.textInverse} align="center">
-          FIXA is for FIX holders
+        <AppText variant="heroSm" color={colors.textInverse} align="center">
+          fixa is for fix holders
         </AppText>
         <AppText variant="bodySm" color={colors.textInverse} align="center" style={{ opacity: 0.78 }}>
           Vetted plumbers, electricians, surveyors and more. Keep any FIX balance to browse — you only pay when you unlock a provider&apos;s direct contact.
@@ -29,7 +29,7 @@ export function FixaGate({ balance = 0, compact, testID = "fixa-gate" }: { balan
         <View style={[styles.balance, { backgroundColor: "rgba(255,255,255,0.08)" }]} accessibilityLabel={`Your FIX balance is ${balance}`}>
           <Ionicons name="wallet-outline" size={14} color={colors.fix} />
           <AppText variant="caption" color={colors.textInverse} tabular>
-            Your FIX balance: <AppText variant="caption" weight="bold" color={colors.fix} tabular>{balance.toLocaleString()} FIX</AppText>
+            Your FIX balance: <AppText variant="caption" color={colors.fix} tabular>{balance.toLocaleString()} FIX</AppText>
           </AppText>
         </View>
         <View style={styles.perks}>
@@ -38,7 +38,7 @@ export function FixaGate({ balance = 0, compact, testID = "fixa-gate" }: { balan
           <Perk icon="refresh-circle" label="24h credit if unreachable" />
         </View>
         <View style={styles.actions}>
-          <Button label="Get FIX" variant="fix" size="lg" iconLeft="add-circle" onPress={() => router.push({ pathname: "/buy-fix", params: { returnTo: "/fixa" } } as any)} style={{ flex: 1.2 }} testID="fixa-gate-buy" />
+          <Button label="Get FIX" variant="premium" size="lg" iconLeft="add-circle" onPress={() => router.push({ pathname: "/buy-fix", params: { returnTo: "/fixa" } } as any)} style={{ flex: 1.2 }} testID="fixa-gate-buy" />
           <Button label="Earn FIX free" variant="inverse" size="lg" onPress={() => router.push("/earn-fix" as any)} style={{ flex: 1 }} testID="fixa-gate-earn" />
         </View>
       </View>

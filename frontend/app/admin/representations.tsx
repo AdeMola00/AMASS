@@ -227,7 +227,7 @@ function DecisionSheet({ rep, onClose, onDone }: { rep: Rep | null; onClose: () 
               <AppText variant="label" tone="tertiary" uppercase>Documents · {rep.documents.length}</AppText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {rep.documents.map((d, i) => (
-                  <View key={i} style={[styles.doc, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                  <View key={i} style={[styles.doc, { backgroundColor: colors.surfaceAlt }]}>
                     <Image source={{ uri: d }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={200} />
                   </View>
                 ))}
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   statusBar: { paddingBottom: space[3], borderBottomWidth: StyleSheet.hairlineWidth },
   card: { flexDirection: "row", gap: 12, alignItems: "center", padding: 12 },
   thumb: { width: 60, height: 60, borderRadius: radii.sm, alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  doc: { width: 110, height: 110, borderRadius: radii.sm, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
+  doc: { width: 110, height: 110, borderRadius: radii.md, overflow: "hidden" },
   actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   notice: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm },
 });

@@ -55,7 +55,7 @@ export default function AgentScoreScreen() {
           <View style={styles.hero}>
             <View style={[styles.scoreRing, { backgroundColor: colors.surfaceInverse }]} accessibilityLabel={`Score ${data.score} out of 100`}>
               <AnimatedNumber value={data.score} variant="heroLg" color={colors.textInverse} testID="score-value" />
-              <AppText variant="caption" color={colors.textMuted}>
+              <AppText variant="caption" color="rgba(255,255,255,0.6)">
                 out of 100
               </AppText>
             </View>
@@ -70,7 +70,7 @@ export default function AgentScoreScreen() {
               const pct = Math.max(0, Math.min(100, f.value));
               const tone = pct >= 70 ? "success" : pct >= 40 ? "primary" : "brand";
               return (
-                <Card key={f.id} elevation="xs" style={{ gap: 10 }} testID={`factor-${f.id}`}>
+                <Card key={f.id} tone="soft" style={{ gap: 10 }} testID={`factor-${f.id}`}>
                   <View style={styles.factorHead}>
                     <AppText variant="title" style={{ flex: 1 }}>
                       {f.label}

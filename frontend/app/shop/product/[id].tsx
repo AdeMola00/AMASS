@@ -15,7 +15,7 @@ import { api, ShopProductDetail } from "@/src/lib/api";
 import { track } from "@/src/lib/analytics";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Avatar, Badge, Button, EmptyState, IconButton, Skeleton, useToast } from "@/src/ui";
+import { AppText, Avatar, Badge, Button, EmptyState, IconButton, PressableScale, Skeleton, useToast } from "@/src/ui";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { RetailerLogo } from "@/src/components/shop/RetailerLogo";
 import { AddControl, ShopProductCard } from "@/src/components/shop/ShopProductCard";
@@ -27,7 +27,7 @@ export default function ShopProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
   const { width } = useWindowDimensions();
   const toast = useToast();
   const basket = useShopBasket();
@@ -81,7 +81,7 @@ export default function ShopProductScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg }} testID="shop-product-screen">
       <ScrollView contentContainerStyle={{ paddingBottom: 140 + insets.bottom }} showsVerticalScrollIndicator={false}>
         {/* Gallery */}
-        <View style={[styles.gallery, { height: galleryH, backgroundColor: colors.surfaceAlt, paddingTop: insets.top }]}>
+        <View style={[styles.gallery, { height: galleryH, backgroundColor: colors.surfaceAlt, paddingTop: insets.top, borderBottomLeftRadius: radii.xxl, borderBottomRightRadius: radii.xxl }]}>
           {p?.images?.length ? (
             <Image source={{ uri: p.images[img] }} style={{ width: "100%", height: galleryH - insets.top }} contentFit="contain" transition={200} accessibilityIgnoresInvertColors accessibilityLabel={p.name} />
           ) : (
@@ -114,7 +114,7 @@ export default function ShopProductScreen() {
         ) : (
           <View style={{ padding: space[4], gap: 14 }}>
             {/* Retailer chip */}
-            <Pressable onPress={() => p.retailer && router.push(`/shop/store/${p.retailer.slug}` as any)} style={[styles.retailer, { borderColor: colors.border, backgroundColor: colors.surface }]} accessibilityRole="button" accessibilityLabel={`Sold by ${p.retailer?.name}`} testID="shop-product-retailer">
+            <PressableScale onPress={() => p.retailer && router.push(`/shop/store/${p.retailer.slug}` as any)} style={[styles.retailer, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={`Sold by ${p.retailer?.name}`} testID="shop-product-retailer">
               <RetailerLogo name={p.retailer?.short_name ?? "Store"} uri={p.retailer?.logo_url} accent={p.retailer?.accent} size={36} radius={radii.xs} />
               <View style={{ flex: 1 }}>
                 <AppText variant="caption" tone="tertiary">
@@ -126,7 +126,7 @@ export default function ShopProductScreen() {
               </View>
               {p.retailer_detail?.badge ? <Badge label={p.retailer_detail.badge} tone="neutral" size="xs" /> : null}
               <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-            </Pressable>
+            </PressableScale>
 
             {/* Title */}
             <View style={{ gap: 4 }}>
@@ -148,7 +148,7 @@ export default function ShopProductScreen() {
             </View>
 
             {/* Price block */}
-            <View style={[styles.priceCard, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="shop-product-price">
+            <View style={[styles.priceCard, { backgroundColor: colors.surface }, shadows.xs]} testID="shop-product-price">
               <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
                 {price?.prefix ? (
                   <AppText variant="bodySm" tone="secondary">
@@ -179,7 +179,7 @@ export default function ShopProductScreen() {
                 <View style={[styles.promoBox, { backgroundColor: colors.massSoft }]} testID="shop-product-promo">
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Ionicons name="pricetag" size={14} color={colors.massText} />
-                    <AppText variant="caption" weight="bold" color={colors.massText}>
+                    <AppText variant="caption" color={colors.massText}>
                       {p.promo.label} · {p.promo.expires_at ? `ends ${fmtDate(p.promo.expires_at)}` : "no end date published"}
                     </AppText>
                   </View>
@@ -322,7 +322,7 @@ export default function ShopProductScreen() {
 
       {/* Sticky basket bar */}
       {p ? (
-        <View style={[styles.bar, { paddingBottom: insets.bottom + 10, backgroundColor: colors.bgElevated, borderTopColor: colors.border }]} testID="shop-product-bar">
+        <View style={[styles.bar, { paddingBottom: insets.bottom + 10, backgroundColor: colors.bgElevated }, shadows.lg]} testID="shop-product-bar">
           <View style={{ flex: 1 }}>
             <AppText variant="title" tabular numberOfLines={1}>
               {price?.prefix ? `${price.prefix} ` : ""}
@@ -358,7 +358,7 @@ export default function ShopProductScreen() {
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   const { colors } = useTheme();
   return (
-    <View style={[styles.block, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+    <View style={[styles.block, { backgroundColor: colors.surfaceAlt }]}>
       <AppText variant="title">{title}</AppText>
       {children}
     </View>
@@ -370,11 +370,11 @@ const styles = StyleSheet.create({
   topBar: { position: "absolute", left: 12, right: 12, flexDirection: "row", gap: 8, alignItems: "center" },
   dots: { position: "absolute", bottom: 10, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  retailer: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: radii.md, borderWidth: 1 },
-  priceCard: { padding: 14, borderRadius: radii.lg, borderWidth: 1, gap: 8 },
+  retailer: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: radii.lg },
+  priceCard: { padding: 16, borderRadius: radii.lg, gap: 8 },
   promoBox: { padding: 10, borderRadius: radii.sm, gap: 4 },
   friends: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: radii.md },
-  block: { padding: 14, borderRadius: radii.lg, borderWidth: 1, gap: 8 },
+  block: { padding: 16, borderRadius: radii.lg, gap: 8 },
   specRow: { flexDirection: "row", gap: 8 },
-  bar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  bar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 12, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl },
 });

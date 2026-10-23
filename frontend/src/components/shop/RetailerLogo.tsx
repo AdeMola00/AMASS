@@ -24,7 +24,7 @@ export function RetailerLogo({ name, uri, accent, size = 72, radius = radii.md, 
   const showImg = !!src && !failed;
   return (
     <View
-      style={[styles.tile, { width: size, height: size, borderRadius: radius, backgroundColor: showImg ? "#FFFFFF" : accent ?? colors.surfaceAlt, borderColor: colors.border }, style]}
+      style={[styles.tile, { width: size, height: size, borderRadius: radius, backgroundColor: showImg ? "#FFFFFF" : accent ?? colors.surfaceAlt }, style]}
       accessibilityRole="image"
       accessibilityLabel={`${name} logo`}
       testID={testID}
@@ -32,7 +32,7 @@ export function RetailerLogo({ name, uri, accent, size = 72, radius = radii.md, 
       {showImg ? (
         <Image source={{ uri: src }} style={{ width: size * 0.78, height: size * 0.78 }} contentFit="contain" transition={120} onError={() => setFailed(true)} accessibilityIgnoresInvertColors />
       ) : (
-        <AppText variant={size >= 64 ? "h2" : "title"} color="#FFFFFF" weight="extrabold">
+        <AppText variant={size >= 64 ? "h2" : "title"} color="#FFFFFF">
           {initialsOf(name)}
         </AppText>
       )}
@@ -41,5 +41,5 @@ export function RetailerLogo({ name, uri, accent, size = 72, radius = radii.md, 
 }
 
 const styles = StyleSheet.create({
-  tile: { alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  tile: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
 });

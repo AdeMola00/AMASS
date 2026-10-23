@@ -4,12 +4,11 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
 import { api, ApiError, ProviderPreview } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Chip, EmptyState, Input, Screen, ScreenHeader, SkeletonRows } from "@/src/ui";
+import { Appear, AppText, Badge, Chip, EmptyState, Input, PressableScale, Screen, ScreenHeader, SkeletonRows } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { FixaGate } from "@/src/components/fixa/FixaGate";
 
@@ -147,14 +146,10 @@ export default function FixaBrowse() {
               />
             )
           }
-          renderItem={({ item }) => (
-            <ProviderRow
-              provider={item}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                router.push(`/fixa/${item.id}` as any);
-              }}
-            />
+          renderItem={({ item, index }) => (
+            <Appear index={index}>
+              <ProviderRow provider={item} onPress={() => router.push(`/fixa/${item.id}` as any)} />
+            </Appear>
           )}
         />
       )}
@@ -167,7 +162,7 @@ function FixBalancePill({ balance, onPress }: { balance: number; onPress: () => 
   return (
     <Pressable onPress={onPress} style={[styles.pill, { backgroundColor: colors.fixSoft }]} accessibilityRole="button" accessibilityLabel={`${balance} FIX. Open wallet`} testID="fixa-balance-pill">
       <View style={[styles.pillDot, { backgroundColor: colors.fix }]} />
-      <AppText variant="caption" weight="bold" color={colors.fixText} tabular>
+      <AppText variant="caption" color={colors.fixText} tabular>
         {balance.toLocaleString()} FIX
       </AppText>
     </Pressable>
@@ -178,9 +173,9 @@ export function ProviderRow({ provider: p, onPress }: { provider: ProviderPrevie
   const { colors, shadows } = useTheme();
   const tier = TIER_META[p.tier ?? 1] ?? TIER_META[1];
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
-      style={({ pressed }) => [styles.row, shadows.xs, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.94 }]}
+      style={[styles.row, shadows.xs, { backgroundColor: colors.surface }]}
       accessibilityRole="button"
       accessibilityLabel={`${p.display_name}, ${p.category}${p.rating ? `, rated ${p.rating}` : ""}. ${p.unlocked ? "Contact unlocked" : "Tap to view and unlock contact"}`}
       testID={`fixa-row-${p.id}`}
@@ -197,7 +192,7 @@ export function ProviderRow({ provider: p, onPress }: { provider: ProviderPrevie
         )}
         {p.verified ? (
           <View style={[styles.verifyDot, { backgroundColor: colors.fix, borderColor: colors.surface }]}>
-            <Ionicons name="shield-checkmark" size={11} color="#052E1F" />
+            <Ionicons name="shield-checkmark" size={11} color="#fff" />
           </View>
         ) : null}
       </View>
@@ -221,7 +216,7 @@ export function ProviderRow({ provider: p, onPress }: { provider: ProviderPrevie
           {p.rating ? (
             <>
               <Ionicons name="star" size={12} color={colors.mass} />
-              <AppText variant="caption" weight="bold" tabular>
+              <AppText variant="caption" tabular>
                 {p.rating.toFixed(1)}
               </AppText>
               <AppText variant="caption" tone="tertiary" tabular>
@@ -242,7 +237,7 @@ export function ProviderRow({ provider: p, onPress }: { provider: ProviderPrevie
       <View style={[styles.lockPill, { backgroundColor: p.unlocked ? colors.successSoft : colors.surfaceAlt }]}>
         <Ionicons name={p.unlocked ? "lock-open" : "lock-closed"} size={14} color={p.unlocked ? colors.success : colors.textSecondary} />
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -250,7 +245,7 @@ const styles = StyleSheet.create({
   pill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 32, borderRadius: radii.pill },
   pillDot: { width: 8, height: 8, borderRadius: 4 },
   note: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: radii.md },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, padding: space[3], borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, padding: space[3], borderRadius: radii.lg },
   avatarWrap: { position: "relative" },
   avatar: { width: 56, height: 56, borderRadius: 28 },
   verifyDot: { position: "absolute", bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", borderWidth: 2 },
