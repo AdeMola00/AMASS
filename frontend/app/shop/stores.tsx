@@ -6,10 +6,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, ScrollView, StyleSheet, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { api, ShopCategory, ShopFilter, ShopRetailer } from "@/src/lib/api";
-import { useTheme } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
-import { AppText, Chip, EmptyState, Input, Screen, ScreenHeader, SkeletonRows } from "@/src/ui";
+import { EmptyState, Screen, ScreenHeader, SkeletonRows } from "@/src/ui";
 import { RetailerRow, RetailerTile } from "@/src/components/shop/RetailerCards";
+import { ShopChip, ShopHeading, ShopSearchField } from "@/src/components/shop/ShopBits";
 
 const CATEGORY_TABS: ShopCategory[] = [
   { key: "all", label: "All", icon: "apps", color: "#111" },
@@ -22,7 +22,6 @@ const CATEGORY_TABS: ShopCategory[] = [
 ];
 
 export default function ChooseStoreScreen() {
-  const { colors } = useTheme();
   const params = useLocalSearchParams<{ filter?: string; category?: string }>();
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<string>(params.category || "all");
@@ -56,14 +55,12 @@ export default function ChooseStoreScreen() {
 
   const header = (
     <View>
-      <View style={{ paddingHorizontal: space[4], paddingBottom: 8 }}>
-        <Input value={q} onChangeText={setQ} placeholder="Search stores and brands" iconLeft="search" iconRight={q ? "close-circle" : undefined} onPressIconRight={() => setQ("")} iconRightLabel="Clear search" returnKeyType="search" testID="shop-stores-search" />
+      <View style={{ paddingHorizontal: space[4], paddingBottom: 12 }}>
+        <ShopSearchField value={q} onChangeText={setQ} placeholder="Search stores and brands" onClear={() => setQ("")} testID="shop-stores-search" />
       </View>
       {!q && savers.length ? (
-        <View style={{ marginBottom: 8 }}>
-          <AppText variant="h3" style={{ paddingHorizontal: space[4], marginBottom: 10 }}>
-            Stores to help you save
-          </AppText>
+        <View style={{ marginBottom: 12 }}>
+          <ShopHeading title="Stores to help you save" style={{ paddingHorizontal: space[4], marginBottom: 12 }} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space[4], gap: 16 }}>
             {savers.map((r) => (
               <RetailerTile key={r.id} r={r} width={84} />
@@ -71,19 +68,17 @@ export default function ChooseStoreScreen() {
           </ScrollView>
         </View>
       ) : null}
-      <AppText variant="h3" style={{ paddingHorizontal: space[4], marginTop: 8 }}>
-        All stores in Lagos
-      </AppText>
+      <ShopHeading title="All stores in Lagos" subtitle={rows ? `${rows.length} store${rows.length === 1 ? "" : "s"}` : undefined} style={{ paddingHorizontal: space[4], marginTop: 8 }} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {CATEGORY_TABS.map((c) => (
-          <Chip key={c.key} label={c.label} selected={category === c.key} onPress={() => setCategory(c.key)} testID={`shop-stores-cat-${c.key}`} />
+          <ShopChip key={c.key} label={c.label} icon={c.key === "all" ? undefined : c.icon} selected={category === c.key} onPress={() => setCategory(c.key)} testID={`shop-stores-cat-${c.key}`} />
         ))}
       </ScrollView>
       {filters.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chips, { paddingTop: 0 }]}>
-          <Chip label="Any" selected={filter === "all"} onPress={() => setFilter("all")} testID="shop-stores-filter-all" />
+          <ShopChip label="Any" selected={filter === "all"} onPress={() => setFilter("all")} testID="shop-stores-filter-all" />
           {filters.map((f) => (
-            <Chip key={f.key} label={f.label} icon={f.icon as any} selected={filter === f.key} onPress={() => setFilter(filter === f.key ? "all" : f.key)} testID={`shop-stores-filter-${f.key}`} />
+            <ShopChip key={f.key} label={f.label} icon={f.key === "offers" ? "pricetag" : f.icon} tone={f.key === "offers" ? "offer" : "default"} selected={filter === f.key} onPress={() => setFilter(filter === f.key ? "all" : f.key)} testID={`shop-stores-filter-${f.key}`} />
           ))}
         </ScrollView>
       ) : null}
@@ -100,7 +95,6 @@ export default function ChooseStoreScreen() {
         renderItem={({ item }) => (
           <View style={{ paddingHorizontal: space[4] }}>
             <RetailerRow r={item} />
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />
           </View>
         )}
         ListEmptyComponent={

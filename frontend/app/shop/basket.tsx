@@ -18,6 +18,7 @@ import { RetailerLogo } from "@/src/components/shop/RetailerLogo";
 import { AddControl } from "@/src/components/shop/ShopProductCard";
 import { PurchaseRoutes } from "@/src/components/shop/ShopBits";
 import { naira, priceLabel } from "@/src/components/shop/shopFormat";
+import { shopFont } from "@/src/components/shop/shopTheme";
 
 export default function BasketScreen() {
   const router = useRouter();
@@ -139,15 +140,15 @@ export default function BasketScreen() {
 
 function GroupCard({ g, onClear }: { g: ShopBasketGroup; onClear: () => void }) {
   const router = useRouter();
-  const { colors, shadows } = useTheme();
+  const { colors, shadows, isDark } = useTheme();
   const r = g.retailer;
   return (
-    <View style={[styles.group, { backgroundColor: colors.surface }, shadows.xs]} testID={`shop-basket-group-${r.slug}`}>
+    <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }, !isDark && shadows.xs]} testID={`shop-basket-group-${r.slug}`}>
       <View style={styles.groupHead}>
         <Pressable onPress={() => router.push(`/shop/store/${r.slug}` as any)} style={[styles.groupHead, { flex: 1 }]} accessibilityRole="button" accessibilityLabel={`Open ${r.name}`} testID={`shop-basket-store-${r.slug}`}>
-          <RetailerLogo name={r.short_name} uri={r.logo_url} accent={r.accent} size={44} radius={radii.sm} />
+          <RetailerLogo name={r.short_name} uri={r.logo_url} accent={r.accent} size={46} radius={radii.sm} />
           <View style={{ flex: 1 }}>
-            <AppText variant="title" numberOfLines={1}>
+            <AppText numberOfLines={1} style={styles.groupName}>
               {r.name}
             </AppText>
             <AppText variant="caption" tone="tertiary" numberOfLines={1}>
@@ -191,11 +192,11 @@ function GroupCard({ g, onClear }: { g: ShopBasketGroup; onClear: () => void }) 
       </View>
 
       <View style={[styles.totals, { borderTopColor: colors.border }]}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
           <AppText variant="bodySm" tone="secondary">
             {g.has_from_prices ? "Subtotal (from prices)" : "Subtotal"}
           </AppText>
-          <AppText variant="title" tabular testID={`shop-basket-subtotal-${r.slug}`}>
+          <AppText tabular style={styles.subtotal} testID={`shop-basket-subtotal-${r.slug}`}>
             {naira(g.subtotal)}
           </AppText>
         </View>
@@ -216,9 +217,11 @@ function GroupCard({ g, onClear }: { g: ShopBasketGroup; onClear: () => void }) 
 
 const styles = StyleSheet.create({
   note: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md },
-  group: { padding: 16, borderRadius: radii.xl, gap: 14 },
+  group: { padding: 16, borderRadius: radii.xl, gap: 14, borderWidth: 1 },
   groupHead: { flexDirection: "row", alignItems: "center", gap: 10 },
+  groupName: { fontFamily: shopFont.bold, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
   line: { flexDirection: "row", alignItems: "center", gap: 10 },
   thumb: { width: 64, height: 64, borderRadius: radii.md, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   totals: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 4 },
+  subtotal: { fontFamily: shopFont.black, fontSize: 20, lineHeight: 24, letterSpacing: -0.4 },
 });

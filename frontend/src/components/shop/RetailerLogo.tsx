@@ -17,14 +17,14 @@ export function initialsOf(name: string): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
-export function RetailerLogo({ name, uri, accent, size = 72, radius = radii.md, style, testID }: { name: string; uri?: string | null; accent?: string; size?: number; radius?: number; style?: ViewStyle; testID?: string }) {
-  const { colors } = useTheme();
+export function RetailerLogo({ name, uri, accent, size = 72, radius = radii.md, elevated, style, testID }: { name: string; uri?: string | null; accent?: string; size?: number; radius?: number; elevated?: boolean; style?: ViewStyle; testID?: string }) {
+  const { colors, shadows, isDark } = useTheme();
   const [failed, setFailed] = useState(false);
   const src = absUrl(uri);
   const showImg = !!src && !failed;
   return (
     <View
-      style={[styles.tile, { width: size, height: size, borderRadius: radius, backgroundColor: showImg ? "#FFFFFF" : accent ?? colors.surfaceAlt }, style]}
+      style={[styles.tile, { width: size, height: size, borderRadius: radius, backgroundColor: showImg ? "#FFFFFF" : accent ?? colors.surfaceAlt, borderColor: isDark ? "transparent" : colors.border }, showImg && styles.bordered, elevated && !isDark && shadows.sm, style]}
       accessibilityRole="image"
       accessibilityLabel={`${name} logo`}
       testID={testID}
@@ -32,7 +32,7 @@ export function RetailerLogo({ name, uri, accent, size = 72, radius = radii.md, 
       {showImg ? (
         <Image source={{ uri: src }} style={{ width: size * 0.78, height: size * 0.78 }} contentFit="contain" transition={120} onError={() => setFailed(true)} accessibilityIgnoresInvertColors />
       ) : (
-        <AppText variant={size >= 64 ? "h2" : "title"} color="#FFFFFF">
+        <AppText variant={size >= 64 ? "h2" : "title"} color="#FFFFFF" style={{ fontFamily: "PlusJakartaSans-800" }}>
           {initialsOf(name)}
         </AppText>
       )}
@@ -42,4 +42,5 @@ export function RetailerLogo({ name, uri, accent, size = 72, radius = radii.md, 
 
 const styles = StyleSheet.create({
   tile: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  bordered: { borderWidth: 1 },
 });

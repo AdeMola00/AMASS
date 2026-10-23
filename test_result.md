@@ -834,3 +834,23 @@ agent_communication:
       Config tab gets "Agent boost tiers" section (cfg-boost-{tier}-tokens/days, cfg-boost-save).
       Demo agent demo@amass.africa / amass2026 owns listing 7d769d80-fdf8-4778-932a-f938aa3c27cf (Palatial Ocean-View Duplex)
       with 12k+ MASS. Note: activating a promotion on the demo listing is a real MASS debit and makes it promoted-first.
+  - agent: "main"
+    message: |
+      SHOP (Brands) INSTACART-ENERGY VISUAL REFRESH — first test pass. FRONTEND ONLY, no backend / route / testID changes.
+      Files: src/components/shop/{shopTheme.ts (new), ShopBits.tsx, ShopHome.tsx, ShopProductCard.tsx, RetailerCards.tsx,
+      RetailerLogo.tsx}, app/shop/{stores,search,basket}.tsx, app/shop/store/[slug].tsx, app/shop/category/[key].tsx,
+      app/shop/product/[id].tsx. What changed visually: vivid per-category tinted tiles (shop-cat-{key}), white ShopChip filter
+      pills (shop-filter-{key}; Offers = yellow when selected), retailer logo tiles with yellow deal tags (shop-retailer-tile-{slug}),
+      brand-red "Show all" circle (shop-show-all-stores), loud banners (yellow deals / red brand gradient / blue info —
+      shop-banner-{key}, shop-banner-cta-{key}), bold section headings with red "See all"/"Show all" (shop-see-all-{key},
+      shop-show-all-{key}), product cards with big bold price + yellow -N% tag + red promo label + red "+" (shop-add-{id}) →
+      red stepper (shop-stepper/minus/plus/qty-{id}), brand-red floating basket bar (shop-basket-pill), store page brand-coloured
+      hero with white ShopSearchField (shop-store-search is now a plain TextInput, clear = shop-store-search-clear), white
+      fulfilment track with ink active pill (shop-fulfil-*), "Deals at X" rail (shop-promo-{id}), ShopChip category/sub chips
+      (shop-store-cat-*, shop-store-sub-*), "Buy from X" card with red gradient "Shop at X" (shop-store-route-website) +
+      WhatsApp/Call. Product page: white gallery, bold title/price, yellow -N% + red promo label, "Add to basket" = red gradient
+      (shop-product-add), Basket button (shop-product-go-basket). Basket groups: bordered white cards, bold subtotal, red
+      "Shop at X" (shop-basket-route-{slug}-website) → hand-off sheet (shop-handoff-sheet / shop-handoff-confirm /
+      shop-handoff-cancel). Search: ShopSearchField shop-search-input, ShopChip suggestions shop-suggest-{i}.
+      Dark mode supported (toggle on Profile: theme-toggle). Demo: demo@amass.africa / amass2026. The Market tab shows a
+      Sponsored AdModal on open — dismiss via ad-close / ad-skip.

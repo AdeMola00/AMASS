@@ -13,13 +13,14 @@ import { api, ShopProduct, ShopRetailerDetail } from "@/src/lib/api";
 import { track } from "@/src/lib/analytics";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, Chip, EmptyState, IconButton, Input, PressableScale, Sheet, Skeleton, useToast } from "@/src/ui";
+import { AppText, Badge, Button, EmptyState, Gloss, IconButton, PressableScale, Sheet, Skeleton, useToast } from "@/src/ui";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { RetailerLogo } from "@/src/components/shop/RetailerLogo";
 import { ShopProductCard } from "@/src/components/shop/ShopProductCard";
-import { BasketPill, PurchaseRoutes, VerifiedNote } from "@/src/components/shop/ShopBits";
+import { BasketPill, OfferTag, PurchaseRoutes, ShopChip, ShopHeading, ShopSearchField, VerifiedNote } from "@/src/components/shop/ShopBits";
 import { accentColors, fmtDate, naira, shareLink } from "@/src/components/shop/shopFormat";
+import { shopFont } from "@/src/components/shop/shopTheme";
 import { AddToCollectionSheet } from "@/src/components/neighbours/AddToCollectionSheet";
 
 type Fulfil = "delivery" | "pickup" | "showroom";
@@ -120,43 +121,45 @@ export default function StoreScreen() {
     <View>
       {/* Accent header */}
       <View style={[styles.hero, { backgroundColor: accent.bg, paddingTop: insets.top + 8 }]} testID="shop-store-header">
+        <Gloss height="70%" />
         <View style={styles.heroRow}>
           <IconButton icon="arrow-back" label="Back" variant="inverse" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/marketplace" as any))} testID="shop-store-back" />
-          <RetailerLogo name={store.short_name} uri={store.logo_url} accent={store.accent} size={44} radius={radii.sm} />
+          <RetailerLogo name={store.short_name} uri={store.logo_url} accent={store.accent} size={46} radius={radii.sm} />
           <View style={{ flex: 1 }}>
-            <AppText variant="h3" color={accent.fg} numberOfLines={1}>
+            <AppText color={accent.fg} numberOfLines={1} style={styles.heroName}>
               {store.name}
             </AppText>
-            <AppText variant="caption" color={accent.fg} style={{ opacity: 0.85 }} numberOfLines={1}>
+            <AppText variant="caption" color={accent.fg} style={{ opacity: 0.88 }} numberOfLines={1}>
               {store.category_labels.join(" · ")}
             </AppText>
           </View>
           <IconButton icon="share-outline" label="Share store" variant="inverse" onPress={() => shareLink(`${store.name} on AMASS`, `https://amass.africa/shop/store/${store.slug}`)} testID="shop-store-share" />
           <IconButton icon={store.saved ? "heart" : "heart-outline"} label={store.saved ? "Unsave store" : "Save store"} variant="inverse" disabled={saving} onPress={toggleSave} testID="shop-store-save" />
         </View>
-        <View style={{ paddingHorizontal: gutter, paddingBottom: 14 }}>
-          <Input value={q} onChangeText={setQ} placeholder={`Search ${store.short_name}`} iconLeft="search" iconRight={q ? "close-circle" : undefined} onPressIconRight={() => setQ("")} iconRightLabel="Clear" containerStyle={{ marginBottom: 0 }} testID="shop-store-search" />
+        <View style={{ paddingHorizontal: gutter, paddingBottom: 18 }}>
+          <ShopSearchField value={q} onChangeText={setQ} placeholder={`Search ${store.short_name}`} onClear={() => setQ("")} testID="shop-store-search" />
         </View>
       </View>
 
       {/* Fee / verification strip */}
-      <Pressable onPress={() => setInfoOpen(true)} style={[styles.strip, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel="Store information" testID="shop-store-info">
-        <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
-          No AMASS fees · {store.product_count ? `${store.product_count} products` : "Catalogue not connected"} · details verified {fmtDate(store.verification.last_verified_at)}
+      <Pressable onPress={() => setInfoOpen(true)} style={[styles.strip, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel="Store information" testID="shop-store-info">
+        <Ionicons name="pricetag" size={14} color={colors.brand} />
+        <AppText variant="caption" numberOfLines={1} style={{ flex: 1, fontFamily: shopFont.semibold }}>
+          No AMASS fees · {store.product_count ? `${store.product_count} products` : "Catalogue not connected"} · verified {fmtDate(store.verification.last_verified_at)}
         </AppText>
         <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
       </Pressable>
 
       {/* Fulfilment selector — only real options are enabled */}
       <View style={[styles.fulfilRow, { paddingHorizontal: gutter }]}>
-        <View style={[styles.fulfilTrack, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="radiogroup">
+        <View style={[styles.fulfilTrack, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="radiogroup">
           {FULFIL.map((f) => {
             const avail = store.fulfilment?.[f.key]?.available === true;
             const active = fulfil === f.key;
             return (
-              <Pressable key={f.key} disabled={!avail} onPress={() => setFulfil(f.key)} style={[styles.fulfilItem, active && [{ backgroundColor: colors.surface }, shadows.xs]]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled: !avail }} testID={`shop-fulfil-${f.key}`}>
-                <Ionicons name={f.icon} size={15} color={avail ? colors.text : colors.textMuted} />
-                <AppText variant="caption" color={avail ? (active ? colors.text : colors.textSecondary) : colors.textMuted}>
+              <Pressable key={f.key} disabled={!avail} onPress={() => setFulfil(f.key)} style={[styles.fulfilItem, active && { backgroundColor: colors.primary }]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled: !avail }} testID={`shop-fulfil-${f.key}`}>
+                <Ionicons name={f.icon} size={15} color={active ? colors.onPrimary : avail ? colors.text : colors.textMuted} />
+                <AppText variant="caption" color={active ? colors.onPrimary : avail ? colors.textSecondary : colors.textMuted} style={active && { fontFamily: shopFont.bold }}>
                   {avail ? f.label : `${f.label} unconfirmed`}
                 </AppText>
               </Pressable>
@@ -176,9 +179,9 @@ export default function StoreScreen() {
       </View>
 
       {/* Location & hours */}
-      <View style={{ paddingHorizontal: gutter, gap: 4, marginTop: 10 }}>
+      <View style={{ paddingHorizontal: gutter, gap: 5, marginTop: 12 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Ionicons name="location-outline" size={15} color={colors.textSecondary} />
+          <Ionicons name="location" size={15} color={colors.brand} />
           <AppText variant="bodySm" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
             {store.locations[0]?.address ?? store.area}
             {store.locations.length > 1 ? ` · +${store.locations.length - 1} more` : ""}
@@ -186,13 +189,14 @@ export default function StoreScreen() {
         </View>
         {store.hours ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Ionicons name="time-outline" size={15} color={colors.textSecondary} />
+            <View style={[styles.openDot, { backgroundColor: colors.success }]} />
             <AppText variant="bodySm" tone="secondary" numberOfLines={1}>
               {store.hours}
             </AppText>
           </View>
         ) : null}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+          {store.deal_count > 0 ? <OfferTag label={`${store.deal_count} deal${store.deal_count === 1 ? "" : "s"}`} size="xs" /> : null}
           {store.tags.map((t) => (
             <Badge key={t.key} label={t.label} tone="neutral" size="xs" />
           ))}
@@ -202,19 +206,17 @@ export default function StoreScreen() {
 
       {/* Promotions */}
       {store.promotions.length ? (
-        <View style={{ marginTop: 16 }}>
-          <AppText variant="h3" style={{ paddingHorizontal: gutter }}>
-            Store offers
-          </AppText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter, gap: 10, paddingTop: 10 }}>
+        <View style={{ marginTop: 22 }}>
+          <ShopHeading title={`Deals at ${store.short_name}`} subtitle="Listed by the retailer · terms on each item" style={{ paddingHorizontal: gutter }} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter, gap: 10, paddingTop: 12 }}>
             {store.promotions.map((pr) => (
-              <PressableScale key={pr.product_id} onPress={() => router.push(`/shop/product/${pr.product_id}` as any)} style={[styles.promo, { backgroundColor: colors.massSoft }]} accessibilityRole="button" testID={`shop-promo-${pr.product_id}`}>
-                <Badge label={pr.label} tone="mass" size="xs" />
-                <AppText variant="bodySm" numberOfLines={2} style={{ marginTop: 6 }}>
+              <PressableScale key={pr.product_id} onPress={() => router.push(`/shop/product/${pr.product_id}` as any)} style={[styles.promo, { backgroundColor: colors.surface, borderColor: colors.border }, shadows.xs]} accessibilityRole="button" testID={`shop-promo-${pr.product_id}`}>
+                <OfferTag label={pr.label} size="xs" />
+                <AppText variant="bodySm" numberOfLines={2} style={{ marginTop: 8, minHeight: 36 }}>
                   {pr.name}
                 </AppText>
-                <View style={{ flexDirection: "row", gap: 6, alignItems: "baseline" }}>
-                  <AppText variant="title" tabular>
+                <View style={{ flexDirection: "row", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
+                  <AppText tabular style={styles.promoPrice}>
                     {naira(pr.price)}
                   </AppText>
                   {pr.previous_price ? (
@@ -234,25 +236,26 @@ export default function StoreScreen() {
 
       {/* Categories within the store */}
       {store.product_count > 0 ? (
-        <View style={{ marginTop: 16 }}>
+        <View style={{ marginTop: 22 }}>
+          <ShopHeading title="Shop the range" style={{ paddingHorizontal: gutter, marginBottom: 10 }} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter, gap: 8 }}>
-            <Chip label={`All (${store.product_count})`} selected={cat === "all" && !sub} onPress={() => { setCat("all"); setSub(null); }} testID="shop-store-cat-all" />
+            <ShopChip label="All" count={store.product_count} selected={cat === "all" && !sub} onPress={() => { setCat("all"); setSub(null); }} testID="shop-store-cat-all" />
             {store.product_categories.map((c) => (
-              <Chip key={c.key} label={c.label} count={c.count} selected={cat === c.key && !sub} onPress={() => { setCat(c.key); setSub(null); }} testID={`shop-store-cat-${c.key}`} />
+              <ShopChip key={c.key} label={c.label} icon={c.icon} count={c.count} selected={cat === c.key && !sub} onPress={() => { setCat(c.key); setSub(null); }} testID={`shop-store-cat-${c.key}`} />
             ))}
           </ScrollView>
           {store.subcategories.length > 1 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: gutter, gap: 8, paddingTop: 8 }}>
               {store.subcategories.slice(0, 12).map((s) => (
-                <Chip key={s.key} label={s.label} count={s.count} selected={sub === s.key} tone="brand" onPress={() => setSub(sub === s.key ? null : s.key)} testID={`shop-store-sub-${s.key.replace(/\s+/g, "-").toLowerCase()}`} />
+                <ShopChip key={s.key} label={s.label} count={s.count} selected={sub === s.key} tone="brand" onPress={() => setSub(sub === s.key ? null : s.key)} testID={`shop-store-sub-${s.key.replace(/\s+/g, "-").toLowerCase()}`} />
               ))}
             </ScrollView>
           ) : null}
           <View style={[styles.feedHead, { paddingHorizontal: gutter }]}>
-            <AppText variant="title">{products ? `${products.length} products` : "Products"}</AppText>
-            <Pressable onPress={() => setSort(sort === "relevance" ? "price_asc" : sort === "price_asc" ? "price_desc" : "relevance")} style={[styles.sortPill, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={`Sort: ${sort}. Change`} testID="shop-store-sort">
+            <AppText style={styles.feedTitle}>{products ? `${products.length} products` : "Products"}</AppText>
+            <Pressable onPress={() => setSort(sort === "relevance" ? "price_asc" : sort === "price_asc" ? "price_desc" : "relevance")} style={[styles.sortPill, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel={`Sort: ${sort}. Change`} testID="shop-store-sort">
               <Ionicons name="swap-vertical" size={14} color={colors.text} />
-              <AppText variant="caption">{sort === "relevance" ? "Relevance" : sort === "price_asc" ? "Price ↑" : "Price ↓"}</AppText>
+              <AppText variant="caption" style={{ fontFamily: shopFont.semibold }}>{sort === "relevance" ? "Relevance" : sort === "price_asc" ? "Price ↑" : "Price ↓"}</AppText>
             </Pressable>
           </View>
         </View>
@@ -298,11 +301,8 @@ export default function StoreScreen() {
         }
         ListFooterComponent={
           store && store.product_count > 0 ? (
-            <View style={{ paddingHorizontal: gutter, marginTop: 28, gap: 12 }}>
-              <AppText variant="title">Buy from {store.short_name}</AppText>
-              <AppText variant="bodySm" tone="secondary">
-                {store.fees_note}
-              </AppText>
+            <View style={[styles.buyCard, { marginHorizontal: gutter, backgroundColor: colors.surface, borderColor: colors.border }, shadows.xs]}>
+              <ShopHeading title={`Buy from ${store.short_name}`} subtitle={store.fees_note} size="md" />
               <PurchaseRoutes retailer={store} routes={store.purchase_routes} compact testIDPrefix="shop-store-route" />
               <VerifiedNote date={store.verification.last_verified_at} source={store.verification.sources?.[0]} label="Store details verified" />
             </View>
@@ -361,14 +361,19 @@ export default function StoreScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { borderBottomLeftRadius: radii.xxl, borderBottomRightRadius: radii.xxl },
-  heroRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingBottom: 12 },
-  strip: { marginTop: 12, marginHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, height: 38, borderRadius: radii.pill },
-  fulfilRow: { marginTop: 10 },
-  fulfilTrack: { flexDirection: "row", borderRadius: radii.pill, padding: 4, gap: 2 },
+  hero: { borderBottomLeftRadius: radii.xxl, borderBottomRightRadius: radii.xxl, overflow: "hidden" },
+  heroRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingBottom: 14 },
+  heroName: { fontFamily: shopFont.black, fontSize: 20, lineHeight: 24, letterSpacing: -0.4 },
+  strip: { marginTop: 14, marginHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, height: 40, borderRadius: radii.pill, borderWidth: 1 },
+  fulfilRow: { marginTop: 12 },
+  fulfilTrack: { flexDirection: "row", borderRadius: radii.pill, padding: 4, gap: 2, borderWidth: 1 },
   fulfilItem: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, height: 36, borderRadius: radii.pill, paddingHorizontal: 4 },
-  promo: { width: 200, padding: 14, borderRadius: radii.lg, gap: 4 },
-  feedHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 },
-  sortPill: { flexDirection: "row", alignItems: "center", gap: 5, height: 34, paddingHorizontal: 12, borderRadius: radii.pill },
+  openDot: { width: 9, height: 9, borderRadius: 5, marginHorizontal: 3 },
+  promo: { width: 200, padding: 14, borderRadius: radii.lg, gap: 4, borderWidth: 1 },
+  promoPrice: { fontFamily: shopFont.black, fontSize: 18, lineHeight: 22, letterSpacing: -0.4 },
+  feedHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
+  feedTitle: { fontFamily: shopFont.bold, fontSize: 16, lineHeight: 20 },
+  sortPill: { flexDirection: "row", alignItems: "center", gap: 5, height: 36, paddingHorizontal: 12, borderRadius: radii.pill, borderWidth: 1 },
   noCat: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md },
+  buyCard: { marginTop: 28, padding: 16, borderRadius: radii.xl, gap: 14, borderWidth: 1 },
 });

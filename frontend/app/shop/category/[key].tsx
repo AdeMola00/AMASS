@@ -10,9 +10,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, ShopCategory, ShopProduct, ShopRetailerBrief } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Chip, EmptyState, Screen, ScreenHeader, Skeleton } from "@/src/ui";
+import { AppText, EmptyState, Screen, ScreenHeader, Skeleton } from "@/src/ui";
 import { ShopProductCard } from "@/src/components/shop/ShopProductCard";
-import { BasketPill, CategoryRow } from "@/src/components/shop/ShopBits";
+import { BasketPill, CategoryRow, ShopChip } from "@/src/components/shop/ShopBits";
+import { shopFont } from "@/src/components/shop/shopTheme";
 
 const SORTS = [
   { key: "relevance", label: "Relevance" },
@@ -74,26 +75,26 @@ export default function ShopCategoryScreen() {
 
   const header = (
     <View>
-      {!params.q ? <CategoryRow categories={[{ key: "all", label: "All", icon: "apps", color: colors.text, count: undefined }, ...cats]} selected={category} onSelect={(k) => { setCategory(k); setBrand(null); }} size={52} style={{ paddingTop: 4 }} /> : null}
+      {!params.q ? <CategoryRow categories={[{ key: "all", label: "All", icon: "apps", color: colors.text, count: undefined }, ...cats]} selected={category} onSelect={(k) => { setCategory(k); setBrand(null); }} size={56} style={{ paddingTop: 4 }} /> : null}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        <Chip label="Offers" icon="pricetag-outline" selected={deals} tone="mass" onPress={() => setDeals(!deals)} testID="shop-browse-deals" />
-        <Chip label="In stock" icon="checkmark-circle-outline" selected={inStock} onPress={() => setInStock(!inStock)} testID="shop-browse-instock" />
+        <ShopChip label="Offers" icon="pricetag" selected={deals} tone="offer" onPress={() => setDeals(!deals)} testID="shop-browse-deals" />
+        <ShopChip label="In stock" icon="checkmark-circle-outline" selected={inStock} onPress={() => setInStock(!inStock)} testID="shop-browse-instock" />
         {(data?.retailers ?? []).map((r) => (
-          <Chip key={r.id} label={r.short_name} selected={retailer === r.slug} onPress={() => setRetailer(retailer === r.slug ? null : r.slug)} testID={`shop-browse-retailer-${r.slug}`} />
+          <ShopChip key={r.id} label={r.short_name} selected={retailer === r.slug} onPress={() => setRetailer(retailer === r.slug ? null : r.slug)} testID={`shop-browse-retailer-${r.slug}`} />
         ))}
       </ScrollView>
       {data && data.brands.length > 1 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chips, { paddingTop: 0 }]}>
           {data.brands.map((b) => (
-            <Chip key={b} label={b} selected={brand === b} tone="brand" onPress={() => setBrand(brand === b ? null : b)} testID={`shop-browse-brand-${b.replace(/\s+/g, "-").toLowerCase()}`} />
+            <ShopChip key={b} label={b} selected={brand === b} tone="brand" onPress={() => setBrand(brand === b ? null : b)} testID={`shop-browse-brand-${b.replace(/\s+/g, "-").toLowerCase()}`} />
           ))}
         </ScrollView>
       ) : null}
       <View style={[styles.feedHead, { paddingHorizontal: gutter }]}>
-        <AppText variant="title">{data ? `${data.products.length} products` : "Products"}</AppText>
-        <Pressable onPress={() => setSort(SORTS[(SORTS.findIndex((s) => s.key === sort) + 1) % SORTS.length].key)} style={[styles.sortPill, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={`Sort: ${SORTS.find((s) => s.key === sort)?.label}. Change`} testID="shop-browse-sort">
+        <AppText style={styles.feedTitle}>{data ? `${data.products.length} products` : "Products"}</AppText>
+        <Pressable onPress={() => setSort(SORTS[(SORTS.findIndex((s) => s.key === sort) + 1) % SORTS.length].key)} style={[styles.sortPill, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel={`Sort: ${SORTS.find((s) => s.key === sort)?.label}. Change`} testID="shop-browse-sort">
           <Ionicons name="swap-vertical" size={14} color={colors.text} />
-          <AppText variant="caption">{SORTS.find((s) => s.key === sort)?.label}</AppText>
+          <AppText variant="caption" style={{ fontFamily: shopFont.semibold }}>{SORTS.find((s) => s.key === sort)?.label}</AppText>
         </Pressable>
       </View>
       {deals ? (
@@ -149,5 +150,6 @@ export default function ShopCategoryScreen() {
 const styles = StyleSheet.create({
   chips: { paddingHorizontal: 16, gap: 8, paddingVertical: 10 },
   feedHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
-  sortPill: { flexDirection: "row", alignItems: "center", gap: 5, height: 34, paddingHorizontal: 12, borderRadius: radii.pill },
+  feedTitle: { fontFamily: shopFont.bold, fontSize: 16, lineHeight: 20 },
+  sortPill: { flexDirection: "row", alignItems: "center", gap: 5, height: 36, paddingHorizontal: 12, borderRadius: radii.pill, borderWidth: 1 },
 });

@@ -19,15 +19,16 @@ import { AppText, Avatar, Badge, Button, EmptyState, IconButton, PressableScale,
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { RetailerLogo } from "@/src/components/shop/RetailerLogo";
 import { AddControl, ShopProductCard } from "@/src/components/shop/ShopProductCard";
-import { PurchaseRoutes, VerifiedNote } from "@/src/components/shop/ShopBits";
+import { OfferTag, PurchaseRoutes, ShopHeading, SolidTag, VerifiedNote } from "@/src/components/shop/ShopBits";
 import { discountPct, fmtDate, naira, priceLabel, shareLink, stockLabel } from "@/src/components/shop/shopFormat";
+import { SHOP, shopFont, tint } from "@/src/components/shop/shopTheme";
 import { AddToCollectionSheet } from "@/src/components/neighbours/AddToCollectionSheet";
 
 export default function ShopProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, shadows } = useTheme();
+  const { colors, shadows, isDark } = useTheme();
   const { width } = useWindowDimensions();
   const toast = useToast();
   const basket = useShopBasket();
@@ -81,7 +82,7 @@ export default function ShopProductScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg }} testID="shop-product-screen">
       <ScrollView contentContainerStyle={{ paddingBottom: 140 + insets.bottom }} showsVerticalScrollIndicator={false}>
         {/* Gallery */}
-        <View style={[styles.gallery, { height: galleryH, backgroundColor: colors.surfaceAlt, paddingTop: insets.top, borderBottomLeftRadius: radii.xxl, borderBottomRightRadius: radii.xxl }]}>
+        <View style={[styles.gallery, { height: galleryH, backgroundColor: isDark ? colors.surface : SHOP.white, paddingTop: insets.top, borderBottomLeftRadius: radii.xxl, borderBottomRightRadius: radii.xxl }, !isDark && shadows.xs]}>
           {p?.images?.length ? (
             <Image source={{ uri: p.images[img] }} style={{ width: "100%", height: galleryH - insets.top }} contentFit="contain" transition={200} accessibilityIgnoresInvertColors accessibilityLabel={p.name} />
           ) : (
@@ -89,6 +90,11 @@ export default function ShopProductScreen() {
               {p ? <Ionicons name="image-outline" size={48} color={colors.textMuted} /> : <Skeleton width="100%" height={galleryH - insets.top} radius={0} />}
             </View>
           )}
+          {p && pct ? (
+            <View style={[styles.galleryTag, { top: insets.top + 60 }]} pointerEvents="none">
+              <OfferTag label={`-${pct}%`} />
+            </View>
+          ) : null}
           <View style={[styles.topBar, { top: insets.top + 6 }]}>
             <IconButton icon="arrow-back" label="Back" variant="glass" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/marketplace" as any))} testID="shop-product-back" />
             <View style={{ flex: 1 }} />
@@ -99,7 +105,7 @@ export default function ShopProductScreen() {
           {p && p.images.length > 1 ? (
             <View style={styles.dots}>
               {p.images.map((_, i) => (
-                <Pressable key={i} onPress={() => setImg(i)} hitSlop={6} style={[styles.dot, { backgroundColor: i === img ? colors.text : colors.borderStrong }]} accessibilityRole="button" accessibilityLabel={`Photo ${i + 1}`} />
+                <Pressable key={i} onPress={() => setImg(i)} hitSlop={6} style={[styles.dot, { backgroundColor: i === img ? colors.brand : colors.borderStrong }, i === img && styles.dotActive]} accessibilityRole="button" accessibilityLabel={`Photo ${i + 1}`} />
               ))}
             </View>
           ) : null}
@@ -114,30 +120,37 @@ export default function ShopProductScreen() {
         ) : (
           <View style={{ padding: space[4], gap: 14 }}>
             {/* Retailer chip */}
-            <PressableScale onPress={() => p.retailer && router.push(`/shop/store/${p.retailer.slug}` as any)} style={[styles.retailer, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={`Sold by ${p.retailer?.name}`} testID="shop-product-retailer">
-              <RetailerLogo name={p.retailer?.short_name ?? "Store"} uri={p.retailer?.logo_url} accent={p.retailer?.accent} size={36} radius={radii.xs} />
+            <PressableScale onPress={() => p.retailer && router.push(`/shop/store/${p.retailer.slug}` as any)} style={[styles.retailer, { backgroundColor: colors.surface, borderColor: colors.border }, !isDark && shadows.xs]} accessibilityRole="button" accessibilityLabel={`Sold by ${p.retailer?.name}`} testID="shop-product-retailer">
+              <RetailerLogo name={p.retailer?.short_name ?? "Store"} uri={p.retailer?.logo_url} accent={p.retailer?.accent} size={40} radius={radii.xs} />
               <View style={{ flex: 1 }}>
                 <AppText variant="caption" tone="tertiary">
                   Sold by
                 </AppText>
-                <AppText variant="bodyMedium" numberOfLines={1}>
+                <AppText numberOfLines={1} style={styles.retailerName}>
                   {p.retailer?.name}
                 </AppText>
+                {p.retailer_detail?.badge ? (
+                  <AppText variant="micro" tone="secondary" numberOfLines={1}>
+                    {p.retailer_detail.badge}
+                  </AppText>
+                ) : null}
               </View>
-              {p.retailer_detail?.badge ? <Badge label={p.retailer_detail.badge} tone="neutral" size="xs" /> : null}
-              <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+              <AppText variant="caption" color={colors.brand} style={{ fontFamily: shopFont.bold }}>
+                Visit store
+              </AppText>
+              <Ionicons name="chevron-forward" size={16} color={colors.brand} />
             </PressableScale>
 
             {/* Title */}
-            <View style={{ gap: 4 }}>
+            <View style={{ gap: 6 }}>
               <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
                 {p.brand ? <Badge label={p.brand} tone="inverse" size="xs" /> : null}
                 {p.subcategory ? <Badge label={p.subcategory} tone="neutral" size="xs" /> : null}
-                {p.tags.includes("new") ? <Badge label="New" tone="info" size="xs" /> : null}
-                {p.tags.includes("bestseller") ? <Badge label="Bestseller" tone="success" size="xs" /> : null}
+                {p.tags.includes("new") ? <SolidTag label="New" color={SHOP.blueFlat} /> : null}
+                {p.tags.includes("bestseller") ? <SolidTag label="Bestseller" color={colors.success} /> : null}
                 {p.sponsored ? <Badge label="Sponsored" tone="neutral" size="xs" /> : null}
               </View>
-              <AppText variant="h2" testID="shop-product-name">
+              <AppText style={styles.title} testID="shop-product-name">
                 {p.name}
               </AppText>
               {p.spec ? (
@@ -148,22 +161,22 @@ export default function ShopProductScreen() {
             </View>
 
             {/* Price block */}
-            <View style={[styles.priceCard, { backgroundColor: colors.surface }, shadows.xs]} testID="shop-product-price">
-              <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
+            <View style={[styles.priceCard, { backgroundColor: colors.surface, borderColor: colors.border }, shadows.xs]} testID="shop-product-price">
+              <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                 {price?.prefix ? (
-                  <AppText variant="bodySm" tone="secondary">
+                  <AppText variant="bodySm" tone="secondary" style={{ fontFamily: shopFont.semibold }}>
                     {price.prefix}
                   </AppText>
                 ) : null}
-                <AppText variant={p.price.kind === "on_request" ? "h3" : "h1"} tabular tone={p.price.kind === "on_request" ? "secondary" : "primary"}>
+                <AppText style={p.price.kind === "on_request" ? styles.priceRequest : styles.priceBig} tabular tone={p.price.kind === "on_request" ? "secondary" : "primary"}>
                   {price?.main}
                 </AppText>
                 {p.promo?.previous_price && pct ? (
-                  <AppText variant="body" tone="tertiary" tabular style={{ textDecorationLine: "line-through", marginBottom: 4 }}>
+                  <AppText variant="body" tone="tertiary" tabular style={{ textDecorationLine: "line-through" }}>
                     {naira(p.promo.previous_price)}
                   </AppText>
                 ) : null}
-                {pct ? <Badge label={`-${pct}%`} tone="mass" size="sm" /> : null}
+                {pct ? <OfferTag label={`-${pct}%`} /> : null}
               </View>
               {price?.sub ? (
                 <AppText variant="caption" tone="secondary">
@@ -176,11 +189,11 @@ export default function ShopProductScreen() {
                 </AppText>
               ) : null}
               {p.promo ? (
-                <View style={[styles.promoBox, { backgroundColor: colors.massSoft }]} testID="shop-product-promo">
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons name="pricetag" size={14} color={colors.massText} />
-                    <AppText variant="caption" color={colors.massText}>
-                      {p.promo.label} · {p.promo.expires_at ? `ends ${fmtDate(p.promo.expires_at)}` : "no end date published"}
+                <View style={[styles.promoBox, { backgroundColor: tint(SHOP.yellow, isDark ? 0.18 : 0.28) }]} testID="shop-product-promo">
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <SolidTag label={p.promo.label} color={colors.brand} />
+                    <AppText variant="caption" style={{ fontFamily: shopFont.semibold }}>
+                      {p.promo.expires_at ? `Ends ${fmtDate(p.promo.expires_at)}` : "No end date published"}
                     </AppText>
                   </View>
                   {p.promo.terms ? (
@@ -191,7 +204,7 @@ export default function ShopProductScreen() {
                 </View>
               ) : null}
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <Badge label={stock!.label} tone={stock!.tone === "neutral" ? "neutral" : stock!.tone} size="xs" testID="shop-product-stock" />
+                <Badge label={stock!.label} icon={stock!.tone === "success" ? "checkmark-circle" : stock!.tone === "error" ? "close-circle" : undefined} tone={stock!.tone === "neutral" ? "neutral" : stock!.tone} size="sm" testID="shop-product-stock" />
                 {p.stock.verified_at ? (
                   <AppText variant="micro" tone="tertiary">
                     checked {fmtDate(p.stock.verified_at)}
@@ -306,9 +319,7 @@ export default function ShopProductScreen() {
 
             {p.similar.length ? (
               <View style={{ marginTop: 8 }}>
-                <AppText variant="h3" style={{ marginBottom: 10 }}>
-                  Similar items
-                </AppText>
+                <ShopHeading title="Similar items" style={{ marginBottom: 12 }} />
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                   {p.similar.map((s) => (
                     <ShopProductCard key={s.id} p={s} variant="rail" />
@@ -324,7 +335,7 @@ export default function ShopProductScreen() {
       {p ? (
         <View style={[styles.bar, { paddingBottom: insets.bottom + 10, backgroundColor: colors.bgElevated }, shadows.lg]} testID="shop-product-bar">
           <View style={{ flex: 1 }}>
-            <AppText variant="title" tabular numberOfLines={1}>
+            <AppText tabular numberOfLines={1} style={styles.barPrice}>
               {price?.prefix ? `${price.prefix} ` : ""}
               {price?.main}
             </AppText>
@@ -335,12 +346,12 @@ export default function ShopProductScreen() {
           {qty > 0 ? (
             <>
               <AddControl p={p} inline size={40} />
-              <Button label="Basket" variant="primary" size="md" iconLeft="cart-outline" onPress={() => router.push("/shop/basket" as any)} testID="shop-product-go-basket" />
+              <Button label="Basket" variant="primary" size="md" iconLeft="cart" onPress={() => router.push("/shop/basket" as any)} testID="shop-product-go-basket" />
             </>
           ) : (
             <Button
               label={p.stock.status === "out_of_stock" ? "Out of stock" : "Add to basket"}
-              variant="primary"
+              variant="brand"
               size="lg"
               iconLeft={p.stock.status === "out_of_stock" ? "close" : "add"}
               disabled={p.stock.status === "out_of_stock"}
@@ -356,10 +367,10 @@ export default function ShopProductScreen() {
 }
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
-  const { colors } = useTheme();
+  const { colors, shadows, isDark } = useTheme();
   return (
-    <View style={[styles.block, { backgroundColor: colors.surfaceAlt }]}>
-      <AppText variant="title">{title}</AppText>
+    <View style={[styles.block, { backgroundColor: colors.surface, borderColor: colors.border }, !isDark && shadows.xs]}>
+      <AppText style={styles.blockTitle}>{title}</AppText>
       {children}
     </View>
   );
@@ -367,14 +378,22 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 
 const styles = StyleSheet.create({
   gallery: { width: "100%", overflow: "hidden" },
+  galleryTag: { position: "absolute", left: 16 },
   topBar: { position: "absolute", left: 12, right: 12, flexDirection: "row", gap: 8, alignItems: "center" },
-  dots: { position: "absolute", bottom: 10, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
+  dots: { position: "absolute", bottom: 12, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6, alignItems: "center" },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  retailer: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: radii.lg },
-  priceCard: { padding: 16, borderRadius: radii.lg, gap: 8 },
-  promoBox: { padding: 10, borderRadius: radii.sm, gap: 4 },
+  dotActive: { width: 18 },
+  retailer: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: radii.lg, borderWidth: 1 },
+  retailerName: { fontFamily: shopFont.bold, fontSize: 15, lineHeight: 19 },
+  title: { fontFamily: shopFont.black, fontSize: 24, lineHeight: 28, letterSpacing: -0.5 },
+  priceCard: { padding: 16, borderRadius: radii.xl, gap: 10, borderWidth: 1 },
+  priceBig: { fontFamily: shopFont.black, fontSize: 30, lineHeight: 34, letterSpacing: -0.8 },
+  priceRequest: { fontFamily: shopFont.bold, fontSize: 18, lineHeight: 22 },
+  promoBox: { padding: 10, borderRadius: radii.sm, gap: 6 },
   friends: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: radii.md },
-  block: { padding: 16, borderRadius: radii.lg, gap: 8 },
+  block: { padding: 16, borderRadius: radii.xl, gap: 8, borderWidth: 1 },
+  blockTitle: { fontFamily: shopFont.bold, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
   specRow: { flexDirection: "row", gap: 8 },
   bar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 12, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl },
+  barPrice: { fontFamily: shopFont.black, fontSize: 18, lineHeight: 22, letterSpacing: -0.4 },
 });

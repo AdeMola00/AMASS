@@ -7,10 +7,11 @@ import { api, ShopSearchResult } from "@/src/lib/api";
 import { track } from "@/src/lib/analytics";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Chip, EmptyState, Input, Screen, ScreenHeader, Skeleton } from "@/src/ui";
+import { AppText, EmptyState, Screen, ScreenHeader, Skeleton } from "@/src/ui";
 import { ShopProductCard } from "@/src/components/shop/ShopProductCard";
 import { RetailerRow } from "@/src/components/shop/RetailerCards";
-import { CategoryRow } from "@/src/components/shop/ShopBits";
+import { CategoryRow, ShopChip, ShopHeading, ShopSearchField } from "@/src/components/shop/ShopBits";
+import { shopFont } from "@/src/components/shop/shopTheme";
 
 export default function ShopSearchScreen() {
   const router = useRouter();
@@ -57,28 +58,26 @@ export default function ShopSearchScreen() {
   return (
     <Screen testID="shop-search-screen">
       <ScreenHeader title="Search the shop" />
-      <View style={{ paddingHorizontal: space[4] }}>
-        <Input value={q} onChangeText={setQ} placeholder="Search products, stores and brands" iconLeft="search" iconRight={q ? "close-circle" : undefined} onPressIconRight={() => setQ("")} iconRightLabel="Clear" autoFocus returnKeyType="search" testID="shop-search-input" />
+      <View style={{ paddingHorizontal: space[4], paddingBottom: 4 }}>
+        <ShopSearchField value={q} onChangeText={setQ} placeholder="Search products, stores and brands" onClear={() => setQ("")} autoFocus testID="shop-search-input" />
       </View>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {sugg.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
             {sugg.map((s, i) => (
-              <Chip key={`${s.kind}-${s.label}-${i}`} label={s.label} icon={s.kind === "store" ? "storefront-outline" : s.kind === "brand" ? "pricetag-outline" : s.kind === "category" ? "grid-outline" : "search-outline"} onPress={() => onSuggestion(s)} testID={`shop-suggest-${i}`} />
+              <ShopChip key={`${s.kind}-${s.label}-${i}`} label={s.label} icon={s.kind === "store" ? "storefront" : s.kind === "brand" ? "pricetag" : s.kind === "category" ? "grid" : "search"} tone={s.kind === "brand" ? "brand" : "default"} onPress={() => onSuggestion(s)} testID={`shop-suggest-${i}`} />
             ))}
           </ScrollView>
         ) : null}
         {!res && !busy ? (
           <View style={{ paddingTop: 8 }}>
-            <AppText variant="title" style={{ paddingHorizontal: space[4], marginBottom: 6 }}>
-              Browse by category
-            </AppText>
+            <ShopHeading title="Browse by category" style={{ paddingHorizontal: space[4], marginBottom: 8 }} />
             <CategoryRow categories={[{ key: "furniture", label: "Furniture", icon: "bed", color: "#F59E0B" }, { key: "electronics", label: "Electronics", icon: "tv", color: "#3B82F6" }, { key: "appliances", label: "Appliances", icon: "snow", color: "#10B981" }, { key: "home_decor", label: "Home décor", icon: "color-palette", color: "#EC4899" }, { key: "kitchen", label: "Kitchen", icon: "restaurant", color: "#EF4444" }, { key: "lighting", label: "Lighting", icon: "bulb", color: "#8B5CF6" }]} />
-            <Pressable onPress={() => router.push("/shop/stores" as any)} style={[styles.row, { marginHorizontal: space[4], backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" testID="shop-search-all-stores">
-              <Ionicons name="storefront-outline" size={18} color={colors.text} />
-              <AppText variant="bodyMedium" style={{ flex: 1 }}>
-                All stores in Lagos
-              </AppText>
+            <Pressable onPress={() => router.push("/shop/stores" as any)} style={[styles.row, { marginHorizontal: space[4], backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="button" testID="shop-search-all-stores">
+              <View style={[styles.rowIcon, { backgroundColor: colors.brandSoft }]}>
+                <Ionicons name="storefront" size={18} color={colors.brand} />
+              </View>
+              <AppText style={[styles.rowText, { flex: 1 }]}>All stores in Lagos</AppText>
               <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
             </Pressable>
           </View>
@@ -93,7 +92,7 @@ export default function ShopSearchScreen() {
           <View style={{ paddingTop: 6 }}>
             {res.stores.length ? (
               <View style={{ paddingHorizontal: space[4] }}>
-                <AppText variant="title">Stores</AppText>
+                <ShopHeading title="Stores" size="md" style={{ marginBottom: 10 }} />
                 {res.stores.map((r) => (
                   <RetailerRow key={r.id} r={r} />
                 ))}
@@ -102,15 +101,15 @@ export default function ShopSearchScreen() {
             {res.brands.length || res.categories.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
                 {res.categories.map((c) => (
-                  <Chip key={c.key} label={c.label} icon="grid-outline" onPress={() => router.push(`/shop/category/${c.key}` as any)} />
+                  <ShopChip key={c.key} label={c.label} icon="grid" onPress={() => router.push(`/shop/category/${c.key}` as any)} />
                 ))}
                 {res.brands.map((b) => (
-                  <Chip key={b} label={b} icon="pricetag-outline" tone="brand" onPress={() => router.push(`/shop/category/all?brand=${encodeURIComponent(b)}` as any)} />
+                  <ShopChip key={b} label={b} icon="pricetag" tone="brand" onPress={() => router.push(`/shop/category/all?brand=${encodeURIComponent(b)}` as any)} />
                 ))}
               </ScrollView>
             ) : null}
             <View style={{ paddingHorizontal: space[4], marginTop: 8 }}>
-              <AppText variant="title">{res.products.length} products</AppText>
+              <ShopHeading title={`${res.products.length} product${res.products.length === 1 ? "" : "s"}`} size="md" />
             </View>
             {res.products.length ? (
               <View style={[styles.grid, { paddingHorizontal: space[4] }]}>
@@ -130,6 +129,8 @@ export default function ShopSearchScreen() {
 
 const styles = StyleSheet.create({
   chips: { paddingHorizontal: 16, gap: 8, paddingVertical: 10 },
-  row: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: radii.lg, marginTop: 10 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radii.lg, marginTop: 12, borderWidth: 1 },
+  rowIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  rowText: { fontFamily: shopFont.bold, fontSize: 15, lineHeight: 20 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 12 },
 });

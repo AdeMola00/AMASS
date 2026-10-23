@@ -1,0 +1,53 @@
+{
+  "summary": "AMASS Shop (Brands) visual refresh — FRONTEND-ONLY review, mobile viewport 390x844, demo@amass.africa / amass2026. Every testID in the review spec is present and functional; no PAGEERRORS, no React red screen, only pre-existing RN-web deprecation warnings (shadow* / props.pointerEvents) and expo-notifications web warning carried from iteration_58/59 (out of scope). Visual refresh matches the Instacart reference: vivid pastel category tiles (Furniture/orange, Electronics/blue, Appliances/mint, Home décor/pink, Kitchen/red), bold section headings with 'See all →', yellow offer tags (-16% / -8% / '16% off' / 'Reduced price' / 'N deals'), brand-red ADD circles + sticky brand-red basket pill + red SLOT/retailer gradients + red 'Shop at X' buttons. Screenshots captured under /app/test_reports/screenshots_iter60/. [Shop home /(tabs)/marketplace] shop-home + 5 category tiles (shop-cat-furniture/electronics/appliances/home-decor + kitchen) + filter chips (shop-filter-offers yellow icon + shop-filter-delivery/pickup) + shop-retailer-grid (7 tiles: fouani, boconcept, furniture-house, slot, pointek, lagom-sweden, orca-deco — NOTE: review spec referenced 'property-os-africa' as a retailer slug, this does NOT exist in the current retailer seed; actual slug set listed above) + shop-show-all-stores red circle + shop-banner-deals (yellow '7 verified price drops in Lagos' banner + shop-banner-cta-deals) + bold shop-section-furnish/-deals/-popular with shop-see-all-deals → /shop/category/all?deals=1 (confirmed URL change + 7 shop-product-open-<id> cards rendered). [Add to basket] shop-add-<id> → shop-stepper-<id> with shop-qty-<id>=1, shop-plus/-minus increments/decrements, floating shop-basket-pill shows red brand pill '2 items · hand off to the retailer…' and header shop-basket-btn badge increments from 1→2. Tapping pill routes to /shop/basket (shop-basket-screen rendered). [Category /shop/category/electronics] shop-browse-screen + CategoryRow + shop-browse-deals yellow + shop-browse-instock + shop-browse-sort cycles 'Relevance → Price ↑' + product grid with yellow -N% tags. [Filter chip] shop-filter-offers → /shop/category/all?deals=1 shows discounted products with yellow -N% tag + struck previous price. shop-filter-delivery → /shop/stores (shop-stores-screen) with shop-stores-filter-delivery available (plus -all/-offers/-pickup/-showroom/-warranty). [Store SLOT /shop/store/slot] red gradient shop-store-header + shop-store-back/share/save (save toast triggered OK, heart toggles without crash — no web push-prompt sheet, matches note) + white in-store search shop-store-search (type 'power' filters + shop-store-search-clear present → clears cleanly) + shop-store-info opens shop-store-info-sheet modal + fulfilment radios shop-fulfil-delivery/pickup/showroom all rendered + shop-fulfil-note + 'Deals at SLOT' rail with 16% off yellow tag + shop-store-cat-all + shop-store-sort cycles + footer red 'Buy from SLOT' card with shop-store-route-website (red gradient) → shop-handoff-sheet 'Continue to SLOT' modal → shop-handoff-cancel closes cleanly. [No catalogue /shop/store/orca-deco] shop-store-no-catalogue rendered with purchase routes, no crash. [Product page /shop/product/<id>] shop-product-screen + gallery with yellow -16% badge + shop-product-retailer (Sold by SLOT · 1-year standard warranty · 'Visit store' red link) + shop-product-name + shop-product-price (bold ₦25,500 with struck ₦30,200 + yellow -16% chip) + shop-product-promo (red/yellow '16% off / No end date published' banner) + shop-product-stock (green 'In stock · checked 23 Oct 2026') + shop-verified-note + shop-product-route-website + sticky shop-product-bar with red Basket button. (In this run shop-product-add returned 0 because the product was already in basket from the preceding rail-add step — expected stateful behaviour; inline stepper + '1 in your SLOT basket' label shown instead). shop-product-save + shop-product-back working. [Basket /shop/basket] shop-basket-screen + shop-basket-back + shop-basket-note + per-group cards shop-basket-group-slot + shop-basket-store-slot + shop-basket-clear-slot + shop-basket-line-<id> + shop-basket-subtotal-slot + red shop-basket-route-slot-website + shop-basket-route-slot-call; second group shop-basket-group-pointek with full matching set. [Shop search /shop/search] shop-search-input autofocuses, typing 'blender' → shop-suggest-0 'Blenders' + 5 product grid with Reduced price yellow tags; clearing shows 'Browse by category' colored tiles + shop-search-all-stores → /shop/stores. [Saved /shop/saved] shop-saved-tab-products/-stores both tabs render (SLOT heart previously tapped — saved store visible under Stores tab). [Dark mode] theme-toggle on /profile flips theme; /marketplace, /shop/store/slot, /shop/product/<id> all render with dark bg, legible light text, yellow tags with dark text intact, red CTAs intact — screenshots 31/32/33 confirm no invisible text. Toggled back to light cleanly. [Regression] mkt-tab-fixa + mkt-tab-declutter both render normal (Featured BOOSTED cards, 12 items grid, Sell button). Deprecated packages detected: none new (same shadow* / pointerEvents / expo-notifications web warnings as prior iterations — not blocking).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/screenshots_iter60/01_shop_home_top.png",
+    "/app/test_reports/screenshots_iter60/02_shop_home_mid.png",
+    "/app/test_reports/screenshots_iter60/03_shop_home_lower.png",
+    "/app/test_reports/screenshots_iter60/04_shop_home_bot.png",
+    "/app/test_reports/screenshots_iter60/07_basket_pill.png",
+    "/app/test_reports/screenshots_iter60/08_basket_screen.png",
+    "/app/test_reports/screenshots_iter60/09_browse_electronics.png",
+    "/app/test_reports/screenshots_iter60/10_deals_category.png",
+    "/app/test_reports/screenshots_iter60/11_product_top.png",
+    "/app/test_reports/screenshots_iter60/15_store_slot_top.png",
+    "/app/test_reports/screenshots_iter60/19_store_info_sheet.png",
+    "/app/test_reports/screenshots_iter60/20_handoff_sheet.png",
+    "/app/test_reports/screenshots_iter60/21_orca_no_catalogue.png",
+    "/app/test_reports/screenshots_iter60/22_basket.png",
+    "/app/test_reports/screenshots_iter60/23_search_blank.png",
+    "/app/test_reports/screenshots_iter60/24_search_blender.png",
+    "/app/test_reports/screenshots_iter60/25_saved.png",
+    "/app/test_reports/screenshots_iter60/27_stores_page.png",
+    "/app/test_reports/screenshots_iter60/28_stores_search_slot.png",
+    "/app/test_reports/screenshots_iter60/30_mkt_declutter.png",
+    "/app/test_reports/screenshots_iter60/31_dark_shop_home.png",
+    "/app/test_reports/screenshots_iter60/32_dark_store_slot.png",
+    "/app/test_reports/screenshots_iter60/33_dark_product.png"
+  ],
+  "action_items": [
+    "Review spec referenced testID 'shop-retailer-tile-property-os-africa' and 'shop-basket-group-property-os-africa' / 'shop-retailer-row-property-os-africa' — these retailer slugs do NOT exist in the current retailer seed. Live retailer slugs are: fouani, boconcept, furniture-house, slot, pointek, lagom-sweden, orca-deco. If 'property-os-africa' is intended as a canonical AMASS-owned retailer, add it to RETAILERS seed; otherwise update the review spec / docs to use the live slugs (e.g. slot) for future test runs. All equivalent testIDs for the live slugs (shop-basket-group-slot, shop-basket-store-slot, shop-basket-route-slot-website, shop-basket-clear-slot) were verified working.",
+    "Pre-existing non-blocking: RN-web deprecation warnings (shadow*, props.pointerEvents) + expo-notifications web warning carried from prior iterations — recommend scheduling a style/boxShadow migration pass separately."
+  ],
+  "critical_code_review_comments": [
+    "Shop home / product / store screens all show excellent Instacart-inspired visual refresh — vivid category tiles, bold section headings, yellow offer tags with dark text (good contrast), brand-red CTAs. Screenshots 01-06 (home), 11-13 (product), 15-17 (store SLOT) confirm.",
+    "Dark mode regression (screenshots 31/32/33): yellow tags remain legible with dark text, red CTAs preserved, light text on dark bg — no invisible text, no clipped buttons observed.",
+    "Shop basket page: groups cleanly separated per retailer with red gradient 'Shop at X' routing to shop-handoff-sheet — brand consistency preserved.",
+    "Stores page (/shop/stores) exposes a full filter set shop-stores-filter-all/-offers/-delivery/-pickup/-showroom/-warranty and category chips shop-stores-cat-<key> plus shop-stores-search live-filtering — matches spec.",
+    "Dismissing Sponsored AdModal via ad-close / ad-skip works reliably with force click; re-navigation does NOT re-trigger within the same session."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A — not in scope", "frontend": "100% — all shop testIDs in review spec present and functional (modulo the retailer-slug naming note above); 0 PAGEERRORS; 0 console errors beyond pre-existing RN-web deprecations"},
+  "seed_data_creation": "None. SLOT store 'saved' heart was toggled on during Store page test (visible under /shop/saved → Stores tab).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Live retailer slugs for Shop section: fouani, boconcept, furniture-house, slot, pointek, lagom-sweden, orca-deco. 'property-os-africa' slug is NOT in the retailer seed — use 'slot' as the primary verified retailer for end-to-end basket/handoff flows. Product-add testID collisions: the same shop-add-<id>/shop-stepper-<id>/shop-qty-<id> appear in both shop-section-deals and shop-section-popular rails (two rails show the same product), so when probing qty use .first or scope by section testID — strict Playwright locators will throw on multi-match. AdModal shows on first marketplace visit per session — dismiss via ad-close or ad-skip (force click), subsequent visits don't re-trigger. shop-product-add is only present when the product is NOT already in basket; otherwise an inline stepper + shop-product-go-basket appears — handle both states. shop-store-search / shop-stores-search / shop-search-input are plain TextInputs with an optional '{testID}-clear' button. See /app/test_reports/screenshots_iter60/ for 34 reference screenshots covering light + dark mode + regression segments.",
+  "rca_of_issue": "N/A — no bugs reproduced; visual refresh ships cleanly with full feature/data/testID preservation."
+}
