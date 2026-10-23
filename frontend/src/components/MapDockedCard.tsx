@@ -16,6 +16,7 @@ import { radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
 import { propertyTypeColor } from "@/src/components/PropertyMarker";
 import type { Property } from "@/src/lib/api";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { FrostedCircle, FrostedLabel, PhotoSheen } from "@/src/ui/Frosted";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_HGAP = spacing.lg;
@@ -213,11 +214,12 @@ function DockedCard({
           ) : (
             <View style={[styles.image, { backgroundColor: colors.surfaceSecondary }]} />
           )}
-          {/* Status chip */}
-          <View style={[styles.statusChip, { backgroundColor: chip.bg }]}>
+          <PhotoSheen radius={0} strength={0.7} />
+          {/* Status chip — frosted */}
+          <FrostedLabel tone="light" size="xs" style={styles.statusChip}>
             <View style={[styles.statusDot, { backgroundColor: chip.fg }]} />
             <Text style={[styles.statusText, { color: chip.fg }]}>{chip.label}</Text>
-          </View>
+          </FrostedLabel>
           {/* Favorite */}
           <Pressable
             onPress={onFavorite}
@@ -225,11 +227,13 @@ function DockedCard({
             hitSlop={10}
             testID={`docked-fav-${item.id}`}
           >
-            <Ionicons
-              name={favorited ? "heart" : "heart-outline"}
-              size={18}
-              color={favorited ? colors.red : "#fff"}
-            />
+            <FrostedCircle size={32} tone="dark">
+              <Ionicons
+                name={favorited ? "heart" : "heart-outline"}
+                size={18}
+                color={favorited ? colors.red : "#fff"}
+              />
+            </FrostedCircle>
           </Pressable>
           {/* Share */}
           <Pressable
@@ -238,16 +242,19 @@ function DockedCard({
             hitSlop={10}
             testID={`docked-share-${item.id}`}
           >
-            <Ionicons name="share-outline" size={16} color="#fff" />
+            <FrostedCircle size={32} tone="dark">
+              <Ionicons name="share-outline" size={16} color="#fff" />
+            </FrostedCircle>
           </Pressable>
           {/* Verified badge */}
           {(item.verified || item.is_free_amass_sale || item.is_amass_exclusive) && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="shield-checkmark" size={11} color="#fff" />
-              <Text style={styles.verifiedText}>
-                {item.is_free_amass_sale || item.is_amass_exclusive ? "AMASS · Free" : "Verified"}
-              </Text>
-            </View>
+            <FrostedLabel
+              tone="dark"
+              size="xs"
+              icon="shield-checkmark"
+              label={item.is_free_amass_sale || item.is_amass_exclusive ? "AMASS · Free" : "Verified"}
+              style={styles.verifiedBadge}
+            />
           )}
         </View>
 
@@ -372,55 +379,12 @@ const makeStyles = (colors: LegacyColors) =>
     position: "relative",
   },
   image: { width: "100%", height: "100%" },
-  statusChip: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.95)",
-  },
+  statusChip: { position: "absolute", top: 10, left: 10 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 10, fontWeight: "900", letterSpacing: 0.35 },
-  favBtn: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(10,10,10,0.42)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  shareBtn: {
-    position: "absolute",
-    top: 10,
-    right: 50,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(10,10,10,0.42)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  verifiedBadge: {
-    position: "absolute",
-    bottom: 8,
-    left: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: "rgba(10,10,10,0.88)",
-  },
-  verifiedText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
+  favBtn: { position: "absolute", top: 10, right: 10 },
+  shareBtn: { position: "absolute", top: 10, right: 50 },
+  verifiedBadge: { position: "absolute", bottom: 8, left: 10 },
   body: {
     paddingHorizontal: 14,
     paddingTop: 10,

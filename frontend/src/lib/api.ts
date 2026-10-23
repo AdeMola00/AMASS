@@ -1439,6 +1439,9 @@ export const api = {
   markNotificationsRead: () =>
     req<{ ok: boolean }>("/notifications/mark-read", { method: "POST" }),
 
+  /** Public — real verified listing photos for the welcome collage (no auth). */
+  welcomePhotos: (limit = 3) => req<{ items: { property_id: string; image: string; label: string; title: string }[]; cached: boolean }>(`/public/welcome-photos?limit=${limit}`),
+
   // ─── Notification Center (user-controlled categories / frequency / quiet hours / push) ───
   notifCenter: (params: { category?: string; before?: string; limit?: number } = {}) => {
     const q = new URLSearchParams();

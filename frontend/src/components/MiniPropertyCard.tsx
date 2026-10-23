@@ -8,6 +8,7 @@ import { HotFlame } from "@/src/components/HotFlame";
 import { TokenIcon } from "@/src/components/TokenIcon";
 import type { Property } from "@/src/lib/api";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { FrostedLabel, PhotoSheen } from "@/src/ui/Frosted";
 
 /**
  * Compact horizontal card used in the collapsed peek state of the map bottom
@@ -56,12 +57,8 @@ export function MiniPropertyCard({
         ) : (
           <View style={[styles.image, { backgroundColor: colors.surfaceSecondary }]} />
         )}
-        {isExclusive && (
-          <View style={styles.freeBadge}>
-            <Ionicons name="star" size={9} color="#fff" />
-            <Text style={styles.freeBadgeText}>FREE</Text>
-          </View>
-        )}
+        <PhotoSheen radius={0} strength={0.6} />
+        {isExclusive && <FrostedLabel label="FREE" icon="star" tone="light" color="#047857" size="xs" style={styles.freeBadge} />}
         {isHot && !isExclusive && (
           <View style={styles.hotWrap}>
             <HotFlame compact />
@@ -137,19 +134,7 @@ const makeStyles = (colors: LegacyColors) =>
   },
   imageWrap: { width: 108, height: 108, position: "relative" },
   image: { width: "100%", height: "100%" },
-  freeBadge: {
-    position: "absolute",
-    top: 6,
-    left: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 999,
-    backgroundColor: "#059669",
-  },
-  freeBadgeText: { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 0.3 },
+  freeBadge: { position: "absolute", top: 6, left: 6 },
   hotWrap: { position: "absolute", top: 6, left: 6 },
   body: { flex: 1, padding: 10, justifyContent: "space-between" },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

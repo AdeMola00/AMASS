@@ -12,6 +12,7 @@ import { TokenIcon } from "@/src/components/TokenIcon";
 import { propertyTypeColor } from "@/src/components/PropertyMarker";
 import type { Property } from "@/src/lib/api";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { FrostedCircle, FrostedLabel, PhotoSheen } from "@/src/ui/Frosted";
 
 export function PropertyCard({
   property,
@@ -97,11 +98,12 @@ export function PropertyCard({
           <View style={[styles.image, { backgroundColor: colors.surfaceSecondary }]} />
         )}
         <LinearGradient
-          colors={["rgba(0,0,0,0.35)", "transparent", "rgba(0,0,0,0.25)"]}
+          colors={["rgba(0,0,0,0.30)", "transparent", "rgba(0,0,0,0.28)"]}
           locations={[0, 0.4, 1]}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
+        <PhotoSheen radius={0} strength={0.7} />
 
         {/* Top row: source badge + hot flame + favorite */}
         <View style={styles.topRow}>
@@ -112,13 +114,14 @@ export function PropertyCard({
                 <Text style={styles.freeBadgeText}>Listed by AMASS · Free Access</Text>
               </View>
             ) : (
-              <View
-                style={[styles.sourceBadge, { backgroundColor: source.color }]}
+              <FrostedLabel
+                label={source.short}
+                icon={source.icon}
+                tone="light"
+                color={source.color}
+                size="xs"
                 testID={`source-badge-${property.listing_source ?? "pending"}`}
-              >
-                <Ionicons name={source.icon} size={10} color="#fff" />
-                <Text style={styles.sourceText}>{source.short}</Text>
-              </View>
+              />
             )}
             {isHot && !isSold && <HotFlame />}
             {isNew && !isHot && !isSold && !property.is_amass_exclusive && (
@@ -130,35 +133,33 @@ export function PropertyCard({
           {onFavorite && (
             <Pressable
               onPress={onFavorite}
-              style={styles.favBtn}
               hitSlop={12}
               testID={`favorite-${property.id}`}
             >
-              <Ionicons
-                name={favorited ? "heart" : "heart-outline"}
-                size={20}
-                color={favorited ? colors.red : "#fff"}
-              />
+              <FrostedCircle size={36} tone="dark">
+                <Ionicons
+                  name={favorited ? "heart" : "heart-outline"}
+                  size={20}
+                  color={favorited ? colors.red : "#fff"}
+                />
+              </FrostedCircle>
             </Pressable>
           )}
         </View>
 
         {/* Bottom-left: Verified OR Token cost pill */}
         {property.is_amass_exclusive ? null : property.token_cost && property.token_cost > 0 ? (
-          <View style={styles.tokenBadge} testID={`token-badge-${property.id}`}>
+          <FrostedLabel tone="dark" style={styles.bottomBadge} testID={`token-badge-${property.id}`}>
             <TokenIcon size={12} />
             <Text style={styles.tokenBadgeText}>
               {property.unlocked ? "Unlocked" : `Unlock for ${property.token_cost}`}
             </Text>
             {property.unlocked && (
-              <Ionicons name="checkmark-circle" size={12} color="#059669" />
+              <Ionicons name="checkmark-circle" size={12} color="#34D399" />
             )}
-          </View>
+          </FrostedLabel>
         ) : property.verified ? (
-          <View style={styles.verifiedBadge} testID="verified-badge">
-            <Ionicons name="shield-checkmark" size={11} color="#fff" />
-            <Text style={styles.verifiedText}>AMASS Verified</Text>
-          </View>
+          <FrostedLabel label="AMASS Verified" icon="shield-checkmark" tone="dark" style={styles.bottomBadge} testID="verified-badge" />
         ) : null}
 
         {isSold && (
@@ -234,15 +235,6 @@ const makeStyles = (colors: LegacyColors) =>
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
-  sourceBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  sourceText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
   newBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -250,27 +242,7 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.statusNew,
   },
   newText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
-  favBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  verifiedBadge: {
-    position: "absolute",
-    bottom: spacing.md,
-    left: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(10,10,10,0.85)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  verifiedText: { color: "#fff", fontSize: 10, fontWeight: "700", letterSpacing: 0.2 },
+  bottomBadge: { position: "absolute", bottom: spacing.md, left: spacing.md },
   freeBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -285,20 +257,6 @@ const makeStyles = (colors: LegacyColors) =>
     shadowOffset: { width: 0, height: 2 },
   },
   freeBadgeText: { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.3 },
-  tokenBadge: {
-    position: "absolute",
-    bottom: spacing.md,
-    left: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(10,10,10,0.85)",
-    borderWidth: 1,
-    borderColor: "#F5B301",
-  },
   tokenBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
   soldOverlay: {
     ...StyleSheet.absoluteFill,

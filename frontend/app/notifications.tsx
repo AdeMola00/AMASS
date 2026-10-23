@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Platform } from "react-native";
 import Animated from "react-native-reanimated";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { api, type AppNotification, type NotifCategoryMeta } from "@/src/lib/api";
@@ -144,6 +144,7 @@ export function routeFor(n: AppNotification): string | null {
 
 export default function Notifications() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ category?: string }>();
   const { colors, shadows } = useTheme();
   const toast = useToast();
   const { requestContextualPush } = usePushPrompt();
@@ -155,7 +156,7 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
-  const [category, setCategory] = useState<string>("all");
+  const [category, setCategory] = useState<string>(typeof params.category === "string" && params.category ? params.category : "all");
   const [pushState, setPushState] = useState<"hidden" | "offer">("hidden");
 
   const load = useCallback(

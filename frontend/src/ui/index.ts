@@ -13,6 +13,7 @@ export { Sheet, ChargeConfirm, SheetLink } from "./Sheet";
 export { PressableScale, Appear, usePop } from "./Motion";
 export { useBounceRefresh } from "./Refresh";
 export { Gloss, BrandGradient } from "./Gloss";
+export { GlassFill, FrostedLabel, FrostedCircle, PhotoSheen } from "./Frosted";
 export { OfflineBanner } from "./OfflineBanner";
 export { Stepper, Tabs, Toggle, BarChart, Sparkline } from "./Navigation";
 export type { StepStatus } from "./Navigation";

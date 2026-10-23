@@ -74,6 +74,9 @@ export const gradients = {
   brand: ["#F0262E", "#B8151A", "#7A0C12"] as const,
   /** FIXA: lime → forest green (FIXA brand colours, theme-independent). */
   fix: ["#7ED958", "#3FA463", "#2E8B57"] as const,
+  /** Wallet token cards — gold MASS coin, deep FIXA green. Brand colours, theme-independent. */
+  massCard: ["#F7E29A", "#D9B547", "#A9842B"] as const,
+  fixCard: ["#56C06A", "#2E8B57", "#1B5A37"] as const,
   /** Soft glossy highlight painted over the top half of brand surfaces / emblems. */
   gloss: ["rgba(255,255,255,0.28)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0)"] as const,
   /** Vertical photo scrim for photo-led cards (transparent → 70% ink). */

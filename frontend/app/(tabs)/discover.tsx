@@ -11,7 +11,7 @@ import { formatNaira } from "@/src/constants/theme";
 import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
 import { gradients, radii, space } from "@/src/theme/tokens";
-import { Appear, AppText, BalanceChip, Card, EmptyState, IconButton, PressableScale, ProgressBar, Screen, Section, Skeleton, SkeletonCard, type IconName, useBounceRefresh } from "@/src/ui";
+import { Appear, AppText, BalanceChip, Card, EmptyState, IconButton, PressableScale, ProgressBar, Screen, Section, Skeleton, SkeletonCard, type IconName, useBounceRefresh, FrostedLabel, PhotoSheen } from "@/src/ui";
 import { useUnreadNotifications } from "@/src/hooks/use-unread-notifications";
 import { ListingCard } from "@/src/components/ListingCard";
 import { getRecentlyViewedIds } from "@/src/lib/recently-viewed";
@@ -213,12 +213,8 @@ export default function Discover() {
                 >
                   <Image source={{ uri: n.image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
                   <LinearGradient colors={[...gradients.scrim]} locations={[0.35, 1]} style={StyleSheet.absoluteFill} />
-                  <View style={[styles.trendBadge, { backgroundColor: "rgba(255,255,255,0.92)" }]}>
-                    <Ionicons name="trending-up" size={11} color="#1C5E39" />
-                    <AppText variant="micro" color="#1C5E39" tabular>
-                      +{n.price_change_pct}%
-                    </AppText>
-                  </View>
+                  <PhotoSheen radius={radii.lg} strength={0.8} />
+                  <FrostedLabel tone="light" size="xs" icon="trending-up" color="#1C5E39" label={`+${n.price_change_pct}%`} style={styles.trendBadge} />
                   <View style={styles.trendBody}>
                     <AppText variant="h3" color="#fff">
                       {n.name}
@@ -425,7 +421,7 @@ const styles = StyleSheet.create({
   railScroll: { marginHorizontal: -space[4] },
   rail: { gap: space[3], paddingHorizontal: space[4] },
   trend: { width: 240, height: 200, borderRadius: radii.lg, overflow: "hidden", justifyContent: "flex-end" },
-  trendBadge: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, height: 22, borderRadius: radii.pill },
+  trendBadge: { position: "absolute", top: 12, left: 12 },
   trendBody: { padding: 14, gap: 2 },
   scoreHead: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14 },
   scoreRing: { width: 60, height: 60, borderRadius: 30, borderWidth: 3, alignItems: "center", justifyContent: "center" },

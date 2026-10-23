@@ -398,6 +398,52 @@ async def me(user: dict = Depends(get_current_user)):
 
 
 # ─── Properties ───────────────────────────────────────────
+@api.get("/public/welcome-photos")
+async def welcome_photos(limit: int = 3):
+    """Public (no auth): real verified listing photos for the welcome collage.
+
+    Returns the freshest verified, live listings that have a cover photo so new
+    users see actual AMASS homes before they sign in. Cached in-process for 10 min.
+    """
+    import re
+    import time as _t
+
+    limit = max(1, min(int(limit), 6))
+    cache = getattr(welcome_photos, "_cache", None)
+    if cache and cache["at"] > _t.time() - 600 and len(cache["items"]) >= limit:
+        return {"items": cache["items"][:limit], "cached": True}
+    cur = (
+        db.properties.find(
+            {"verified": True, "images.0": {"$exists": True}, "status": {"$nin": ["sold", "archived", "hidden", "draft", "rejected"]}},
+            {"_id": 0, "id": 1, "title": 1, "location": 1, "city": 1, "images": {"$slice": 1}, "created_at": 1},
+        )
+        .sort("created_at", -1)
+        .limit(24)
+    )
+    items, seen_cities = [], set()
+    async for p in cur:
+        img = (p.get("images") or [None])[0]
+        if not img or not str(img).startswith("http") or "example.com" in str(img):
+            continue
+        if re.search(r"\b(test|dummy|sample)\b", p.get("title") or "", re.I):
+            continue
+        city = (p.get("city") or "").strip()
+        # Prefer one photo per city so the collage spans the map.
+        if city and city in seen_cities and len(items) < 12:
+            continue
+        seen_cities.add(city)
+        label = city or (p.get("location") or "").split(",")[0].strip() or "AMASS Verified"
+        # Collage pills are ~90dp wide — keep labels short and recognisable.
+        short = {"Victoria Island": "V.I. Lagos", "Port Harcourt": "PH City", "Lekki Phase 1": "Lekki"}
+        if len(label) > 11:
+            label = short.get(label) or label.split(" ")[0]
+        items.append({"property_id": p["id"], "image": img, "label": label[:12], "title": p.get("title", "")})
+        if len(items) >= 6:
+            break
+    welcome_photos._cache = {"at": _t.time(), "items": items}  # type: ignore[attr-defined]
+    return {"items": items[:limit], "cached": False}
+
+
 @api.get("/properties")
 async def list_properties(
     listing_type: Optional[str] = None,

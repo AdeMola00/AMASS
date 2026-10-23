@@ -22,6 +22,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import { AmassLogo } from "@/src/components/AmassLogo";
+import { api } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
 import { gradients, motion, radii, space } from "@/src/theme/tokens";
 import { AppText, Button, PressableScale, useReducedMotion, type ButtonVariant, type IconName } from "@/src/ui";
@@ -117,8 +118,25 @@ const SLIDES: Slide[] = [
   },
 ];
 
+/** Curated fallback collage — replaced by live verified listing photos when the API answers. */
+const FALLBACK_TILES: Tile[] = SLIDES[0].tiles!;
+
 export default function Onboarding() {
   const router = useRouter();
+  const [liveTiles, setLiveTiles] = useState<Tile[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api
+      .welcomePhotos(3)
+      .then((r) => {
+        const tiles = r.items.filter((i) => i.image).map((i) => ({ image: i.image, label: i.label }));
+        if (alive && tiles.length === 3) setLiveTiles(tiles);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
   const { colors } = useTheme();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -172,7 +190,7 @@ export default function Onboarding() {
           <View style={{ width, flex: 1 }}>
             <View style={[styles.hero, { height: heroH, borderBottomLeftRadius: radii.xxl, borderBottomRightRadius: radii.xxl, backgroundColor: colors.surfaceAlt }]}>
               {item.kind === "amass" ? (
-                <AmassHero slide={item} i={i} width={width} heroH={heroH} scrollX={scrollX} reduce={reduce} bg={colors.bg} />
+                <AmassHero slide={{ ...item, tiles: liveTiles ?? FALLBACK_TILES }} i={i} width={width} heroH={heroH} scrollX={scrollX} reduce={reduce} bg={colors.bg} live={!!liveTiles} />
               ) : item.kind === "fixa" ? (
                 <FixaHero slide={item} i={i} width={width} heroH={heroH} scrollX={scrollX} reduce={reduce} />
               ) : (
@@ -257,9 +275,9 @@ export default function Onboarding() {
 }
 
 /* ─── Slide 1: AMASS — sky, floating lockup on frosted glass, tilted home tiles ─── */
-function AmassHero({ slide, i, width, heroH, scrollX, reduce, bg }: { slide: Slide; i: number; width: number; heroH: number; scrollX: SharedValue<number>; reduce: boolean; bg: string }) {
+function AmassHero({ slide, i, width, heroH, scrollX, reduce, bg, live }: { slide: Slide; i: number; width: number; heroH: number; scrollX: SharedValue<number>; reduce: boolean; bg: string; live: boolean }) {
   const emblemH = Math.round(Math.min(132, Math.max(96, width * 0.3)));
-  const tileW = Math.round(Math.min(98, width * 0.23));
+  const tileW = Math.round(Math.min(104, width * 0.25));
   const tileH = Math.round(tileW * 1.25);
   return (
     <>
@@ -278,13 +296,14 @@ function AmassHero({ slide, i, width, heroH, scrollX, reduce, bg }: { slide: Sli
           { left: Math.max(space[4], width * 0.12), bottom: heroH * 0.07, rotate: "-4deg", dur: 2900 },
         ][k];
         return (
-          <Parallax key={t.label} i={i} width={width} scrollX={scrollX} factor={k === 2 ? 0.9 : 0.6} style={[styles.abs, { left: pos.left, right: pos.right, top: pos.top, bottom: pos.bottom }]}>
+          <Parallax key={`${t.label}-${k}`} i={i} width={width} scrollX={scrollX} factor={k === 2 ? 0.9 : 0.6} style={[styles.abs, { left: pos.left, right: pos.right, top: pos.top, bottom: pos.bottom }]}>
             <Floating reduce={reduce} amplitude={6} duration={pos.dur} delay={k * 350}>
               <Animated.View entering={reduce ? undefined : FadeInDown.delay(200 + k * 120).duration(motion.slow)}>
-                <View style={[styles.tile, { width: tileW, height: tileH, transform: [{ rotate: pos.rotate }] }]}>
+                <View style={[styles.tile, { width: tileW, height: tileH, transform: [{ rotate: pos.rotate }] }]} testID={live ? `welcome-tile-live-${k}` : `welcome-tile-${k}`}>
                   <Image source={{ uri: t.image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} />
                   <View style={styles.tileLabel}>
-                    <AppText variant="micro" color="#111111" numberOfLines={1}>
+                    {live ? <Ionicons name="shield-checkmark" size={9} color="#1C5E39" /> : null}
+                    <AppText variant="micro" color="#111111" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ flexShrink: 1, letterSpacing: 0 }}>
                       {t.label}
                     </AppText>
                   </View>
@@ -446,7 +465,7 @@ const styles = StyleSheet.create({
   logoBadge: { backgroundColor: "rgba(255,255,255,0.94)", borderRadius: radii.md, paddingHorizontal: 10, paddingVertical: 6 },
   skip: { backgroundColor: "rgba(17,17,17,0.45)", paddingHorizontal: 14, height: 36, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
   tile: { borderRadius: radii.md, overflow: "hidden", backgroundColor: "#fff", borderWidth: 3, borderColor: "#fff", shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
-  tileLabel: { position: "absolute", left: 6, right: 6, bottom: 6, backgroundColor: "rgba(255,255,255,0.92)", borderRadius: radii.pill, paddingHorizontal: 8, paddingVertical: 3, alignItems: "center" },
+  tileLabel: { position: "absolute", left: 3, right: 3, bottom: 4, backgroundColor: "rgba(255,255,255,0.92)", borderRadius: radii.pill, paddingHorizontal: 6, paddingVertical: 3, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 3 },
   glass: { paddingHorizontal: 26, paddingVertical: 22, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.75)", shadowColor: "#000", shadowOpacity: 0.16, shadowRadius: 24, shadowOffset: { width: 0, height: 14 }, elevation: 8 },
   fixaCard: { backgroundColor: "#FFFFFF", alignItems: "center", paddingVertical: 20, paddingHorizontal: 18, overflow: "hidden", shadowColor: "#0B3D1F", shadowOpacity: 0.28, shadowRadius: 26, shadowOffset: { width: 0, height: 16 }, elevation: 10 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.94)", paddingHorizontal: 12, height: 32, borderRadius: radii.pill, shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 4 },

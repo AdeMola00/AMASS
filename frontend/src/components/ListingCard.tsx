@@ -10,7 +10,7 @@ import { api, Property } from "@/src/lib/api";
 import { formatMarkerPrice } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { gradients, motion, radii } from "@/src/theme/tokens";
-import { AppText, Badge, PressableScale } from "@/src/ui";
+import { AppText, Badge, FrostedCircle, FrostedLabel, GlassFill, PhotoSheen, PressableScale } from "@/src/ui";
 
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 
@@ -89,14 +89,17 @@ export function ListingCard({
             accessibilityLabel={`Photo of ${property.title}`}
           />
           <LinearGradient colors={[...gradients.scrim]} style={styles.scrim} />
+          <PhotoSheen radius={radii.lg} strength={0.8} />
           <View style={styles.topRow}>
             <View style={{ flexDirection: "row", gap: 6, flex: 1, flexWrap: "wrap" }}>
-              {property.verified ? <Badge label="Verified" tone="success" icon="shield-checkmark" /> : null}
+              {property.verified ? <FrostedLabel label="Verified" icon="shield-checkmark" tone="light" color="#1C5E39" size="xs" /> : null}
               {property.is_amass_exclusive ? <Badge label="AMASS Exclusive" tone="brand" icon="ribbon" /> : null}
               {isSold ? <Badge label="Sold" tone="inverse" icon="lock-closed" /> : null}
             </View>
           </View>
-          <View style={styles.priceWrap}>
+          {/* Frosted price plate — reads on any photo */}
+          <View style={[styles.pricePlate, compact && styles.pricePlateCompact]}>
+            <GlassFill tone="dark" radius={radii.md} />
             <AppText variant={compact ? "title" : "h3"} color="#fff" tabular style={isSold && { textDecorationLine: "line-through" }}>
               {formatMarkerPrice(property.price, property.listing_type)}
             </AppText>
@@ -136,9 +139,11 @@ export function ListingCard({
           accessibilityLabel={isSaved ? "Remove from saved" : "Save property"}
           accessibilityState={{ selected: isSaved }}
           testID={`save-${property.id}`}
-          style={[styles.heart, { backgroundColor: isDark ? "rgba(28,28,26,0.85)" : "rgba(255,255,255,0.92)" }]}
+          style={styles.heart}
         >
-          <Ionicons name={isSaved ? "heart" : "heart-outline"} size={18} color={isSaved ? colors.brand : colors.text} />
+          <FrostedCircle size={34} tone={isDark ? "dark" : "light"}>
+            <Ionicons name={isSaved ? "heart" : "heart-outline"} size={18} color={isSaved ? colors.brand : isDark ? "#FFFFFF" : colors.text} />
+          </FrostedCircle>
         </Pressable>
       </Animated.View>
       {onAddToList ? (
@@ -151,9 +156,11 @@ export function ListingCard({
           accessibilityRole="button"
           accessibilityLabel="Add to a shared list"
           testID={`add-to-list-${property.id}`}
-          style={[styles.heart, styles.listBtn, { backgroundColor: isDark ? "rgba(28,28,26,0.85)" : "rgba(255,255,255,0.92)" }]}
+          style={[styles.heart, styles.listBtn]}
         >
-          <Ionicons name="albums-outline" size={17} color={colors.text} />
+          <FrostedCircle size={34} tone={isDark ? "dark" : "light"}>
+            <Ionicons name="albums-outline" size={17} color={isDark ? "#FFFFFF" : colors.text} />
+          </FrostedCircle>
         </Pressable>
       ) : null}
     </View>
@@ -167,7 +174,8 @@ const styles = StyleSheet.create({
   heartWrap: { position: "absolute", top: 10, right: 10 },
   heart: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   listBtn: { position: "absolute", top: 10, right: 50 },
-  priceWrap: { position: "absolute", left: 12, bottom: 10 },
+  pricePlate: { position: "absolute", left: 10, bottom: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radii.md, overflow: "hidden" },
+  pricePlateCompact: { paddingHorizontal: 8, paddingVertical: 4 },
   body: { padding: 14, gap: 4 },
   locRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   specRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
