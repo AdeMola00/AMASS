@@ -469,23 +469,17 @@ def register_agent_platform_v2_routes(
             {"user_id": user_id}, {"$set": update}
         )
         # Notify agent of the change.
-        await db.notifications.insert_one(
-            {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "kind": "badge_update",
-                "title": (
-                    f"You've been recognised as a {DEFAULT_BADGE_RULES[data.tier]['label']}"
-                    if data.tier
-                    else "Your AMASS badge has been reset to auto-compute"
-                ),
-                "body": "Congratulations from the AMASS team."
+        from notification_center import emit
+        await emit(
+            db, user_id, "badge_update",
+            (
+                f"You've been recognised as a {DEFAULT_BADGE_RULES[data.tier]['label']}"
                 if data.tier
-                else "",
-                "read": False,
-                "meta": {"tier": data.tier},
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
+                else "Your AMASS badge has been reset to auto-compute"
+            ),
+            "Congratulations from the AMASS team." if data.tier else "",
+            {"tier": data.tier},
+            action_url="/agent-score",
         )
         return {"ok": True, "tier": data.tier}
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable, RefreshControl, useWindowDimensions } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, useWindowDimensions } from "react-native";
+import Animated from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -10,7 +11,8 @@ import { formatNaira } from "@/src/constants/theme";
 import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
 import { gradients, radii, space } from "@/src/theme/tokens";
-import { Appear, AppText, BalanceChip, Card, EmptyState, IconButton, PressableScale, ProgressBar, Screen, Section, Skeleton, SkeletonCard, type IconName } from "@/src/ui";
+import { Appear, AppText, BalanceChip, Card, EmptyState, IconButton, PressableScale, ProgressBar, Screen, Section, Skeleton, SkeletonCard, type IconName, useBounceRefresh } from "@/src/ui";
+import { useUnreadNotifications } from "@/src/hooks/use-unread-notifications";
 import { ListingCard } from "@/src/components/ListingCard";
 import { getRecentlyViewedIds } from "@/src/lib/recently-viewed";
 import { AmassPinIcon } from "@/src/components/AmassLogo";
@@ -43,10 +45,9 @@ export default function Discover() {
   const [featured, setFeatured] = useState<Property[]>([]);
   const [recent, setRecent] = useState<Property[]>([]);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
-  const [unread, setUnread] = useState(0);
+  const { unread } = useUnreadNotifications();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setError(false);
@@ -66,7 +67,6 @@ export default function Discover() {
     } finally {
       setLoading(false);
     }
-    api.notifications().then((r) => setUnread(r.unread ?? 0)).catch(() => {});
   }, []);
 
   const loadRecent = useCallback(async () => {
@@ -86,11 +86,7 @@ export default function Discover() {
     }, [loadRecent])
   );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([load(), loadRecent()]);
-    setRefreshing(false);
-  };
+  const { refreshControl, bounceStyle } = useBounceRefresh(() => Promise.all([load(), loadRecent()]));
 
   const trending = useMemo(() => neighborhoods.filter((n) => n.trending), [neighborhoods]);
   const movers = useMemo(() => [...neighborhoods].sort((a, b) => (b.price_change_pct ?? 0) - (a.price_change_pct ?? 0)).slice(0, 4), [neighborhoods]);
@@ -99,10 +95,11 @@ export default function Discover() {
 
   return (
     <Screen testID="discover-screen">
-      <ScrollView
+      <Animated.ScrollView
+        style={bounceStyle}
         contentContainerStyle={{ paddingBottom: 140, gap: space[6] }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
+        refreshControl={refreshControl}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -307,7 +304,7 @@ export default function Discover() {
             AMASS · Africa&apos;s property operating system
           </AppText>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </Screen>
   );
 }

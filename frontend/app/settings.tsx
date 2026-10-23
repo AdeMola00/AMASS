@@ -12,7 +12,6 @@ import { useTheme, useThemeMode, ThemeMode } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
 import { AppText, ListRow, RowGroup, Screen, ScreenHeader, SegmentedControl, useToast } from "@/src/ui";
 
-const PREF_PUSH = "amass_pref_push";
 const PREF_EMAIL = "amass_pref_email";
 
 export default function Settings() {
@@ -22,12 +21,10 @@ export default function Settings() {
   const { colors } = useTheme();
   const { mode, setMode } = useThemeMode();
   const toast = useToast();
-  const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    storage.getItem<boolean>(PREF_PUSH, true).then((v) => setPushEnabled(v ?? true));
     storage.getItem<boolean>(PREF_EMAIL, false).then((v) => setEmailEnabled(v ?? false));
   }, []);
 
@@ -106,9 +103,10 @@ export default function Settings() {
           <ListRow
             icon="notifications-outline"
             iconTone="brand"
-            label="Push notifications"
-            caption="New leads, messages and unlock receipts"
-            trailing={<Switch value={pushEnabled} onValueChange={savePref(PREF_PUSH, setPushEnabled)} trackColor={{ true: colors.primary }} testID="settings-push-notifications" />}
+            label="Notification preferences"
+            caption="Categories, instant vs daily digests, quiet hours, phone alerts"
+            onPress={() => router.push("/notification-preferences" as any)}
+            testID="settings-notification-preferences"
           />
           <ListRow
             icon="mail-outline"

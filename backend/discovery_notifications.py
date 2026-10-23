@@ -21,16 +21,8 @@ async def push_notification(
     db, user_id: str, kind: str, title: str, body: str,
     meta: Optional[Dict[str, Any]] = None,
 ):
-    await db.notifications.insert_one({
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "kind": kind,
-        "title": title,
-        "body": body,
-        "read": False,
-        "meta": meta or {},
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
+    from notification_center import emit  # respects the user's category / quiet-hour / push preferences
+    await emit(db, user_id, kind, title, body, meta or {})
 
 
 async def _admin_user_ids(db) -> List[str]:

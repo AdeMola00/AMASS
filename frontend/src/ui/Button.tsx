@@ -49,7 +49,7 @@ export function Button({
   onPress,
   ...rest
 }: ButtonProps) {
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
   const scale = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const s = SIZES[size];
@@ -57,7 +57,8 @@ export function Button({
 
   const palette: Record<ButtonVariant, { bg: string; fg: string; border?: string; shadow?: object }> = {
     primary: { bg: colors.primary, fg: colors.onPrimary },
-    brand: { bg: colors.brand, fg: colors.onBrand },
+    /** Glossy brand red → crimson gradient (painted below); flat brand fill when disabled. */
+    brand: { bg: colors.brand, fg: colors.onBrand, shadow: shadows.brand },
     secondary: { bg: colors.surfaceAlt, fg: colors.text },
     outline: { bg: "transparent", fg: colors.text, border: colors.borderStrong },
     ghost: { bg: "transparent", fg: colors.textSecondary },
@@ -108,6 +109,12 @@ export function Button({
     >
       {variant === "premium" ? (
         <LinearGradient colors={[...gradients.premium]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+      ) : null}
+      {variant === "brand" && !isDisabled ? (
+        <>
+          <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={[...gradients.gloss]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "45%" }]} />
+        </>
       ) : null}
       {loading ? (
         <ActivityIndicator color={p.fg} />

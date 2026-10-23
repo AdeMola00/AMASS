@@ -236,17 +236,13 @@ def register_phase4_routes(
             upsert=True,
         )
         # Notify the agent
-        await db.notifications.insert_one(
-            {
-                "id": str(uuid.uuid4()),
-                "user_id": agent_user_id,
-                "kind": "review_received",
-                "title": "New review pending approval",
-                "body": f"{data.rating}★ — awaiting moderation before it goes live.",
-                "read": False,
-                "meta": {"review_id": review_id},
-                "created_at": now.isoformat(),
-            }
+        from notification_center import emit
+        await emit(
+            db, agent_user_id, "review_received",
+            "New review pending approval",
+            f"{data.rating}★ — awaiting moderation before it goes live.",
+            {"review_id": review_id},
+            action_url="/agent-score",
         )
         return ReviewOut(**set_doc)
 
@@ -339,17 +335,12 @@ def register_phase4_routes(
             "rejected": "Your AMASS review couldn't be approved",
             "flagged": "Your AMASS review needs more info",
         }[new_status]
-        await db.notifications.insert_one(
-            {
-                "id": str(uuid.uuid4()),
-                "user_id": r["reviewer_id"],
-                "kind": "review_moderation",
-                "title": title,
-                "body": data.admin_note or "",
-                "read": False,
-                "meta": {"review_id": review_id, "status": new_status},
-                "created_at": now.isoformat(),
-            }
+        from notification_center import emit
+        await emit(
+            db, r["reviewer_id"], "review_moderation",
+            title,
+            data.admin_note or "",
+            {"review_id": review_id, "status": new_status},
         )
         return {"ok": True, "status": new_status}
 

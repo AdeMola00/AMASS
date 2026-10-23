@@ -6,8 +6,6 @@ import {
   Pressable,
   ScrollView,
   Platform,
-  FlatList,
-  RefreshControl,
   Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -34,6 +32,9 @@ import {
   MarketFilterState,
 } from "@/src/components/marketplace/MarketFilterSheet";
 import { AdModal } from "@/src/components/AdModal";
+import Animated from "react-native-reanimated";
+import { useBounceRefresh } from "@/src/ui/Refresh";
+import { ScreenLift } from "@/src/ui/Layout";
 import { useAdTrigger } from "@/src/hooks/useAdTrigger";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 import { FixaGate } from "@/src/components/fixa/FixaGate";
@@ -169,7 +170,6 @@ export default function Marketplace() {
   });
 
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [categories, setCategories] = useState<MarketCategory[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -273,11 +273,7 @@ export default function Marketplace() {
     loadItems();
   }, [loadItems]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([loadCategories(), loadItems(), loadSaved()]);
-    setRefreshing(false);
-  };
+  const { refreshControl, bounceStyle } = useBounceRefresh(() => Promise.all([loadCategories(), loadItems(), loadSaved()]), { progressViewOffset: headerH });
 
   const toggleView = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -488,18 +484,17 @@ export default function Marketplace() {
   );
 
   return (
-    <View style={styles.container} testID="marketplace-screen">
+    <ScreenLift style={styles.container} testID="marketplace-screen">
       {section === "brands" ? (
         <ShopHome headerH={headerH} active />
       ) : (
-      <FlatList
+      <Animated.FlatList
+        style={bounceStyle}
         data={(fixaLocked ? [] : section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems) as any[]}
         keyExtractor={(_, i) => `row-${i}`}
         contentContainerStyle={{ paddingTop: headerH + 8, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} progressViewOffset={headerH} tintColor={colors.red} />
-        }
+        refreshControl={refreshControl}
         ListHeaderComponent={loading || fixaLocked ? null : listHeader}
         removeClippedSubviews={Platform.OS !== "web"}
         initialNumToRender={8}
@@ -761,7 +756,7 @@ export default function Marketplace() {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </ScreenLift>
   );
 }
 

@@ -16,9 +16,10 @@ const SIZE_MAP: Record<Size, number> = {
 // Measured once from the supplied file so it is never stretched or cropped.
 const EMBLEM_ASPECT = 1.5275;
 
-// Authoritative AMASS brand emblem (supplied by the client — used unaltered,
-// transparent background so it sits on any light surface).
-const EMBLEM_SRC = require("../../assets/images/amass-emblem.png");
+// Authoritative AMASS brand emblem (supplied by the client), finished with the
+// brand gradient — brand red → deep crimson with a soft glossy highlight.
+// Generated from the unaltered master by scripts/generate_glossy_emblem.py.
+const EMBLEM_SRC = require("../../assets/images/amass-emblem-glossy.png");
 
 /**
  * AMASS brand logo.

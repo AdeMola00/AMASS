@@ -49,16 +49,8 @@ async def public_users(db, ids: Iterable[str]) -> dict[str, dict]:
 async def notify(db, user_id: Optional[str], kind: str, title: str, body: str, meta: Optional[dict] = None) -> None:
     if not user_id:
         return
-    await db.notifications.insert_one({
-        "id": new_id(),
-        "user_id": user_id,
-        "kind": kind,
-        "title": title[:120],
-        "body": (body or "")[:160],
-        "read": False,
-        "meta": meta or {},
-        "created_at": now().isoformat(),
-    })
+    from notification_center import emit  # respects the user's category / quiet-hour / push preferences
+    await emit(db, user_id, kind, title, body, meta or {})
 
 
 async def is_blocked_between(db, a: str, b: str) -> bool:

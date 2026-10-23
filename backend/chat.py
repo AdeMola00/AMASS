@@ -159,34 +159,23 @@ async def _wait_for_new_messages(db, conversation_id: str, after: datetime,
 
 async def _notify(db, user_id: str, conversation_id: str, sender_name: str,
                   preview: str, property_id: Optional[str], item_id: Optional[str] = None):
-    await db.notifications.insert_one({
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "kind": "NEW_MESSAGE",
-        "title": f"{sender_name} sent you a message",
-        "body": preview[:120],
-        "read": False,
-        "meta": {"conversation_id": conversation_id,
-                 "property_id": property_id,
-                 "item_id": item_id,
-                 "sender_name": sender_name},
-        "created_at": _now().isoformat(),
-    })
-    # Push relay (best-effort; must not block message send)
+    # Routed through the Notification Center so the user's category / quiet-hour /
+    # push preferences apply. One unread row per conversation (collapsed), push per message.
     try:
-        from push_notifications import send_push
-        await send_push(
-            recipients=[user_id],
-            data={
-                "title": sender_name,
-                "message": preview[:180] or "New message",
-                "action_url": f"/chat/{conversation_id}",
-            },
-            idempotency_key=f"chat-{conversation_id}-{_now().timestamp()}",
+        from notification_center import emit
+        await emit(
+            db, user_id, "NEW_MESSAGE",
+            f"{sender_name} sent you a message",
+            preview[:120] or "New message",
+            {"conversation_id": conversation_id,
+             "property_id": property_id,
+             "item_id": item_id,
+             "sender_name": sender_name},
+            action_url=f"/chat/{conversation_id}",
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — never block message send
         import logging
-        logging.getLogger("amass.chat").warning("push send failed: %s", e)
+        logging.getLogger("amass.chat").warning("notification emit failed: %s", e)
 
 
 # ── Router ───────────────────────────────────────────────────────

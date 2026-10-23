@@ -52,16 +52,8 @@ def _now_iso() -> str:
 async def _notify(db, user_id: Optional[str], kind: str, title: str, body: str, meta: dict) -> None:
     if not user_id:
         return
-    await db.notifications.insert_one({
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "kind": kind,
-        "title": title,
-        "body": body[:160],
-        "read": False,
-        "meta": meta,
-        "created_at": _now_iso(),
-    })
+    from notification_center import emit  # respects the user's category / quiet-hour / push preferences
+    await emit(db, user_id, kind, title, body, meta)
 
 
 def _fmt_naira(n: int) -> str:

@@ -4,7 +4,8 @@
  * section with a clear next step, and property cards keep their paid action.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable, RefreshControl } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import Animated from "react-native-reanimated";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -13,7 +14,8 @@ import { track } from "@/src/lib/analytics";
 import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { Appear, AppText, Avatar, Badge, Card, EmptyState, IconButton, PressableScale, Screen, Section, SkeletonCard, type IconName } from "@/src/ui";
+import { Appear, AppText, Avatar, Badge, Card, EmptyState, IconButton, PressableScale, Screen, Section, SkeletonCard, useBounceRefresh, type IconName } from "@/src/ui";
+import { useUnreadNotifications } from "@/src/hooks/use-unread-notifications";
 import { EventRow } from "@/src/components/neighbours/EventRow";
 import { PostRow } from "@/src/components/neighbours/PostRow";
 
@@ -26,8 +28,8 @@ export default function NeighboursTab() {
   const [data, setData] = useState<NeighboursHome | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [unread, setUnread] = useState(0);
+  const { unread: notifUnread } = useUnreadNotifications();
 
   const load = useCallback(async () => {
     setError(false);
@@ -39,9 +41,9 @@ export default function NeighboursTab() {
       setError(true);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
+  const { refreshControl, bounceStyle } = useBounceRefresh(load);
 
   useFocusEffect(
     useCallback(() => {
@@ -82,12 +84,12 @@ export default function NeighboursTab() {
               </View>
             ) : null}
           </View>
-          <IconButton icon="notifications-outline" label="Notifications" onPress={() => router.push("/notifications" as any)} testID="nb-notifications" />
+          <IconButton icon="notifications-outline" label="Notifications" badge={notifUnread} onPress={() => router.push("/notifications" as any)} testID="nb-notifications" />
           <IconButton icon="options-outline" label="Privacy & settings" onPress={() => router.push("/neighbours/settings" as any)} testID="nb-settings" />
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.text} />}>
+      <Animated.ScrollView style={bounceStyle} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
         {loading ? (
           <>
             <SkeletonCard />
@@ -328,7 +330,7 @@ export default function NeighboursTab() {
             </AppText>
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
     </Screen>
   );
 }

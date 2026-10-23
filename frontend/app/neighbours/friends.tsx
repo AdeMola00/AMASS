@@ -26,6 +26,8 @@ export default function FriendsScreen() {
     setError(false);
     try {
       setData(await api.socialConnections());
+      api.markNotifReadByTarget("kind", "CONNECTION_REQUEST").catch(() => {});
+      api.markNotifReadByTarget("kind", "CONNECTION_ACCEPTED").catch(() => {});
     } catch {
       setError(true);
     } finally {

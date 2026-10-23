@@ -10,6 +10,7 @@ import * as Location from "expo-location";
 import { api, MapMarker, Property, UnlockResult } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
 import { useWallet } from "@/src/contexts/wallet";
+import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, BalanceChip, Button, UnlockDialog, useToast } from "@/src/ui";
@@ -71,6 +72,7 @@ const nudgeText = (p: Pin) => {
 export default function HomeMap() {
   const { colors, shadows, isDark } = useTheme();
   const toast = useToast();
+  const { requestContextualPush } = usePushPrompt();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ ai_filters?: string }>();
@@ -352,6 +354,8 @@ export default function HomeMap() {
       await api.createSavedSearch(name, criteria, true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       toast.show({ kind: "success", title: "Search saved", body: `We'll notify you when new listings match "${name}".`, actionLabel: "View", onAction: () => router.push("/saved-searches" as any) });
+      // Value moment → the one place we offer phone alerts for matches (never on launch).
+      setTimeout(() => requestContextualPush("saved_search").catch(() => {}), 900);
     } catch (e: any) {
       toast.error("Couldn't save search", e?.message ?? "Please try again.");
     }

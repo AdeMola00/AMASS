@@ -9,7 +9,7 @@ import { useWallet } from "@/src/contexts/wallet";
 import { api } from "@/src/lib/api";
 import { useTheme, useThemeMode } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AnimatedNumber, AppText, Avatar, Badge, Button, ListRow, RowGroup, Screen, StatTile, type IconName } from "@/src/ui";
+import { AnimatedNumber, AppText, Avatar, Badge, Button, ListRow, RowGroup, Screen, StatTile, type IconName, Gloss } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 type Row = { icon: IconName; label: string; route: string; caption?: string; requires?: "agent"; tone?: "default" | "brand" | "mass" | "fix" | "success" | "warning" | "info" | "premium" };
@@ -136,6 +136,7 @@ export default function Profile() {
         {/* Wallet hero — Top-up button is a sibling of the card pressable (no nested buttons on web) */}
         <View style={styles.walletWrap} testID="wallet-card-wrap">
           <LinearGradient colors={isDark ? ["#292926", "#1C1C1A"] : ["#1C1C1A", "#111111"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wallet}>
+            <Gloss height="48%" opacity={0.55} />
             <View style={styles.walletCoin}>
               <TokenIcon size={120} animated />
             </View>

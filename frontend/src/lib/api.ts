@@ -536,6 +536,45 @@ async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+/* ─── Notification Center types ──────────────────────────────────────── */
+export type NotifFrequency = "immediate" | "daily" | "weekly";
+export type PushPromptStatus = "undetermined" | "granted" | "denied" | "dismissed" | "blocked";
+export type NotifCategoryMeta = { label: string; caption: string; icon: string; digest: boolean; default_frequency: NotifFrequency };
+export type AppNotification = {
+  id: string;
+  user_id: string;
+  kind: string;
+  category: string;
+  title: string;
+  body: string;
+  read: boolean;
+  meta: Record<string, any>;
+  action_url?: string | null;
+  created_at: string;
+};
+export type NotifCenterPage = {
+  items: AppNotification[];
+  unread: number;
+  unread_by_category: Record<string, number>;
+  categories: Record<string, NotifCategoryMeta>;
+  next_before: string | null;
+};
+export type NotifPrefs = {
+  user_id: string;
+  categories: Record<string, { enabled: boolean; frequency: NotifFrequency }>;
+  quiet_hours: { enabled: boolean; start: string; end: string };
+  push_enabled: boolean;
+  push_prompt: { status: PushPromptStatus; last_prompted_at: string | null; context: string | null };
+  updated_at: string;
+  catalog: Record<string, NotifCategoryMeta>;
+  frequencies: NotifFrequency[];
+};
+export type NotifPrefsUpdate = {
+  categories?: Record<string, { enabled?: boolean; frequency?: NotifFrequency }>;
+  quiet_hours?: { enabled?: boolean; start?: string; end?: string };
+  push_enabled?: boolean;
+};
+
 /* ─── Monetization types ─────────────────────────────────────────────── */
 export type FeatureKey = "property" | "fixa_provider";
 export type UnlockQuote = {
@@ -1399,6 +1438,34 @@ export const api = {
     req<{ unread: number; items: any[] }>("/notifications"),
   markNotificationsRead: () =>
     req<{ ok: boolean }>("/notifications/mark-read", { method: "POST" }),
+
+  // ─── Notification Center (user-controlled categories / frequency / quiet hours / push) ───
+  notifCenter: (params: { category?: string; before?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.category && params.category !== "all") q.set("category", params.category);
+    if (params.before) q.set("before", params.before);
+    if (params.limit) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return req<NotifCenterPage>(`/notifications/center${qs ? `?${qs}` : ""}`);
+  },
+  notifUnreadCount: () => req<{ unread: number }>("/notifications/unread-count"),
+  notifPrefs: () => req<NotifPrefs>("/notifications/prefs"),
+  updateNotifPrefs: (body: NotifPrefsUpdate) =>
+    req<NotifPrefs>("/notifications/prefs", { method: "PUT", body: JSON.stringify(body) }),
+  notifPushPrompt: (status: PushPromptStatus, context?: string) =>
+    req<{ ok: boolean; push_prompt: NotifPrefs["push_prompt"]; push_enabled: boolean }>("/notifications/push-prompt", {
+      method: "POST",
+      body: JSON.stringify({ status, context }),
+    }),
+  markNotifRead: (id: string) => req<{ ok: boolean; unread: number }>(`/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
+  markNotifReadByTarget: (target_type: string, target_id: string) =>
+    req<{ ok: boolean; marked: number; unread: number }>("/notifications/read-by-target", {
+      method: "POST",
+      body: JSON.stringify({ target_type, target_id }),
+    }),
+  markNotifReadAll: (category?: string) =>
+    req<{ ok: boolean; marked: number; unread: number }>(`/notifications/read-all${category && category !== "all" ? `?category=${encodeURIComponent(category)}` : ""}`, { method: "POST" }),
+  notifPreview: () => req<{ ok: boolean; notification: AppNotification }>("/notifications/preview", { method: "POST" }),
   createAgentReferral: (data: {
     property_id: string;
     client_user_id?: string;

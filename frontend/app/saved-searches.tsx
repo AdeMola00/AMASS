@@ -54,6 +54,7 @@ export default function SavedSearchesScreen() {
     try {
       const list = await api.savedSearches();
       setRows(list);
+      api.markNotifReadByTarget("category", "property_matches").catch(() => {});
     } catch {
       setError(true);
     }

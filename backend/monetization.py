@@ -516,6 +516,20 @@ class UnlockService:
         ent = await self.db.entitlements.find_one({"id": ent_id}, {"_id": 0})
         await self._event(uid, feature_key, target_id, "paid", fee, currency, t, {"transaction_id": ent.get("transaction_id")})
         balance_after = int(updated["balance"] + updated["bonus_balance"])
+        # Receipt in the Notification Center (never pushed — the user just did this on-screen).
+        try:
+            from notification_center import emit
+            await emit(
+                self.db, uid, "UNLOCK_RECEIPT",
+                f"Receipt · {fee} {currency} spent",
+                f"Unlocked {t.label}. Balance now {balance_after} {currency}.",
+                {"reference": ent.get("transaction_id") or ent_id, "feature_key": feature_key, "target_id": target_id, "amount": fee, "currency": currency, **({"property_id": target_id} if feature_key == "property" else {})},
+                action_url="/wallet",
+                push=False,
+            )
+        except Exception as e:  # never block the unlock
+            import logging
+            logging.getLogger("amass.monetization").warning("unlock receipt notification failed: %s", e)
         return await self._result(user, t, ent, charged=fee, currency=currency, balance_after=balance_after)
 
     async def _result(self, user: dict, t: Target, ent: Optional[dict], *, charged: int, currency: str, free_reason: Optional[str] = None, balance_after: Optional[int] = None) -> dict:

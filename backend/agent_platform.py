@@ -397,17 +397,13 @@ async def maybe_mark_starter_kit_eligible(
             }
         )
     # Notify user
-    await db.notifications.insert_one(
-        {
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "kind": "starter_kit_eligible",
-            "title": "You've unlocked the AMASS Starter Kit",
-            "body": "5+ quality listings verified. Our team will process your kit soon.",
-            "read": False,
-            "meta": {},
-            "created_at": now.isoformat(),
-        }
+    from notification_center import emit
+    await emit(
+        db, user_id, "starter_kit_eligible",
+        "You've unlocked the AMASS Starter Kit",
+        "5+ quality listings verified. Our team will process your kit soon.",
+        {"starter_kit": True},
+        action_url="/agent-dashboard",
     )
 
 
@@ -599,18 +595,13 @@ def register_agent_platform_routes(
                 {"id": "founding"}, {"$inc": {"claimed": 1}}
             )
         # Notify
-        await db.notifications.insert_one(
-            {
-                "id": str(uuid.uuid4()),
-                "user_id": pending["user_id"],
-                "kind": "subscription_activated",
-                "title": f"{plan['name']} plan activated",
-                "body": f"Welcome to the {plan['name']} plan. Your ₦{pending['amount_ngn']:,} "
-                f"subscription is now active.",
-                "read": False,
-                "meta": {"plan_id": plan["id"], "reference": pending["reference"]},
-                "created_at": now.isoformat(),
-            }
+        from notification_center import emit
+        await emit(
+            db, pending["user_id"], "subscription_activated",
+            f"{plan['name']} plan activated",
+            f"Welcome to the {plan['name']} plan. Your ₦{pending['amount_ngn']:,} subscription is now active.",
+            {"plan_id": plan["id"], "reference": pending["reference"]},
+            action_url="/agent-plans",
         )
         # Clean pending
         await db.pending_agent_subscriptions.delete_many(
@@ -805,23 +796,17 @@ def register_agent_platform_routes(
             {"user_id": user_id}, {"$set": updates}
         )
         # Notify
-        await db.notifications.insert_one(
-            {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "kind": "verification_result",
-                "title": "AMASS verification approved"
+        from notification_center import emit
+        await emit(
+            db, user_id, "verification_result",
+            "AMASS verification approved" if data.approve else "AMASS verification declined",
+            (
+                "Congratulations — your AMASS Agent verification is approved."
                 if data.approve
-                else "AMASS verification declined",
-                "body": (
-                    "Congratulations — your AMASS Agent verification is approved."
-                    if data.approve
-                    else (data.reason or "Please review and resubmit your details.")
-                ),
-                "read": False,
-                "meta": {"level": updates.get("verification_level")},
-                "created_at": now.isoformat(),
-            }
+                else (data.reason or "Please review and resubmit your details.")
+            ),
+            {"level": updates.get("verification_level"), "decision": "approved" if data.approve else "rejected"},
+            action_url="/become-agent",
         )
         return {"ok": True, "status": updates["status"]}
 
@@ -842,21 +827,13 @@ def register_agent_platform_routes(
                 }
             },
         )
-        await db.notifications.insert_one(
-            {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "kind": "account_status",
-                "title": "Account suspended" if data.suspend else "Account reinstated",
-                "body": (
-                    data.reason
-                    if data.suspend
-                    else "Your AMASS account is active again."
-                ) or "",
-                "read": False,
-                "meta": {},
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
+        from notification_center import emit
+        await emit(
+            db, user_id, "account_status",
+            "Account suspended" if data.suspend else "Account reinstated",
+            (data.reason if data.suspend else "Your AMASS account is active again.") or "",
+            {"suspended": bool(data.suspend)},
+            action_url="/become-agent",
         )
         return {"ok": True, "status": new_status}
 
@@ -915,17 +892,13 @@ def register_agent_platform_routes(
             "delivered": "Your AMASS Starter Kit has been delivered",
             "not_eligible": "AMASS Starter Kit update",
         }
-        await db.notifications.insert_one(
-            {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "kind": "starter_kit_status",
-                "title": titles.get(data.status, "Starter Kit update"),
-                "body": data.notes or "",
-                "read": False,
-                "meta": {"status": data.status, "tracking": data.tracking_reference},
-                "created_at": now.isoformat(),
-            }
+        from notification_center import emit
+        await emit(
+            db, user_id, "starter_kit_status",
+            titles.get(data.status, "Starter Kit update"),
+            data.notes or "",
+            {"status": data.status, "tracking": data.tracking_reference},
+            action_url="/agent-dashboard",
         )
         return {"ok": True, "status": data.status}
 

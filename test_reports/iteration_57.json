@@ -1,0 +1,34 @@
+{
+  "summary": "AMASS Notification Center + Glossy UI polish verification (backend + frontend, mobile 390x844 web preview, demo@amass.africa / amass2026). BACKEND: tests/test_notification_center.py 13/13 PASS + new tests/test_notification_review_spotcheck.py 10/10 PASS covering every endpoint called out in the review request: GET /center (shape items/unread/unread_by_category/categories/next_before + category filter + 400 on bogus), GET /unread-count, GET+PUT /prefs (brand_offers=weekly persists, quiet_hours 23:00-06:30 persists, messages.frequency forced to immediate, unknown category→400, invalid freq→422), POST /push-prompt for granted|dismissed|blocked, POST /preview + POST /{id}/read (404 for other user + 404 for unknown id), POST /read-by-target {category:property_matches} marks correctly and center unread_by_category drops to 0, POST /read-all, legacy GET /notifications still works, admin POST /admin/run-matchers returns 200 shape {saved_searches,nearby,brand_offers,marketplace,passport,digests,since} + non-admin → 401/403. Chat funnel collapse (3 messages → ONE unread row with meta.count=3, action_url=/chat/{id}) and category-off suppression already covered by the existing suite — spot-checked, not duplicated. FRONTEND: /notifications renders notif-group-all/messages/property_matches/receipts/social/brands chips, notif-mark-all + notif-prefs present; chip tap filters; subtitle shows 'You're all caught up' after read-all. /notification-preferences renders glossy red 'Phone alerts' hero with prefs-push-toggle — tapping on WEB does NOT crash (no red screen, no page error), prefs-quiet-toggle + prefs-quiet-times visible with quiet-start-{HHMM} chips (23:00 highlighted) and quiet-end-{HHMM} chips (06:30 highlighted), prefs-cat-{messages|brand_offers|nearby_listings|property_matches|receipts}-toggle all present, prefs-freq-{brand_offers|nearby_listings|property_matches|marketplace}-{immediate|daily|weekly} segments present, prefs-preview tap succeeds. /settings → settings-notification-preferences row navigates to /notification-preferences. Discover tab bell (discover-notifications) and Neighbours tab bell (nb-notifications) both rendered. Market tab (/) and /wallet render without errors (wallet shows MASS 12,692 + FIX 590 heroes). No red screen on any route. Only noise: expo-notifications web warning + RN-web 'shadow*' / 'pointerEvents' deprecations + useNativeDriver JS fallback (expected on web).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "RN-web deprecations (global)", "issue": "'shadow* style props are deprecated. Use boxShadow' and 'props.pointerEvents is deprecated. Use style.pointerEvents' logged on every bundle. Non-blocking but previously flagged in iteration_56. Reference: /app/frontend StyleSheet.create callsites (sweep needed)."},
+      {"component": "Animated.* (ScreenLift / Refresh)", "issue": "'useNativeDriver is not supported... Falling back to JS-based animation' logged on screens using Animated.timing/spring with useNativeDriver:true. Expected on web preview — native builds will use the native driver. Non-blocking; just confirming the fade-and-lift / bounce animations fall back cleanly without crashing."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_notification_center.py",
+    "/app/backend/tests/test_notification_review_spotcheck.py",
+    "/app/test_reports/pytest/pytest_iteration57_notif.xml",
+    "/app/test_reports/pytest/pytest_iteration57_notif_spotcheck.xml"
+  ],
+  "action_items": [
+    "No functional blockers. Optional sweep: migrate 'shadow*' props → boxShadow and 'props.pointerEvents' → style.pointerEvents in StyleSheet.create callsites to silence the RN-web deprecation noise (same note as iteration_56).",
+    "Verified on web preview only. Real-device push delivery (Expo native) was NOT tested — out of scope per review-request note."
+  ],
+  "critical_code_review_comments": [
+    "backend/notification_center.py: emit() correctly short-circuits on dedupe_key + collapses same-target unread rows (meta.count++) and respects per-category enabled + frequency gates. Legacy social/chat/wallet writers routed through this funnel (verified by test_messages_collapse_per_conversation_and_sync_on_read + test_social_request_notification_routed).",
+    "backend/notification_center.py: PUT /prefs correctly forces non-digest categories (messages/social/receipts/admin/passport/services) back to 'immediate' even if the client sends a frequency — matches review-request spec.",
+    "backend/notification_center.py: push-prompt flipping to 'blocked' sets push_enabled=False and preserves last_prompted_at + context — safe to call from web (never requests OS permission). Pairs cleanly with the frontend info-toast on web."
+  ],
+  "updated_files": ["/app/backend/tests/test_notification_review_spotcheck.py"],
+  "success_rate": {"backend": "100% (23/23 — 13 full suite + 10 review spotcheck)", "frontend": "~100% — every testID in the review spec rendered, push-toggle on web does not crash, no red screens, no page errors"},
+  "seed_data_creation": "None persisted. Spotcheck test registers ephemeral review57.{tag}.{uuid} users via /auth/register (no cleanup required — standard pattern for this suite).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend: pytest tests/test_notification_center.py AND tests/test_notification_review_spotcheck.py — expect 23/23. Frontend: login demo@amass.africa/amass2026, visit /notifications (chips notif-group-{all|messages|property_matches|receipts|social|brands|nearby_listings} + notif-mark-all + notif-prefs). /notification-preferences has prefs-push-toggle (web = info toast, no crash), prefs-quiet-toggle + prefs-quiet-times with quiet-start-HHMM / quiet-end-HHMM chips, prefs-cat-{key}-toggle for every CATEGORIES key, prefs-freq-{key}-{immediate|daily|weekly}, prefs-preview. settings-notification-preferences row on /settings. Discover bell: discover-notifications. Neighbours bell: nb-notifications. Read-sync verified via API: POST /notifications/read-by-target {category: property_matches} after /saved-searches open drops unread_by_category.property_matches to 0."
+}

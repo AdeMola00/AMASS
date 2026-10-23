@@ -1,33 +1,64 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Pressable, StyleSheet, View, ViewStyle } from "react-native";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/theme";
-import { radii, space } from "@/src/theme/tokens";
+import { motion, radii, space } from "@/src/theme/tokens";
 import { AppText } from "./Text";
+import { useReducedMotion } from "./Feedback";
 
 import type { IconName } from "./icons";
 
-/* ─── Screen: safe-area aware root with themed background ───────────── */
+/* ─── Screen: safe-area aware root with themed background ─────────────
+   Every screen opens with a subtle fade-and-lift (opacity 0→1, 14dp rise,
+   ~300ms ease-out). Reduced-motion users get an instant cut.             */
+export function useScreenLift(enabled = true) {
+  const reduce = useReducedMotion();
+  const progress = useSharedValue(enabled && !reduce ? 0 : 1);
+  useEffect(() => {
+    if (!enabled || reduce) return;
+    progress.value = withTiming(1, { duration: motion.slow, easing: Easing.out(Easing.cubic) });
+  }, [enabled, reduce, progress]);
+  return useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ translateY: (1 - progress.value) * 14 }],
+  }));
+}
+
+/** Bare fade-and-lift container for legacy screens that manage their own chrome. */
+export function ScreenLift({ children, style, testID }: { children: React.ReactNode; style?: ViewStyle | ViewStyle[]; testID?: string }) {
+  const lift = useScreenLift();
+  return (
+    <Animated.View style={[style, lift]} testID={testID}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export function Screen({
   children,
   style,
   edges = ["top"],
   testID,
   bg,
+  animated = true,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
   edges?: ("top" | "bottom")[];
   testID?: string;
   bg?: string;
+  /** Set false for map / camera screens where the lift would fight native views. */
+  animated?: boolean;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const lift = useScreenLift(animated);
   return (
-    <View
+    <Animated.View
       style={[
         styles.screen,
         {
@@ -35,12 +66,13 @@ export function Screen({
           paddingTop: edges.includes("top") ? insets.top : 0,
           paddingBottom: edges.includes("bottom") ? insets.bottom : 0,
         },
+        lift,
         style,
       ]}
       testID={testID}
     >
       {children}
-    </View>
+    </Animated.View>
   );
 }
 

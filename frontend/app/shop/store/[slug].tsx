@@ -15,6 +15,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, Button, Chip, EmptyState, IconButton, Input, PressableScale, Sheet, Skeleton, useToast } from "@/src/ui";
 import { useShopBasket } from "@/src/contexts/shopBasket";
+import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { RetailerLogo } from "@/src/components/shop/RetailerLogo";
 import { ShopProductCard } from "@/src/components/shop/ShopProductCard";
 import { BasketPill, PurchaseRoutes, VerifiedNote } from "@/src/components/shop/ShopBits";
@@ -35,6 +36,7 @@ export default function StoreScreen() {
   const { colors, shadows } = useTheme();
   const { width } = useWindowDimensions();
   const toast = useToast();
+  const { requestContextualPush } = usePushPrompt();
   const basket = useShopBasket();
   const [store, setStore] = useState<ShopRetailerDetail | null>(null);
   const [error, setError] = useState(false);
@@ -54,6 +56,7 @@ export default function StoreScreen() {
       setStore(s);
       setError(false);
       track("shop_store_view", { retailer: slug });
+      api.markNotifReadByTarget("store", slug).catch(() => {});
       const first = (["delivery", "pickup", "showroom"] as Fulfil[]).find((k) => s.fulfilment?.[k]?.available === true);
       setFulfil((f) => f ?? first ?? null);
     } catch {
@@ -91,6 +94,7 @@ export default function StoreScreen() {
       const r = await api.shopToggleSave("store", store.id);
       setStore({ ...store, saved: r.saved });
       toast.show({ kind: "success", title: r.saved ? `Saved ${store.short_name}` : `Removed ${store.short_name}`, actionLabel: r.saved ? "Add to a list" : undefined, onAction: r.saved ? () => setListOpen(true) : undefined });
+      if (r.saved) setTimeout(() => requestContextualPush("brand_follow").catch(() => {}), 900);
     } catch (e: any) {
       toast.error("Couldn't save", e?.message);
     } finally {

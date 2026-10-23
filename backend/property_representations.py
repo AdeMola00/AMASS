@@ -370,6 +370,24 @@ def register_representation_routes(db, require_auth, require_admin, optional_use
                 {"property_uuid": rep["property_id"]},
                 {"$set": {"has_verified_representation": True, "updated_at": now}},
             )
+        # Tell the agent about the admin decision (Notification Center → "Admin decisions").
+        try:
+            from notification_center import emit
+            copy = {
+                "APPROVED": ("Your mandate was approved", "Your representation is now live on the Property Passport."),
+                "REJECTED": ("Your mandate was declined", data.reason or "Review the reason and resubmit your documents."),
+                "DOCS_REQUESTED": ("More documents needed", data.reason or "An admin asked for additional mandate documents."),
+                "SUSPENDED": ("Your mandate was suspended", data.reason or "Contact support if you believe this is a mistake."),
+                "REVOKED": ("Your mandate was revoked", data.reason or "Your representation has been removed."),
+            }[new_status]
+            await emit(
+                db, rep.get("user_id") or rep.get("agent_id"), "REPRESENTATION_DECISION", copy[0], copy[1],
+                {"representation_id": rep_id, "status": new_status, "amass_property_id": rep.get("amass_property_id"), "property_id": rep.get("property_id")},
+                dedupe_key=f"rep:{rep_id}:{new_status}:{now.date().isoformat()}",
+                action_url=f"/property-passport/{rep['amass_property_id']}" if rep.get("amass_property_id") else "/agent-dashboard",
+            )
+        except Exception:
+            pass
         return {"ok": True, "status": new_status}
 
     return agent, public, admin

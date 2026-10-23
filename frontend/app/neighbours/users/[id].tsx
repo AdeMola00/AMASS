@@ -10,6 +10,7 @@ import { track } from "@/src/lib/analytics";
 import { useTheme } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
 import { AppText, Avatar, Badge, Button, Card, EmptyState, IconButton, Screen, ScreenHeader, Sheet, SkeletonRows, useToast } from "@/src/ui";
+import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { ReportSheet } from "@/src/components/neighbours/ReportSheet";
 
 type Profile = Awaited<ReturnType<typeof api.socialUser>>;
@@ -19,6 +20,7 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const toast = useToast();
+  const { requestContextualPush } = usePushPrompt();
   const [p, setP] = useState<Profile | null>(null);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -63,6 +65,7 @@ export default function UserProfileScreen() {
       track("connection_sent");
       setP({ ...p, connection: { status: r.status as any, requested_by_me: true, id: r.id } });
       toast.success(r.status === "accepted" ? "You're connected" : "Request sent");
+      setTimeout(() => requestContextualPush("social_request").catch(() => {}), 900);
     } catch (e: any) {
       toast.error("Couldn't connect", e?.message);
     } finally {

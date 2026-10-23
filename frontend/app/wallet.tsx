@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable, RefreshControl } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import Animated from "react-native-reanimated";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, Stack } from "expo-router";
@@ -9,7 +10,7 @@ import { api, Currency, WalletTransaction } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { gradients, radii, space } from "@/src/theme/tokens";
-import { AnimatedNumber, AppText, Badge, Card, Chip, EmptyState, IconButton, ListRow, PressableScale, RowGroup, Screen, ScreenHeader, Section, SkeletonRows, StatTile, useToast, type IconName } from "@/src/ui";
+import { AnimatedNumber, AppText, Badge, Card, Chip, EmptyState, IconButton, ListRow, PressableScale, RowGroup, Screen, ScreenHeader, Section, SkeletonRows, StatTile, useToast, type IconName, Gloss, useBounceRefresh } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 type TxFilter = "all" | "MASS" | "FIX";
@@ -48,7 +49,6 @@ export default function WalletScreen() {
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [txFilter, setTxFilter] = useState<TxFilter>("all");
   const [conversion, setConversion] = useState<{ MASS_ngn: number; FIX_ngn: number }>({ MASS_ngn: 10, FIX_ngn: 10 });
@@ -76,10 +76,14 @@ export default function WalletScreen() {
   }, [loadTx]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
     await Promise.all([refresh(), loadTx()]);
-    setRefreshing(false);
   }, [refresh, loadTx]);
+  const { refreshControl, bounceStyle } = useBounceRefresh(onRefresh);
+
+  // Receipts land here → keep the notification centre in sync.
+  useEffect(() => {
+    api.markNotifReadByTarget("category", "receipts").catch(() => {});
+  }, []);
 
   const claim = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -125,14 +129,16 @@ export default function WalletScreen() {
         right={<IconButton icon="time-outline" label="Unlock history" onPress={() => router.push("/unlocks")} testID="wallet-history" />}
       />
 
-      <ScrollView
+      <Animated.ScrollView
+        style={bounceStyle}
         contentContainerStyle={{ paddingBottom: 60 + insets.bottom, gap: space[5] }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
+        refreshControl={refreshControl}
       >
         {/* MASS hero */}
         <View style={{ paddingHorizontal: space[4], gap: space[3] }}>
           <LinearGradient colors={isDark ? ["#292926", "#1C1C1A"] : ["#1C1C1A", "#111111"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero} testID="mass-card">
+            <Gloss height="48%" opacity={0.55} />
             <View style={styles.heroCoin}>
               <TokenIcon size={150} animated />
             </View>
@@ -339,7 +345,7 @@ export default function WalletScreen() {
             </View>
           )}
         </Section>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {loading && !mass ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg, justifyContent: "center", padding: space[4] }]}>

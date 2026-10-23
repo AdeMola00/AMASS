@@ -758,3 +758,33 @@ agent_communication:
       /neighbours/collections?create=1&kind=shopping.
       NOTE web: window.open is used for "website" hand-off (new tab) — assert the handoff POST + sheet rather than
       the external page. Expo AdModal may pop on Market after ~3s (tap "Skip"). Demo: demo@amass.africa / amass2026.
+  - agent: "main"
+    message: |
+      NOTIFICATION CENTER + GLOSSY POLISH — FIRST TEST PASS.
+      Backend /app/backend/notification_center.py mounted (prefix /api/notifications, auth): GET /center?category=&before=&limit=
+      → {items, unread, unread_by_category, categories(catalog), next_before}; GET /unread-count; GET /prefs; PUT /prefs
+      {categories:{key:{enabled,frequency}}, quiet_hours:{enabled,start,end}, push_enabled}; POST /push-prompt {status,context};
+      POST /{id}/read; POST /read-by-target {target_type: property|conversation|store|category|kind|…, target_id};
+      POST /read-all?category=; POST /preview (adds an in-app sample, never pushed); POST /admin/run-matchers (admin).
+      Legacy GET /api/notifications + POST /api/notifications/mark-read still work. ALL existing writers (chat, social,
+      marketplace, discovery, improvement, agent platform, reviews, representations, unlock/top-up receipts) now go through
+      `emit` → user prefs (category off → not stored; digest frequency only for SAVED_SEARCH_MATCH/NEARBY_LISTINGS/
+      BRAND_OFFER/MARKET_AD; same unread conversation collapses into ONE row with meta.count; quiet hours mute push only).
+      pytest: tests/test_notification_center.py 13/13; regression chat/neighbours/marketplace/agent/reviews/passport green
+      (3 pre-existing data-drift failures in agent_platform_phase1 quota + monetization marker keys — unrelated).
+      Frontend: /notifications rewritten (testIDs notifications-screen, notif-mark-all, notif-prefs, notif-group-{all|
+      messages|property_matches|nearby_listings|brand_offers|marketplace|social|passport|receipts|admin|services},
+      notif-list, notif-{id}, notif-load-more, notif-empty, notif-push-offer[native only]); new /notification-preferences
+      (notification-preferences-screen, prefs-push-toggle, prefs-open-settings, prefs-quiet-toggle, prefs-quiet-times,
+      quiet-start-HHMM / quiet-end-HHMM chips, prefs-cat-{key}, prefs-cat-{key}-toggle, prefs-freq-{key}-{immediate|daily|
+      weekly}, prefs-preview); Settings → "Notification preferences" row (settings-notification-preferences). Bell badges on
+      Discover (discover-notifications) + Neighbours (nb-notifications) use /unread-count. Read-sync: property detail,
+      saved-searches (category property_matches), shop store (store slug), friends (kinds CONNECTION_*), wallet (receipts).
+      Push: expo-notifications restored (plugin in app.json, POST_NOTIFICATIONS un-blocked, app.config.js wires
+      google-services.json only when present). Contextual prompt sheet (push-prompt-sheet, push-prompt-allow,
+      push-prompt-later) fires only after: save search (home map bookmark), save a store, send a friend request, tapping
+      the centre's offer card, or the preferences toggle — NEVER on launch; on WEB it is unsupported (no sheet; toggle
+      shows an info toast). Glossy: AmassLogo uses amass-emblem-glossy.png (red→crimson + highlight), Button variant
+      "brand" is a gradient pill, Gloss sheen on wallet/profile heroes, Screen fade-and-lift on open, useBounceRefresh
+      (brand-tinted spinner + settle bounce) on Discover/Market/Neighbours/Wallet/Notifications. Demo:
+      demo@amass.africa / amass2026 (966+ unread seeded by earlier tests — fine).

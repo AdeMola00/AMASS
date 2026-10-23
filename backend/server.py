@@ -2116,6 +2116,10 @@ app.include_router(register_chat_routes(db, get_current_user, require_admin))
 from push_notifications import register_push_routes
 app.include_router(register_push_routes())
 
+# ─── Notification Center (user-controlled categories / frequency / quiet hours / push) ───
+from notification_center import register_notification_center_routes, start_notification_center
+app.include_router(register_notification_center_routes(db, get_current_user, require_admin))
+
 # ─── Emergent-managed Google Auth bridge ───
 from google_auth import register_google_auth_routes
 app.include_router(
@@ -2219,6 +2223,7 @@ async def _monetization_startup():
 @app.on_event("startup")
 async def on_startup():
     await _monetization_startup()
+    await start_notification_center(db)  # indexes + hourly matcher/digest sweep
     # ─── DB Indexes (idempotent) ─────────────────────────────
     try:
         await db.properties.create_index("id", unique=True)

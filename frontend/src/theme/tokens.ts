@@ -70,6 +70,10 @@ export const palette = {
 /** Premium / paid-gate gradient (blue → violet). Identical in both themes. */
 export const gradients = {
   premium: ["#3B6CF6", "#7A3BEF"] as const,
+  /** AMASS brand: brand red → deep crimson. Identical in both themes (brand colour). */
+  brand: ["#F0262E", "#B8151A", "#7A0C12"] as const,
+  /** Soft glossy highlight painted over the top half of brand surfaces / emblems. */
+  gloss: ["rgba(255,255,255,0.28)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0)"] as const,
   /** Vertical photo scrim for photo-led cards (transparent → 70% ink). */
   scrim: ["rgba(17,17,17,0)", "rgba(17,17,17,0.72)"] as const,
 } as const;

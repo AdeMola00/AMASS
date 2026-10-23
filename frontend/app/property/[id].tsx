@@ -89,6 +89,7 @@ export default function PropertyDetails() {
       api.favoriteIds().then((r) => setFavorited(r.ids.includes(id))).catch(() => {});
       api.recordView(id).catch(() => {});
       recordRecentlyViewed(id).catch(() => {});
+      api.markNotifReadByTarget("property", id).catch(() => {});
       api.socialContext([id]).then((r) => setSocial(r[id] ?? null)).catch(() => {});
       track("property_detail_view", { property_id: id, arrived_via: arrivedVia });
     }

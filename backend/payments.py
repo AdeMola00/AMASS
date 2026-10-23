@@ -159,6 +159,20 @@ def register_payment_routes(
             {"reference": reference},
             {"$set": {"status": "paid", "verified_at": datetime.now(timezone.utc).isoformat()}},
         )
+        # Receipt in the Notification Center (webhook path — the user may be off-screen, so push is allowed).
+        try:
+            from notification_center import emit
+            total = int(intent["credits"]) + int(intent.get("bonus", 0) or 0)
+            await emit(
+                db, intent["user_id"], "TOPUP_RECEIPT",
+                f"Receipt · {total} {intent['currency']} added",
+                f"₦{int(intent['amount_ngn']):,} top-up confirmed ({intent['bundle_name']}).",
+                {"reference": reference, "amount_ngn": intent["amount_ngn"], "credits": total, "currency": intent["currency"], "provider": provider},
+                action_url="/wallet",
+            )
+        except Exception as e:  # never block fulfilment
+            import logging
+            logging.getLogger("amass.payments").warning("top-up receipt notification failed: %s", e)
         return {"credited": intent["credits"], "bonus": intent.get("bonus", 0)}
 
     # ─── INITIALIZE ─────────────────────────────────────────────

@@ -232,18 +232,9 @@ def register_property_improvement_routes(
     router = APIRouter(prefix="/api", tags=["property-improvement"])
 
     async def _push_notification(user_id: str, kind: str, title: str, body: str, meta: Optional[dict] = None):
-        """Store an in-app notification. Real push delivery wires in later."""
-        doc = {
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "kind": kind,
-            "title": title,
-            "body": body,
-            "read": False,
-            "meta": meta or {},
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.notifications.insert_one(dict(doc))
+        """Store (and maybe push) an in-app notification via the Notification Center."""
+        from notification_center import emit
+        await emit(db, user_id, kind, title, body, meta or {})
 
     # ═══ Catalog endpoints ═════════════════════════════════════
     @router.get("/improve/catalog")
