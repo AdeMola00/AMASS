@@ -23,7 +23,7 @@ import { PropertyMarker } from "@/src/components/PropertyMarker";
 import { TokenIcon } from "@/src/components/TokenIcon";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
-import { Button, ProgressBar, Screen, ScreenHeader, Sheet, AppText, useToast } from "@/src/ui";
+import { Button, ProgressBar, Screen, ScreenHeader, Sheet, AppText, useCelebrate, useToast } from "@/src/ui";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 type Step = 0 | 1 | 2 | 3 | 4;
@@ -60,6 +60,7 @@ export default function SubmitProperty() {
   const insets = useSafeAreaInsets();
   const { colors: tc } = useTheme();
   const toast = useToast();
+  const celebrate = useCelebrate();
   const [step, setStep] = useState<Step>(0);
   const [submitting, setSubmitting] = useState(false);
   const [limitSheet, setLimitSheet] = useState<{ planName: string; limit: number | null } | null>(null);
@@ -152,6 +153,7 @@ export default function SubmitProperty() {
         mandate: mandatePayload,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      celebrate({ title: "Listed!", icon: "home", tone: "brand" });
       router.replace(`/property/${created.id}`);
     } catch (e: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});

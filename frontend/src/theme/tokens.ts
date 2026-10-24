@@ -65,6 +65,9 @@ export const palette = {
   amber: { 100: "#FCF7E6", 500: "#E8B815", 600: "#C99E0E", 700: "#9A7A0A" },
   blue: { 50: "#EEF2FF", 100: "#E0E7FF", 400: "#6366F1", 500: "#4F46E5", 600: "#4338CA", 700: "#3730A3" },
   violet: { 100: "#EDE9FE", 400: "#A78BFA", 500: "#8B5CF6", 600: "#7C3AED" },
+  // Section accents — Market (sunny orange) and Declutter (teal). Users know where they are by colour alone.
+  orange: { 50: "#FFF4E8", 100: "#FFE4C7", 400: "#FFA033", 500: "#F97316", 600: "#DD5F0C", 700: "#B14A08", 900: "#3D1F08" },
+  teal: { 50: "#E9FAF7", 100: "#CDF3EC", 400: "#2DD4BF", 500: "#14B8A6", 600: "#0F9488", 700: "#0F766E", 900: "#0B3B36" },
 } as const;
 
 /** Premium / paid-gate gradient (blue → violet). Identical in both themes. */
@@ -74,14 +77,31 @@ export const gradients = {
   brand: ["#F0262E", "#B8151A", "#7A0C12"] as const,
   /** FIXA: lime → forest green (FIXA brand colours, theme-independent). */
   fix: ["#7ED958", "#3FA463", "#2E8B57"] as const,
+  /** Section accents (theme-independent): Market = sunny orange, Declutter = teal, Map = brand red. */
+  market: ["#FFB347", "#F97316", "#DD5F0C"] as const,
+  declutter: ["#2DD4BF", "#14B8A6", "#0F766E"] as const,
+  map: ["#FF5A60", "#E11B22", "#B8151A"] as const,
   /** Wallet token cards — gold MASS coin, deep FIXA green. Brand colours, theme-independent. */
   massCard: ["#F7E29A", "#D9B547", "#A9842B"] as const,
   fixCard: ["#56C06A", "#2E8B57", "#1B5A37"] as const,
   /** Soft glossy highlight painted over the top half of brand surfaces / emblems. */
   gloss: ["rgba(255,255,255,0.28)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0)"] as const,
+  /** Moving sheen band for Shimmer (transparent → white → transparent). */
+  shimmer: ["rgba(255,255,255,0)", "rgba(255,255,255,0.32)", "rgba(255,255,255,0)"] as const,
   /** Vertical photo scrim for photo-led cards (transparent → 70% ink). */
   scrim: ["rgba(17,17,17,0)", "rgba(17,17,17,0.72)"] as const,
 } as const;
+
+/** App sections and their accent — the single place that decides "what colour is Market?". */
+export type SectionKey = "map" | "market" | "fixa" | "declutter" | "social" | "wallet";
+export const sectionGradient: Record<SectionKey, readonly string[]> = {
+  map: gradients.map,
+  market: gradients.market,
+  fixa: gradients.fix,
+  declutter: gradients.declutter,
+  social: gradients.fix,
+  wallet: gradients.massCard,
+};
 
 /** 4/8pt grid */
 export const space = {
@@ -100,26 +120,26 @@ export const space = {
 } as const;
 
 export const radii = {
-  xs: 8,
-  sm: 12,
-  md: 16,
-  lg: 20,
-  xl: 24,
-  xxl: 32,
+  xs: 10,
+  sm: 14,
+  md: 18,
+  lg: 24,
+  xl: 28,
+  xxl: 36,
   pill: 999,
 } as const;
 
 /**
- * Plus Jakarta Sans is capped at 500 app-wide — hierarchy comes from the type
- * scale (size + tracking), never from heavy weights. The heavier keys are kept
- * so existing call-sites compile; they all resolve to the Medium face.
+ * Plus Jakarta Sans — chunky, confident headings and labels (600–800) with a
+ * comfortable 400/500 body. Hierarchy comes from weight AND size so screens
+ * read at a glance.
  */
 export const fontFamilies = {
   regular: "PlusJakartaSans-400",
   medium: "PlusJakartaSans-500",
-  semibold: "PlusJakartaSans-500",
-  bold: "PlusJakartaSans-500",
-  extrabold: "PlusJakartaSans-500",
+  semibold: "PlusJakartaSans-600",
+  bold: "PlusJakartaSans-700",
+  extrabold: "PlusJakartaSans-800",
   /** Distinctive display serif — expressive headlines & wallet balances only. */
   display: "DMSerifDisplay",
 } as const;
@@ -131,42 +151,46 @@ export const boldFont = {
   black: "PlusJakartaSans-800",
 } as const;
 
-/** Type scale — tight, consistent line heights (1.1 display → 1.5 body) */
+/** Type scale — chunky headings, comfortable body (1.1 display → 1.5 body) */
 export const typeScale = {
   /** Editorial serif — onboarding hero, sheet headlines, wallet balances. Never for prices in lists. */
   heroLg: { fontSize: 44, lineHeight: 48, letterSpacing: -0.8, fontFamily: fontFamilies.display },
   hero: { fontSize: 34, lineHeight: 38, letterSpacing: -0.5, fontFamily: fontFamilies.display },
   heroSm: { fontSize: 26, lineHeight: 30, letterSpacing: -0.3, fontFamily: fontFamilies.display },
-  display: { fontSize: 34, lineHeight: 38, letterSpacing: -1, fontFamily: fontFamilies.medium },
-  h1: { fontSize: 28, lineHeight: 32, letterSpacing: -0.8, fontFamily: fontFamilies.medium },
-  h2: { fontSize: 22, lineHeight: 26, letterSpacing: -0.5, fontFamily: fontFamilies.medium },
-  h3: { fontSize: 18, lineHeight: 22, letterSpacing: -0.3, fontFamily: fontFamilies.medium },
-  title: { fontSize: 16, lineHeight: 20, letterSpacing: -0.2, fontFamily: fontFamilies.medium },
-  body: { fontSize: 15, lineHeight: 22, letterSpacing: 0, fontFamily: fontFamilies.regular },
-  bodyMedium: { fontSize: 15, lineHeight: 22, letterSpacing: 0, fontFamily: fontFamilies.medium },
-  bodySm: { fontSize: 13, lineHeight: 18, letterSpacing: 0, fontFamily: fontFamilies.regular },
-  caption: { fontSize: 12, lineHeight: 16, letterSpacing: 0, fontFamily: fontFamilies.medium },
-  label: { fontSize: 11, lineHeight: 14, letterSpacing: 0.6, fontFamily: fontFamilies.medium },
-  micro: { fontSize: 10, lineHeight: 12, letterSpacing: 0.4, fontFamily: fontFamilies.medium },
+  display: { fontSize: 36, lineHeight: 40, letterSpacing: -1, fontFamily: fontFamilies.extrabold },
+  h1: { fontSize: 30, lineHeight: 34, letterSpacing: -0.8, fontFamily: fontFamilies.extrabold },
+  h2: { fontSize: 24, lineHeight: 28, letterSpacing: -0.5, fontFamily: fontFamilies.bold },
+  h3: { fontSize: 20, lineHeight: 24, letterSpacing: -0.4, fontFamily: fontFamilies.bold },
+  title: { fontSize: 17, lineHeight: 22, letterSpacing: -0.2, fontFamily: fontFamilies.bold },
+  body: { fontSize: 16, lineHeight: 24, letterSpacing: 0, fontFamily: fontFamilies.regular },
+  bodyMedium: { fontSize: 16, lineHeight: 24, letterSpacing: 0, fontFamily: fontFamilies.semibold },
+  bodySm: { fontSize: 14, lineHeight: 20, letterSpacing: 0, fontFamily: fontFamilies.regular },
+  caption: { fontSize: 13, lineHeight: 17, letterSpacing: 0, fontFamily: fontFamilies.semibold },
+  label: { fontSize: 12, lineHeight: 15, letterSpacing: 0.5, fontFamily: fontFamilies.bold },
+  micro: { fontSize: 11, lineHeight: 13, letterSpacing: 0.3, fontFamily: fontFamilies.bold },
 } as const;
 
 export type TypeVariant = keyof typeof typeScale;
 
-/** Motion — purposeful, 150–300ms, respects reduced motion in components */
+/** Motion — playful but light, 150–300ms, respects reduced motion in components */
 export const motion = {
   fast: 150,
   base: 220,
   slow: 300,
   /** Per-item stagger for lists and grids. */
   stagger: 50,
-  /** Press feedback scale for cards & pill buttons / small icon buttons. */
-  pressScale: 0.97,
-  pressScaleSmall: 0.93,
+  /** Squish on press for cards & pill buttons / small icon buttons. */
+  pressScale: 0.95,
+  pressScaleSmall: 0.9,
   spring: { damping: 18, stiffness: 220, mass: 0.9 },
   springSoft: { damping: 22, stiffness: 160, mass: 1 },
+  /** Bouncy release — slight overshoot back to 1 (buttons, tiles). */
+  springBounce: { damping: 11, stiffness: 300, mass: 0.7 },
   /** Quick overshoot for heart / add pops. */
   springPop: { damping: 10, stiffness: 200, mass: 0.8 },
+  /** Shimmer sweep across hero banners / primary buttons. */
+  shimmer: { duration: 1400, pause: 2600 },
 } as const;
 
 export const hitSlop = { top: 8, bottom: 8, left: 8, right: 8 } as const;
-export const MIN_TOUCH = 44;
+export const MIN_TOUCH = 48;

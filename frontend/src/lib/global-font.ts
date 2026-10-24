@@ -14,11 +14,14 @@ import { Text, TextInput, StyleSheet } from "react-native";
 import { fontFamily } from "@/src/constants/theme";
 
 function weightToFamily(weight?: string | number): string {
-  // Weight is capped at 500 app-wide — hierarchy comes from size/tracking.
-  if (weight === "bold") return fontFamily.medium;
+  // Map numeric / named weights onto the loaded Plus Jakarta Sans faces so chunky labels render chunky.
+  if (weight === "bold") return fontFamily.bold;
   const n = typeof weight === "string" ? parseInt(weight, 10) : weight;
   if (!n || Number.isNaN(n) || n <= 400) return fontFamily.regular;
-  return fontFamily.medium;
+  if (n <= 500) return fontFamily.medium;
+  if (n <= 600) return fontFamily.semibold;
+  if (n <= 700) return fontFamily.bold;
+  return fontFamily.extrabold;
 }
 
 function patch(Component: any) {

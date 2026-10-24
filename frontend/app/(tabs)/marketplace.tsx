@@ -7,6 +7,7 @@ import {
   ScrollView,
   Platform,
   Modal,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,7 +43,9 @@ import { ShopHome } from "@/src/components/shop/ShopHome";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
-import { Skeleton, SkeletonCard, EmptyState } from "@/src/ui";
+import { gradients } from "@/src/theme/tokens";
+import { LinearGradient } from "expo-linear-gradient";
+import { Skeleton, SkeletonCard, EmptyState, Tile, Shimmer } from "@/src/ui";
 
 type ViewMode = "grid" | "list";
 type MarketSection = "brands" | "fixa" | "declutter";
@@ -93,10 +96,10 @@ const CITIES = [
   "Kano",
 ];
 
-const SECTIONS: { key: MarketSection; label: string }[] = [
-  { key: "brands", label: "Brands" },
-  { key: "fixa", label: "FIXA" },
-  { key: "declutter", label: "Declutter" },
+const SECTIONS: { key: MarketSection; label: string; icon: IconName }[] = [
+  { key: "brands", label: "Brands", icon: "storefront" },
+  { key: "fixa", label: "FIXA", icon: "construct" },
+  { key: "declutter", label: "Declutter", icon: "pricetag" },
 ];
 
 type SortKey = "nearby" | "newest" | "price_asc" | "price_desc" | "rating";
@@ -157,10 +160,13 @@ function sortItems(list: MarketplaceItem[], key: SortKey, chosenCity: string): M
 export default function Marketplace() {
   const colors = useLegacyColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { isDark } = useTheme();
+  const { isDark, colors: tc } = useTheme();
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
+  // 4 tiles per row inside the horizontal padding, 8px gaps.
+  const tileW = Math.floor((Math.min(winW, 720) - spacing.lg * 2 - 8 * 3) / 4);
   const filterRef = useRef<MarketFilterSheetRef>(null);
   const bookingRef = useRef<BookingSheetRef>(null);
   const { ad, visible: adVisible, dismiss: adDismiss, noteInteraction } = useAdTrigger({
@@ -352,39 +358,41 @@ export default function Marketplace() {
     return rows;
   }, [sortedItems]);
 
+  // Big illustrated tiles — FIXA trades in a 4-up grid, Declutter categories in one row.
   const chipRail = (
-    <View style={styles.catsRail}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catsRow}>
-        {section === "fixa" &&
-          FIXA_CHIPS.map((c) => (
-            <ChipTile
+    <View style={styles.tilesWrap}>
+      {section === "fixa" ? (
+        <View style={styles.tileGrid} testID="fixa-tile-grid">
+          {FIXA_CHIPS.map((c) => (
+            <Tile
               key={c.key}
               icon={c.icon}
               label={c.key}
-              active={fixaChip === c.key}
-              activeColor="#15803D"
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setFixaChip(fixaChip === c.key ? null : c.key);
-              }}
+              color={tc.fix}
+              size="sm"
+              selected={fixaChip === c.key}
+              onPress={() => setFixaChip(fixaChip === c.key ? null : c.key)}
+              style={{ width: tileW }}
               testID={`fixa-chip-${c.key}`}
             />
           ))}
-        {section === "declutter" &&
-          DECLUTTER_CHIPS.map((c) => (
-            <ChipTile
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tileRow} testID="declutter-tile-row">
+          {DECLUTTER_CHIPS.map((c) => (
+            <Tile
               key={c.key}
               icon={c.icon}
               label={c.label}
-              active={declutterChip === c.key}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setDeclutterChip(declutterChip === c.key ? null : c.key);
-              }}
+              color={tc.declutter}
+              size="md"
+              selected={declutterChip === c.key}
+              onPress={() => setDeclutterChip(declutterChip === c.key ? null : c.key)}
               testID={`declutter-chip-${c.key}`}
             />
           ))}
-      </ScrollView>
+        </ScrollView>
+      )}
     </View>
   );
 
@@ -393,13 +401,18 @@ export default function Marketplace() {
       {/* FIXA brand banner — only within the FIXA section */}
       {section === "fixa" && (
         <View style={styles.fixaBanner}>
+          <LinearGradient colors={[...gradients.fix]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <Shimmer intensity={0.5} delay={700} />
           <Image source={{ uri: FIXA_LOGO_URI }} style={styles.fixaLogoImg} contentFit="contain" />
           <View style={{ flex: 1 }}>
-            <Text style={styles.fixaTitle}>FIXA Verified Services</Text>
-            <Text style={styles.fixaSub}>Vetted pros — background-checked, rated & insured.</Text>
+            <Text style={styles.fixaTitle}>FIXA Verified</Text>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+              <View style={styles.fixaPill}><Ionicons name="shield-checkmark" size={12} color="#1C5E39" /><Text style={styles.fixaPillText}>Vetted</Text></View>
+              <View style={styles.fixaPill}><Ionicons name="star" size={12} color="#1C5E39" /><Text style={styles.fixaPillText}>Rated</Text></View>
+            </View>
           </View>
           <View style={styles.fixaShield}>
-            <Ionicons name="shield-checkmark" size={18} color="#111111" />
+            <Ionicons name="shield-checkmark" size={18} color="#2E8B57" />
           </View>
         </View>
       )}
@@ -533,28 +546,23 @@ export default function Marketplace() {
               testID="market-error"
             />
           ) : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="search-outline" size={30} color={colors.textMuted} />
-              </View>
-              <Text style={styles.emptyTitle}>
-                {section === "fixa" ? "No pros found in this trade" : "No pre-owned items right now"}
-              </Text>
-              <Text style={styles.emptyBody}>Try another category or change your city.</Text>
-              {(activeFilterCount > 0 || fixaChip || declutterChip) && (
-                <Pressable
-                  onPress={() => {
-                    setFilters({});
-                    setFixaChip(null);
-                    setDeclutterChip(null);
-                  }}
-                  style={styles.clearBtn}
-                  testID="clear-filters"
-                >
-                  <Text style={styles.clearBtnText}>Clear filters</Text>
-                </Pressable>
-              )}
-            </View>
+            <EmptyState
+              icon={section === "fixa" ? "construct-outline" : "cube-outline"}
+              title={section === "fixa" ? "No pros here yet" : "Nothing here yet"}
+              body={section === "fixa" ? "Try another trade or city." : "Try another category or city."}
+              actionLabel={activeFilterCount > 0 || fixaChip || declutterChip ? "Clear filters" : undefined}
+              actionIcon="close-circle-outline"
+              onAction={
+                activeFilterCount > 0 || fixaChip || declutterChip
+                  ? () => {
+                      setFilters({});
+                      setFixaChip(null);
+                      setDeclutterChip(null);
+                    }
+                  : undefined
+              }
+              testID="market-empty"
+            />
           )
         }
         renderItem={
@@ -596,7 +604,7 @@ export default function Marketplace() {
         <View style={styles.headerRow}>
           <View style={styles.brandRow}>
             <AmassLogo size={26} showWordmark={false} />
-            <Text style={styles.brandTitle}>Market</Text>
+            <Text style={[styles.brandTitle, { color: tc.market }]}>Market</Text>
           </View>
           <View style={styles.headerActions}>
             <Pressable
@@ -658,10 +666,11 @@ export default function Marketplace() {
           )}
         </View>
 
-        {/* Row 3: segmented control */}
+        {/* Row 3: segmented control — each section carries its own colour + icon */}
         <View style={styles.segTrack}>
           {SECTIONS.map((s) => {
             const active = section === s.key;
+            const accent = s.key === "fixa" ? tc.fix : s.key === "declutter" ? tc.declutter : tc.market;
             return (
               <Pressable
                 key={s.key}
@@ -671,9 +680,7 @@ export default function Marketplace() {
                 accessibilityState={{ selected: active }}
                 testID={`mkt-tab-${s.key}`}
               >
-                {s.key === "fixa" && (
-                  <View style={[styles.segDot, active && { backgroundColor: "#2E8B57" }]} />
-                )}
+                <Ionicons name={s.icon} size={15} color={active ? accent : colors.textTertiary} />
                 <Text style={[styles.segText, active && styles.segTextActive]}>{s.label}</Text>
               </Pressable>
             );
@@ -710,12 +717,14 @@ export default function Marketplace() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
           router.push("/marketplace/sell" as any);
         }}
-        style={[styles.sellFab, { bottom: 92 + insets.bottom }]}
+        style={({ pressed }) => [styles.sellFab, { bottom: 92 + insets.bottom }, pressed && { transform: [{ scale: 0.95 }] }]}
         accessibilityRole="button"
         accessibilityLabel={section === "declutter" ? "Sell an item" : "Join FIXA"}
         testID="sell-fab"
       >
-        <Ionicons name="add" size={20} color="#fff" />
+        <LinearGradient colors={[...(section === "declutter" ? gradients.declutter : gradients.fix)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        <Shimmer intensity={0.7} delay={1200} />
+        <Ionicons name={section === "declutter" ? "pricetag" : "hammer"} size={20} color="#fff" />
         <Text style={styles.sellFabText}>
           {section === "declutter" ? "Sell" : "Join FIXA"}
         </Text>
@@ -757,39 +766,6 @@ export default function Marketplace() {
         </Pressable>
       </Modal>
     </ScreenLift>
-  );
-}
-
-function ChipTile({
-  icon,
-  label,
-  active,
-  onPress,
-  activeColor,
-  testID,
-}: {
-  icon: IconName;
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  activeColor?: string;
-  testID?: string;
-}) {
-  const colors = useLegacyColors();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const fill = activeColor ?? colors.ink;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.chipTile, active && { backgroundColor: fill }]}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      testID={testID}
-    >
-      <Ionicons name={icon} size={15} color={active ? "#fff" : colors.textSecondary} />
-      <Text style={[styles.chipTileText, active && { color: "#fff" }]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -922,7 +898,6 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.pill,
   },
   segItemActive: { backgroundColor: colors.surface, ...shadows.soft },
-  segDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textMuted },
   segText: { fontSize: 13, fontFamily: F.semibold, color: colors.textTertiary },
   segTextActive: { color: colors.text, fontFamily: F.bold },
 
@@ -942,19 +917,10 @@ const makeStyles = (colors: LegacyColors) =>
   cityRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 16 },
   cityRowText: { fontSize: 14, color: colors.text, fontFamily: F.medium },
 
-  // Chips rail
-  catsRail: { paddingTop: 6 },
-  catsRow: { gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 6 },
-  chipTile: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    height: 38,
-    paddingHorizontal: 14,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  chipTileText: { fontSize: 13, fontFamily: F.semibold, color: colors.textSecondary },
+  // Category tiles
+  tilesWrap: { paddingTop: 10 },
+  tileGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: spacing.lg },
+  tileRow: { gap: 10, paddingHorizontal: spacing.lg },
 
   // FIXA banner
   fixaBanner: {
@@ -965,19 +931,21 @@ const makeStyles = (colors: LegacyColors) =>
     marginTop: 10,
     padding: 14,
     borderRadius: radius.lg,
-    backgroundColor: "#111111",
-  },
-  fixaLogoImg: { width: 54, height: 54, borderRadius: 12, backgroundColor: "#000" },
-  fixaShield: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
     backgroundColor: "#2E8B57",
+    overflow: "hidden",
+  },
+  fixaLogoImg: { width: 54, height: 54, borderRadius: 14, backgroundColor: "#111" },
+  fixaShield: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
   },
-  fixaTitle: { color: "#40B575", fontSize: 15, fontFamily: F.bold, letterSpacing: -0.2 },
-  fixaSub: { color: "rgba(255,255,255,0.72)", fontSize: 12, fontFamily: F.regular, marginTop: 2 },
+  fixaTitle: { color: "#fff", fontSize: 18, fontFamily: F.extrabold, letterSpacing: -0.3 },
+  fixaPill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.9)", paddingHorizontal: 8, height: 22, borderRadius: 11 },
+  fixaPillText: { color: "#1C5E39", fontSize: 11, fontFamily: F.bold },
 
   // Section header
   sectionHeader: {
@@ -1064,38 +1032,17 @@ const makeStyles = (colors: LegacyColors) =>
   sellFab: {
     position: "absolute",
     right: 20,
-    height: 52,
-    paddingHorizontal: 20,
-    borderRadius: 26,
+    height: 56,
+    paddingHorizontal: 22,
+    borderRadius: 28,
     backgroundColor: colors.ink,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
+    overflow: "hidden",
     ...shadows.floating,
   },
-  sellFabText: { color: "#fff", fontSize: 14, fontFamily: F.bold, letterSpacing: 0.2 },
+  sellFabText: { color: "#fff", fontSize: 16, fontFamily: F.extrabold, letterSpacing: -0.2 },
 
   loading: { paddingTop: 80, alignItems: "center", justifyContent: "center" },
-
-  emptyState: { alignItems: "center", paddingHorizontal: spacing.xxl, paddingTop: 60, gap: 12 },
-  emptyIcon: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyTitle: { fontSize: 17, fontFamily: F.bold, color: colors.text, textAlign: "center" },
-  emptyBody: { fontSize: 13, color: colors.textTertiary, fontFamily: F.regular, textAlign: "center", lineHeight: 18 },
-  clearBtn: {
-    marginTop: 6,
-    paddingHorizontal: 18,
-    height: 42,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  clearBtnText: { color: "#fff", fontSize: 13, fontFamily: F.bold },
 });

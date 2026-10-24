@@ -49,6 +49,7 @@ CATEGORIES: dict[str, dict[str, Any]] = {
     "brand_offers": {"label": "Offers from brands you follow", "caption": "Verified deals from stores you saved", "icon": "pricetag", "digest": True, "default_frequency": "weekly"},
     "marketplace": {"label": "Marketplace ads & offers", "caption": "Relevant ads and promos (bundled). Offers on your own listings always arrive instantly", "icon": "storefront", "digest": True, "default_frequency": "daily"},
     "social": {"label": "Social requests", "caption": "Friend requests, list invites, estate joins", "icon": "people", "digest": False, "default_frequency": "immediate"},
+    "nearby_free": {"label": "Free items nearby", "caption": "Giveaways in categories you follow on Social", "icon": "gift", "digest": True, "default_frequency": "immediate"},
     "passport": {"label": "Passport reminders", "caption": "Mandate and Passport expiry", "icon": "document-text", "digest": False, "default_frequency": "immediate"},
     "receipts": {"label": "Receipts", "caption": "Top-ups, unlocks and payouts", "icon": "receipt", "digest": False, "default_frequency": "immediate"},
     "admin": {"label": "Admin decisions", "caption": "Approvals, rejections and moderation", "icon": "shield-checkmark", "digest": False, "default_frequency": "immediate"},
@@ -86,6 +87,7 @@ KIND_CATEGORY: dict[str, str] = {
     "SOCIAL_POST_LIKE": "social",
     "SOCIAL_POST_COMMENT": "social",
     "SOCIAL_POST_REMOVED": "admin",
+    "SOCIAL_NEARBY_FREE": "nearby_free",
     "QUESTION_ANSWERED": "social",
     "ANSWER_ACCEPTED": "social",
     "EVENT_REMINDER": "social",
@@ -121,19 +123,21 @@ def kinds_for(category: str) -> list[str]:
 
 # Only proactive discovery kinds are ever bundled; transactional kinds in the same
 # category (e.g. an offer on YOUR listing) always arrive instantly.
-DIGESTABLE_KINDS = {"SAVED_SEARCH_MATCH", "NEARBY_LISTINGS", "BRAND_OFFER", "MARKET_AD"}
+DIGESTABLE_KINDS = {"SAVED_SEARCH_MATCH", "NEARBY_LISTINGS", "BRAND_OFFER", "MARKET_AD", "SOCIAL_NEARBY_FREE"}
 
 DIGEST_KIND = {
     "property_matches": "SAVED_SEARCH_MATCH",
     "nearby_listings": "NEARBY_LISTINGS",
     "brand_offers": "BRAND_OFFER",
     "marketplace": "MARKET_AD",
+    "nearby_free": "SOCIAL_NEARBY_FREE",
 }
 DIGEST_ROUTE = {
     "property_matches": "/saved-searches",
-    "nearby_listings": "/(tabs)/discover",
+    "nearby_listings": "/(tabs)",
     "brand_offers": "/shop/saved",
     "marketplace": "/(tabs)/marketplace",
+    "nearby_free": "/(tabs)/social",
 }
 
 
@@ -334,6 +338,11 @@ def _digest_copy(category: str, items: list[dict]) -> tuple[str, str]:
         total = sum(int(i["meta"].get("count", 1)) for i in items)
         who = stores[0] if len(stores) == 1 else f"{len(stores)} brands you follow"
         return (f"{total} new offer{'s' if total != 1 else ''} from {who}", "Verified price drops and promotions — AMASS adds no fee.")
+    if category == "nearby_free":
+        total = sum(int(i["meta"].get("count", 1)) for i in items)
+        cats = sorted({i["meta"].get("category_label") for i in items if i["meta"].get("category_label")})
+        what = cats[0] if len(cats) == 1 else f"{len(cats)} categories you follow"
+        return (f"{total} free item{'s' if total != 1 else ''} nearby · {what}", "Neighbours are giving these away. Tap to claim one.")
     # marketplace
     return (f"{n} Marketplace update{'s' if n != 1 else ''} for you", "Relevant ads and offers from the last period.")
 

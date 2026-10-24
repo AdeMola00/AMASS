@@ -10,7 +10,7 @@ import { api } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { motion, radii, space } from "@/src/theme/tokens";
-import { AnimatedNumber, AppText, Badge, Button, Card, EmptyState, Input, Screen, ScreenHeader, Section, Sheet, SkeletonRows, useToast, type IconName } from "@/src/ui";
+import { AnimatedNumber, AppText, Badge, Button, Card, EmptyState, Input, Screen, ScreenHeader, Section, Sheet, SkeletonRows, useCelebrate, useToast, type IconName } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 type Task = {
@@ -47,6 +47,7 @@ export default function EarnScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const toast = useToast();
+  const confetti = useCelebrate();
   const { wallet, refresh } = useWallet();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [streak, setStreak] = useState(0);
@@ -113,7 +114,8 @@ export default function EarnScreen() {
           const r = await api.claimTask("daily_login");
           if (r.ok) {
             celebrate(task.tokens);
-            toast.success(`+${task.tokens} MASS claimed`, "See you tomorrow to keep the streak going.");
+            confetti({ icon: "sparkles", tone: "mass" });
+            toast.success(`+${task.tokens} MASS claimed`, "See you tomorrow!");
           } else {
             toast.info("Already claimed today", "Come back tomorrow for another bonus.");
           }
@@ -130,6 +132,7 @@ export default function EarnScreen() {
           const r = await api.claimTask("share_listing");
           if (r.ok) {
             celebrate(task.tokens);
+            confetti({ icon: "sparkles", tone: "mass" });
             toast.success(`+${task.tokens} MASS`, "Thanks for spreading the word.");
           } else if (r.reason === "daily_limit_reached") toast.info("Limit reached", "You've claimed the maximum 3 share bonuses today.");
           await load();

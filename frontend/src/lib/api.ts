@@ -2842,7 +2842,7 @@ export const api = {
   },
   socialMine: () => req<{ items: SocialPost[]; counts: Record<string, number> }>("/social/posts/mine"),
   socialPost: (id: string) => req<SocialPostDetail>(`/social/posts/${encodeURIComponent(id)}`),
-  socialCreatePost: (body: SocialPostInput) => req<{ ok: boolean; post: SocialPost }>("/social/posts", { method: "POST", body: JSON.stringify(body) }),
+  socialCreatePost: (body: SocialPostInput) => req<{ ok: boolean; post: SocialPost; alerted: number }>("/social/posts", { method: "POST", body: JSON.stringify(body) }),
   socialEditPost: (id: string, body: Partial<SocialPostInput> & { status?: SocialPostStatus }) => req<{ ok: boolean; post: SocialPost }>(`/social/posts/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) }),
   socialDeletePost: (id: string) => req<{ ok: boolean }>(`/social/posts/${encodeURIComponent(id)}`, { method: "DELETE" }),
   socialToggleLike: (id: string) => req<{ liked: boolean; like_count: number }>(`/social/posts/${encodeURIComponent(id)}/like`, { method: "POST" }),
@@ -2855,6 +2855,10 @@ export const api = {
   socialUnhidePost: (id: string) => req<{ ok: boolean }>(`/social/posts/${encodeURIComponent(id)}/hide`, { method: "DELETE" }),
   socialReportPost: (id: string, reason: string, details?: string) => req<{ ok: boolean }>(`/social/posts/${encodeURIComponent(id)}/report`, { method: "POST", body: JSON.stringify({ reason, details }) }),
   socialUpload: (data_url: string) => req<{ url: string; path: string }>("/social/posts/uploads", { method: "POST", body: JSON.stringify({ data_url }) }),
+  // Nearby Alerts — follow categories, hear about free items posted nearby
+  socialAlerts: () => req<SocialAlerts>("/social/alerts"),
+  socialAlertsSet: (categories: string[]) => req<SocialAlerts>("/social/alerts", { method: "PUT", body: JSON.stringify({ categories }) }),
+  socialAlertsToggle: (category: string) => req<SocialAlerts & { toggled: string; now_following: boolean }>("/social/alerts/toggle", { method: "POST", body: JSON.stringify({ category }) }),
 };
 
 // ─── Social feed types ───
@@ -2882,6 +2886,17 @@ export type SocialPost = {
   liked: boolean; is_mine: boolean; market_item_id?: string | null;
 };
 export type SocialFeed = { items: SocialPost[]; next_cursor: string | null; scope: SocialScope; scope_label: string; scopes: SocialMeta["scopes"] };
+export type SocialAlerts = {
+  categories: (SocialCategory & { following: boolean; nearby_free: number })[];
+  following: string[];
+  prefs: { enabled: boolean; frequency: NotifFrequency; push_enabled: boolean; push_status: PushPromptStatus };
+  /** Widest ring alerts cover (the user's city) — counts and copy refer to this. */
+  scope_label: string;
+  /** The user's tightest place (estate → area → city) for headers. */
+  home_label: string;
+  scopes: SocialMeta["scopes"];
+  alerts_7d: number;
+};
 export type SocialComment = { id: string; body: string; created_at: string; author?: PublicUser | null; is_mine: boolean; is_poster: boolean };
 export type SocialPostDetail = SocialPost & {
   comments: SocialComment[];

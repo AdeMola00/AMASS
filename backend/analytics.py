@@ -34,6 +34,7 @@ ALLOWED = {
     "contact_match_optin", "contact_match_result", "connection_sent", "connection_accepted", "estate_request",
     "estate_approved", "collection_created", "collection_invite", "collection_item_added", "event_rsvp",
     "question_asked", "question_answered", "report_submitted", "neighbours_open",
+    "social_open", "social_scope", "social_alerts_open", "social_alert_follow", "social_alert_unfollow",
     "shop_open", "shop_store_view", "shop_product_view", "shop_add_to_basket", "shop_retailer_handoff", "shop_search",
 }
 VIA = ("direct", "friend", "collection", "estate", "recommendation", "share", "search")

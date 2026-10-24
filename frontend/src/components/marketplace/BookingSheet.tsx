@@ -16,6 +16,7 @@ import * as Haptics from "expo-haptics";
 import { api, MarketplaceItem } from "@/src/lib/api";
 import { radius, spacing, formatNaira, shadows } from "@/src/constants/theme";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { Illustration, useCelebrate } from "@/src/ui";
 
 export type BookingSheetRef = {
   open: (item: MarketplaceItem) => void;
@@ -41,6 +42,7 @@ function nextDates(count: number = 7) {
 
 export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
   const colors = useLegacyColors();
+  const celebrate = useCelebrate();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -103,6 +105,7 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setConfirmed(true);
+      celebrate({ title: "Booked!", icon: "calendar", tone: "fix" });
       setTimeout(() => sheetRef.current?.dismiss(), 1600);
     } catch (e: any) {
       Alert.alert("Booking failed", e?.message || "Please try again.");
@@ -126,9 +129,7 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
           <View style={styles.loading}><ActivityIndicator color={colors.red} /></View>
         ) : confirmed ? (
           <View style={styles.confirmed} testID="fixa-booking-confirmed">
-            <View style={styles.confirmedIcon}>
-              <Ionicons name="checkmark" size={32} color="#fff" />
-            </View>
+            <Illustration name="success" size={150} />
             <Text style={styles.confirmedTitle}>Booking sent!</Text>
             <Text style={styles.confirmedBody}>
               {item.seller_name} will reach out shortly to confirm.

@@ -344,7 +344,7 @@ export default function PropertyDetails() {
               </AppText>
             ) : (
               <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
-                Deciding with someone? Add this home to a private shared list.
+                Share with someone? Add to a list.
               </AppText>
             )}
             <Button label="Add to list" size="xs" variant="secondary" iconLeft="albums-outline" onPress={() => setListOpen(true)} testID="add-to-list-inline" />
@@ -371,11 +371,22 @@ export default function PropertyDetails() {
               </View>
               <View style={{ flex: 1 }}>
                 <AppText variant="title" color={colors.textInverse}>
-                  Property details locked
+                  Locked
                 </AppText>
-                <AppText variant="caption" color={colors.textInverse} style={{ opacity: 0.75, marginTop: 2 }}>
-                  One fee reveals the exact address, every photo, full specs, AI insights and the agent's direct contact — forever.
-                </AppText>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
+                  {([
+                    ["location", "Address"],
+                    ["images", "Photos"],
+                    ["call", "Agent"],
+                  ] as const).map(([ic, lb]) => (
+                    <View key={lb} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Ionicons name={ic} size={12} color={colors.mass} />
+                      <AppText variant="micro" color={colors.textInverse} style={{ opacity: 0.85 }}>
+                        {lb}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
               </View>
               <View style={[styles.costPill, { backgroundColor: colors.massSoft, borderColor: colors.mass }]}>
                 <TokenIcon size={12} />
@@ -558,13 +569,13 @@ export default function PropertyDetails() {
                   Improve My Property
                 </AppText>
                 <AppText variant="caption" color={colors.textInverse} style={{ opacity: 0.75, marginTop: 4 }}>
-                  Book an inspection, apply for renovation financing, and hire verified FIXA pros — all in one place.
+                  Inspect · Finance · Renovate
                 </AppText>
               </View>
             </View>
             <View style={styles.improveActions}>
               <Button
-                label="Request Inspection"
+                label="Inspect"
                 variant={isDark ? "primary" : "inverse"}
                 size="sm"
                 iconLeft="clipboard"
@@ -573,7 +584,7 @@ export default function PropertyDetails() {
                 testID="improve-request-inspection"
               />
               <Button
-                label="Get Financing"
+                label="Finance"
                 variant={isDark ? "primary" : "inverse"}
                 size="sm"
                 iconLeft="cash"
@@ -586,7 +597,7 @@ export default function PropertyDetails() {
 
           {similar.length > 0 && (
             <View style={styles.section}>
-              <AppText variant="h3">Similar homes nearby</AppText>
+              <AppText variant="h3">Nearby homes</AppText>
               <FlatList
                 data={similar}
                 keyExtractor={(p) => p.id}
@@ -621,7 +632,7 @@ export default function PropertyDetails() {
               <>
                 <IconButton icon="rocket" label={property.promotion ? "Extend boost" : "Boost listing"} variant="brand" size={54} iconSize={22} onPress={() => router.push(`/agent/boost/${property.id}` as any)} testID="boost-listing-btn" />
                 <Button
-                  label="Manage listing"
+                  label="Manage"
                   variant="primary"
                   size="lg"
                   iconLeft="briefcase"
@@ -632,7 +643,7 @@ export default function PropertyDetails() {
               </>
             ) : (
               <Button
-                label="Chat with Agent · Free"
+                label="Chat · Free"
                 variant="primary"
                 size="lg"
                 iconLeft="chatbubbles"

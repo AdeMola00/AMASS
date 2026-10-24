@@ -1,6 +1,6 @@
 import React from "react";
 import { Text, TextProps, TextStyle, StyleSheet } from "react-native";
-import { useTheme } from "@/src/theme";
+import { useTheme, useTextScale } from "@/src/theme";
 import { typeScale, TypeVariant, fontFamilies } from "@/src/theme/tokens";
 
 export type TextTone =
@@ -41,6 +41,7 @@ export function AppText({
   ...rest
 }: AppTextProps) {
   const { colors } = useTheme();
+  const { factor } = useTextScale();
   const toneColor: Record<TextTone, string> = {
     primary: colors.text,
     secondary: colors.textSecondary,
@@ -55,11 +56,14 @@ export function AppText({
     error: colors.error,
     info: colors.info,
   };
+  const base = typeScale[variant];
+  // "Larger text" mode: scale the variant's size + line-height (explicit style overrides still win).
+  const scaled = factor === 1 ? base : { ...base, fontSize: Math.round(base.fontSize * factor), lineHeight: Math.round(base.lineHeight * factor) };
   return (
     <Text
       {...rest}
       style={[
-        typeScale[variant],
+        scaled,
         { color: color ?? toneColor[tone] },
         weight ? { fontFamily: fontFamilies[weight] } : null,
         tabular ? styles.tabular : null,

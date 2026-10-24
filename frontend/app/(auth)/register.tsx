@@ -70,10 +70,7 @@ export default function Register() {
         <View style={styles.header}>
           <AmassLogo size="lg" />
           <View style={{ gap: 6 }}>
-            <AppText variant="hero">create your account</AppText>
-            <AppText variant="body" tone="secondary">
-              Join thousands discovering premium properties across Africa.
-            </AppText>
+            <AppText variant="hero">join AMASS</AppText>
           </View>
         </View>
 
@@ -122,7 +119,7 @@ export default function Register() {
             </View>
           )}
 
-          <Button label="Create Account" size="lg" fullWidth loading={loading} onPress={submit} testID="register-submit-button" />
+          <Button label="Create Account" size="lg" fullWidth iconLeft="person-add-outline" loading={loading} onPress={submit} testID="register-submit-button" />
 
           <View style={styles.divider}>
             <Divider style={{ flex: 1 }} />

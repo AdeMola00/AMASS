@@ -10,7 +10,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, BrandGradient, Button, Chip, EmptyState, RowGroup, Screen, ScreenHeader, SegmentedControl, SkeletonRows, Toggle, useToast, type IconName } from "@/src/ui";
 
-const ORDER = ["property_matches", "nearby_listings", "brand_offers", "marketplace", "social", "passport", "receipts", "admin", "messages", "services"];
+const ORDER = ["property_matches", "nearby_listings", "brand_offers", "marketplace", "social", "nearby_free", "passport", "receipts", "admin", "messages", "services"];
 const START_PRESETS = ["20:00", "21:00", "22:00", "23:00", "00:00"];
 const END_PRESETS = ["05:00", "06:00", "07:00", "08:00", "09:00"];
 const FREQ_LABEL: Record<NotifFrequency, string> = { immediate: "Instant", daily: "Daily", weekly: "Weekly" };

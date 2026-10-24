@@ -60,19 +60,16 @@ export default function Login() {
         <View style={styles.header}>
           <AmassLogo size="xl" />
           <View style={{ gap: 6 }}>
-            <AppText variant="hero">welcome back</AppText>
-            <AppText variant="body" tone="secondary">
-              Sign in to continue exploring properties across Africa.
-            </AppText>
+            <AppText variant="hero">welcome back 👋</AppText>
           </View>
         </View>
 
         <View style={styles.form}>
-          <Button label="Continue with phone number" size="lg" fullWidth iconLeft="phone-portrait-outline" onPress={() => router.push({ pathname: "/(auth)/phone", params: redirect ? { redirect } : {} } as any)} testID="login-phone-button" />
+          <Button label="Use phone number" size="lg" fullWidth iconLeft="phone-portrait-outline" onPress={() => router.push({ pathname: "/(auth)/phone", params: redirect ? { redirect } : {} } as any)} testID="login-phone-button" />
           <View style={styles.divider}>
             <Divider style={{ flex: 1 }} />
             <AppText variant="caption" tone="tertiary">
-              or sign in with email
+              or email
             </AppText>
             <Divider style={{ flex: 1 }} />
           </View>
@@ -121,7 +118,7 @@ export default function Login() {
             </View>
           )}
 
-          <Button label="Sign In" size="lg" fullWidth loading={loading} onPress={submit} testID="login-submit-button" />
+          <Button label="Sign In" size="lg" fullWidth iconLeft="log-in-outline" loading={loading} onPress={submit} testID="login-submit-button" />
 
           <View style={styles.divider}>
             <Divider style={{ flex: 1 }} />

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from "react-native-reanimated";
 import { useAuth } from "@/src/contexts/auth";
 import { api } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
@@ -67,6 +67,7 @@ function FloatingBottomBar({ state, navigation }: any) {
     x.value = withSpring(state.index * tabW, motion.spring);
   }, [state.index, tabW, x]);
   const pill = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  const accent = tabConfig(state.routes[state.index]?.name ?? "", colors).accent;
 
   return (
     <View style={styles.container} pointerEvents="box-none" testID="floating-bottom-nav">
@@ -77,7 +78,7 @@ function FloatingBottomBar({ state, navigation }: any) {
         {Platform.OS !== "web" ? <BlurView intensity={isDark ? 60 : 80} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : null}
         <View style={styles.bar} accessibilityRole="tablist">
           {tabW > 0 ? (
-            <Animated.View pointerEvents="none" style={[styles.pill, { width: tabW, backgroundColor: isDark ? "rgba(255,255,255,0.08)" : colors.surfaceAlt }, pill]} />
+            <Animated.View pointerEvents="none" style={[styles.pill, { width: tabW, backgroundColor: `${accent}1F` }, pill]} />
           ) : null}
           {state.routes.map((r: any, i: number) => (
             <TabButton
@@ -99,16 +100,15 @@ function FloatingBottomBar({ state, navigation }: any) {
 
 function TabButton({ route, active, onPress, badge }: any) {
   const { colors } = useTheme();
-  const cfg = tabConfig(route.name);
+  const cfg = tabConfig(route.name, colors);
   const scale = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const tint = active ? cfg.accent : colors.textSecondary;
   return (
     <Pressable
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});
-        scale.value = withSpring(1.12, motion.spring, () => {
-          scale.value = withSpring(1, motion.spring);
-        });
+        scale.value = withSequence(withSpring(0.85, motion.spring), withSpring(1.18, motion.springBounce), withSpring(1, motion.spring));
         onPress();
       }}
       style={styles.tab}
@@ -118,7 +118,7 @@ function TabButton({ route, active, onPress, badge }: any) {
       accessibilityLabel={`${cfg.label} tab${badge ? `, ${badge} unread` : ""}`}
     >
       <Animated.View style={[styles.iconWrap, anim]}>
-        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={23} color={active ? colors.text : colors.textSecondary} />
+        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={24} color={tint} />
         {badge > 0 ? (
           <View style={[styles.badge, { backgroundColor: colors.brand, borderColor: colors.tabBar }]}>
             <AppText variant="micro" color="#fff" tabular>
@@ -127,27 +127,28 @@ function TabButton({ route, active, onPress, badge }: any) {
           </View>
         ) : null}
       </Animated.View>
-      <AppText variant="micro" color={active ? colors.text : colors.textSecondary} style={styles.tabLabel}>
+      <AppText variant="micro" color={tint} style={styles.tabLabel}>
         {cfg.label}
       </AppText>
     </Pressable>
   );
 }
 
-function tabConfig(routeName: string): { label: string; icon: IconName; iconActive: IconName } {
+/** Each tab carries its section accent — users know where they are by colour alone. */
+function tabConfig(routeName: string, colors: ReturnType<typeof useTheme>["colors"]): { label: string; icon: IconName; iconActive: IconName; accent: string } {
   switch (routeName) {
     case "index":
-      return { label: "Home", icon: "map-outline", iconActive: "map" };
+      return { label: "Home", icon: "map-outline", iconActive: "map", accent: colors.brand };
     case "social":
-      return { label: "Social", icon: "chatbubbles-outline", iconActive: "chatbubbles" };
+      return { label: "Social", icon: "chatbubbles-outline", iconActive: "chatbubbles", accent: colors.fix };
     case "marketplace":
-      return { label: "Market", icon: "grid-outline", iconActive: "grid" };
+      return { label: "Market", icon: "grid-outline", iconActive: "grid", accent: colors.market };
     case "neighbours":
-      return { label: "Neighbours", icon: "people-outline", iconActive: "people" };
+      return { label: "Neighbours", icon: "people-outline", iconActive: "people", accent: colors.info };
     case "profile":
-      return { label: "Profile", icon: "person-outline", iconActive: "person" };
+      return { label: "Profile", icon: "person-outline", iconActive: "person", accent: colors.text };
     default:
-      return { label: "", icon: "ellipse-outline", iconActive: "ellipse" };
+      return { label: "", icon: "ellipse-outline", iconActive: "ellipse", accent: colors.text };
   }
 }
 

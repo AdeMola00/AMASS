@@ -18,12 +18,13 @@ import { AppText, Button, Sheet, SheetLink, useToast } from "@/src/ui";
  * device, not already granted/blocked, not dismissed in the last 14 days) and
  * only trigger the OS prompt when the user taps "Turn on".
  */
-export type PushContext = "saved_search" | "brand_follow" | "social_request" | "notification_center" | "preferences";
+export type PushContext = "saved_search" | "brand_follow" | "social_request" | "nearby_alert" | "notification_center" | "preferences";
 
 const COPY: Record<PushContext, { title: string; body: string }> = {
   saved_search: { title: "Hear about new matches first", body: "We'll buzz your phone the moment a home matches this search — nothing else unless you choose it." },
   brand_follow: { title: "Catch verified offers in time", body: "Deals from brands you follow are short-lived. Get a phone alert when one lands." },
   social_request: { title: "Know when friends respond", body: "Get a quiet nudge when someone accepts, reacts to a shared list or invites you." },
+  nearby_alert: { title: "Be first to claim free items", body: "Free things go fast. Get a buzz the moment a neighbour posts one in a category you follow." },
   notification_center: { title: "Turn on phone alerts?", body: "Pick exactly which alerts reach your phone — and when. Quiet hours are built in." },
   preferences: { title: "Turn on phone alerts", body: "Only the categories you keep on will ever reach your phone. Quiet hours are respected." },
 };

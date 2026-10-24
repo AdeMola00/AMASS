@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, StyleSheet, Pressable, TextInput, ScrollView, Platform, Linking, Animated, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Pressable, TextInput, ScrollView, Platform, Linking, Animated, ActivityIndicator, Image } from "react-native";
+import Reanimated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
 import { MapView, Marker, PROVIDER_DEFAULT, Region, IS_MAP_LIMITED_IN_EXPO_GO } from "@/src/lib/map";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,11 +10,12 @@ import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { api, MapMarker, Property, UnlockResult } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
+import { useAuth } from "@/src/contexts/auth";
 import { useWallet } from "@/src/contexts/wallet";
 import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, BalanceChip, Button, UnlockDialog, useToast } from "@/src/ui";
+import { AppText, BalanceChip, Button, ILLUSTRATIONS, UnlockDialog, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { ClusterMarker } from "@/src/components/PropertyMarker";
 import { FilterChip } from "@/src/components/FilterChip";
@@ -37,8 +39,8 @@ type ChipConf = { key: string; label: string; icon?: IconName; apply: (f: Filter
 const QUICK_FILTERS: ChipConf[] = [
   { key: "sale", label: "For Sale", icon: "pricetag-outline", apply: (f) => ({ ...f, listingType: f.listingType === "buy" ? undefined : "buy" }), isActive: (f) => f.listingType === "buy" },
   { key: "rent", label: "To Rent", icon: "key-outline", apply: (f) => ({ ...f, listingType: f.listingType === "rent" ? undefined : "rent" }), isActive: (f) => f.listingType === "rent" },
-  { key: "land", label: "Land", apply: (f) => ({ ...f, propertyType: f.propertyType === "land" ? undefined : "land" }), isActive: (f) => f.propertyType === "land" },
-  { key: "com", label: "Commercial", apply: (f) => ({ ...f, propertyType: f.propertyType === "commercial" ? undefined : "commercial" }), isActive: (f) => f.propertyType === "commercial" },
+  { key: "land", label: "Land", icon: "leaf-outline", apply: (f) => ({ ...f, propertyType: f.propertyType === "land" ? undefined : "land" }), isActive: (f) => f.propertyType === "land" },
+  { key: "com", label: "Commercial", icon: "business-outline", apply: (f) => ({ ...f, propertyType: f.propertyType === "commercial" ? undefined : "commercial" }), isActive: (f) => f.propertyType === "commercial" },
   { key: "luxe", label: "Luxury", icon: "diamond", apply: (f) => ({ ...f, minPrice: f.minPrice === 200_000_000 ? undefined : 200_000_000 }), isActive: (f) => f.minPrice === 200_000_000 },
   { key: "ver", label: "Verified", icon: "shield-checkmark", apply: (f) => ({ ...f, verifiedOnly: !f.verifiedOnly }), isActive: (f) => !!f.verifiedOnly },
 ];
@@ -61,6 +63,10 @@ const toPin = (m: MapMarker): Pin =>
     boosted: m.promotion_tier === "boost",
   }) as unknown as Pin;
 const hasNudge = (p: Pin) => p.friendsSaved > 0 || p.inSharedList;
+const greeting = () => {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+};
 /** Attribution for the conversion funnel: a friend's save beats a shared list beats direct. */
 const pinVia = (p: Pin): "friend" | "collection" | "direct" => (p.friendsSaved > 0 ? "friend" : p.inSharedList ? "collection" : "direct");
 const nudgeText = (p: Pin) => {
@@ -73,6 +79,13 @@ const nudgeText = (p: Pin) => {
 export default function HomeMap() {
   const { colors, shadows, isDark } = useTheme();
   const toast = useToast();
+  const { user } = useAuth();
+  const firstName = (user?.full_name || "").trim().split(" ")[0] || "there";
+  const [greet, setGreet] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setGreet(false), 6500);
+    return () => clearTimeout(t);
+  }, []);
   const { requestContextualPush } = usePushPrompt();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -494,6 +507,16 @@ export default function HomeMap() {
           </View>
           <BalanceChip compact style={styles.balanceChip} testID="map-balance-chip" />
         </View>
+        {greet && user ? (
+          <Reanimated.View entering={FadeInDown.delay(400).duration(300)} exiting={FadeOutUp.duration(250)} style={styles.greetRow} pointerEvents="none" testID="home-greeting">
+            <View style={[styles.greetPill, shadows.sm, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.92)" }]}>
+              <Image source={ILLUSTRATIONS["mascot-wave"]} style={{ width: 28, height: 28 }} resizeMode="contain" />
+              <AppText variant="caption">
+                {greeting()}, {firstName} 👋
+              </AppText>
+            </View>
+          </Reanimated.View>
+        ) : null}
       </View>
 
       {Math.abs(heading) > 2 ? (
@@ -632,17 +655,20 @@ export default function HomeMap() {
         {locked ? (
           <View style={[styles.lockedBanner, shadows.lg, { backgroundColor: colors.surfaceInverse }]} testID="get-mass-banner" accessibilityRole="summary">
             <View style={[styles.lockedIcon, { backgroundColor: colors.massSoft }]}>
-              <TokenIcon size={22} />
+              <TokenIcon size={24} animated />
             </View>
             <View style={{ flex: 1 }}>
               <AppText variant="title" color={colors.textInverse}>
-                Exploring is free — details need MASS
+                Unlock homes with MASS
               </AppText>
-              <AppText variant="caption" color={colors.textInverse} style={{ opacity: 0.75, marginTop: 2 }}>
-                Your MASS balance is 0. Top up to unlock any property.
-              </AppText>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                <Ionicons name="lock-closed" size={12} color={colors.mass} />
+                <AppText variant="caption" color={colors.textInverse} style={{ opacity: 0.75 }} tabular>
+                  0 MASS
+                </AppText>
+              </View>
             </View>
-            <Button label="Get MASS" variant="premium" size="sm" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="get-mass-btn" />
+            <Button label="Get MASS" variant="premium" size="sm" iconLeft="add" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="get-mass-btn" />
           </View>
         ) : null}
       </View>
@@ -715,6 +741,8 @@ const styles = StyleSheet.create({
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   filterDot: { position: "absolute", top: -3, right: -3, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   chipsRowWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
+  greetRow: { flexDirection: "row", justifyContent: "flex-start" },
+  greetPill: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 14, height: 40, borderRadius: radii.pill },
   chipsGlass: { flex: 1, borderRadius: radii.pill, overflow: "hidden", paddingVertical: 5, paddingHorizontal: 5 },
   chipsRow: { gap: 6, paddingRight: 4 },
   balanceChip: { flexShrink: 0 },

@@ -20,6 +20,7 @@ import { WalletProvider } from "@/src/contexts/wallet";
 import { PushPromptProvider } from "@/src/contexts/pushPrompt";
 import { ThemeProvider, useTheme } from "@/src/theme";
 import { ToastProvider } from "@/src/ui/Toast";
+import { CelebrationProvider } from "@/src/ui/Celebrate";
 import { OfflineBanner } from "@/src/ui/OfflineBanner";
 
 LogBox.ignoreAllLogs(true);
@@ -122,9 +123,11 @@ export default function RootLayout() {
                   <CartProvider>
                     <ShopBasketProvider>
                       <ToastProvider>
-                        <PushPromptProvider>
-                          <ThemedStack />
-                        </PushPromptProvider>
+                        <CelebrationProvider>
+                          <PushPromptProvider>
+                            <ThemedStack />
+                          </PushPromptProvider>
+                        </CelebrationProvider>
                       </ToastProvider>
                     </ShopBasketProvider>
                   </CartProvider>

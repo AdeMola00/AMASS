@@ -1,0 +1,43 @@
+{
+  "summary": "Tested Nearby Alerts (Social) end to end: backend (the existing pytest file plus a new hermetic spot-check suite) and frontend (/social/alerts, Social tab strip and bell pill, empty-state CTA, notifications E2E as a fresh user B, compose/mine/prefs regression) at 390x844. The feature works. The existing test_social_nearby_alerts.py did NOT pass 11/11 on my run: 9/11. The 2 failures come from the test design, not the app: test_other_category_does_not_alert and test_blocked_follower_is_skipped assert the GLOBAL `alerted` count == 0, but demo (furniture + kitchen) and TEST users left over from earlier runs also follow those categories city-wide. My spot-check suite checks what each recipient actually receives and passed 9/9, confirming the logic: other categories, sell posts, blocked followers, the author and non-members (estate posts) are not alerted, daily frequency queues the alert, and E2E delivery works. Frontend: all flows passed. No deprecated packages and no SafeAreaView issues detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "tests/test_social_nearby_alerts.py", "issue": "Not hermetic: 2/11 fail on a shared DB (assert alerted == 0 while demo and leftover TEST followers exist). The file also never deletes the posts and follows it creates. 20 TEST_ giveaway posts were city-visible and showing in the real Lagos feed and in demo's 'free now' counts. I cleaned them up."},
+      {"endpoint": "GET /api/social/alerts (nearby_free counts) + social-alerts-strip", "issue": "The 'free now' tile counts and the strip text ('14 free now in Lekki Gardens Phase 2') count every visible post city-wide but are labelled with the estate name. The Social feed (estate scope) with the Kitchen chip then says 'Quiet in Lekki Gardens Phase 2 / No free kitchen right now' while the Kitchen tile badge says 3. Contradictory UX."},
+      {"endpoint": "POST /api/social/posts `alerted`", "issue": "Counts every visible follower, including those with nearby_free disabled, daily/weekly frequency or quiet hours. The compose toast 'N neighbours ... got a nudge' can overstate."},
+      {"endpoint": "_nearby_followers (social_feed.py:342)", "issue": "Excludes blocks but not mutes. The feed hides muted authors (line 309 muted_ids_for), yet a follower who muted the author still gets 'Free X near you' for that author's posts."},
+      {"endpoint": "create_post fan-out (social_feed.py:474)", "issue": "asyncio.create_task result is not kept, so the task can be garbage-collected mid-run (Python docs warning). emit() is called one follower at a time, capped at 5000 follows. Fine for the pilot but won't scale."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Social tab (category selected)", "issues": ["Bell pill social-alert-toggle is 104x38px, below the 44px touch target (add hitSlop or minHeight 44).", "Empty state social-empty: the FAB 'Post' (y 698-754) overlaps the right-hand CTA ('Alert me when one's posted' / 'Share an item'). The CTA row also runs almost to the screen edge at 390px."]},
+      {"screen": "/social/alerts", "issues": ["Tile label 'Garden & outdoor' truncates to 'Garden & out…' at 390px with 3 columns.", "Rapid taps on a second tile while the first toggle is in flight are silently dropped (`if (busy) return`)."]},
+      {"screen": "/notifications", "issues": ["CHIP_LABEL / CATEGORY_TONE have no nearby_free entry, so the chip falls back to the long catalog label 'Free items nearby' and the default tone."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_social_nearby_alerts_spotcheck.py", "/app/backend/tests/test_social_nearby_alerts.py", "/app/test_reports/pytest/nearby_alerts_spot.xml"],
+  "action_items": [
+    "Make test_social_nearby_alerts.py hermetic: assert on what each recipient receives (e.g. follower gets no notification), not the global `alerted` == 0. Add teardown that deletes TEST_ posts and follows.",
+    "Make the 'free now' counts match the label: either compute them for the scope shown (estate) or label them with the city/area.",
+    "Exclude muted users (social_mutes where muted_id == author) from _nearby_followers.",
+    "Optional: count only followers with nearby_free enabled + immediate for the `alerted`/toast copy; keep a reference to the fan-out task.",
+    "Raise the social-alert-toggle touch target to 44px; keep the FAB off the empty-state CTAs; add 'nearby_free' to CHIP_LABEL/CATEGORY_TONE in notifications.tsx."
+  ],
+  "critical_code_review_comments": [
+    "social_feed.py:342 _nearby_followers: blocks honoured, mutes not.",
+    "social_feed.py:474 untracked asyncio.create_task.",
+    "social_feed.py:388 _alerts_payload counts every visible scope, but scope_label = estate name."
+  ],
+  "updated_files": ["/app/backend/tests/test_social_nearby_alerts_spotcheck.py (new)"],
+  "success_rate": {"backend": "Spot-check 9/9 (100%); existing file 9/11 (2 failures are test-design / shared-data issues, not app bugs)", "frontend": "100% of the requested flows passed"},
+  "seed_data_creation": "Fresh TEST_ users were registered (test_spot.*, test_e2e.b.13337@amass.africa / Alerts2026!). All TEST_ social posts (20) and TEST-user follows were deleted afterwards. Demo is back to following furniture + kitchen, frequency immediate.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the spot-check with EXPO_PUBLIC_BACKEND_URL exported: pytest tests/test_social_nearby_alerts_spotcheck.py -n 0. The original file fails 2 tests whenever anyone else follows furniture/kitchen in Lagos (demo does). Login on web: fill [data-testid=login-email] / [data-testid=login-password], then click login-submit-button.",
+  "rca_of_issue": "Failing pytest: the posts are city-visible, and everyone in Lagos who follows the category counts toward `alerted` (demo + leftover test_alerts.* users from prior runs, which never clean up). For the blocked test: furniture followers = demo + previous follower + previous poster = 3 after excluding the author and the blocked user, so the assertion saw 3, not 0."
+}

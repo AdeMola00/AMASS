@@ -7,7 +7,7 @@ import { api } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
-import { AppText, Button, EmptyState, IconButton, Screen } from "@/src/ui";
+import { AppText, Button, EmptyState, IconButton, Screen, useCelebrate } from "@/src/ui";
 
 /**
  * Deep-link callback landing screen — providers redirect here after checkout.
@@ -19,6 +19,7 @@ export default function PaymentCallback() {
   const params = useLocalSearchParams<{ ref?: string; status?: string }>();
   const { refresh } = useWallet();
   const [state, setState] = useState<"checking" | "success" | "pending" | "failed">("checking");
+  const celebrate = useCelebrate();
   const [details, setDetails] = useState<any>(null);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function PaymentCallback() {
           setDetails(s);
           if (s.status === "paid") {
             setState("success");
+            celebrate({ title: s.credits ? `+${s.credits} ${s.currency ?? ""}`.trim() : "Paid!", icon: "wallet", tone: s.currency === "FIX" ? "fix" : "mass" });
             await refresh();
             return;
           }
@@ -79,10 +81,10 @@ export default function PaymentCallback() {
             <EmptyState
               variant="success"
               title="Payment successful"
-              body={`${details?.credits ? `${details.credits} ${details?.currency ?? ""}`.trim() : "Your tokens"} ${details?.credits ? "have" : "have"} been credited to your wallet.`}
+              body={details?.credits ? `+${details.credits} ${details?.currency ?? ""}`.trim() : "Tokens added to your wallet."}
               testID="payment-success"
             />
-            <Button label="View wallet" size="lg" fullWidth iconRight="arrow-forward" onPress={toWallet} style={{ marginHorizontal: space[6] }} />
+            <Button label="View wallet" size="lg" fullWidth iconLeft="wallet" iconRight="arrow-forward" onPress={toWallet} style={{ marginHorizontal: space[6] }} />
           </Animated.View>
         ) : state === "pending" ? (
           <Animated.View entering={FadeIn.duration(220)}>

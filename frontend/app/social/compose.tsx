@@ -17,7 +17,7 @@ import { track } from "@/src/lib/analytics";
 import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Button, IconButton, Input, PressableScale, Screen, Sheet, SheetLink, Skeleton, Toggle, useToast } from "@/src/ui";
+import { AppText, Button, IconButton, Input, PressableScale, Screen, Sheet, SheetLink, Skeleton, Toggle, useCelebrate, useToast } from "@/src/ui";
 import { socialFeedSignal } from "@/src/components/social/socialFeedSignal";
 import { FIXA, photoUrl, socialFont } from "@/src/components/social/socialTheme";
 
@@ -31,6 +31,7 @@ export default function SocialComposeScreen() {
   const { user } = useAuth();
   const { colors, shadows, isDark } = useTheme();
   const toast = useToast();
+  const celebrate = useCelebrate();
 
   const [meta, setMeta] = useState<SocialMeta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,7 +169,9 @@ export default function SocialComposeScreen() {
       track(editing ? "social_post_edited" : "social_post_created", { kind, category, photos: photos.length, visibility });
       socialFeedSignal.markDirty();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      toast.success(editing ? "Post updated" : kind === "give" ? "Shared with your neighbours 🎁" : "Your item is live", editing ? undefined : `Visible to ${scopeLabel}`);
+      if (!editing) celebrate({ title: kind === "give" ? "Shared 🎁" : "It's live!", icon: kind === "give" ? "gift" : "pricetag", tone: "fix" });
+      const alerted = !editing ? Number(("alerted" in r ? r.alerted : 0) ?? 0) : 0;
+      toast.success(editing ? "Post updated" : kind === "give" ? "Shared with your neighbours 🎁" : "Your item is live", editing ? undefined : alerted > 0 ? `${alerted} neighbour${alerted === 1 ? "" : "s"} following ${meta?.categories.find((c) => c.key === category)?.label ?? "this category"} got a nudge · ${scopeLabel}` : `Visible to ${scopeLabel}`);
       // Edit: pop back to the detail screen underneath (it refetches via the signal). Create: swap the composer for the new post.
       if (editing && router.canGoBack()) router.back();
       else router.replace(`/social/post/${r.post.id}` as any);

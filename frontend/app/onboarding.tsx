@@ -25,12 +25,12 @@ import { AmassLogo } from "@/src/components/AmassLogo";
 import { api } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
 import { gradients, motion, radii, space } from "@/src/theme/tokens";
-import { AppText, Button, PressableScale, useReducedMotion, type ButtonVariant, type IconName } from "@/src/ui";
+import { AppText, Button, Illustration, PressableScale, Shimmer, useReducedMotion, type ButtonVariant, type IconName, type IllustrationName } from "@/src/ui";
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Welcome flow — Corner-inspired: immersive imagery, generous negative space,
-   confident lowercase type, floating glossy objects, stacked pill actions.
-   Slide 1 = AMASS brand moment · Slide 2 = FIXA brand moment · then features.
+   Welcome flow — 4 swipeable picture screens, 2–4 word headlines, almost no
+   paragraphs. Slide 1 = AMASS brand moment · Slide 2 = Market (illustrated) ·
+   Slide 3 = FIXA brand moment · Slide 4 = Wallet (illustrated).
    ────────────────────────────────────────────────────────────────────────── */
 
 const FIXA_LOCKUP = require("../assets/images/fixa-pro-lockup.png");
@@ -40,11 +40,15 @@ type Tile = { image: string; label: string };
 type Chip = { icon: IconName; label: string };
 type Slide = {
   key: string;
-  kind: "amass" | "fixa" | "feature";
-  image: string;
+  kind: "amass" | "fixa" | "illustration";
+  image?: string;
+  illustration?: IllustrationName;
+  /** Gradient wash behind an illustration slide. */
+  wash?: readonly string[];
   headline: string;
   subtitle: string;
   cta: ButtonVariant;
+  ctaIcon?: IconName;
   tiles?: Tile[];
   chips?: Chip[];
   bullets?: { icon: IconName; label: string; tone: "mass" | "fix" | "ink" }[];
@@ -55,9 +59,10 @@ const SLIDES: Slide[] = [
     key: "amass",
     kind: "amass",
     image: "https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=1400&q=85",
-    headline: "africa's property operating system",
-    subtitle: "Find, verify and unlock homes, land and investments — from Lekki to Abuja — on one living map.",
+    headline: "find your home",
+    subtitle: "Verified homes, land & investments on one map.",
     cta: "brand",
+    ctaIcon: "map",
     tiles: [
       { image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&q=80", label: "Lekki" },
       { image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=600&q=80", label: "Ikoyi" },
@@ -65,12 +70,28 @@ const SLIDES: Slide[] = [
     ],
   },
   {
+    key: "market",
+    kind: "illustration",
+    illustration: "onboard-market",
+    wash: gradients.market,
+    headline: "buy. sell. declutter.",
+    subtitle: "Trusted brands and neighbours, right nearby.",
+    cta: "market",
+    ctaIcon: "storefront",
+    chips: [
+      { icon: "storefront", label: "brands" },
+      { icon: "gift", label: "free finds" },
+      { icon: "pricetag", label: "pre-owned" },
+    ],
+  },
+  {
     key: "fixa",
     kind: "fixa",
     image: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1400&q=80",
-    headline: "meet FIXA — home services with dignity",
-    subtitle: "Book vetted plumbers, electricians, cleaners and movers. Pay with FIX tokens and track every job in-app.",
+    headline: "fix anything",
+    subtitle: "Vetted pros. Pay with FIX. Track every job.",
     cta: "fix",
+    ctaIcon: "construct",
     chips: [
       { icon: "construct", label: "repairs" },
       { icon: "flash", label: "electrical" },
@@ -80,40 +101,18 @@ const SLIDES: Slide[] = [
     ],
   },
   {
-    key: "verified",
-    kind: "feature",
-    image: "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=1400&q=85",
-    headline: "verified listings. zero surprises.",
-    subtitle: "Agents are vetted and listings are checked on-site, so you can buy, rent or lease with confidence.",
+    key: "wallet",
+    kind: "illustration",
+    illustration: "onboard-wallet",
+    wash: gradients.massCard,
+    headline: "one simple wallet",
+    subtitle: "You always see the cost before you tap.",
     cta: "primary",
-    chips: [
-      { icon: "shield-checkmark", label: "on-site verified" },
-      { icon: "ribbon", label: "vetted agents" },
-    ],
-  },
-  {
-    key: "tokens",
-    kind: "feature",
-    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1400&q=85",
-    headline: "two tokens. one simple wallet.",
-    subtitle: "Pay small, clearly-disclosed fees with tokens — you always see the cost and your balance before confirming.",
-    cta: "primary",
+    ctaIcon: "rocket",
     bullets: [
-      { icon: "home", label: "MASS unlocks property details and verified agent contacts", tone: "mass" },
-      { icon: "construct", label: "FIX pays for FIXA home services and provider boosts", tone: "fix" },
-      { icon: "gift", label: "Earn both with daily bonuses, tasks and referrals", tone: "ink" },
-    ],
-  },
-  {
-    key: "ai",
-    kind: "feature",
-    image: "https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1400&q=85",
-    headline: "services, brands and AI insights",
-    subtitle: "Ask AMASS anything — then book inspections, declutter, renovate or shop from trusted brands.",
-    cta: "primary",
-    chips: [
-      { icon: "sparkles", label: "ask AMASS" },
-      { icon: "storefront", label: "trusted brands" },
+      { icon: "home", label: "MASS unlocks homes", tone: "mass" },
+      { icon: "construct", label: "FIX pays pros", tone: "fix" },
+      { icon: "gift", label: "Earn daily", tone: "ink" },
     ],
   },
 ];
@@ -194,11 +193,11 @@ export default function Onboarding() {
               ) : item.kind === "fixa" ? (
                 <FixaHero slide={item} i={i} width={width} heroH={heroH} scrollX={scrollX} reduce={reduce} />
               ) : (
-                <FeatureHero slide={item} i={i} width={width} scrollX={scrollX} reduce={reduce} />
+                <IllustrationHero slide={item} i={i} width={width} heroH={heroH} scrollX={scrollX} reduce={reduce} />
               )}
               {/* Top chrome: emblem badge (except the brand moments) + Skip */}
               <View style={[styles.topRow, { paddingTop: insets.top + space[3] }]} pointerEvents="box-none">
-                {item.kind === "feature" ? (
+                {item.kind === "illustration" ? (
                   <View style={styles.logoBadge}>
                     <AmassLogo size="md" showWordmark={false} />
                   </View>
@@ -218,20 +217,18 @@ export default function Onboarding() {
               <AppText variant="hero" testID={`onboarding-title-${i}`}>
                 {item.headline}
               </AppText>
-              <AppText variant="body" tone="secondary">
+              <AppText variant="bodyMedium" tone="secondary">
                 {item.subtitle}
               </AppText>
               {item.bullets ? (
                 <View style={styles.bullets}>
                   {item.bullets.map((b, k) => {
                     const fg = b.tone === "mass" ? colors.massText : b.tone === "fix" ? colors.fixText : colors.text;
-                    const bg = b.tone === "mass" ? colors.massSoft : b.tone === "fix" ? colors.fixSoft : colors.surface;
+                    const bg = b.tone === "mass" ? colors.massSoft : b.tone === "fix" ? colors.fixSoft : colors.surfaceAlt;
                     return (
-                      <Animated.View key={b.label} entering={reduce ? undefined : FadeInDown.delay(k * motion.stagger).duration(motion.base)} style={[styles.bullet, { backgroundColor: colors.surfaceAlt }]}>
-                        <View style={[styles.bulletIcon, { backgroundColor: bg }]}>
-                          <Ionicons name={b.icon} size={15} color={fg} />
-                        </View>
-                        <AppText variant="bodySm" tone="secondary" style={{ flex: 1 }}>
+                      <Animated.View key={b.label} entering={reduce ? undefined : FadeInDown.delay(k * motion.stagger).duration(motion.base)} style={[styles.bullet, { backgroundColor: bg }]}>
+                        <Ionicons name={b.icon} size={18} color={fg} />
+                        <AppText variant="caption" color={fg}>
                           {b.label}
                         </AppText>
                       </Animated.View>
@@ -248,26 +245,30 @@ export default function Onboarding() {
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 8, backgroundColor: colors.bg }]} pointerEvents="box-none">
         <View style={styles.dots} accessibilityLabel={`Step ${index + 1} of ${SLIDES.length}`}>
           {SLIDES.map((s, i) => (
-            <Dot key={s.key} active={i === index} color={s.kind === "fixa" && i === index ? colors.fix : s.kind === "amass" && i === index ? colors.brand : colors.primary} />
+            <Dot key={s.key} active={i === index} color={i === index ? (s.kind === "fixa" ? colors.fix : s.kind === "amass" ? colors.brand : s.key === "market" ? colors.market : s.key === "wallet" ? colors.mass : colors.primary) : colors.primary} />
           ))}
         </View>
         <Button
-          label={isLast ? "Get started" : "Continue"}
+          label={isLast ? "Let's go" : "Next"}
           variant={slide.cta}
           size="lg"
           fullWidth
-          iconRight="arrow-forward"
+          iconLeft={isLast ? slide.ctaIcon : undefined}
+          iconRight={isLast ? undefined : "arrow-forward"}
           onPress={next}
           accessibilityLabel={isLast ? "Get started" : "Continue"}
           testID="onboarding-next"
         />
         <PressableScale onPress={finish} haptic={false} accessibilityRole="button" testID="onboarding-signin" style={styles.signin}>
-          <AppText variant="bodySm" tone="tertiary">
-            Already have an account?{" "}
-            <AppText variant="bodySm" tone="primary">
-              Sign in
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Ionicons name="log-in-outline" size={16} color={colors.textTertiary} />
+            <AppText variant="bodySm" tone="tertiary">
+              Have an account?{" "}
+              <AppText variant="bodySm" tone="primary" weight="bold">
+                Sign in
+              </AppText>
             </AppText>
-          </AppText>
+          </View>
         </PressableScale>
       </View>
     </View>
@@ -375,8 +376,8 @@ function FixaHero({ slide, i, width, heroH, scrollX, reduce }: { slide: Slide; i
             <Animated.View entering={reduce ? undefined : FadeInDown.duration(motion.slow + 100)} style={[styles.fixaCard, { width: cardW, borderRadius: radii.xxl }]} testID="onboarding-fixa-lockup">
               <LinearGradient colors={[...gradients.gloss]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={[styles.abs, { left: 0, right: 0, top: 0, height: "40%" }]} pointerEvents="none" />
               <Image source={FIXA_LOCKUP} style={{ width: lockupW, height: lockupH }} contentFit="contain" accessibilityLabel="FIXA PRO" />
-              <AppText variant="micro" color="#5B6B60" align="center" style={{ marginTop: 6 }}>
-                A great platform for service providers and those who need services.
+              <AppText variant="caption" color="#5B6B60" align="center" style={{ marginTop: 6 }}>
+                Pros you can trust
               </AppText>
             </Animated.View>
           </Floating>
@@ -386,22 +387,34 @@ function FixaHero({ slide, i, width, heroH, scrollX, reduce }: { slide: Slide; i
   );
 }
 
-/* ─── Feature slides: photo-led hero with vertical scrim + floating glossy chips ─── */
-function FeatureHero({ slide, i, width, scrollX, reduce }: { slide: Slide; i: number; width: number; scrollX: SharedValue<number>; reduce: boolean }) {
+/* ─── Illustrated slides: section-coloured gradient wash + big floating illustration + glossy chips ─── */
+function IllustrationHero({ slide, i, width, heroH, scrollX, reduce }: { slide: Slide; i: number; width: number; heroH: number; scrollX: SharedValue<number>; reduce: boolean }) {
+  const artSize = Math.round(Math.min(360, Math.max(240, Math.min(width * 0.78, heroH * 0.66))));
+  const wash = [...(slide.wash ?? gradients.brand)] as [string, string, ...string[]];
   return (
     <>
-      <Parallax i={i} width={width} scrollX={scrollX} factor={0.3} style={StyleSheet.absoluteFill}>
-        <Image source={{ uri: slide.image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={400} />
-      </Parallax>
-      <LinearGradient colors={[...gradients.scrim]} locations={[0.45, 1]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <LinearGradient colors={wash} start={{ x: 0, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0)"]} style={[styles.abs, { left: 0, right: 0, top: 0, height: "50%" }]} pointerEvents="none" />
+      <Shimmer intensity={0.5} delay={600} />
+      {/* soft spotlight disc behind the illustration */}
+      <View style={[styles.abs, { alignSelf: "center", top: heroH * 0.16, width: artSize * 0.92, height: artSize * 0.92, borderRadius: artSize, backgroundColor: "rgba(255,255,255,0.22)" }]} pointerEvents="none" />
+      <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", paddingBottom: slide.chips ? heroH * 0.12 : 0 }]} pointerEvents="none">
+        <Parallax i={i} width={width} scrollX={scrollX} factor={0.4}>
+          <Floating reduce={reduce} amplitude={8} duration={3400}>
+            <Animated.View entering={reduce ? undefined : FadeInDown.duration(motion.slow + 100)}>
+              <Illustration name={slide.illustration ?? "mascot-wave"} size={artSize} testID={`onboarding-art-${slide.key}`} />
+            </Animated.View>
+          </Floating>
+        </Parallax>
+      </View>
       {slide.chips ? (
         <View style={styles.chipRow} pointerEvents="none">
           {slide.chips.map((c, k) => (
             <Floating key={c.label} reduce={reduce} amplitude={4} duration={2800 + k * 400} delay={k * 300}>
               <Animated.View entering={reduce ? undefined : FadeInDown.delay(200 + k * 120).duration(motion.slow)}>
                 <View style={[styles.chip, { transform: [{ rotate: k % 2 ? "3deg" : "-3deg" }] }]}>
-                  <Ionicons name={c.icon} size={14} color="#111111" />
-                  <AppText variant="micro" color="#111111">
+                  <Ionicons name={c.icon} size={15} color="#111111" />
+                  <AppText variant="caption" color="#111111">
                     {c.label}
                   </AppText>
                 </View>
@@ -468,12 +481,11 @@ const styles = StyleSheet.create({
   tileLabel: { position: "absolute", left: 3, right: 3, bottom: 4, backgroundColor: "rgba(255,255,255,0.92)", borderRadius: radii.pill, paddingHorizontal: 6, paddingVertical: 3, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 3 },
   glass: { paddingHorizontal: 26, paddingVertical: 22, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.75)", shadowColor: "#000", shadowOpacity: 0.16, shadowRadius: 24, shadowOffset: { width: 0, height: 14 }, elevation: 8 },
   fixaCard: { backgroundColor: "#FFFFFF", alignItems: "center", paddingVertical: 20, paddingHorizontal: 18, overflow: "hidden", shadowColor: "#0B3D1F", shadowOpacity: 0.28, shadowRadius: 26, shadowOffset: { width: 0, height: 16 }, elevation: 10 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.94)", paddingHorizontal: 12, height: 32, borderRadius: radii.pill, shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.94)", paddingHorizontal: 14, height: 36, borderRadius: radii.pill, shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
   chipRow: { position: "absolute", left: space[5], right: space[5], bottom: space[6], flexDirection: "row", flexWrap: "wrap", gap: 8 },
   copy: { paddingHorizontal: space[6], paddingTop: space[6], gap: space[3] },
-  bullets: { gap: 8, marginTop: 4 },
-  bullet: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: radii.md },
-  bulletIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  bullets: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  bullet: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, height: 40, borderRadius: radii.pill },
   footer: { paddingHorizontal: space[6], paddingTop: space[3], gap: 14 },
   dots: { flexDirection: "row", gap: 6, justifyContent: "center" },
   signin: { alignSelf: "center", paddingVertical: 8, minHeight: 44, justifyContent: "center" },

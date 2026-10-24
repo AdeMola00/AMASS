@@ -10,7 +10,7 @@ import { useWallet } from "@/src/contexts/wallet";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, EmptyState, Screen, ScreenHeader, Sheet, Skeleton, useToast } from "@/src/ui";
+import { AppText, Badge, Button, EmptyState, Screen, ScreenHeader, Sheet, Skeleton, useCelebrate, useToast } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 export default function SubscribeScreen() {
@@ -18,6 +18,7 @@ export default function SubscribeScreen() {
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const toast = useToast();
+  const celebrate = useCelebrate();
   const { wallet, subscribe, refresh } = useWallet();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +65,7 @@ export default function SubscribeScreen() {
       const res = await subscribe(plan.id);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setDone({ name: plan.name, credited: res.credited });
+      celebrate({ title: `+${res.credited} MASS`, icon: "star", tone: "premium" });
     } catch (e: any) {
       toast.error("Subscription failed", e?.message ?? "Please try again.");
     } finally {

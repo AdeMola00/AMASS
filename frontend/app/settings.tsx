@@ -3,12 +3,13 @@ import { View, StyleSheet, ScrollView, Switch, Alert, Platform } from "react-nat
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import Constants from "expo-constants";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { useWallet } from "@/src/contexts/wallet";
 import { openPrivacyPolicy, openTerms } from "@/src/lib/legal";
 import { storage } from "@/src/utils/storage";
-import { useTheme, useThemeMode, ThemeMode } from "@/src/theme";
+import { useTheme, useThemeMode, useTextScale, ThemeMode } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
 import { AppText, ListRow, RowGroup, Screen, ScreenHeader, SegmentedControl, useToast } from "@/src/ui";
 
@@ -20,6 +21,7 @@ export default function Settings() {
   const { mass } = useWallet();
   const { colors } = useTheme();
   const { mode, setMode } = useThemeMode();
+  const { textScale, setTextScale } = useTextScale();
   const toast = useToast();
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -80,11 +82,9 @@ export default function Settings() {
       <ScrollView contentContainerStyle={{ padding: space[4], gap: space[5], paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
         <RowGroup title="Appearance">
           <View style={{ padding: space[4], gap: 12 }}>
-            <View style={{ gap: 2 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="color-palette-outline" size={18} color={colors.text} />
               <AppText variant="bodyMedium">Theme</AppText>
-              <AppText variant="caption" tone="tertiary">
-                Light and dark are each designed deliberately — pick one, or follow your device.
-              </AppText>
             </View>
             <SegmentedControl<ThemeMode>
               value={mode}
@@ -97,6 +97,24 @@ export default function Settings() {
               ]}
             />
           </View>
+          <ListRow
+            icon="text-outline"
+            iconTone="info"
+            label="Larger text"
+            caption="Bigger words everywhere"
+            last
+            trailing={
+              <Switch
+                value={textScale === "large"}
+                onValueChange={(v) => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setTextScale(v ? "large" : "normal");
+                }}
+                trackColor={{ true: colors.primary }}
+                testID="settings-larger-text"
+              />
+            }
+          />
         </RowGroup>
 
         <RowGroup title="Notifications">
@@ -104,27 +122,26 @@ export default function Settings() {
             icon="notifications-outline"
             iconTone="brand"
             label="Notification preferences"
-            caption="Categories, instant vs daily digests, quiet hours, phone alerts"
+            caption="Alerts · Digests · Quiet hours"
             onPress={() => router.push("/notification-preferences" as any)}
             testID="settings-notification-preferences"
           />
           <ListRow
             icon="mail-outline"
             label="Email updates"
-            caption="Saved-search alerts and product news"
             last
             trailing={<Switch value={emailEnabled} onValueChange={savePref(PREF_EMAIL, setEmailEnabled)} trackColor={{ true: colors.primary }} testID="settings-email-updates" />}
           />
         </RowGroup>
 
         <RowGroup title="Security">
-          <ListRow icon="lock-closed-outline" label="Change password" caption={`We'll email a reset code to ${user?.email ?? "your address"}`} onPress={() => router.push({ pathname: "/(auth)/forgot-password", params: { email: user?.email ?? "" } } as any)} last testID="settings-change-password" />
+          <ListRow icon="lock-closed-outline" label="Change password" onPress={() => router.push({ pathname: "/(auth)/forgot-password", params: { email: user?.email ?? "" } } as any)} last testID="settings-change-password" />
         </RowGroup>
 
         <RowGroup title="Account">
-          <ListRow icon="star-outline" iconTone="premium" label="Subscription" value={plan ? `${plan} plan` : "No active plan"} onPress={() => router.push("/subscribe")} testID="settings-subscription" />
-          <ListRow icon="pricetags-outline" label="Agent plans" caption="Starter · Pro · Agency" onPress={() => router.push("/agent-plans")} testID="settings-agent-plans" />
-          <ListRow icon="trash-outline" label={deleting ? "Deleting…" : "Delete account"} caption="Permanently erase your account and data" onPress={deleting ? undefined : onDeleteAccount} destructive last testID="settings-delete-account" />
+          <ListRow icon="star-outline" iconTone="premium" label="Subscription" value={plan ? `${plan} plan` : "No plan"} onPress={() => router.push("/subscribe")} testID="settings-subscription" />
+          <ListRow icon="pricetags-outline" label="Agent plans" onPress={() => router.push("/agent-plans")} testID="settings-agent-plans" />
+          <ListRow icon="trash-outline" label={deleting ? "Deleting…" : "Delete account"} onPress={deleting ? undefined : onDeleteAccount} destructive last testID="settings-delete-account" />
         </RowGroup>
 
         <RowGroup title="Legal">

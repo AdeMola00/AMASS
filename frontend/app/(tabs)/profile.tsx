@@ -9,46 +9,46 @@ import { useWallet } from "@/src/contexts/wallet";
 import { api } from "@/src/lib/api";
 import { useTheme, useThemeMode } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AnimatedNumber, AppText, Avatar, Badge, Button, ListRow, RowGroup, Screen, StatTile, type IconName, Gloss } from "@/src/ui";
+import { AnimatedNumber, AppText, Avatar, Badge, Button, ListRow, ProgressBar, RowGroup, Screen, Shimmer, StatTile, type IconName, Gloss } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
-type Row = { icon: IconName; label: string; route: string; caption?: string; requires?: "agent"; tone?: "default" | "brand" | "mass" | "fix" | "success" | "warning" | "info" | "premium" };
+type Row = { icon: IconName; label: string; route: string; requires?: "agent"; tone?: "default" | "brand" | "mass" | "fix" | "success" | "warning" | "info" | "premium" };
 
-// Ordered by product priority (see spec); grouped for scannability.
+// Ordered by product priority (see spec); grouped for scannability. Icon + 1–3 word label only.
 const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: "Wallet & rewards",
     rows: [
-      { icon: "wallet-outline", label: "Wallet", route: "/wallet", caption: "MASS · FIX · Transactions · Subscriptions", tone: "mass" },
-      { icon: "lock-open-outline", label: "My Unlocks", route: "/unlocks", caption: "Properties you've unlocked" },
-      { icon: "heart-outline", label: "Saved Properties", route: "/saved-properties", caption: "Your favorites", tone: "brand" },
-      { icon: "bookmark-outline", label: "Saved Searches", route: "/saved-searches", caption: "Alerts when new listings match" },
-      { icon: "gift-outline", label: "Earn Tokens", route: "/earn", caption: "Tasks · Referrals · Daily bonuses", tone: "success" },
+      { icon: "wallet-outline", label: "Wallet", route: "/wallet", tone: "mass" },
+      { icon: "lock-open-outline", label: "My Unlocks", route: "/unlocks" },
+      { icon: "heart-outline", label: "Saved Properties", route: "/saved-properties", tone: "brand" },
+      { icon: "bookmark-outline", label: "Saved Searches", route: "/saved-searches" },
+      { icon: "gift-outline", label: "Earn Tokens", route: "/earn", tone: "success" },
     ],
   },
   {
     title: "Agents & listings",
     rows: [
-      { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", caption: "Verified authority to market properties", tone: "brand" },
-      { icon: "add-circle-outline", label: "List a Property", route: "/submit-property", caption: "Publish a new listing" },
-      { icon: "briefcase-outline", label: "Agent Workspace", route: "/agent-workspace", caption: "Referrals · Commissions · Payouts", requires: "agent" },
-      { icon: "pricetags-outline", label: "Agent Plans", route: "/agent-plans", caption: "Starter · Pro · Agency · Founding pricing", tone: "premium" },
+      { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", tone: "brand" },
+      { icon: "add-circle-outline", label: "List a Property", route: "/submit-property" },
+      { icon: "briefcase-outline", label: "Agent Workspace", route: "/agent-workspace", requires: "agent" },
+      { icon: "pricetags-outline", label: "Agent Plans", route: "/agent-plans", tone: "premium" },
     ],
   },
   {
     title: "Services",
     rows: [
-      { icon: "storefront-outline", label: "My Market Listings", route: "/marketplace/my-listings", caption: "Declutter items · Offers in & out · Sales", tone: "brand" },
-      { icon: "hammer-outline", label: "Provider Dashboard", route: "/provider-dashboard", caption: "FIXA jobs · FIX earnings · Boost", tone: "fix" },
-      { icon: "construct-outline", label: "Improve My Property", route: "/improve", caption: "Inspections · Financing · Renovation", tone: "info" },
-      { icon: "megaphone-outline", label: "My Ad Campaigns", route: "/ads", caption: "Analytics · AI coach · Pause/refund" },
+      { icon: "storefront-outline", label: "My Market Listings", route: "/marketplace/my-listings", tone: "brand" },
+      { icon: "hammer-outline", label: "Provider Dashboard", route: "/provider-dashboard", tone: "fix" },
+      { icon: "construct-outline", label: "Improve My Property", route: "/improve", tone: "info" },
+      { icon: "megaphone-outline", label: "My Ad Campaigns", route: "/ads" },
     ],
   },
   {
     title: "Trust & documents",
     rows: [
-      { icon: "document-text-outline", label: "My Documents", route: "/my-documents", caption: "Contracts & titles" },
-      { icon: "shield-checkmark-outline", label: "Identity Verification", route: "/identity-verification", caption: "Enhance trust", tone: "success" },
+      { icon: "document-text-outline", label: "My Documents", route: "/my-documents" },
+      { icon: "shield-checkmark-outline", label: "Identity Verification", route: "/identity-verification", tone: "success" },
     ],
   },
   {
@@ -62,12 +62,17 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   },
 ];
 
+function greeting() {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
 export default function Profile() {
   const router = useRouter();
   const { user, signOut } = useAuth();
   const { mass, fix } = useWallet();
-  const { colors, isDark } = useTheme();
-  const { mode, setMode } = useThemeMode();
+  const { colors, isDark, shadows } = useTheme();
+  const { setMode } = useThemeMode();
 
   const [saved, setSaved] = useState<number | null>(null);
   const [unlocked, setUnlocked] = useState<number | null>(null);
@@ -81,6 +86,17 @@ export default function Profile() {
   );
 
   const memberYear = user?.created_at ? new Date(user.created_at).getFullYear() : new Date().getFullYear();
+  const firstName = (user?.full_name || "").trim().split(" ")[0] || "there";
+
+  // Profile completion — steps that unlock trust & features. Tap a step to do it.
+  const steps = [
+    { key: "photo", label: "Add photo", done: !!user?.avatar_url, icon: "camera-outline" as IconName, route: "/settings" },
+    { key: "phone", label: "Verify phone", done: !!user?.phone_verified, icon: "call-outline" as IconName, route: "/(auth)/phone" },
+    { key: "save", label: "Save a home", done: (saved ?? 0) > 0, icon: "heart-outline" as IconName, route: "/(tabs)" },
+    { key: "id", label: "Verify ID", done: !!user?.is_agent, icon: "shield-checkmark-outline" as IconName, route: "/identity-verification" },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  const nextStep = steps.find((s) => !s.done);
 
   const doSignOut = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -106,17 +122,17 @@ export default function Profile() {
         <View style={styles.header}>
           <View style={styles.identity}>
             <Avatar name={user?.full_name} uri={user?.avatar_url} size={72} verified={!!user?.is_agent} />
-            <View style={{ flex: 1, gap: 4 }}>
-              <AppText variant="heroSm" numberOfLines={1}>
-                {user?.full_name || "AMASS Member"}
+            <View style={{ flex: 1, gap: 2 }}>
+              <AppText variant="caption" tone="tertiary" testID="profile-greeting">
+                {greeting()} 👋
               </AppText>
-              <AppText variant="bodySm" tone="tertiary" numberOfLines={1}>
-                {user?.email}
+              <AppText variant="h2" numberOfLines={1}>
+                {firstName}
               </AppText>
               <View style={styles.badges}>
                 {user?.is_agent ? <Badge label="Verified Agent" tone="success" icon="shield-checkmark" testID="badge-agent" /> : <Badge label="Member" tone="neutral" icon="person" />}
                 {user?.is_admin ? <Badge label="Admin" tone="brand" icon="key" /> : null}
-                {(user as any)?.phone_verified ? <Badge label="Phone verified" tone="info" icon="call" /> : null}
+                {(user as any)?.phone_verified ? <Badge label="Phone" tone="info" icon="call" /> : null}
               </View>
             </View>
             <Pressable
@@ -128,15 +144,48 @@ export default function Profile() {
               hitSlop={8}
               style={[styles.themeBtn, { backgroundColor: colors.surfaceAlt }]}
             >
-              <Ionicons name={isDark ? "sunny" : "moon"} size={18} color={colors.text} />
+              <Ionicons name={isDark ? "sunny" : "moon"} size={20} color={colors.text} />
             </Pressable>
           </View>
         </View>
+
+        {/* Profile completion — progress + one obvious next step */}
+        {doneCount < steps.length ? (
+          <Pressable
+            onPress={() => nextStep && router.push(nextStep.route as any)}
+            accessibilityRole="button"
+            accessibilityLabel={`Profile ${doneCount} of ${steps.length} complete. Next: ${nextStep?.label}`}
+            testID="profile-progress"
+            style={({ pressed }) => [styles.progress, { backgroundColor: colors.surface }, shadows.xs, pressed && { opacity: 0.92 }]}
+          >
+            <View style={{ flex: 1, gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <AppText variant="title">Profile {Math.round((doneCount / steps.length) * 100)}%</AppText>
+                <AppText variant="caption" tone="tertiary" tabular>
+                  {doneCount}/{steps.length}
+                </AppText>
+              </View>
+              <ProgressBar value={doneCount / steps.length} tone="brand" height={8} />
+              <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                {steps.map((s) => (
+                  <View key={s.key} style={[styles.step, { backgroundColor: s.done ? colors.successSoft : colors.surfaceAlt }]}>
+                    <Ionicons name={s.done ? "checkmark-circle" : s.icon} size={14} color={s.done ? colors.success : colors.textSecondary} />
+                    <AppText variant="micro" color={s.done ? colors.success : colors.textSecondary}>
+                      {s.label}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
 
         {/* Wallet hero — Top-up button is a sibling of the card pressable (no nested buttons on web) */}
         <View style={styles.walletWrap} testID="wallet-card-wrap">
           <LinearGradient colors={isDark ? ["#292926", "#1C1C1A"] : ["#1C1C1A", "#111111"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wallet}>
             <Gloss height="48%" opacity={0.55} />
+            <Shimmer intensity={0.35} delay={900} />
             <View style={styles.walletCoin}>
               <TokenIcon size={120} animated />
             </View>
@@ -174,9 +223,12 @@ export default function Profile() {
                 {mass?.subscription?.plan_id ? (
                   <Badge label={`${mass.subscription.plan_id} plan`} tone="premium" icon="star" />
                 ) : (
-                  <AppText variant="caption" color="rgba(255,255,255,0.6)">
-                    Tap to manage wallet
-                  </AppText>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <AppText variant="caption" color="rgba(255,255,255,0.7)">
+                      Wallet
+                    </AppText>
+                    <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.7)" />
+                  </View>
                 )}
               </View>
             </Pressable>
@@ -190,7 +242,7 @@ export default function Profile() {
         <View style={styles.stats}>
           <StatTile icon="heart" tone="brand" value={saved ?? "—"} label="Saved" onPress={() => router.push("/saved-properties")} testID="stat-saved" />
           <StatTile icon="lock-open" tone="default" value={unlocked ?? "—"} label="Unlocked" onPress={() => router.push("/unlocks")} testID="stat-unlocked" />
-          <StatTile icon="calendar" tone="mass" value={String(memberYear)} label="Member since" />
+          <StatTile icon="calendar" tone="mass" value={String(memberYear)} label="Since" />
         </View>
 
         {/* Admin */}
@@ -214,7 +266,6 @@ export default function Profile() {
                     icon={m.icon}
                     iconTone={m.tone ?? "default"}
                     label={m.label}
-                    caption={m.caption}
                     onPress={() => router.push(m.route as any)}
                     last={i === g.rows.length - 1}
                     testID={`menu-${m.label.toLowerCase().replace(/\s+/g, "-")}`}
@@ -233,9 +284,6 @@ export default function Profile() {
           ))}
 
           <Button label="Sign out" variant="destructive" iconLeft="log-out-outline" fullWidth size="lg" onPress={doSignOut} testID="sign-out-button" />
-          <AppText variant="caption" tone="muted" align="center">
-            Theme: {mode === "system" ? "System" : mode === "dark" ? "Dark" : "Light"} · Change in Settings
-          </AppText>
         </View>
       </ScrollView>
     </Screen>
@@ -245,8 +293,10 @@ export default function Profile() {
 const styles = StyleSheet.create({
   header: { paddingHorizontal: space[4], paddingTop: space[2] },
   identity: { flexDirection: "row", alignItems: "center", gap: 14 },
-  badges: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 2 },
-  themeBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
+  themeBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  progress: { marginHorizontal: space[4], padding: space[4], borderRadius: radii.lg, flexDirection: "row", alignItems: "center", gap: 10 },
+  step: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, height: 26, borderRadius: radii.pill },
   walletWrap: { marginHorizontal: space[4] },
   wallet: { borderRadius: radii.xl, padding: 20, overflow: "hidden" },
   walletTopup: { position: "absolute", top: 20, right: 20 },

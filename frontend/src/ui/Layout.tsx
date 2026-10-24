@@ -270,7 +270,7 @@ export function ListRow({
         leading
       ) : icon ? (
         <View style={[styles.rowIcon, { backgroundColor: t.bg }]}>
-          <Ionicons name={icon} size={18} color={t.fg} />
+          <Ionicons name={icon} size={20} color={t.fg} />
         </View>
       ) : null}
       <View style={{ flex: 1, gap: 2 }}>
@@ -322,6 +322,6 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 12 },
   sectionAction: { flexDirection: "row", alignItems: "center", gap: 2, paddingVertical: 4 },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: space[4], paddingVertical: 14, minHeight: 56 },
-  rowIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  rowIcon: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   group: { borderRadius: radii.lg, overflow: "hidden" },
 });

@@ -20,9 +20,10 @@ social_post_reports · social_contact_events. Routes: /api/social/posts/* and /a
 """
 from __future__ import annotations
 
+import asyncio
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -123,6 +124,14 @@ class UploadIn(BaseModel):
     data_url: str
 
 
+class AlertsIn(BaseModel):
+    categories: List[str] = Field(default_factory=list, max_length=20)
+
+
+class AlertToggleIn(BaseModel):
+    category: str
+
+
 def _iso(d) -> Optional[str]:
     if isinstance(d, datetime):
         return d.isoformat()
@@ -141,9 +150,19 @@ def _public_url(path: str) -> str:
     return f"/api/public-files/{path}"
 
 
+def _post_visible_to(p: dict, ctx: dict) -> bool:
+    """Python mirror of `_visible_filter` for one post × one viewer context (used by Nearby Alerts fan-out)."""
+    if p.get("estate_id") and p["estate_id"] in ctx["estate_ids"]:
+        return True
+    if p.get("visibility") == "city" and (p.get("city") == ctx["city"] or (p.get("area") and p.get("area") in ctx["areas"])):
+        return True
+    return p.get("visibility") == "area" and bool(p.get("area")) and p.get("area") in ctx["areas"]
+
+
 def register_social_feed_routes(db, get_current_user, require_admin):
     router = APIRouter(prefix="/api/social", tags=["social-feed"])
     files = APIRouter(tags=["social-feed"])
+    _bg_tasks: set = set()  # keeps alert fan-out tasks referenced until they finish
 
     # ─── Viewer context: estates → areas → city ───
     async def _ctx(user: dict) -> dict:
@@ -320,6 +339,115 @@ def register_social_feed_routes(db, get_current_user, require_admin):
             counts[r.get("status", "active")] = counts.get(r.get("status", "active"), 0) + 1
         return {"items": items, "counts": counts}
 
+    # ─── Nearby Alerts: follow a category → hear about free items posted nearby ───
+    async def _nearby_followers(post: dict, author_id: str) -> list[str]:
+        """Followers of the post's category who can SEE the post (same estate / area / city), minus blocks."""
+        follows = await db.social_category_follows.find({"category": post.get("category"), "user_id": {"$ne": author_id}}, {"_id": 0, "user_id": 1}).to_list(5000)
+        uids = [f["user_id"] for f in follows]
+        if not uids:
+            return []
+        blocked = await blocked_ids_for(db, author_id)
+        uids = [u for u in uids if u not in blocked]
+        if not uids:
+            return []
+        # Followers who muted the author, or switched the "Free items nearby" category off, are left alone.
+        muted = {m["user_id"] for m in await db.social_mutes.find({"user_id": {"$in": uids}, "muted_id": author_id}, {"_id": 0, "user_id": 1}).to_list(len(uids))}
+        off = {p["user_id"] for p in await db.notification_prefs.find({"user_id": {"$in": uids}, "categories.nearby_free.enabled": False}, {"_id": 0, "user_id": 1}).to_list(len(uids))}
+        uids = [u for u in uids if u not in muted and u not in off]
+        if not uids:
+            return []
+        mems = await db.estate_members.find({"user_id": {"$in": uids}, "status": "approved"}, {"_id": 0, "user_id": 1, "estate_id": 1}).to_list(20000)
+        est_ids = list({m["estate_id"] for m in mems})
+        ests = {e["id"]: e for e in await db.estates.find({"id": {"$in": est_ids}, "status": {"$ne": "rejected"}}, {"_id": 0, "id": 1, "area": 1, "city": 1}).to_list(len(est_ids) or 1)} if est_ids else {}
+        users = {u["id"]: u for u in await db.users.find({"id": {"$in": uids}}, {"_id": 0, "id": 1, "city": 1}).to_list(len(uids))}
+        by_user: dict[str, list[dict]] = {}
+        for m in mems:
+            if m["estate_id"] in ests:
+                by_user.setdefault(m["user_id"], []).append(ests[m["estate_id"]])
+        out = []
+        for uid in uids:
+            my = by_user.get(uid, [])
+            ctx = {"estate_ids": [e["id"] for e in my], "areas": {e["area"] for e in my if e.get("area")}, "city": (users.get(uid) or {}).get("city") or (my[0]["city"] if my else None) or "Lagos"}
+            if _post_visible_to(post, ctx):
+                out.append(uid)
+        return out
+
+    async def _emit_nearby(post: dict, author: dict, uids: list[str]) -> None:
+        from notification_center import emit
+        label = CATEGORY_LABEL.get(post.get("category", "other"), "item")
+        first = (author.get("full_name") or "A neighbour").split(" ")[0]
+        for uid in uids:
+            try:
+                await emit(
+                    db, uid, "SOCIAL_NEARBY_FREE",
+                    f"Free {label.lower()} near you",
+                    f"{first} is giving away “{post['title']}” · {_location_label(post)}",
+                    {"post_id": post["id"], "category": post.get("category"), "category_label": label, "location_label": _location_label(post), "cover": (post.get("photos") or [None])[0]},
+                    dedupe_key=f"nearby_free:{post['id']}:{uid}", action_url=f"/social/post/{post['id']}",
+                )
+            except Exception:  # one bad recipient must never stop the rest
+                continue
+
+    async def _alerts_payload(user: dict, ctx: dict) -> dict:
+        from notification_center import get_prefs
+        follows = await db.social_category_follows.find({"user_id": user["id"]}, {"_id": 0, "category": 1}).to_list(50)
+        following = {f["category"] for f in follows}
+        live = await db.social_posts.aggregate([
+            {"$match": {"status": {"$in": FEED_STATUSES}, "kind": "give", "author_id": {"$ne": user["id"]}, **_visible_filter(ctx, user["id"])}},
+            {"$group": {"_id": "$category", "n": {"$sum": 1}}},
+        ]).to_list(50)
+        counts = {r["_id"]: int(r["n"]) for r in live}
+        prefs = await get_prefs(db, user["id"])
+        cat = prefs["categories"].get("nearby_free", {"enabled": True, "frequency": "immediate"})
+        since = (now() - timedelta(days=7)).isoformat()
+        alerts_7d = await db.notifications.count_documents({"user_id": user["id"], "kind": "SOCIAL_NEARBY_FREE", "created_at": {"$gte": since}})
+        return {
+            "categories": [{**c, "following": c["key"] in following, "nearby_free": counts.get(c["key"], 0)} for c in CATEGORIES],
+            "following": [c["key"] for c in CATEGORIES if c["key"] in following],
+            "prefs": {"enabled": bool(cat.get("enabled", True)), "frequency": cat.get("frequency", "immediate"), "push_enabled": bool(prefs.get("push_enabled")), "push_status": (prefs.get("push_prompt") or {}).get("status", "undetermined")},
+            # Alerts cover everything the user can see on Social (their estate → area → city), so the label is the city.
+            "scope_label": ctx["city"],
+            "home_label": (ctx["estates"][0]["name"] if ctx["estates"] else (ctx["areas"][0] if ctx["areas"] else ctx["city"])),
+            "scopes": {"estates": ctx["estates"], "areas": ctx["areas"], "city": ctx["city"]},
+            "alerts_7d": alerts_7d,
+        }
+
+    async def _ensure_nearby_free_on(user_id: str) -> None:
+        """Following a category means the user wants these alerts — switch the category back on if it was off."""
+        await db.notification_prefs.update_one({"user_id": user_id, "categories.nearby_free.enabled": False}, {"$set": {"categories.nearby_free.enabled": True}})
+
+    @router.get("/alerts")
+    async def alerts(user: dict = Depends(get_current_user)):
+        return await _alerts_payload(user, await _ctx(user))
+
+    @router.put("/alerts")
+    async def set_alerts(data: AlertsIn, user: dict = Depends(get_current_user)):
+        keys = []
+        for k in data.categories:
+            ensure(k in CATEGORY_LABEL, 422, f"Unknown category: {k}")
+            if k not in keys:
+                keys.append(k)
+        await db.social_category_follows.delete_many({"user_id": user["id"], "category": {"$nin": keys}})
+        for k in keys:
+            await db.social_category_follows.update_one({"user_id": user["id"], "category": k}, {"$setOnInsert": {"id": new_id(), "user_id": user["id"], "category": k, "created_at": now()}}, upsert=True)
+        if keys:
+            await _ensure_nearby_free_on(user["id"])
+        return await _alerts_payload(user, await _ctx(user))
+
+    @router.post("/alerts/toggle")
+    async def toggle_alert(data: AlertToggleIn, user: dict = Depends(get_current_user)):
+        ensure(data.category in CATEGORY_LABEL, 422, "Unknown category")
+        key = {"user_id": user["id"], "category": data.category}
+        if await db.social_category_follows.find_one(key):
+            await db.social_category_follows.delete_one(key)
+            following = False
+        else:
+            await db.social_category_follows.insert_one({**key, "id": new_id(), "created_at": now()})
+            await _ensure_nearby_free_on(user["id"])
+            following = True
+        out = await _alerts_payload(user, await _ctx(user))
+        return {**out, "toggled": data.category, "now_following": following}
+
     # ─── Create ───
     @router.post("/posts")
     async def create_post(data: PostIn, user: dict = Depends(get_current_user)):
@@ -347,7 +475,15 @@ def register_social_feed_routes(db, get_current_user, require_admin):
         await db.social_posts.insert_one(post)
         post.pop("_id", None)
         await award(db, user["id"], "social_post", 3, {"post_id": post["id"]})
-        return {"ok": True, "post": (await _outs([post], user, ctx))[0]}
+        # Nearby Alerts: free items ping neighbours who follow this category (fan-out happens off the request path).
+        alerted: list[str] = []
+        if post["kind"] == "give":
+            alerted = await _nearby_followers(post, user["id"])
+            if alerted:
+                task = asyncio.create_task(_emit_nearby(post, user, alerted))
+                _bg_tasks.add(task)
+                task.add_done_callback(_bg_tasks.discard)
+        return {"ok": True, "post": (await _outs([post], user, ctx))[0], "alerted": len(alerted)}
 
     # ─── Detail ───
     @router.get("/posts/{post_id}")
@@ -577,4 +713,6 @@ async def ensure_social_feed_indexes(db) -> None:
     await db.social_post_comments.create_index([("post_id", 1), ("created_at", 1)])
     await db.social_post_hidden.create_index([("user_id", 1), ("post_id", 1)], unique=True)
     await db.social_post_reports.create_index([("status", 1), ("created_at", -1)])
+    await db.social_category_follows.create_index([("user_id", 1), ("category", 1)], unique=True)
+    await db.social_category_follows.create_index("category")
     await db.conversations.create_index([("social_post_id", 1), ("kind", 1)])

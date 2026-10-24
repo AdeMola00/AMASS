@@ -49,6 +49,13 @@ export type ThemeColors = {
   infoSoft: string;
   premium: string;
   premiumSoft: string;
+  // Section accents — Market (orange) · Declutter (teal). Map = brand, FIXA/Social = fix.
+  market: string;
+  marketText: string;
+  marketSoft: string;
+  declutter: string;
+  declutterText: string;
+  declutterSoft: string;
   // Lines
   border: string;
   borderStrong: string;
@@ -138,6 +145,13 @@ export const lightTheme: AppTheme = {
     premium: "#4F46E5",
     premiumSoft: "#EEF2FF",
 
+    market: "#F97316",
+    marketText: "#B14A08",
+    marketSoft: "#FFF4E8",
+    declutter: "#14B8A6",
+    declutterText: "#0F766E",
+    declutterSoft: "#E9FAF7",
+
     border: "#E5E3DE",
     borderStrong: "#CCC9C2",
     divider: "#EAE8E3",
@@ -204,6 +218,13 @@ export const darkTheme: AppTheme = {
     infoSoft: "#23224F",
     premium: "#6366F1",
     premiumSoft: "#23224F",
+
+    market: "#FFA033",
+    marketText: "#FFD2A3",
+    marketSoft: "#3D1F08",
+    declutter: "#2DD4BF",
+    declutterText: "#9BEDE2",
+    declutterSoft: "#0B3B36",
 
     border: "#333330",
     borderStrong: "#4D4D47",

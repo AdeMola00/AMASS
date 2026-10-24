@@ -3,6 +3,7 @@ import { StyleSheet, View, ViewStyle, AccessibilityInfo, Pressable } from "react
 import Ionicons from "@react-native-vector-icons/ionicons";
 import Animated, {
   Easing,
+  FadeInDown,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
@@ -15,6 +16,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space, motion, TypeVariant } from "@/src/theme/tokens";
 import { AppText } from "./Text";
 import { Button } from "./Button";
+import { Illustration, type IllustrationName } from "./Illustration";
 
 import type { IconName } from "./icons";
 
@@ -77,12 +79,47 @@ export function SkeletonCard({ imageHeight = 160, style }: { imageHeight?: numbe
   );
 }
 
-/* ─── Empty / Error / Offline states ────────────────────────────────── */
+/* ─── Empty / Error / Offline states — illustrated, 1-line copy ─────── */
+const ICON_TO_ILLUSTRATION: Partial<Record<string, IllustrationName>> = {
+  heart: "empty-saved",
+  "heart-outline": "empty-saved",
+  bookmark: "empty-saved",
+  "bookmark-outline": "empty-saved",
+  chatbubbles: "empty-messages",
+  "chatbubbles-outline": "empty-messages",
+  chatbubble: "empty-messages",
+  "chatbubble-outline": "empty-messages",
+  "chatbubble-ellipses-outline": "empty-messages",
+  "mail-outline": "empty-messages",
+  notifications: "empty-notifications",
+  "notifications-outline": "empty-notifications",
+  "notifications-off-outline": "empty-notifications",
+  wallet: "empty-wallet",
+  "wallet-outline": "empty-wallet",
+  "card-outline": "empty-wallet",
+  "receipt-outline": "empty-wallet",
+  "cash-outline": "empty-wallet",
+  cube: "empty-items",
+  "cube-outline": "empty-items",
+  "pricetag-outline": "empty-items",
+  "pricetags-outline": "empty-items",
+  "storefront-outline": "empty-items",
+  "bag-outline": "empty-items",
+  "cart-outline": "empty-items",
+  "leaf-outline": "empty-items",
+  "gift-outline": "empty-items",
+  "construct-outline": "empty-items",
+  "hammer-outline": "empty-items",
+  "cloud-offline-outline": "offline",
+};
+
 export function EmptyState({
   icon = "search-outline",
+  illustration,
   title,
   body,
   actionLabel,
+  actionIcon,
   onAction,
   secondaryLabel,
   onSecondary,
@@ -92,9 +129,12 @@ export function EmptyState({
   testID,
 }: {
   icon?: IconName;
+  /** Explicit illustration; otherwise picked from `variant` / `icon`. Pass `null` to keep the icon circle. */
+  illustration?: IllustrationName | null;
   title: string;
   body?: string;
   actionLabel?: string;
+  actionIcon?: IconName;
   onAction?: () => void;
   secondaryLabel?: string;
   onSecondary?: () => void;
@@ -112,11 +152,20 @@ export function EmptyState({
         : variant === "success"
           ? { bg: colors.successSoft, fg: colors.success, icon: "checkmark-circle-outline" as IconName }
           : { bg: colors.surfaceAlt, fg: colors.textSecondary, icon };
+  const art: IllustrationName | null =
+    illustration === null ? null : (illustration ?? (variant === "success" ? "success" : variant === "error" || variant === "offline" ? "offline" : (ICON_TO_ILLUSTRATION[icon] ?? "empty-search")));
+  const artSize = compact ? 112 : 168;
   return (
     <View style={[styles.empty, compact && { paddingVertical: space[6] }, style]} testID={testID}>
-      <View style={[styles.emptyIcon, { backgroundColor: tone.bg }, compact && { width: 56, height: 56, borderRadius: 18 }]}>
-        <Ionicons name={variant === "empty" ? icon : tone.icon} size={compact ? 24 : 30} color={tone.fg} />
-      </View>
+      {art ? (
+        <Animated.View entering={FadeInDown.duration(motion.base).springify().damping(18)}>
+          <Illustration name={art} size={artSize} style={{ marginBottom: 2 }} />
+        </Animated.View>
+      ) : (
+        <View style={[styles.emptyIcon, { backgroundColor: tone.bg }, compact && { width: 56, height: 56, borderRadius: 18 }]}>
+          <Ionicons name={variant === "empty" ? icon : tone.icon} size={compact ? 24 : 30} color={tone.fg} />
+        </View>
+      )}
       <AppText variant={compact ? "title" : "h3"} align="center">
         {title}
       </AppText>
@@ -126,9 +175,9 @@ export function EmptyState({
         </AppText>
       ) : null}
       {actionLabel && onAction ? (
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
-          {secondaryLabel && onSecondary ? <Button label={secondaryLabel} variant="secondary" size="sm" onPress={onSecondary} /> : null}
-          <Button label={actionLabel} size="sm" onPress={onAction} variant={variant === "error" ? "primary" : "primary"} />
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+          {secondaryLabel && onSecondary ? <Button label={secondaryLabel} variant="secondary" size="md" onPress={onSecondary} /> : null}
+          <Button label={actionLabel} size="md" iconLeft={actionIcon ?? (variant === "error" || variant === "offline" ? "refresh" : undefined)} onPress={onAction} variant={variant === "success" ? "fix" : "primary"} />
         </View>
       ) : null}
     </View>

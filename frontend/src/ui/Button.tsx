@@ -1,16 +1,17 @@
 import React from "react";
 import { ActivityIndicator, Pressable, PressableProps, StyleSheet, View, ViewStyle } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/theme";
 import { fontFamilies, gradients, motion, radii } from "@/src/theme/tokens";
 import { AppText } from "./Text";
+import { Shimmer } from "./Shimmer";
 
 import type { IconName } from "./icons";
 /** `premium` = blue→violet gradient pill — reserved for paid / premium gates (unlocks, top-ups, subscriptions). */
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "brand" | "mass" | "fix" | "outline" | "inverse" | "premium";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "brand" | "mass" | "fix" | "outline" | "inverse" | "premium" | "market" | "declutter";
 export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 export type ButtonProps = Omit<PressableProps, "style" | "children"> & {
@@ -23,6 +24,8 @@ export type ButtonProps = Omit<PressableProps, "style" | "children"> & {
   iconRight?: IconName;
   fullWidth?: boolean;
   haptic?: boolean;
+  /** Moving sheen — on by default for large filled CTAs, off for quiet buttons. */
+  shimmer?: boolean;
   style?: ViewStyle | ViewStyle[];
 };
 
@@ -30,10 +33,12 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const SIZES: Record<ButtonSize, { h: number; px: number; fs: number; icon: number; gap: number }> = {
   xs: { h: 32, px: 12, fs: 12, icon: 14, gap: 4 },
-  sm: { h: 36, px: 14, fs: 13, icon: 16, gap: 6 },
-  md: { h: 48, px: 20, fs: 15, icon: 18, gap: 8 },
-  lg: { h: 56, px: 24, fs: 16, icon: 20, gap: 10 },
+  sm: { h: 38, px: 14, fs: 13, icon: 16, gap: 6 },
+  md: { h: 50, px: 20, fs: 15, icon: 19, gap: 8 },
+  lg: { h: 58, px: 24, fs: 17, icon: 22, gap: 10 },
 };
+
+const FILLED: ButtonVariant[] = ["primary", "brand", "fix", "premium", "market", "declutter", "mass"];
 
 export function Button({
   label,
@@ -45,6 +50,7 @@ export function Button({
   iconRight,
   fullWidth,
   haptic = true,
+  shimmer,
   style,
   onPress,
   ...rest
@@ -54,6 +60,7 @@ export function Button({
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const s = SIZES[size];
   const isDisabled = disabled || loading;
+  const showShimmer = (shimmer ?? (size === "lg" && FILLED.includes(variant))) && !isDisabled;
 
   const palette: Record<ButtonVariant, { bg: string; fg: string; border?: string; shadow?: object }> = {
     primary: { bg: colors.primary, fg: colors.onPrimary },
@@ -65,12 +72,15 @@ export function Button({
     destructive: { bg: colors.errorSoft, fg: colors.error },
     mass: { bg: colors.mass, fg: "#1A1200" },
     fix: { bg: colors.fix, fg: "#FFFFFF" },
+    market: { bg: colors.market, fg: "#FFFFFF" },
+    declutter: { bg: colors.declutter, fg: "#FFFFFF" },
     /** Translucent white on dark hero surfaces (identical in both themes). */
     inverse: { bg: "rgba(255,255,255,0.14)", fg: "#FFFFFF" },
     /** Gradient is painted by a LinearGradient layer below. */
     premium: { bg: "transparent", fg: "#FFFFFF" },
   };
   const p = palette[variant];
+  const gradient = variant === "brand" ? gradients.brand : variant === "fix" ? gradients.fix : variant === "market" ? gradients.market : variant === "declutter" ? gradients.declutter : variant === "premium" ? gradients.premium : null;
 
   return (
     <AnimatedPressable
@@ -82,10 +92,11 @@ export function Button({
         scale.value = withSpring(motion.pressScale, motion.spring);
       }}
       onPressOut={() => {
-        scale.value = withSpring(1, motion.spring);
+        // squish → bounce back with a tiny overshoot
+        scale.value = withSequence(withSpring(1.03, motion.springBounce), withSpring(1, motion.spring));
       }}
       onPress={(e) => {
-        if (haptic) Haptics.selectionAsync().catch(() => {});
+        if (haptic) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         onPress?.(e);
       }}
       {...rest}
@@ -107,31 +118,23 @@ export function Button({
         style,
       ]}
     >
-      {variant === "premium" ? (
-        <LinearGradient colors={[...gradients.premium]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
-      ) : null}
-      {variant === "brand" && !isDisabled ? (
+      {gradient && (variant === "premium" || !isDisabled) ? (
         <>
-          <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={[...gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <LinearGradient colors={[...gradients.gloss]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "45%" }]} />
         </>
       ) : null}
-      {variant === "fix" && !isDisabled ? (
-        <>
-          <LinearGradient colors={[...gradients.fix]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-          <LinearGradient colors={[...gradients.gloss]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "45%" }]} />
-        </>
-      ) : null}
-      {variant === "primary" && !isDisabled ? (
+      {(variant === "primary" || variant === "mass") && !isDisabled ? (
         <LinearGradient colors={["rgba(255,255,255,0.14)", "rgba(255,255,255,0)"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "50%" }]} />
       ) : null}
+      {showShimmer ? <Shimmer intensity={variant === "mass" ? 0.6 : 0.9} /> : null}
       {loading ? (
         <ActivityIndicator color={p.fg} />
       ) : (
         <View style={[styles.row, { gap: s.gap }]}>
           {iconLeft && <Ionicons name={iconLeft} size={s.icon} color={p.fg} />}
           <AppText
-            style={{ fontSize: s.fs, lineHeight: s.fs + 4, fontFamily: fontFamilies.medium, letterSpacing: -0.1 }}
+            style={{ fontSize: s.fs, lineHeight: s.fs + 4, fontFamily: fontFamilies.bold, letterSpacing: -0.2 }}
             color={p.fg}
             numberOfLines={1}
           >
@@ -161,7 +164,7 @@ export function IconButton({
   onPress?: () => void;
   size?: number;
   iconSize?: number;
-  variant?: "secondary" | "ghost" | "primary" | "brand" | "glass" | "inverse";
+  variant?: "secondary" | "ghost" | "primary" | "brand" | "glass" | "inverse" | "fix" | "market" | "declutter";
   color?: string;
   label: string;
   style?: ViewStyle | ViewStyle[];
@@ -177,22 +180,26 @@ export function IconButton({
       ? colors.primary
       : variant === "brand"
         ? colors.brand
-        : variant === "secondary"
-          ? colors.surfaceAlt
-          : variant === "glass"
-            ? colors.glass
-            : variant === "inverse"
-              ? "rgba(255,255,255,0.14)"
-              : "transparent";
+        : variant === "fix"
+          ? colors.fix
+          : variant === "market"
+            ? colors.market
+            : variant === "declutter"
+              ? colors.declutter
+              : variant === "secondary"
+                ? colors.surfaceAlt
+                : variant === "glass"
+                  ? colors.glass
+                  : variant === "inverse"
+                    ? "rgba(255,255,255,0.14)"
+                    : "transparent";
   const fg =
     color ??
     (variant === "primary"
       ? colors.onPrimary
-      : variant === "brand"
-        ? colors.onBrand
-        : variant === "inverse"
-          ? "#FFFFFF"
-          : colors.text);
+      : variant === "brand" || variant === "fix" || variant === "market" || variant === "declutter" || variant === "inverse"
+        ? "#FFFFFF"
+        : colors.text);
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -204,7 +211,7 @@ export function IconButton({
         scale.value = withSpring(motion.pressScaleSmall, motion.spring);
       }}
       onPressOut={() => {
-        scale.value = withSpring(1, motion.spring);
+        scale.value = withSequence(withSpring(1.06, motion.springBounce), withSpring(1, motion.spring));
       }}
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});

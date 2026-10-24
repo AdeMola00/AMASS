@@ -7,8 +7,8 @@ import { useReducedMotion } from "./Feedback";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/* ─── PressableScale: 0.97 scale press feedback for cards & tiles ──────
-   Keeps the whole surface tappable; use `scaleTo` 0.93 for small icon
+/* ─── PressableScale: squish-and-bounce press feedback for cards & tiles ──
+   Keeps the whole surface tappable; use `scaleTo` 0.9 for small icon
    affordances. Haptic selection tick on press (native only).             */
 export function PressableScale({
   children,
@@ -35,7 +35,7 @@ export function PressableScale({
         rest.onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        scale.value = withSpring(1, motion.spring);
+        scale.value = withSequence(withSpring(1 + (1 - scaleTo) * 0.5, motion.springBounce), withSpring(1, motion.spring));
         rest.onPressOut?.(e);
       }}
       onPress={(e) => {

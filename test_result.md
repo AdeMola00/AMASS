@@ -883,3 +883,29 @@ agent_communication:
       social-compose-pickup; social-compose-crosslist (sell only). On success → router.replace(/social/post/{id}) + toast.
       /social/mine (social-mine-screen; social-mine-back; social-mine-new; social-mine-stats; social-mine-filter-{all|active|
       reserved|gone|paused}; same PostCard + menu). Web: photo upload via file chooser — can be skipped. Demo demo@amass.africa / amass2026.
+  - agent: "main"
+    message: |
+      NEARBY ALERTS (Social) — first test pass. Follow Social categories → notified when a neighbour posts a FREE item (kind=give)
+      that is visible to you (same estate / area / city as the post's visibility). Backend (backend/social_feed.py):
+      GET /api/social/alerts → {categories[{key,label,icon,color,following,nearby_free}], following[], prefs{enabled,frequency,push_enabled,push_status},
+      scope_label, scopes, alerts_7d}; PUT /api/social/alerts {categories:[...]} replaces the set (422 on unknown key);
+      POST /api/social/alerts/toggle {category} → same payload + {toggled, now_following}. Following re-enables the notification
+      category `nearby_free` if it was off. POST /api/social/posts (kind=give) now returns `alerted` = number of nearby followers
+      and fans out SOCIAL_NEARBY_FREE notifications (category nearby_free, action_url /social/post/{id}) in a background task
+      (poll /api/notifications/center?category=nearby_free for ~2s). Author + blocked users never alerted; sell posts never alert;
+      frequency daily/weekly → queued for digest instead of instant. Collection social_category_follows. Pytest:
+      backend/tests/test_social_nearby_alerts.py 11/11 green.
+      Frontend: NEW /social/alerts (social-alerts-screen; social-alerts-back; hero social-alerts-hero; stats social-alerts-stats
+      (only when following>0 or alerts_7d>0); tile grid social-alerts-grid with Tile social-alert-tile-{key} (tap = follow/unfollow,
+      selected = filled, badge = free items available now); frequency social-alerts-frequency with SegmentedControl
+      social-alerts-freq-{immediate|daily|weekly} (saves to /notifications/prefs categories.nearby_free); phone card social-alerts-phone
+      (+ social-alerts-phone-btn: web → info toast; native → contextual push prompt); social-alerts-prefs-link → /notification-preferences;
+      error state social-alerts-error). First-ever follow fires a confetti celebration (celebration-overlay).
+      Social tab (tabs)/social.tsx: strip social-alerts-strip under the chips (no category selected) → /social/alerts; shows
+      "Hear first about free items" (none followed) or "Nearby alerts on · N categories" + followed-category icon dots.
+      When a category chip (social-cat-{key}) is selected the strip is replaced by a bell pill social-alert-toggle ("Alert me" /
+      "Alerts on") that toggles following for that category (toast with "Manage" action). Empty feed with a non-followed category
+      selected: EmptyState primary action = "Alert me when one's posted" (follows), secondary = "Share an item".
+      Compose success toast now says "N neighbours following X got a nudge" when alerted>0.
+      Notification preferences now lists the "Free items nearby" category (prefs-cat-nearby_free, with Instant/Daily/Weekly).
+      Demo demo@amass.africa / amass2026 (member of Lekki Gardens Phase 2; currently follows furniture + kitchen from smoke test).

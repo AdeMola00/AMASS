@@ -10,17 +10,17 @@ import { useFocusEffect, useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, SocialMeta, SocialPost, SocialPostKind, SocialScope } from "@/src/lib/api";
+import { api, SocialAlerts, SocialMeta, SocialPost, SocialPostKind, SocialScope } from "@/src/lib/api";
 import { track } from "@/src/lib/analytics";
 import { useAuth } from "@/src/contexts/auth";
 import { storage } from "@/src/utils/storage";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Avatar, EmptyState, IconButton, PressableScale, Screen, Skeleton, SkeletonCard } from "@/src/ui";
+import { AppText, Avatar, EmptyState, IconButton, PressableScale, Screen, Skeleton, SkeletonCard, useCelebrate, useToast, type IconName } from "@/src/ui";
 import { useUnreadNotifications } from "@/src/hooks/use-unread-notifications";
 import { PostCard } from "@/src/components/social/PostCard";
 import { PostMenuSheet } from "@/src/components/social/PostMenuSheet";
-import { FixaLockup, FixaMark, ScopeSheet, SocialChip } from "@/src/components/social/SocialBits";
+import { ActionPill, FixaLockup, FixaMark, ScopeSheet, SocialChip } from "@/src/components/social/SocialBits";
 import { socialFeedSignal } from "@/src/components/social/socialFeedSignal";
 import { FIXA, socialFont } from "@/src/components/social/socialTheme";
 
@@ -53,6 +53,10 @@ export default function SocialTab() {
   const [menuPost, setMenuPost] = useState<SocialPost | null>(null);
   const [welcomeDismissed, setWelcomeDismissed] = useState(true);
   const [saidHi, setSaidHi] = useState(false);
+  const [alerts, setAlerts] = useState<SocialAlerts | null>(null);
+  const [alertBusy, setAlertBusy] = useState(false);
+  const toast = useToast();
+  const celebrate = useCelebrate();
   const reqId = useRef(0);
 
   // Scope: remembered, defaults to the tightest scope the user has (estate → area → city).
@@ -103,12 +107,38 @@ export default function SocialTab() {
 
   useFocusEffect(
     useCallback(() => {
+      api.socialAlerts().then(setAlerts).catch(() => {});
       if (scopeReady && socialFeedSignal.consume()) {
         load(true);
         api.socialMeta().then(setMeta).catch(() => {});
       }
     }, [scopeReady, load])
   );
+
+  /** Follow / unfollow the currently selected category straight from the feed. */
+  const toggleAlert = async () => {
+    if (!category || alertBusy) return;
+    const wasFollowing = !!alerts?.following.includes(category);
+    const firstEver = !wasFollowing && !(alerts?.following.length ?? 0);
+    const label = meta?.categories.find((c) => c.key === category)?.label ?? "this category";
+    Haptics.impactAsync(wasFollowing ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setAlertBusy(true);
+    try {
+      const r = await api.socialAlertsToggle(category);
+      setAlerts(r);
+      track(r.now_following ? "social_alert_follow" : "social_alert_unfollow", { category, from: "feed" });
+      if (r.now_following) {
+        if (firstEver) celebrate({ title: "You'll hear first 🎁", icon: "gift", tone: "fix" });
+        toast.show({ kind: "success", title: `Alerts on · ${label}`, body: `We'll nudge you when a neighbour gives one away in ${r.scope_label}.`, actionLabel: "Manage", onAction: () => router.push("/social/alerts" as any) });
+      } else {
+        toast.info(`Alerts off · ${label}`);
+      }
+    } catch (e: any) {
+      toast.error("Couldn't update alerts", e?.message ?? "Please try again.");
+    } finally {
+      setAlertBusy(false);
+    }
+  };
 
   const loadMore = async () => {
     if (!cursor || loadingMore) return;
@@ -145,6 +175,9 @@ export default function SocialTab() {
   const removePost = (id: string) => setItems((prev) => (prev ?? []).filter((x) => x.id !== id));
 
   const categoryIcon = useMemo(() => Object.fromEntries((meta?.categories ?? []).map((c) => [c.key, c.icon])), [meta]);
+  const followingCategory = !!(category && alerts?.following.includes(category));
+  const selectedCategoryLabel = meta?.categories.find((c) => c.key === category)?.label ?? "this";
+  const followedLive = useMemo(() => (alerts?.categories ?? []).filter((c) => c.following).reduce((n, c) => n + c.nearby_free, 0), [alerts]);
   const estateJoined = !!meta?.scopes.estates.length;
   const posted = (meta?.counts.mine_active ?? 0) > 0;
   const steps = [estateJoined, posted, saidHi];
@@ -222,6 +255,51 @@ export default function SocialTab() {
           </AppText>
         </View>
       ) : null}
+
+      {/* Nearby alerts — follow the selected category right here, or open the full alert tiles */}
+      {category && alerts ? (
+        <View style={[styles.alertRow, { paddingHorizontal: gutter }]}>
+          <ActionPill
+            icon={followingCategory ? "notifications" : "notifications-outline"}
+            label={followingCategory ? "Alerts on" : "Alert me"}
+            active={followingCategory}
+            onPress={toggleAlert}
+            accessibilityLabel={followingCategory ? `Alerts on for ${selectedCategoryLabel}. Tap to turn off` : `Alert me when free ${selectedCategoryLabel} is posted nearby`}
+            testID="social-alert-toggle"
+          />
+          <AppText variant="micro" tone="tertiary" style={{ flex: 1 }} numberOfLines={2}>
+            {followingCategory ? `We'll nudge you when free ${selectedCategoryLabel.toLowerCase()} is posted in ${alerts.scope_label}.` : `Hear first when a neighbour gives ${selectedCategoryLabel.toLowerCase()} away.`}
+          </AppText>
+        </View>
+      ) : alerts ? (
+        <PressableScale onPress={() => router.push("/social/alerts" as any)} scaleTo={0.97} style={[styles.alertStrip, { marginHorizontal: gutter, backgroundColor: alerts.following.length ? colors.surface : colors.fixSoft, borderColor: alerts.following.length ? colors.border : "transparent" }]} accessibilityRole="button" accessibilityLabel={alerts.following.length ? `Nearby alerts on for ${alerts.following.length} categories. Manage` : "Set up nearby alerts for free items"} testID="social-alerts-strip">
+          {alerts.following.length ? (
+            <View style={{ flexDirection: "row" }}>
+              {alerts.categories
+                .filter((c) => c.following)
+                .slice(0, 4)
+                .map((c, i) => (
+                  <View key={c.key} style={[styles.alertDot, { backgroundColor: c.color, marginLeft: i ? -10 : 0, borderColor: colors.surface }]}>
+                    <Ionicons name={c.icon as IconName} size={14} color="#FFFFFF" />
+                  </View>
+                ))}
+            </View>
+          ) : (
+            <View style={[styles.alertDot, { backgroundColor: colors.fix, borderColor: colors.fixSoft }]}>
+              <Ionicons name="gift" size={15} color="#FFFFFF" />
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <AppText variant="caption" style={{ fontFamily: socialFont.bold }} color={alerts.following.length ? colors.text : colors.fixText} numberOfLines={1}>
+              {alerts.following.length ? `Nearby alerts on · ${alerts.following.length} ${alerts.following.length === 1 ? "category" : "categories"}` : "Hear first about free items"}
+            </AppText>
+            <AppText variant="micro" tone="tertiary" numberOfLines={1}>
+              {alerts.following.length ? (followedLive ? `${followedLive} free now in ${alerts.scope_label}` : `Watching ${alerts.scope_label}`) : "Follow Furniture, Kids, Electronics… and get a nudge"}
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </PressableScale>
+      ) : null}
     </View>
   );
 
@@ -279,11 +357,11 @@ export default function SocialTab() {
               <EmptyState
                 icon="leaf-outline"
                 title={debouncedQ ? "No matches nearby" : scope === "city" ? "Nothing here yet" : `Quiet in ${scopeLabel}`}
-                body={debouncedQ ? "Try a different word, or widen the area." : scope === "city" ? "Be the first to share something — a chair, books, a fridge you no longer need." : "Widen to your area or city, or be the first to post here."}
-                actionLabel="Share an item"
-                onAction={() => router.push("/social/compose" as any)}
-                secondaryLabel={scope !== "city" ? `Show all of ${meta?.scopes.city ?? "the city"}` : undefined}
-                onSecondary={scope !== "city" ? () => changeScope("city") : undefined}
+                body={debouncedQ ? "Try a different word, or widen the area." : category && !followingCategory ? `No free ${selectedCategoryLabel.toLowerCase()} right now — want a nudge when a neighbour posts one?` : scope === "city" ? "Be the first to share something — a chair, books, a fridge you no longer need." : "Widen to your area or city, or be the first to post here."}
+                actionLabel={category && !followingCategory && alerts ? "Alert me when one's posted" : "Share an item"}
+                onAction={category && !followingCategory && alerts ? toggleAlert : () => router.push("/social/compose" as any)}
+                secondaryLabel={category && !followingCategory && alerts ? "Share an item" : scope !== "city" ? `Show all of ${meta?.scopes.city ?? "the city"}` : undefined}
+                onSecondary={category && !followingCategory && alerts ? () => router.push("/social/compose" as any) : scope !== "city" ? () => changeScope("city") : undefined}
                 testID="social-empty"
               />
             )}
@@ -305,22 +383,24 @@ export default function SocialTab() {
         }
       />
 
-      {/* Post FAB */}
-      <PressableScale
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-          router.push("/social/compose" as any);
-        }}
-        style={[styles.fab, { bottom: 64 + Math.max(insets.bottom, 10) + 16, backgroundColor: colors.fix }, shadows.lg]}
-        accessibilityRole="button"
-        accessibilityLabel="Share an item"
-        testID="social-fab"
-      >
-        <Ionicons name="create" size={22} color={FIXA.white} />
-        <AppText variant="caption" color={FIXA.white} style={{ fontFamily: socialFont.bold }}>
-          Post
-        </AppText>
-      </PressableScale>
+      {/* Post FAB — hidden on the empty state, which already offers "Share an item" (avoids overlapping its buttons) */}
+      {items && items.length === 0 && !error ? null : (
+        <PressableScale
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            router.push("/social/compose" as any);
+          }}
+          style={[styles.fab, { bottom: 64 + Math.max(insets.bottom, 10) + 16, backgroundColor: colors.fix }, shadows.lg]}
+          accessibilityRole="button"
+          accessibilityLabel="Share an item"
+          testID="social-fab"
+        >
+          <Ionicons name="create" size={22} color={FIXA.white} />
+          <AppText variant="caption" color={FIXA.white} style={{ fontFamily: socialFont.bold }}>
+            Post
+          </AppText>
+        </PressableScale>
+      )}
 
       {meta ? <ScopeSheet visible={scopeOpen} onClose={() => setScopeOpen(false)} value={scope} onChange={changeScope} scopes={meta.scopes} /> : null}
       <PostMenuSheet post={menuPost} visible={!!menuPost} onClose={() => setMenuPost(null)} onUpdated={(p) => { updatePost(p); if (p.status === "gone" || p.status === "paused") removePost(p.id); }} onRemoved={(id) => removePost(id)} />
@@ -355,6 +435,9 @@ const styles = StyleSheet.create({
   chips: { paddingHorizontal: 16, gap: 8, paddingVertical: 12 },
   feedTitleRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 2 },
   feedTitle: { fontFamily: socialFont.black, fontSize: 20, lineHeight: 24, letterSpacing: -0.5 },
+  alertRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 },
+  alertStrip: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, minHeight: 56, borderRadius: radii.lg, borderWidth: 1, marginTop: 2 },
+  alertDot: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   footer: { alignItems: "center", gap: 6, paddingHorizontal: 40, paddingTop: 24 },
   fab: { position: "absolute", right: 16, height: 56, paddingHorizontal: 18, borderRadius: 28, flexDirection: "row", alignItems: "center", gap: 8 },
 });

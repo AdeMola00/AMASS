@@ -13,7 +13,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Button, Card, Divider, EmptyState, IconButton, Input, ProgressBar, Screen } from "@/src/ui";
 import type { IconName } from "@/src/ui";
-import { useToast } from "@/src/ui";
+import { useCelebrate, useToast } from "@/src/ui";
 
 type Step = 0 | 1 | 2;
 type PaymentMethod = "card" | "transfer" | "wallet" | "escrow" | "bnpl";
@@ -31,6 +31,7 @@ export default function Checkout() {
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const toast = useToast();
+  const celebrate = useCelebrate();
   const { cart, refresh } = useCart();
   const [step, setStep] = useState<Step>(0);
   const [address, setAddress] = useState("");
@@ -52,6 +53,7 @@ export default function Checkout() {
       const res = await api.checkout();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setOrder({ id: res.order_id, eta_days: res.eta_days, total });
+      celebrate({ title: "Order placed!", icon: "bag-check" });
       setStep(2);
       refresh();
     } catch (e: any) {

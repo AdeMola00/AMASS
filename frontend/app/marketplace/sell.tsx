@@ -23,7 +23,7 @@ import * as Location from "expo-location";
 import { api } from "@/src/lib/api";
 import { radius, shadows, spacing, formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
-import { Button, Screen, ScreenHeader, useToast } from "@/src/ui";
+import { Button, Screen, ScreenHeader, useCelebrate, useToast } from "@/src/ui";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 const CATEGORIES = [
@@ -59,6 +59,7 @@ export default function SellListing() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const celebrate = useCelebrate();
   const { colors: tc } = useTheme();
 
   const [images, setImages] = useState<string[]>([]);
@@ -221,7 +222,8 @@ export default function SellListing() {
         seller_whatsapp: phone.trim() || undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      toast.success("Listing published", "Your listing is now live on AMASS Marketplace.");
+      celebrate({ title: "Listed!", icon: "pricetag", tone: "success" });
+      toast.success("Listing published", "Your listing is now live.");
       router.replace(`/marketplace/${res.item.id}` as any);
     } catch (e: any) {
       toast.error("Couldn't publish", e?.message || "Please try again.");

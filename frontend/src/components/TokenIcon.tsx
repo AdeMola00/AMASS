@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useMemo } from "react";
-import { View, Text, StyleSheet, Animated, ViewStyle } from "react-native";
+import { View, Text, StyleSheet, Animated, ViewStyle, Easing } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { fonts, shadows } from "@/src/constants/theme";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { useReducedMotion } from "@/src/ui/Feedback";
 
 /**
  * AMASS Token coin — used as the visual currency indicator throughout the app.
- * Small pulsing animation for balance chips, static for inline usage.
+ * `animated` = a slow coin spin (rotateY) with a pause between spins; static for inline usage.
+ * Respects the OS reduce-motion setting.
  */
 export function TokenIcon({
   size = 22,
@@ -21,19 +23,22 @@ export function TokenIcon({
 }) {
   const colors = useLegacyColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const reduce = useReducedMotion();
 
-  const scale = useRef(new Animated.Value(1)).current;
+  const spin = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (!animated) return;
+    if (!animated || reduce) return;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(scale, { toValue: 1.08, duration: 900, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(spin, { toValue: 1, duration: 1300, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.delay(2200),
+        Animated.timing(spin, { toValue: 0, duration: 0, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [animated, scale]);
+  }, [animated, reduce, spin]);
+  const rotateY = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   const bgColors: Record<string, string> = {
     gold: "#F5B301",
@@ -53,7 +58,7 @@ export function TokenIcon({
           borderRadius: size / 2,
           backgroundColor: bgColors[tone],
           borderColor,
-          transform: [{ scale }],
+          transform: [{ perspective: 400 }, { rotateY }],
         },
         style,
       ]}

@@ -10,7 +10,7 @@ import { api, Currency, WalletTransaction } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { gradients, radii, space } from "@/src/theme/tokens";
-import { AnimatedNumber, AppText, Badge, Button, Card, Chip, EmptyState, Gloss, IconButton, ListRow, PressableScale, RowGroup, Screen, ScreenHeader, Section, Sheet, SheetLink, SkeletonRows, useBounceRefresh, useToast, type IconName } from "@/src/ui";
+import { AnimatedNumber, AppText, Badge, Button, Card, Chip, EmptyState, Gloss, IconButton, ListRow, PressableScale, RowGroup, Screen, ScreenHeader, Section, Sheet, SheetLink, Shimmer, SkeletonRows, useBounceRefresh, useCelebrate, useToast, type IconName } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -60,6 +60,7 @@ export default function WalletScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const toast = useToast();
+  const celebrate = useCelebrate();
   const { mass, fix, refresh, loading, claimDailyLogin } = useWallet();
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [txLoading, setTxLoading] = useState(true);
@@ -126,8 +127,8 @@ export default function WalletScreen() {
     const res = await claimDailyLogin();
     setClaiming(false);
     if (res.credited) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      toast.success(`+${res.credited} MASS claimed`, "Come back tomorrow for your next daily bonus.");
+      celebrate({ title: `+${res.credited} MASS`, icon: "sparkles", tone: "mass" });
+      toast.success(`+${res.credited} MASS claimed`, "See you tomorrow!");
       await Promise.all([loadTx(), loadEarn()]);
     } else if (res.already_claimed) {
       toast.info("Already claimed today", "Your next daily bonus unlocks tomorrow.");
@@ -157,7 +158,6 @@ export default function WalletScreen() {
   }, [transactions]);
 
   const dailyClaimed = earn?.daily ? !earn.daily.claimable && earn.daily.completed : false;
-  const fixRuleSummary = earn?.fixRules?.length ? `${earn.fixRules.map((r) => `+${r.amount} ${r.description.toLowerCase()}`).slice(0, 2).join(" · ")}` : "Complete FIXA jobs and reviews";
 
   return (
     <Screen testID="wallet-screen">
@@ -237,13 +237,13 @@ export default function WalletScreen() {
         </View>
 
         {/* ── Ways to earn ── */}
-        <Section title="Ways to earn" caption="Free tokens for showing up, finishing tasks and bringing friends">
+        <Section title="Ways to earn" caption="Free tokens, every day">
           <RowGroup>
             <ListRow
               icon="calendar"
               iconTone="mass"
               label="Daily bonus"
-              caption={earn?.daily ? `+${earn.daily.tokens} MASS every day${earn.streak > 1 ? ` · ${earn.streak}-day streak` : ""}` : "Claim free MASS once a day just for showing up."}
+              caption={earn?.daily ? `+${earn.daily.tokens} MASS${earn.streak > 1 ? ` · 🔥 ${earn.streak}-day streak` : ""}` : undefined}
               onPress={claiming || dailyClaimed ? undefined : claim}
               testID="wallet-daily-bonus"
               trailing={<Badge label={claiming ? "Claiming…" : dailyClaimed ? "Claimed" : "Claim"} tone={dailyClaimed ? "neutral" : "mass"} icon={dailyClaimed ? "checkmark-circle" : "sparkles"} size="md" />}
@@ -252,7 +252,7 @@ export default function WalletScreen() {
               icon="checkmark-done"
               iconTone="brand"
               label="Complete tasks"
-              caption={earn ? (earn.openTasks > 0 ? `${earn.openTasks} task${earn.openTasks === 1 ? "" : "s"} open · up to ${earn.openTokens} MASS` : "All tasks done — new ones drop regularly") : "Verify your phone, complete your profile, save a home…"}
+              caption={earn && earn.openTasks > 0 ? `${earn.openTasks} open` : undefined}
               onPress={() => router.push("/earn")}
               testID="wallet-earn-tasks"
               trailing={earn && earn.openTasks > 0 ? <Badge label={`+${earn.openTokens}`} tone="mass" size="sm" /> : undefined}
@@ -261,30 +261,30 @@ export default function WalletScreen() {
               icon="people"
               iconTone="info"
               label="Refer a friend"
-              caption={earn?.referralTokens ? `+${earn.referralTokens} MASS for every friend who joins` : "Share your code — you both get MASS when they join."}
               onPress={() => router.push("/earn")}
               testID="wallet-earn-referral"
+              trailing={earn?.referralTokens ? <Badge label={`+${earn.referralTokens}`} tone="mass" size="sm" /> : undefined}
             />
-            <ListRow icon="construct" iconTone="fix" label="Earn FIX" caption={fixRuleSummary} onPress={() => router.push("/earn-fix" as any)} testID="wallet-earn-fix" />
+            <ListRow icon="construct" iconTone="fix" label="Earn FIX" onPress={() => router.push("/earn-fix" as any)} testID="wallet-earn-fix" />
             {subscription && subscription.plan_id ? (
               <ListRow
                 icon="star"
                 iconTone="premium"
-                label={`${subscription.plan_id.toUpperCase()} plan · active`}
-                caption={`Monthly MASS drops · next renewal ${subscription.next_renewal ? new Date(subscription.next_renewal).toLocaleDateString() : "—"}`}
+                label={`${subscription.plan_id.toUpperCase()} plan`}
+                caption={subscription.next_renewal ? `Renews ${new Date(subscription.next_renewal).toLocaleDateString()}` : undefined}
                 onPress={() => router.push("/subscribe")}
                 last
                 testID="wallet-subscription"
                 trailing={<Badge label="Active" tone="premium" icon="checkmark-circle" />}
               />
             ) : (
-              <ListRow icon="star" iconTone="premium" label="Monthly plan" caption="100 – 1,200 MASS every month. Unused MASS rolls over." onPress={() => router.push("/subscribe")} last testID="wallet-upgrade" />
+              <ListRow icon="star" iconTone="premium" label="Monthly plan" caption="MASS every month" onPress={() => router.push("/subscribe")} last testID="wallet-upgrade" />
             )}
           </RowGroup>
         </Section>
 
         {/* ── Receipts ── */}
-        <Section title="Receipts" caption="Every credit and charge · tap a row for the full receipt">
+        <Section title="Receipts" caption="Tap a row for details">
           <View style={styles.filters}>
             {(["all", "MASS", "FIX"] as TxFilter[]).map((f) => (
               <Chip key={f} label={f === "all" ? "All" : f} selected={txFilter === f} onPress={() => setTxFilter(f)} tone={f === "FIX" ? "fix" : f === "MASS" ? "mass" : "default"} testID={`wallet-filter-${f}`} />
@@ -400,6 +400,7 @@ function TokenCard({
   return (
     <LinearGradient colors={gradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, shadows.md]} testID={testID}>
       <Gloss height="52%" opacity={0.9} />
+      <Shimmer intensity={0.45} delay={ccy === "FIX" ? 1600 : 500} />
       {/* soft lower-right glow for depth */}
       <LinearGradient colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.10)"]} start={{ x: 0.2, y: 0.3 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <View style={styles.heroArt} pointerEvents="none">

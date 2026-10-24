@@ -148,9 +148,9 @@ export const fonts = {  serif: Platform.select({
 export const fontFamily = {
   regular: "PlusJakartaSans-400",
   medium: "PlusJakartaSans-500",
-  semibold: "PlusJakartaSans-500",
-  bold: "PlusJakartaSans-500",
-  extrabold: "PlusJakartaSans-500",
+  semibold: "PlusJakartaSans-600",
+  bold: "PlusJakartaSans-700",
+  extrabold: "PlusJakartaSans-800",
 } as const;
 
 // Currency accents — MASS (gold) and FIX (FIXA green) so users can always tell

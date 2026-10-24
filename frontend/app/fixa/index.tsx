@@ -8,7 +8,7 @@ import { api, ApiError, ProviderPreview } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { Appear, AppText, Badge, Chip, EmptyState, Input, PressableScale, Screen, ScreenHeader, SkeletonRows } from "@/src/ui";
+import { Appear, AppText, Badge, EmptyState, Input, PressableScale, Screen, ScreenHeader, SkeletonRows, Tile } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { FixaGate } from "@/src/components/fixa/FixaGate";
 
@@ -17,6 +17,37 @@ const TIER_META: Record<number, { label: string; icon: IconName }> = {
   2: { label: "Skilled trade", icon: "build-outline" },
   3: { label: "Project", icon: "hammer-outline" },
   4: { label: "Professional", icon: "ribbon-outline" },
+};
+
+/** One consistent icon per trade, app-wide. */
+export const TRADE_ICON: Record<string, IconName> = {
+  plumbing: "water",
+  plumber: "water",
+  electrical: "flash",
+  electrician: "flash",
+  carpentry: "hammer",
+  carpenter: "hammer",
+  painting: "color-palette",
+  painter: "color-palette",
+  tiling: "grid",
+  "ac repair": "snow",
+  ac: "snow",
+  solar: "sunny",
+  cctv: "videocam",
+  security: "videocam",
+  cleaning: "sparkles",
+  cleaner: "sparkles",
+  movers: "cube",
+  moving: "cube",
+  interior: "bed",
+  architects: "business",
+  architect: "business",
+  generator: "flash",
+  roofing: "home",
+  gardening: "leaf",
+  pest: "bug",
+  welding: "flame",
+  pool: "water",
 };
 
 export default function FixaBrowse() {
@@ -71,7 +102,7 @@ export default function FixaBrowse() {
     if (fix && allowed === false && (fix.spendable ?? 0) > 0) load();
   }, [fix, allowed, load]);
 
-  const subtitle = useMemo(() => (allowed ? `${items.length} vetted pros · ${balance.toLocaleString()} FIX` : "Verified home-service pros"), [allowed, items.length, balance]);
+  const subtitle = useMemo(() => (allowed ? `${items.length} pros` : "Vetted home pros"), [allowed, items.length]);
 
   return (
     <Screen testID="fixa-screen">
@@ -103,26 +134,34 @@ export default function FixaBrowse() {
           }
           ListHeaderComponent={
             <View style={{ gap: space[3] }}>
-              <Input placeholder="Search a trade, name or area" value={query} onChangeText={setQuery} iconLeft="search" returnKeyType="search" onSubmitEditing={load} testID="fixa-search" />
+              <Input placeholder="Search a trade or name" value={query} onChangeText={setQuery} iconLeft="search" returnKeyType="search" onSubmitEditing={load} testID="fixa-search" />
               <FlatList
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 data={["__verified", ...subs]}
                 keyExtractor={(s) => s}
-                contentContainerStyle={{ gap: 8 }}
+                contentContainerStyle={{ gap: 10, paddingVertical: 2 }}
                 renderItem={({ item: s }) =>
                   s === "__verified" ? (
-                    <Chip label="FIXA verified" icon="shield-checkmark" selected={verifiedOnly} tone="fix" onPress={() => setVerifiedOnly((v) => !v)} testID="fixa-chip-verified" />
+                    <Tile icon="shield-checkmark" label="Verified" color={colors.fix} size="sm" selected={verifiedOnly} onPress={() => setVerifiedOnly((v) => !v)} testID="fixa-chip-verified" />
                   ) : (
-                    <Chip label={s} selected={sub === s} onPress={() => setSub(sub === s ? null : s)} testID={`fixa-sub-${s.toLowerCase().replace(/\s+/g, "-")}`} />
+                    <Tile icon={TRADE_ICON[s.toLowerCase()] ?? "construct"} label={s} color={colors.fix} size="sm" selected={sub === s} onPress={() => setSub(sub === s ? null : s)} testID={`fixa-sub-${s.toLowerCase().replace(/\s+/g, "-")}`} />
                   )
                 }
               />
-              <View style={[styles.note, { backgroundColor: colors.fixSoft }]} accessibilityRole="summary">
-                <Ionicons name="information-circle" size={15} color={colors.fixText} />
-                <AppText variant="caption" color={colors.fixText} style={{ flex: 1 }}>
-                  Browsing is free. Direct contact is unlocked per provider with FIX — one-time, yours forever.
-                </AppText>
+              <View style={styles.noteRow} accessibilityRole="summary" accessibilityLabel="Browsing is free. Unlock a provider's contact once with FIX.">
+                <View style={[styles.note, { backgroundColor: colors.fixSoft }]}>
+                  <Ionicons name="eye" size={15} color={colors.fixText} />
+                  <AppText variant="caption" color={colors.fixText}>
+                    Browse free
+                  </AppText>
+                </View>
+                <View style={[styles.note, { backgroundColor: colors.fixSoft }]}>
+                  <Ionicons name="lock-open" size={15} color={colors.fixText} />
+                  <AppText variant="caption" color={colors.fixText}>
+                    Unlock with FIX
+                  </AppText>
+                </View>
               </View>
             </View>
           }
@@ -135,8 +174,9 @@ export default function FixaBrowse() {
               <EmptyState
                 icon="construct-outline"
                 title="No pros match"
-                body="Try another trade or clear the search."
-                actionLabel="Clear filters"
+                body="Try another trade."
+                actionLabel="Clear"
+                actionIcon="close-circle-outline"
                 onAction={() => {
                   setSub(null);
                   setQuery("");
@@ -244,7 +284,8 @@ export function ProviderRow({ provider: p, onPress }: { provider: ProviderPrevie
 const styles = StyleSheet.create({
   pill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 32, borderRadius: radii.pill },
   pillDot: { width: 8, height: 8, borderRadius: 4 },
-  note: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: radii.md },
+  note: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, height: 34, borderRadius: radii.pill },
+  noteRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   row: { flexDirection: "row", alignItems: "center", gap: 12, padding: space[3], borderRadius: radii.lg },
   avatarWrap: { position: "relative" },
   avatar: { width: 56, height: 56, borderRadius: 28 },
