@@ -137,7 +137,7 @@ function Action({ icon, label, onPress, badge, dot, tone, testID }: { icon: Icon
         <Ionicons name={icon} size={18} color={c} />
         {badge ? (
           <View style={[styles.actionBadge, { backgroundColor: colors.brand, borderColor: colors.surface }]}>
-            <AppText variant="micro" color="#fff" tabular style={{ fontSize: 9, lineHeight: 11 }}>
+            <AppText variant="micro" color="#fff" tabular style={{ fontSize: 11, lineHeight: 14 }}>
               {badge > 9 ? "9+" : badge}
             </AppText>
           </View>

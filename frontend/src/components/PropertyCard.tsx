@@ -64,7 +64,7 @@ export function PropertyCard({
         </View>
         <View style={styles.rowBody}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <PriceText value={property.price} size={20} suffix={priceSuffix} />
+            <PriceText value={property.price} size={24} suffix={priceSuffix} />
           </View>
           <Text numberOfLines={1} style={styles.rowTitle}>
             {property.title}
@@ -241,7 +241,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.pill,
     backgroundColor: colors.statusNew,
   },
-  newText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
+  newText: { color: "#fff", fontSize: 12, fontWeight: "800", letterSpacing: 0.4 },
   bottomBadge: { position: "absolute", bottom: spacing.md, left: spacing.md },
   freeBadge: {
     flexDirection: "row",
@@ -256,8 +256,8 @@ const makeStyles = (colors: LegacyColors) =>
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
-  freeBadgeText: { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.3 },
-  tokenBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  freeBadgeText: { color: "#fff", fontSize: 12, fontWeight: "900", letterSpacing: 0.3 },
+  tokenBadgeText: { color: "#fff", fontSize: 13, fontWeight: "800" },
   soldOverlay: {
     ...StyleSheet.absoluteFill,
     alignItems: "center",
@@ -266,18 +266,18 @@ const makeStyles = (colors: LegacyColors) =>
   },
   soldText: {
     color: "#fff",
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "900",
     letterSpacing: 6,
     transform: [{ rotate: "-8deg" }],
   },
   body: { padding: spacing.lg, gap: 6 },
-  title: { ...typography.body, color: colors.text, fontWeight: "600" },
+  title: { ...typography.body, fontSize: 18, lineHeight: 24, color: colors.text, fontWeight: "700" },
   locRow: { flexDirection: "row", alignItems: "center", gap: 3 },
   location: { ...typography.caption, color: colors.textSecondary, flex: 1 },
   specs: { flexDirection: "row", gap: spacing.md, marginTop: 4 },
   spec: { flexDirection: "row", alignItems: "center", gap: 4 },
-  specText: { fontSize: 12, color: colors.textSecondary, fontWeight: "600" },
+  specText: { fontSize: 15, color: colors.textSecondary, fontWeight: "600" },
 
   // Row variant (list view)
   rowCard: {
@@ -303,5 +303,5 @@ const makeStyles = (colors: LegacyColors) =>
   rowImage: { width: "100%", height: "100%" },
   rowHot: { position: "absolute", top: 6, left: 6 },
   rowBody: { flex: 1, gap: 4, justifyContent: "center" },
-  rowTitle: { fontSize: 13, fontWeight: "600", color: colors.text },
+  rowTitle: { fontSize: 17, fontWeight: "700", color: colors.text },
 });

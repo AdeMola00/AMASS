@@ -31,11 +31,12 @@ export type ButtonProps = Omit<PressableProps, "style" | "children"> & {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+/** Buttons read at a glance: 15–18 pt bold labels, 42–60 pt tall (spec: buttons 16–18 / 600–700). */
 const SIZES: Record<ButtonSize, { h: number; px: number; fs: number; icon: number; gap: number }> = {
-  xs: { h: 32, px: 12, fs: 12, icon: 14, gap: 4 },
-  sm: { h: 38, px: 14, fs: 13, icon: 16, gap: 6 },
-  md: { h: 50, px: 20, fs: 15, icon: 19, gap: 8 },
-  lg: { h: 58, px: 24, fs: 17, icon: 22, gap: 10 },
+  xs: { h: 34, px: 12, fs: 13, icon: 15, gap: 4 },
+  sm: { h: 42, px: 16, fs: 15, icon: 17, gap: 6 },
+  md: { h: 54, px: 22, fs: 17, icon: 20, gap: 8 },
+  lg: { h: 60, px: 26, fs: 18, icon: 22, gap: 10 },
 };
 
 const FILLED: ButtonVariant[] = ["primary", "brand", "fix", "premium", "market", "declutter", "mass"];
@@ -134,7 +135,7 @@ export function Button({
         <View style={[styles.row, { gap: s.gap }]}>
           {iconLeft && <Ionicons name={iconLeft} size={s.icon} color={p.fg} />}
           <AppText
-            style={{ fontSize: s.fs, lineHeight: s.fs + 4, fontFamily: fontFamilies.bold, letterSpacing: -0.2 }}
+            style={{ fontSize: s.fs, lineHeight: s.fs + 4, fontFamily: fontFamilies.bold, letterSpacing: -0.2, flexShrink: 1 }}
             color={p.fg}
             numberOfLines={1}
           >
@@ -257,7 +258,7 @@ export function useFadePress() {
 const styles = StyleSheet.create({
   base: { alignItems: "center", justifyContent: "center", alignSelf: "flex-start", minWidth: 44 },
   full: { alignSelf: "stretch", width: "100%" },
-  row: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "center", flexShrink: 1, maxWidth: "100%" },
   iconBtn: { alignItems: "center", justifyContent: "center" },
   badge: {
     position: "absolute",

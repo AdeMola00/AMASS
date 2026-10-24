@@ -265,14 +265,14 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
         <View style={[styles.coverTop, { padding: 18 * s }]}>
           <View style={[styles.brandPill, { paddingHorizontal: 10 * s, height: 30 * s, borderRadius: 15 * s }]}>
             <AmassLogo size={18 * s} showWordmark={false} />
-            <AppText style={{ fontSize: 12 * s, lineHeight: 14 * s, letterSpacing: 2, fontFamily: fontFamilies.extrabold }} color={INK}>
+            <AppText style={{ fontSize: 14 * s, lineHeight: 17 * s, letterSpacing: 2, fontFamily: fontFamilies.extrabold }} color={INK}>
               AMASS
             </AppText>
           </View>
           {p.verified ? (
             <View style={[styles.verifiedPill, { height: 28 * s, paddingHorizontal: 10 * s, borderRadius: 14 * s }]}>
               <Ionicons name="shield-checkmark" size={12 * s} color={PAPER} />
-              <AppText style={{ fontSize: 10 * s, lineHeight: 12 * s, letterSpacing: 1, fontFamily: fontFamilies.bold }} color={PAPER}>
+              <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, letterSpacing: 1, fontFamily: fontFamilies.bold }} color={PAPER}>
                 VERIFIED
               </AppText>
             </View>
@@ -280,22 +280,22 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
         </View>
         <View style={[styles.coverBottom, { padding: 20 * s, gap: 10 * s }]}>
           <View style={[styles.kicker, { backgroundColor: RED, paddingHorizontal: 8 * s, height: 22 * s, borderRadius: 6 * s }]}>
-            <AppText style={{ fontSize: 10 * s, lineHeight: 12 * s, letterSpacing: 1.2, fontFamily: fontFamilies.bold }} color={PAPER}>
+            <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, letterSpacing: 1.2, fontFamily: fontFamilies.bold }} color={PAPER}>
               {kicker}
             </AppText>
           </View>
-          <AppText style={{ fontSize: 30 * s, lineHeight: 34 * s, fontFamily: fontFamilies.extrabold }} color={PAPER} numberOfLines={3}>
+          <AppText style={{ fontSize: 32 * s, lineHeight: 36 * s, fontFamily: fontFamilies.extrabold }} color={PAPER} numberOfLines={3}>
             {p.title}
           </AppText>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 * s }}>
             <Ionicons name="location" size={14 * s} color="rgba(255,255,255,0.8)" />
-            <AppText style={{ fontSize: 13 * s, lineHeight: 16 * s, fontFamily: fontFamilies.medium }} color="rgba(255,255,255,0.85)" numberOfLines={1}>
+            <AppText style={{ fontSize: 15 * s, lineHeight: 19 * s, fontFamily: fontFamilies.medium }} color="rgba(255,255,255,0.85)" numberOfLines={1}>
               {p.location && p.city && !p.location.includes(p.city) ? `${p.location}, ${p.city}` : p.location || where}
             </AppText>
           </View>
           <View style={[styles.pricePlate, { paddingHorizontal: 14 * s, paddingVertical: 8 * s, borderRadius: 14 * s }]}>
             <GlassFill tone="dark" radius={14 * s} />
-            <AppText style={{ fontSize: 26 * s, lineHeight: 30 * s, fontFamily: fontFamilies.extrabold, fontVariant: ["tabular-nums"] }} color={PAPER}>
+            <AppText style={{ fontSize: 28 * s, lineHeight: 33 * s, fontFamily: fontFamilies.extrabold, fontVariant: ["tabular-nums"] }} color={PAPER}>
               {price}
             </AppText>
           </View>
@@ -304,7 +304,7 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
               {specs.map((x) => (
                 <View key={x.v} style={{ flexDirection: "row", alignItems: "center", gap: 4 * s }}>
                   <Ionicons name={x.icon} size={12 * s} color="rgba(255,255,255,0.85)" />
-                  <AppText style={{ fontSize: 12 * s, lineHeight: 14 * s, fontFamily: fontFamilies.semibold }} color="rgba(255,255,255,0.9)">
+                  <AppText style={{ fontSize: 14 * s, lineHeight: 17 * s, fontFamily: fontFamilies.semibold }} color="rgba(255,255,255,0.9)">
                     {x.v}
                   </AppText>
                 </View>
@@ -312,7 +312,7 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
             </View>
           ) : null}
           <View style={[styles.hairline, { marginTop: 4 * s }]} />
-          <AppText style={{ fontSize: 11 * s, lineHeight: 13 * s, fontFamily: fontFamilies.medium, letterSpacing: 0.6 }} color="rgba(255,255,255,0.7)">
+          <AppText style={{ fontSize: 13 * s, lineHeight: 16 * s, fontFamily: fontFamilies.medium, letterSpacing: 0.6 }} color="rgba(255,255,255,0.7)">
             {story.brand.domain} · link in caption
           </AppText>
         </View>
@@ -331,23 +331,23 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
         <View style={{ padding: 20 * s, gap: 6 * s }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 * s }}>
             <AmassLogo size={20 * s} showWordmark={false} />
-            <AppText style={{ fontSize: 12 * s, lineHeight: 14 * s, letterSpacing: 2.5, fontFamily: fontFamilies.extrabold }} color={PAPER}>
+            <AppText style={{ fontSize: 14 * s, lineHeight: 17 * s, letterSpacing: 2.5, fontFamily: fontFamilies.extrabold }} color={PAPER}>
               AMASS
             </AppText>
             <View style={{ flex: 1 }} />
             {p.verified ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 * s }}>
                 <Ionicons name="shield-checkmark" size={12 * s} color="#7ED958" />
-                <AppText style={{ fontSize: 10 * s, lineHeight: 12 * s, letterSpacing: 1, fontFamily: fontFamilies.bold }} color="#7ED958">
+                <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, letterSpacing: 1, fontFamily: fontFamilies.bold }} color="#7ED958">
                   VERIFIED
                 </AppText>
               </View>
             ) : null}
           </View>
-          <AppText style={{ fontSize: 22 * s, lineHeight: 26 * s, fontFamily: fontFamilies.extrabold, marginTop: 10 * s }} color={PAPER} numberOfLines={2}>
+          <AppText style={{ fontSize: 24 * s, lineHeight: 29 * s, fontFamily: fontFamilies.extrabold, marginTop: 10 * s }} color={PAPER} numberOfLines={2}>
             {p.title}
           </AppText>
-          <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, fontFamily: fontFamilies.medium }} color="rgba(255,255,255,0.7)" numberOfLines={1}>
+          <AppText style={{ fontSize: 14 * s, lineHeight: 18 * s, fontFamily: fontFamilies.medium }} color="rgba(255,255,255,0.7)" numberOfLines={1}>
             {where}
           </AppText>
         </View>
@@ -363,17 +363,17 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
         <View style={{ padding: 20 * s, gap: 10 * s }}>
           <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
             <View>
-              <AppText style={{ fontSize: 10 * s, lineHeight: 12 * s, letterSpacing: 1.2, fontFamily: fontFamilies.bold }} color={RED}>
+              <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, letterSpacing: 1.2, fontFamily: fontFamilies.bold }} color={RED}>
                 {kicker}
               </AppText>
-              <AppText style={{ fontSize: 28 * s, lineHeight: 32 * s, fontFamily: fontFamilies.extrabold, fontVariant: ["tabular-nums"] }} color={PAPER}>
+              <AppText style={{ fontSize: 30 * s, lineHeight: 34 * s, fontFamily: fontFamilies.extrabold, fontVariant: ["tabular-nums"] }} color={PAPER}>
                 {price}
               </AppText>
             </View>
             {specs.length ? (
               <View style={{ alignItems: "flex-end", gap: 2 * s }}>
                 {specs.map((x) => (
-                  <AppText key={x.v} style={{ fontSize: 11 * s, lineHeight: 13 * s, fontFamily: fontFamilies.semibold }} color="rgba(255,255,255,0.85)">
+                  <AppText key={x.v} style={{ fontSize: 13 * s, lineHeight: 16 * s, fontFamily: fontFamilies.semibold }} color="rgba(255,255,255,0.85)">
                     {x.v}
                   </AppText>
                 ))}
@@ -381,7 +381,7 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
             ) : null}
           </View>
           <View style={styles.hairline} />
-          <AppText style={{ fontSize: 11 * s, lineHeight: 13 * s, fontFamily: fontFamilies.medium, letterSpacing: 0.6 }} color="rgba(255,255,255,0.65)">
+          <AppText style={{ fontSize: 13 * s, lineHeight: 16 * s, fontFamily: fontFamilies.medium, letterSpacing: 0.6 }} color="rgba(255,255,255,0.65)">
             {story.brand.domain} · link in caption
           </AppText>
         </View>
@@ -399,14 +399,14 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
         <View style={[styles.coverTop, { padding: 16 * s }]}>
           <View style={[styles.brandPill, { paddingHorizontal: 10 * s, height: 30 * s, borderRadius: 15 * s }]}>
             <AmassLogo size={18 * s} showWordmark={false} />
-            <AppText style={{ fontSize: 12 * s, lineHeight: 14 * s, letterSpacing: 2, fontFamily: fontFamilies.extrabold }} color={INK}>
+            <AppText style={{ fontSize: 14 * s, lineHeight: 17 * s, letterSpacing: 2, fontFamily: fontFamilies.extrabold }} color={INK}>
               AMASS
             </AppText>
           </View>
           {p.verified ? (
             <View style={[styles.verifiedPill, { height: 28 * s, paddingHorizontal: 10 * s, borderRadius: 14 * s }]}>
               <Ionicons name="shield-checkmark" size={12 * s} color={PAPER} />
-              <AppText style={{ fontSize: 10 * s, lineHeight: 12 * s, letterSpacing: 1, fontFamily: fontFamilies.bold }} color={PAPER}>
+              <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, letterSpacing: 1, fontFamily: fontFamilies.bold }} color={PAPER}>
                 VERIFIED
               </AppText>
             </View>
@@ -414,16 +414,16 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
         </View>
       </View>
       <View style={{ flex: 1, padding: 18 * s, gap: 8 * s }}>
-        <AppText style={{ fontSize: 10 * s, lineHeight: 12 * s, letterSpacing: 1.2, fontFamily: fontFamilies.bold }} color={RED}>
+        <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, letterSpacing: 1.2, fontFamily: fontFamilies.bold }} color={RED}>
           {kicker}
         </AppText>
-        <AppText style={{ fontSize: 20 * s, lineHeight: 24 * s, fontFamily: fontFamilies.extrabold }} color={INK} numberOfLines={2}>
+        <AppText style={{ fontSize: 22 * s, lineHeight: 27 * s, fontFamily: fontFamilies.extrabold }} color={INK} numberOfLines={2}>
           {p.title}
         </AppText>
-        <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, fontFamily: fontFamilies.medium }} color={SECOND} numberOfLines={1}>
+        <AppText style={{ fontSize: 14 * s, lineHeight: 18 * s, fontFamily: fontFamilies.medium }} color={SECOND} numberOfLines={1}>
           {p.location && p.city && !p.location.includes(p.city) ? `${p.location}, ${p.city}` : p.location || where}
         </AppText>
-        <AppText style={{ fontSize: 26 * s, lineHeight: 30 * s, fontFamily: fontFamilies.extrabold, fontVariant: ["tabular-nums"], marginTop: 2 * s }} color={INK}>
+        <AppText style={{ fontSize: 28 * s, lineHeight: 33 * s, fontFamily: fontFamilies.extrabold, fontVariant: ["tabular-nums"], marginTop: 2 * s }} color={INK}>
           {price}
         </AppText>
         {specs.length ? (
@@ -431,7 +431,7 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
             {specs.map((x) => (
               <View key={x.v} style={[styles.specChip, { backgroundColor: SOFT, paddingHorizontal: 9 * s, height: 24 * s, borderRadius: 12 * s, gap: 4 * s }]}>
                 <Ionicons name={x.icon} size={11 * s} color={INK} />
-                <AppText style={{ fontSize: 11 * s, lineHeight: 13 * s, fontFamily: fontFamilies.bold }} color={INK}>
+                <AppText style={{ fontSize: 13 * s, lineHeight: 16 * s, fontFamily: fontFamilies.bold }} color={INK}>
                   {x.v}
                 </AppText>
               </View>
@@ -439,7 +439,7 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
           </View>
         ) : null}
         {p.amenities?.length ? (
-          <AppText style={{ fontSize: 11 * s, lineHeight: 15 * s, fontFamily: fontFamilies.medium }} color={SECOND} numberOfLines={2}>
+          <AppText style={{ fontSize: 13 * s, lineHeight: 18 * s, fontFamily: fontFamilies.medium }} color={SECOND} numberOfLines={2}>
             {p.amenities.slice(0, 4).join(" · ")}
           </AppText>
         ) : null}
@@ -450,27 +450,27 @@ function StorySlide({ kind, story, w, h, testID }: { kind: SlideKind; story: Lis
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 * s }}>
                 <Avatar name={agent.full_name} uri={agent.avatar_url ?? undefined} size={30 * s} />
                 <View style={{ flex: 1 }}>
-                  <AppText style={{ fontSize: 9 * s, lineHeight: 11 * s, letterSpacing: 1, fontFamily: fontFamilies.bold }} color={MUTED}>
+                  <AppText style={{ fontSize: 11 * s, lineHeight: 14 * s, letterSpacing: 1, fontFamily: fontFamilies.bold }} color={MUTED}>
                     LISTED BY
                   </AppText>
-                  <AppText style={{ fontSize: 12 * s, lineHeight: 14 * s, fontFamily: fontFamilies.bold }} color={INK} numberOfLines={1}>
+                  <AppText style={{ fontSize: 14 * s, lineHeight: 17 * s, fontFamily: fontFamilies.bold }} color={INK} numberOfLines={1}>
                     {agent.full_name}
                   </AppText>
                   {agent.badge?.label ? (
-                    <AppText style={{ fontSize: 10 * s, lineHeight: 12 * s, fontFamily: fontFamilies.semibold }} color={RED} numberOfLines={1}>
+                    <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, fontFamily: fontFamilies.semibold }} color={RED} numberOfLines={1}>
                       {agent.badge.label}
                     </AppText>
                   ) : null}
                 </View>
               </View>
             ) : null}
-            <AppText style={{ fontSize: 10 * s, lineHeight: 12 * s, fontFamily: fontFamilies.medium }} color={SECOND}>
+            <AppText style={{ fontSize: 12 * s, lineHeight: 15 * s, fontFamily: fontFamilies.medium }} color={SECOND}>
               {story.brand.domain}/property/{p.id.slice(0, 8)}…
             </AppText>
           </View>
           <View style={[styles.qr, { borderColor: LINE, padding: 5 * s, borderRadius: 10 * s }]}>
             <QRCode value={story.share_url} size={56 * s} color={INK} backgroundColor={PAPER} />
-            <AppText style={{ fontSize: 8 * s, lineHeight: 10 * s, letterSpacing: 1, fontFamily: fontFamilies.bold, marginTop: 3 * s }} color={MUTED}>
+            <AppText style={{ fontSize: 8 * s, lineHeight: 13 * s, letterSpacing: 1, fontFamily: fontFamilies.bold, marginTop: 3 * s }} color={MUTED}>
               SCAN
             </AppText>
           </View>

@@ -131,6 +131,6 @@ const styles = StyleSheet.create({
   chips: { paddingHorizontal: 16, gap: 8, paddingVertical: 10 },
   row: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radii.lg, marginTop: 12, borderWidth: 1 },
   rowIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  rowText: { fontFamily: shopFont.bold, fontSize: 15, lineHeight: 20 },
+  rowText: { fontFamily: shopFont.bold, fontSize: 17, lineHeight: 23 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 12 },
 });

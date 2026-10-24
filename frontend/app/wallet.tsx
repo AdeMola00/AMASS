@@ -418,7 +418,7 @@ function TokenCard({
         </AppText>
       </View>
       <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
-        <AnimatedNumber value={balance} variant="heroLg" color={ink} style={{ fontSize: 52, lineHeight: 58 }} testID={balanceTestID} />
+        <AnimatedNumber value={balance} variant="heroLg" color={ink} style={{ fontSize: 54, lineHeight: 60 }} testID={balanceTestID} />
         <AppText variant="title" color={ink} style={{ opacity: 0.8 }}>
           {ccy}
         </AppText>

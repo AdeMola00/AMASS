@@ -5,7 +5,7 @@
  * Never shows an unverified claim.
  */
 import React from "react";
-import { Pressable, StyleSheet, View, ViewStyle } from "react-native";
+import { Pressable, StyleSheet, View, ViewStyle, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -22,12 +22,19 @@ import { SHOP, shopFont } from "./shopTheme";
 export function ShopProductCard({ p, width, variant = "grid", showRetailer = true, style, testID }: { p: ShopProduct; width?: number; variant?: "grid" | "rail"; showRetailer?: boolean; style?: ViewStyle; testID?: string }) {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { width: winW } = useWindowDimensions();
   const price = priceLabel(p.price);
   const pct = discountPct(p);
   const stock = stockLabel(p.stock);
   const img = p.images[0];
   const w = width ?? (variant === "rail" ? 168 : undefined);
   const onRequest = p.price.kind === "on_request";
+  // Prices must never truncate: pick the biggest bold size that fits the card, and only keep the
+  // "From" prefix inline when there is room for it (otherwise it sits on its own line above).
+  const cardW = w ?? Math.floor((winW - 44) / 2);
+  const est = (s: string, fs: number) => s.length * fs * 0.6;
+  const priceFs = onRequest ? 16 : est(price.main, 23) <= cardW - 8 ? 23 : est(price.main, 19) <= cardW - 8 ? 19 : 17;
+  const prefixInline = !!price.prefix && est(price.main, priceFs) + 44 <= cardW - 8;
   return (
     <View style={[styles.card, w ? { width: w } : { flex: 1 }, style]} testID={testID ?? `shop-product-${p.id}`}>
       <PressableScale
@@ -50,32 +57,41 @@ export function ShopProductCard({ p, width, variant = "grid", showRetailer = tru
           </View>
         </View>
         <View style={{ gap: 3, paddingTop: 10 }}>
-          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-            {price.prefix ? (
+          {price.prefix && !prefixInline ? (
+            <AppText variant="caption" tone="secondary" style={{ fontFamily: shopFont.semibold }}>
+              {price.prefix}
+            </AppText>
+          ) : null}
+          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+            {price.prefix && prefixInline ? (
               <AppText variant="caption" tone="secondary" style={{ fontFamily: shopFont.semibold }}>
                 {price.prefix}
               </AppText>
             ) : null}
-            <AppText style={onRequest ? styles.priceRequest : styles.price} tabular tone={onRequest ? "secondary" : "primary"} numberOfLines={1}>
+            <AppText style={[onRequest ? styles.priceRequest : styles.price, { fontSize: priceFs, lineHeight: priceFs + 5, flexShrink: 1 }]} tabular tone={onRequest ? "secondary" : "primary"} numberOfLines={1} testID={`shop-product-price-${p.id}`}>
               {price.main}
             </AppText>
-            {p.promo?.previous_price && pct ? (
-              <AppText variant="bodySm" tone="tertiary" tabular style={{ textDecorationLine: "line-through" }}>
-                {naira(p.promo.previous_price)}
-              </AppText>
-            ) : null}
           </View>
-          {p.promo && pct ? <SolidTag label={p.promo.label} color={colors.brand} /> : null}
+          {(p.promo?.previous_price && pct) || (p.promo && pct) ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              {p.promo?.previous_price && pct ? (
+                <AppText variant="bodySm" tone="tertiary" tabular numberOfLines={1} style={{ textDecorationLine: "line-through", flexShrink: 1 }}>
+                  {naira(p.promo.previous_price)}
+                </AppText>
+              ) : null}
+              {p.promo && pct ? <SolidTag label={p.promo.label} color={colors.brand} /> : null}
+            </View>
+          ) : null}
           <AppText variant="bodySm" numberOfLines={2} style={[{ minHeight: 36 }, styles.name]}>
             {p.name}
           </AppText>
           <AppText variant="caption" tone="tertiary" numberOfLines={1}>
             {[p.brand, p.spec].filter(Boolean).join(" · ") || p.subcategory}
           </AppText>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 1, minWidth: 0 }}>
               {stock.tone !== "neutral" ? <Ionicons name={stock.tone === "success" ? "checkmark-circle" : "close-circle"} size={12} color={stock.tone === "success" ? colors.success : colors.error} /> : null}
-              <AppText variant="micro" tone={stock.tone === "neutral" ? "tertiary" : stock.tone} style={{ fontFamily: shopFont.bold }}>
+              <AppText variant="micro" tone={stock.tone === "neutral" ? "tertiary" : stock.tone} numberOfLines={1} style={{ fontFamily: shopFont.bold, flexShrink: 1 }}>
                 {stock.label}
               </AppText>
             </View>
@@ -164,13 +180,13 @@ export function AddControl({ p, size = 38, inline }: { p: ShopProduct; size?: nu
 }
 
 const styles = StyleSheet.create({
-  card: { minWidth: 140 },
+  card: { minWidth: 120 },
   imageWrap: { aspectRatio: 1, borderRadius: radii.md, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1 },
   image: { width: "88%", height: "88%" },
   imageFallback: { alignItems: "center", justifyContent: "center", flex: 1 },
   tagSlot: { position: "absolute", left: 8, top: 8 },
-  price: { fontFamily: shopFont.black, fontSize: 18, lineHeight: 22, letterSpacing: -0.4 },
-  priceRequest: { fontFamily: shopFont.semibold, fontSize: 14, lineHeight: 18 },
+  price: { fontFamily: shopFont.black, letterSpacing: -0.5 },
+  priceRequest: { fontFamily: shopFont.semibold },
   name: { fontFamily: "PlusJakartaSans-500" },
   addBtn: { alignItems: "center", justifyContent: "center" },
   stepper: { flexDirection: "row", alignItems: "center", paddingHorizontal: 2, gap: 2 },

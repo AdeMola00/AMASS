@@ -1304,23 +1304,23 @@ const makeStyles = (colors: LegacyColors) =>
   },
   sheetIcon: { width: 64, height: 64, borderRadius: 22, alignItems: "center", justifyContent: "center", marginBottom: 4 },
 
-  h1: { ...typography.display, fontSize: 24 },
-  sub: { ...typography.body, color: colors.textTertiary, lineHeight: 20 },
+  h1: { ...typography.display, fontSize: 26 },
+  sub: { ...typography.body, color: colors.textTertiary, lineHeight: 23 },
   subheader: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "800",
     color: colors.textSecondary,
     letterSpacing: 0.5,
     textTransform: "uppercase",
     marginTop: 6,
   },
-  fieldLabel: { fontSize: 12, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.3, marginLeft: 4 },
+  fieldLabel: { fontSize: 14, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.3, marginLeft: 4 },
   input: {
     minHeight: 52,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceSecondary,
     paddingHorizontal: spacing.lg,
-    fontSize: 15,
+    fontSize: 17,
     color: colors.text,
     fontWeight: "500",
   },
@@ -1330,13 +1330,13 @@ const makeStyles = (colors: LegacyColors) =>
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    height: 38,
-    paddingHorizontal: 14,
+    minHeight: 44,
+    paddingHorizontal: 16,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceSecondary,
   },
   chipOn: { backgroundColor: colors.ink },
-  chipText: { fontSize: 12, fontWeight: "600", color: colors.textSecondary },
+  chipText: { fontSize: 15, fontWeight: "700", color: colors.textSecondary },
 
   grid2: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   gridCard: {
@@ -1349,8 +1349,8 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "flex-end",
   },
   gridCardActive: { backgroundColor: colors.ink },
-  gridLabel: { fontSize: 15, fontWeight: "800", color: colors.text },
-  gridCaption: { fontSize: 11, color: colors.textTertiary, fontWeight: "500" },
+  gridLabel: { fontSize: 17, fontWeight: "800", color: colors.text },
+  gridCaption: { fontSize: 13, color: colors.textTertiary, fontWeight: "500" },
 
   gpsBtn: {
     flexDirection: "row",
@@ -1361,7 +1361,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.pill,
     backgroundColor: colors.ink,
   },
-  gpsBtnText: { color: "#fff", fontSize: 14, fontWeight: "500" },
+  gpsBtnText: { color: "#fff", fontSize: 16, fontWeight: "500" },
   mapWrap: {
     height: 220,
     borderRadius: radius.md,
@@ -1388,7 +1388,7 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.surfaceSecondary,
   },
   gpsChipDot: { width: 8, height: 8, borderRadius: 4 },
-  gpsChipText: { flex: 1, fontSize: 12, fontWeight: "700", color: colors.text },
+  gpsChipText: { flex: 1, fontSize: 14, fontWeight: "700", color: colors.text },
 
   dupPreview: {
     padding: 12,
@@ -1402,19 +1402,19 @@ const makeStyles = (colors: LegacyColors) =>
     gap: 8,
   },
   dupPreviewTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     color: colors.text,
   },
   dupPreviewText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 14,
     color: colors.text,
     fontWeight: "600",
-    lineHeight: 17,
+    lineHeight: 20,
   },
   dupPreviewNearest: {
-    fontSize: 11,
+    fontSize: 13,
     color: colors.textTertiary,
     fontWeight: "600",
     marginLeft: 24,
@@ -1431,7 +1431,7 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
     gap: 8,
   },
-  pickerBtnText: { fontSize: 14, fontWeight: "700", color: colors.text },
+  pickerBtnText: { fontSize: 16, fontWeight: "700", color: colors.text },
   emptyPhotos: {
     padding: 24,
     borderRadius: radius.md,
@@ -1442,7 +1442,7 @@ const makeStyles = (colors: LegacyColors) =>
     gap: 8,
     backgroundColor: colors.surfaceSecondary,
   },
-  emptyPhotosText: { fontSize: 13, color: colors.textTertiary, textAlign: "center", fontWeight: "500" },
+  emptyPhotosText: { fontSize: 15, color: colors.textTertiary, textAlign: "center", fontWeight: "500" },
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   photoWrap: {
     width: "48%",
@@ -1462,7 +1462,7 @@ const makeStyles = (colors: LegacyColors) =>
     paddingVertical: 3,
     borderRadius: radius.pill,
   },
-  coverBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800", letterSpacing: 0.6 },
+  coverBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.6 },
   removeBtn: {
     position: "absolute",
     top: 8,
@@ -1491,7 +1491,7 @@ const makeStyles = (colors: LegacyColors) =>
     paddingVertical: 6,
     borderRadius: radius.pill,
   },
-  previewPriceText: { fontSize: 15, fontWeight: "800", color: colors.text },
+  previewPriceText: { fontSize: 17, fontWeight: "800", color: colors.text },
   reviewRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1500,8 +1500,8 @@ const makeStyles = (colors: LegacyColors) =>
     borderBottomColor: colors.divider,
     gap: 12,
   },
-  reviewLabel: { fontSize: 12, color: colors.textTertiary, fontWeight: "600" },
-  reviewValue: { fontSize: 13, color: colors.text, fontWeight: "700", flex: 1, textAlign: "right" },
+  reviewLabel: { fontSize: 14, color: colors.textTertiary, fontWeight: "600" },
+  reviewValue: { fontSize: 15, color: colors.text, fontWeight: "700", flex: 1, textAlign: "right" },
   notice: {
     flexDirection: "row",
     gap: 10,
@@ -1510,7 +1510,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.md,
     marginTop: spacing.md,
   },
-  noticeText: { flex: 1, fontSize: 12, color: colors.text, lineHeight: 18 },
+  noticeText: { flex: 1, fontSize: 14, color: colors.text, lineHeight: 21 },
 
   stickyBar: {
     position: "absolute",

@@ -123,7 +123,7 @@ export default function InboxScreen() {
           containerStyle={{ flex: 1 }}
           value={q}
           onChangeText={setQ}
-          placeholder="Search messages, agents…"
+          placeholder="Search messages…"
           iconLeft="search"
           iconRight={q.length > 0 ? "close-circle" : undefined}
           onPressIconRight={() => setQ("")}

@@ -151,23 +151,30 @@ export const boldFont = {
   black: "PlusJakartaSans-800",
 } as const;
 
-/** Type scale — chunky headings, comfortable body (1.1 display → 1.5 body) */
+/**
+ * Type scale — big, bold, glanceable (Zillow-grade hierarchy). Sizes sit at the top of the
+ * accessible ranges: page headings 32, section headings 22–26, titles 19, body 17, meta 14–15.
+ * Nothing essential is lighter than 500. Prices get their own variants so they always lead.
+ */
 export const typeScale = {
   /** Editorial serif — onboarding hero, sheet headlines, wallet balances. Never for prices in lists. */
-  heroLg: { fontSize: 44, lineHeight: 48, letterSpacing: -0.8, fontFamily: fontFamilies.display },
-  hero: { fontSize: 34, lineHeight: 38, letterSpacing: -0.5, fontFamily: fontFamilies.display },
-  heroSm: { fontSize: 26, lineHeight: 30, letterSpacing: -0.3, fontFamily: fontFamilies.display },
-  display: { fontSize: 36, lineHeight: 40, letterSpacing: -1, fontFamily: fontFamilies.extrabold },
-  h1: { fontSize: 30, lineHeight: 34, letterSpacing: -0.8, fontFamily: fontFamilies.extrabold },
-  h2: { fontSize: 24, lineHeight: 28, letterSpacing: -0.5, fontFamily: fontFamilies.bold },
-  h3: { fontSize: 20, lineHeight: 24, letterSpacing: -0.4, fontFamily: fontFamilies.bold },
-  title: { fontSize: 17, lineHeight: 22, letterSpacing: -0.2, fontFamily: fontFamilies.bold },
-  body: { fontSize: 16, lineHeight: 24, letterSpacing: 0, fontFamily: fontFamilies.regular },
-  bodyMedium: { fontSize: 16, lineHeight: 24, letterSpacing: 0, fontFamily: fontFamilies.semibold },
-  bodySm: { fontSize: 14, lineHeight: 20, letterSpacing: 0, fontFamily: fontFamilies.regular },
-  caption: { fontSize: 13, lineHeight: 17, letterSpacing: 0, fontFamily: fontFamilies.semibold },
-  label: { fontSize: 12, lineHeight: 15, letterSpacing: 0.5, fontFamily: fontFamilies.bold },
-  micro: { fontSize: 11, lineHeight: 13, letterSpacing: 0.3, fontFamily: fontFamilies.bold },
+  heroLg: { fontSize: 48, lineHeight: 56, letterSpacing: -0.8, fontFamily: fontFamilies.display },
+  hero: { fontSize: 38, lineHeight: 44, letterSpacing: -0.5, fontFamily: fontFamilies.display },
+  heroSm: { fontSize: 30, lineHeight: 36, letterSpacing: -0.3, fontFamily: fontFamilies.display },
+  display: { fontSize: 40, lineHeight: 46, letterSpacing: -1, fontFamily: fontFamilies.extrabold },
+  h1: { fontSize: 32, lineHeight: 38, letterSpacing: -0.8, fontFamily: fontFamilies.extrabold },
+  h2: { fontSize: 26, lineHeight: 31, letterSpacing: -0.5, fontFamily: fontFamilies.extrabold },
+  h3: { fontSize: 22, lineHeight: 27, letterSpacing: -0.4, fontFamily: fontFamilies.bold },
+  title: { fontSize: 19, lineHeight: 24, letterSpacing: -0.2, fontFamily: fontFamilies.bold },
+  /** Money — list / card prices (24) and the detail-page price (30). Always pair with `tabular`. */
+  price: { fontSize: 24, lineHeight: 28, letterSpacing: -0.6, fontFamily: fontFamilies.extrabold },
+  priceLg: { fontSize: 30, lineHeight: 34, letterSpacing: -0.8, fontFamily: fontFamilies.extrabold },
+  body: { fontSize: 17, lineHeight: 26, letterSpacing: 0, fontFamily: fontFamilies.medium },
+  bodyMedium: { fontSize: 17, lineHeight: 26, letterSpacing: 0, fontFamily: fontFamilies.semibold },
+  bodySm: { fontSize: 15, lineHeight: 22, letterSpacing: 0, fontFamily: fontFamilies.medium },
+  caption: { fontSize: 14, lineHeight: 19, letterSpacing: 0, fontFamily: fontFamilies.semibold },
+  label: { fontSize: 13, lineHeight: 16, letterSpacing: 0.5, fontFamily: fontFamilies.bold },
+  micro: { fontSize: 12, lineHeight: 15, letterSpacing: 0.3, fontFamily: fontFamilies.bold },
 } as const;
 
 export type TypeVariant = keyof typeof typeScale;

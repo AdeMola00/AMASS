@@ -51,7 +51,7 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
   },
   label: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.textSecondary,
     textAlign: "center",

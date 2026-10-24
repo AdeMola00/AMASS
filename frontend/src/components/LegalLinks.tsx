@@ -47,6 +47,6 @@ export function LegalLinksRow() {
 }
 
 const styles = StyleSheet.create({
-  consent: { marginTop: space[3], paddingHorizontal: space[4], lineHeight: 18 },
+  consent: { marginTop: space[3], paddingHorizontal: space[4], lineHeight: 21 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: space[3] },
 });

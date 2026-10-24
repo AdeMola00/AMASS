@@ -57,7 +57,7 @@ export function PreviewTile({
             </View>
           ) : null}
           <View style={[styles.kind, { backgroundColor: pin.category === "sale" ? colors.brand : colors.info }]}>
-            <AppText variant="micro" color="#fff" style={{ fontSize: 10, lineHeight: 12 }}>
+            <AppText variant="micro" color="#fff" style={{ fontSize: 12, lineHeight: 15 }}>
               {kindLabel(pin).toUpperCase()}
             </AppText>
           </View>
@@ -133,7 +133,7 @@ function Tag({ icon, label, color, soft }: { icon: any; label: string; color: st
   return (
     <View style={[styles.tag, { backgroundColor: soft }]}>
       <Ionicons name={icon} size={11} color={color} />
-      <AppText variant="micro" color={color} numberOfLines={1} style={{ fontSize: 10.5, lineHeight: 13 }}>
+      <AppText variant="micro" color={color} numberOfLines={1} style={{ fontSize: 12.5, lineHeight: 16 }}>
         {label}
       </AppText>
     </View>
@@ -147,9 +147,9 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", justifyContent: "center" },
   lock: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   kind: { position: "absolute", left: 6, bottom: 6, paddingHorizontal: 6, height: 18, borderRadius: 6, alignItems: "center", justifyContent: "center" },
-  price: { fontFamily: "PlusJakartaSans-800", fontSize: 24, lineHeight: 28, letterSpacing: -0.6, flexShrink: 1 },
+  price: { fontFamily: "PlusJakartaSans-800", fontSize: 26, lineHeight: 31, letterSpacing: -0.6, flexShrink: 1 },
   specs: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" },
-  specText: { fontFamily: "PlusJakartaSans-700", fontSize: 14, lineHeight: 18 },
+  specText: { fontFamily: "PlusJakartaSans-700", fontSize: 16, lineHeight: 21 },
   sep: { width: 3, height: 3, borderRadius: 2, marginHorizontal: 3 },
   badges: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 2 },
   tag: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, height: 20, borderRadius: 6 },

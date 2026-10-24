@@ -69,11 +69,13 @@ export default function UpdatesTab() {
   return (
     <Screen edges={[]} testID="updates-screen">
       <View style={[styles.header, { paddingTop: insets.top + 6, alignSelf: "center", width: maxW }]}>
-        <View style={[styles.emblem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <AmassLogo size={26} showWordmark={false} testID="updates-emblem" />
-        </View>
-        <View style={{ flex: 1, gap: 1 }}>
-          <AppText variant="h2" testID="updates-title">
+        {width >= 360 ? (
+          <View style={[styles.emblem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <AmassLogo size={26} showWordmark={false} testID="updates-emblem" />
+          </View>
+        ) : null}
+        <View style={{ flex: 1, gap: 1, minWidth: 0 }}>
+          <AppText variant="h2" numberOfLines={1} testID="updates-title">
             Updates
           </AppText>
           <AppText variant="caption" tone="secondary" numberOfLines={1} testID="updates-subtitle">

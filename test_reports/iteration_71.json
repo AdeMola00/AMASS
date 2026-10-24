@@ -1,0 +1,42 @@
+{
+  "summary": "RETEST #2 of the typography/layout regressions. FRONTEND ONLY: Expo web at 390x844, 375x667, 320x568 and 768x1024, checked with the DOM overflow audit, per-element measurements and screenshots. PASS: (1) Onboarding slide 4. At 375 and 320 the headline, subtitle, bullet row, dots, 'Let's go' and 'Sign in' are all visible above the footer. Slides 1-3 are fine and 390 is fine. (2) Shop prices. On /shop/category/all?deals=1, /shop/category/furniture, /shop/search and the market deal carousel (390 and 320), 0 of more than 150 price texts are truncated or outside the card. 'From' sits above the price; the struck price and 'Reduced price' are on their own line. (3) Owned passport sticky bar: 46px icons with the full 'Manage' label at 320; 54px icons and the lg pill with icon at 390 and 768. (4) Unlock CTA at 320 reads 'Unlock · 1,200 MASS' plus 'You have 300 MASS'. Home tiles at 320 read 'Unlock · 1,200 MASS' in full with a 44px save circle. (5) The hero-locked-photos pill sits 14px above the FOR SALE/Premium badges at 320 and 390, no overlap. (6) Updates title fits at 320 with no emblem. Neighbours title is 26px and fits. Tab label 'Neighbours' is 55px wide in a 59px tab, no ellipsis. (7) The score grid is 2x2 and WALK/SCHOOLS/SAFETY/INFRA are all visible at 390 and 320. (8) Become-agent: my-reps-btn and see-plans-btn are full width with full labels. (9) Market location pill is icon-only at 320 and shows 'All of Nigeria' at 390; basket and saved are visible. (10) Home placeholder 'Search area, landmark' at 17px is 182px wide in 202px available at 390. promo-badge-feature 'Featured · 14d left' shows in full and its row wraps. (11) stat-unlocked = 0 and /unlocks is empty; the 'My unlocks' title fits at 320. Tablet home and passport are clean. No console errors. NEW/REMAINING: /shop/search shows a single column at 320. The unlock CTA balance line is truncated at 390. Smaller truncations are listed below. 'Chat · Free' could NOT be tested: there are no is_free_amass_sale listings, and demo has 0 unlocks.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "/shop/search grid at 320", "issue": "Results show as ONE column of 140px cards, leaving the right half of the screen empty. RCA: search.tsx:50 sets cardW = floor((320-32-12)/2) = 138, but ShopProductCard styles.card has minWidth: 140 (ShopProductCard.tsx:183). Two cards (2x140+12 = 292) no longer fit the 288px row, so flexWrap drops each card to its own row. At 390 it is 2 columns and correct.", "testID": "shop-product-open-*", "priority": "MEDIUM"},
+      {"component": "Passport unlock CTA subline at 390", "issue": "'You have 300 MASS · confirm before paying' is truncated to 'confirm before …' (scrollWidth > clientWidth, 234px box), so the word 'paying' is cut.", "testID": "unlock-cta-btn", "priority": "LOW"},
+      {"component": "Passport AMASS AI value chip at 320", "issue": "The 'Under-priced' tag is truncated to 'Under-pric…' (12px font in a 76px box).", "testID": "property-details", "priority": "LOW"},
+      {"component": "Neighbours quick tiles at 320", "issue": "The 'Shared lists' and 'Local map' labels are truncated to 'Shared l…' and 'Local m…' (12px font, 58px tiles).", "testID": "nb-quick-collections / nb-quick-places", "priority": "LOW"},
+      {"component": "Shop category grid at 320", "issue": "Cards measure 16-156 and 168-308, so the right card enters the 16px right padding by 4px (12px right margin against 16px left). Cards in the same row also differ in height (275 vs 283).", "testID": "shop-product-open-*", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Onboarding slide 4 at 320", "issues": ["Only the first bullet chip is fully visible; the second ('FIX pays pros', right edge 348 against a 320 viewport) peeks in and the row scrolls. The spec asked for the first 2 chips to be visible."]},
+      {"screen": "Agent dashboard Boosts card", "issues": ["Copy reads '1 listing promoted · 2 views since', with nothing after 'since' (agent-dashboard.tsx:495)."]},
+      {"screen": "Market brand tiles at 320", "issues": ["Retailer names under the logos are truncated ('BoConc…', 'Furniture…'), as is the 'Showroom' tag. These are ellipsized, so this is low priority."]},
+      {"screen": "Updates swipe pane", "issues": ["The hidden 'Mark unread' swipe action label is truncated (48px pane) at 390 and 320."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/screenshots_iter71/", "/app/test_reports/screenshots_iter71/hdr.py", "/app/test_reports/screenshots_iter71/audit.js", "/app/test_reports/screenshots_iter71/measure.js"],
+  "action_items": [
+    "MEDIUM: fix the 1-column /shop/search grid at 320. Either lower ShopProductCard styles.card minWidth (e.g. 130), drop the minWidth when an explicit width prop is passed, or clamp cardW. Then recheck /shop/category at 320 (4px right-padding overflow).",
+    "LOW: keep 'confirm before paying' in full on the unlock-cta-btn subline at 390 (shorter copy or a narrower threshold).",
+    "LOW: stop 'Under-priced' truncating at 320 (let the AI value chip wrap, or shorten it to 'Under').",
+    "LOW: fix the Neighbours quick-tile labels at 320 (smaller font, 2 lines, or shorter labels: 'Lists' / 'Map').",
+    "LOW: onboarding slide 4 at 320: shrink the chip padding or font so 2 chips fit, or accept the scroll peek.",
+    "LOW: finish the Boosts subtitle copy ('views since boost').",
+    "Untested: 'Chat · Free' needs a non-owned unlocked or is_free_amass_sale listing. None exists for demo; the code path (tight → md, no icon) mirrors 'Manage'."
+  ],
+  "critical_code_review_comments": [
+    "ShopProductCard styles.card { minWidth: 140 } conflicts with the cardW computed by callers on narrow screens (search.tsx:50). Any caller that passes a width below 140 will get wrapping or overflow.",
+    "neighbours-title at 390 (38px font, lineHeight 44): the audit sees a 4px vertical overflow (scrollHeight 48 against 44), but nothing is visibly clipped."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "~90% (all 11 targeted checks pass except Chat · Free, which could not be tested; 1 MED and several LOW new findings)"},
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Load the helpers with: _g={**globals(),**locals()}; exec(open('/tmp/hdr.py').read(),_g). First copy hdr.py, audit.js and measure.js from screenshots_iter71 to /tmp. Screenshots from browser_automation land in /root/.emergent/automation_output/<ts>/. Useful IDs: owned (demo) 3998e99b-80f9-4ce1-b04e-6f16c4feae01; locked (fixa) f2342766-9443-44ee-929c-a1b46b830f29. 6bfa65fc-... (is_amass_exclusive) is still LOCKED for demo (Unlock · 800 MASS), and no is_free_amass_sale listings exist, so 'Chat · Free' cannot be reached without spending MASS. /shop/search: type into the input and press Enter.",
+  "rca_of_issue": "/shop/search 1-column at 320: cardW 138 < card minWidth 140, so two cards plus the 12px gap (292) exceed the 288px row and flexWrap puts each card on its own row."
+}

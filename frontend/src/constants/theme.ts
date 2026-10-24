@@ -118,14 +118,14 @@ export const shadows = {
 } as const;
 
 export const typography = {
-  display: { fontSize: 34, fontWeight: "500" as const, letterSpacing: -1 },
-  h1: { fontSize: 28, fontWeight: "500" as const, letterSpacing: -0.8 },
-  h2: { fontSize: 22, fontWeight: "500" as const, letterSpacing: -0.5 },
-  h3: { fontSize: 18, fontWeight: "500" as const, letterSpacing: -0.3 },
-  body: { fontSize: 15, fontWeight: "500" as const },
-  bodyBold: { fontSize: 15, fontWeight: "500" as const },
-  caption: { fontSize: 13, fontWeight: "500" as const },
-  micro: { fontSize: 11, fontWeight: "500" as const, letterSpacing: 0.4 },
+  display: { fontSize: 40, lineHeight: 46, fontWeight: "800" as const, letterSpacing: -1 },
+  h1: { fontSize: 32, lineHeight: 38, fontWeight: "800" as const, letterSpacing: -0.8 },
+  h2: { fontSize: 26, lineHeight: 31, fontWeight: "700" as const, letterSpacing: -0.5 },
+  h3: { fontSize: 22, lineHeight: 27, fontWeight: "700" as const, letterSpacing: -0.3 },
+  body: { fontSize: 17, lineHeight: 26, fontWeight: "500" as const },
+  bodyBold: { fontSize: 17, lineHeight: 26, fontWeight: "700" as const },
+  caption: { fontSize: 15, lineHeight: 21, fontWeight: "500" as const },
+  micro: { fontSize: 13, lineHeight: 17, fontWeight: "600" as const, letterSpacing: 0.3 },
 } as const;
 
 // Premium serif font stack — for prices & luxury headlines (magazine feel).

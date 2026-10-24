@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   overlay: { position: "absolute", left: 0, right: 0, bottom: 10, alignItems: "center" },
   hint: {
     color: "rgba(255,255,255,0.85)",
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "600",
     backgroundColor: "rgba(17,17,17,0.55)",
     paddingHorizontal: 10,

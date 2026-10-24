@@ -309,15 +309,15 @@ const makeStyles = (colors: LegacyColors) =>
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
   },
-  title: { ...typography.h1, fontSize: 24 },
-  resetText: { color: colors.red, fontWeight: "700", fontSize: 14 },
+  title: { ...typography.h1, fontSize: 26 },
+  resetText: { color: colors.red, fontWeight: "700", fontSize: 16 },
   section: {
     paddingVertical: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.divider,
     gap: spacing.md,
   },
-  sectionTitle: { fontSize: 15, fontWeight: "800", color: colors.text, letterSpacing: -0.2 },
+  sectionTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.2 },
   chipsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chipsRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   chip: {
@@ -346,7 +346,7 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.ink,
     borderColor: colors.ink,
   },
-  chipText: { fontSize: 13, fontWeight: "700", color: colors.textSecondary },
+  chipText: { fontSize: 15, fontWeight: "700", color: colors.textSecondary },
   chipTextActive: { color: "#fff" },
   priceInputs: { flexDirection: "row", gap: 10 },
   priceInputWrap: {
@@ -357,9 +357,9 @@ const makeStyles = (colors: LegacyColors) =>
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  priceLabel: { fontSize: 11, color: colors.textTertiary, fontWeight: "700", letterSpacing: 0.5 },
-  priceInput: { fontSize: 16, fontWeight: "700", color: colors.text, marginTop: 2 },
-  priceHint: { fontSize: 11, color: colors.red, fontWeight: "700", marginTop: 2 },
+  priceLabel: { fontSize: 13, color: colors.textTertiary, fontWeight: "700", letterSpacing: 0.5 },
+  priceInput: { fontSize: 18, fontWeight: "700", color: colors.text, marginTop: 2 },
+  priceHint: { fontSize: 13, color: colors.red, fontWeight: "700", marginTop: 2 },
   footer: {
     paddingVertical: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -372,5 +372,5 @@ const makeStyles = (colors: LegacyColors) =>
     alignItems: "center",
     justifyContent: "center",
   },
-  applyText: { color: "#fff", fontSize: 16, fontWeight: "500", letterSpacing: -0.2 },
+  applyText: { color: "#fff", fontSize: 18, fontWeight: "500", letterSpacing: -0.2 },
 });

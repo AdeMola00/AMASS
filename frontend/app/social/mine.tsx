@@ -189,7 +189,7 @@ function Stat({ icon, value, label }: { icon: any; value: number; label: string 
 
 const styles = StyleSheet.create({
   stats: { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: 20, marginTop: 4 },
-  statValue: { fontFamily: socialFont.black, fontSize: 20, lineHeight: 24, letterSpacing: -0.4 },
+  statValue: { fontFamily: socialFont.black, fontSize: 22, lineHeight: 27, letterSpacing: -0.4 },
   chips: { paddingHorizontal: 16, gap: 8, paddingVertical: 12 },
   newBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
 });

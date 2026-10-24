@@ -917,9 +917,9 @@ function Field({
 const makeStyles = (colors: LegacyColors) =>
   StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  h1: { ...typography.display, fontSize: 28 },
+  h1: { ...typography.display, fontSize: 30 },
   h2: { ...typography.h2, marginBottom: 8 },
-  sub: { ...typography.body, color: colors.textTertiary, marginTop: 6, lineHeight: 22 },
+  sub: { ...typography.body, color: colors.textTertiary, marginTop: 6, lineHeight: 25 },
   grid2: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   gridCard: {
     width: "48%",
@@ -933,8 +933,8 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "flex-end",
   },
   gridCardActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  gridLabel: { fontSize: 16, fontWeight: "800", color: colors.text },
-  gridCaption: { fontSize: 12, color: colors.textTertiary, fontWeight: "500" },
+  gridLabel: { fontSize: 18, fontWeight: "800", color: colors.text },
+  gridCaption: { fontSize: 14, color: colors.textTertiary, fontWeight: "500" },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     flexDirection: "row",
@@ -948,14 +948,14 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.surface,
   },
   chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  chipText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
+  chipText: { fontSize: 15, fontWeight: "600", color: colors.textSecondary },
   trustBox: {
     padding: spacing.lg,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceSecondary,
     gap: 12,
   },
-  trustQ: { fontSize: 14, fontWeight: "800", color: colors.text },
+  trustQ: { fontSize: 16, fontWeight: "800", color: colors.text },
   mandateOpts: { flexDirection: "row", gap: 8 },
   mandateOpt: {
     flex: 1,
@@ -972,8 +972,8 @@ const makeStyles = (colors: LegacyColors) =>
   mandateOptOn: { backgroundColor: colors.emerald, borderColor: colors.emerald },
   mandateOptOff: { backgroundColor: colors.ink, borderColor: colors.ink },
   mandateOptWarn: { backgroundColor: colors.gold, borderColor: colors.gold },
-  mandateOptText: { fontSize: 13, fontWeight: "800", color: colors.text },
-  trustHint: { fontSize: 12, color: colors.textTertiary, lineHeight: 17 },
+  mandateOptText: { fontSize: 15, fontWeight: "800", color: colors.text },
+  trustHint: { fontSize: 14, color: colors.textTertiary, lineHeight: 20 },
   warn: {
     flexDirection: "row",
     alignItems: "center",
@@ -982,9 +982,9 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.md,
     backgroundColor: colors.goldLight,
   },
-  warnText: { flex: 1, fontSize: 12, color: colors.text, lineHeight: 17 },
+  warnText: { flex: 1, fontSize: 14, color: colors.text, lineHeight: 20 },
   row2: { flexDirection: "row", gap: 12 },
-  fieldLabel: { fontSize: 12, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.3, marginLeft: 4 },
+  fieldLabel: { fontSize: 14, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.3, marginLeft: 4 },
   aiDescRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1002,13 +1002,13 @@ const makeStyles = (colors: LegacyColors) =>
     minWidth: 70,
     justifyContent: "center",
   },
-  aiBtnText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.2 },
+  aiBtnText: { color: "#fff", fontSize: 13, fontWeight: "800", letterSpacing: 0.2 },
   input: {
     minHeight: 52,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceSecondary,
     paddingHorizontal: spacing.lg,
-    fontSize: 15,
+    fontSize: 17,
     color: colors.text,
     fontWeight: "500",
   },
@@ -1018,7 +1018,7 @@ const makeStyles = (colors: LegacyColors) =>
     overflow: "hidden",
     backgroundColor: colors.surfaceSecondary,
   },
-  coordText: { textAlign: "center", fontSize: 12, color: colors.textTertiary, fontWeight: "600" },
+  coordText: { textAlign: "center", fontSize: 14, color: colors.textTertiary, fontWeight: "600" },
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   photoWrap: {
     width: "48%",
@@ -1040,7 +1040,7 @@ const makeStyles = (colors: LegacyColors) =>
   },
   coverBadgeText: {
     color: "#fff",
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0.6,
   },
@@ -1073,7 +1073,7 @@ const makeStyles = (colors: LegacyColors) =>
     gap: 8,
   },
   pickerBtnText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "700",
     color: colors.text,
   },
@@ -1089,7 +1089,7 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.surfaceSecondary,
   },
   emptyPhotosText: {
-    fontSize: 13,
+    fontSize: 15,
     color: colors.textTertiary,
     textAlign: "center",
     fontWeight: "500",
@@ -1110,7 +1110,7 @@ const makeStyles = (colors: LegacyColors) =>
     paddingVertical: 6,
     borderRadius: radius.pill,
   },
-  previewPriceText: { fontSize: 16, fontWeight: "800", color: colors.text },
+  previewPriceText: { fontSize: 18, fontWeight: "800", color: colors.text },
   reviewRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1119,8 +1119,8 @@ const makeStyles = (colors: LegacyColors) =>
     borderBottomColor: colors.divider,
     gap: 12,
   },
-  reviewLabel: { fontSize: 13, color: colors.textTertiary, fontWeight: "600" },
-  reviewValue: { fontSize: 14, color: colors.text, fontWeight: "600", flexShrink: 1, textAlign: "right" },
+  reviewLabel: { fontSize: 15, color: colors.textTertiary, fontWeight: "600" },
+  reviewValue: { fontSize: 16, color: colors.text, fontWeight: "600", flexShrink: 1, textAlign: "right" },
   notice: {
     flexDirection: "row",
     gap: 10,
@@ -1129,7 +1129,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.md,
     marginTop: spacing.md,
   },
-  noticeText: { flex: 1, fontSize: 13, color: colors.text, lineHeight: 18 },
+  noticeText: { flex: 1, fontSize: 15, color: colors.text, lineHeight: 21 },
   stickyBar: {
     position: "absolute",
     left: 0,

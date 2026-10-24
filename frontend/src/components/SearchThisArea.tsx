@@ -45,5 +45,5 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: 999,
     backgroundColor: colors.ink,
   },
-  label: { color: "#fff", fontSize: 13, fontWeight: "700", letterSpacing: -0.2 },
+  label: { color: "#fff", fontSize: 15, fontWeight: "700", letterSpacing: -0.2 },
 });

@@ -265,7 +265,7 @@ const makeStyles = (colors: LegacyColors) =>
   },
   identityCol: { flex: 1, gap: 4 },
   nameRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  name: { fontSize: 16, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3, flex: 1 },
+  name: { fontSize: 18, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3, flex: 1 },
   tradeRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   tradeChip: {
     paddingHorizontal: 8,
@@ -273,10 +273,10 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: 6,
     backgroundColor: "rgba(34,197,94,0.12)",
   },
-  tradeChipText: { fontSize: 10, fontFamily: F.bold, color: "#15803D", letterSpacing: 0.4 },
+  tradeChipText: { fontSize: 12, fontFamily: F.bold, color: "#15803D", letterSpacing: 0.4 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
-  metaText: { fontSize: 12, color: colors.textMuted, fontFamily: F.regular },
-  metaTextStrong: { fontSize: 12, color: colors.text, fontFamily: F.semibold },
+  metaText: { fontSize: 14, color: colors.textMuted, fontFamily: F.regular },
+  metaTextStrong: { fontSize: 14, color: colors.text, fontFamily: F.semibold },
   dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.textMuted, marginHorizontal: 2 },
 
   badgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
@@ -291,12 +291,12 @@ const makeStyles = (colors: LegacyColors) =>
     borderWidth: 1,
     borderColor: "rgba(34,197,94,0.25)",
   },
-  fixaBadgeText: { fontSize: 10, fontFamily: F.semibold, color: "#15803D" },
+  fixaBadgeText: { fontSize: 12, fontFamily: F.semibold, color: "#15803D" },
 
-  specText: { fontSize: 13, color: colors.textSecondary, fontFamily: F.regular, lineHeight: 18 },
+  specText: { fontSize: 15, color: colors.textSecondary, fontFamily: F.regular, lineHeight: 21 },
 
   areaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  areaText: { fontSize: 12, color: colors.textMuted, fontFamily: F.regular, flex: 1 },
+  areaText: { fontSize: 14, color: colors.textMuted, fontFamily: F.regular, flex: 1 },
 
   footerRow: {
     flexDirection: "row",
@@ -308,8 +308,8 @@ const makeStyles = (colors: LegacyColors) =>
     borderTopColor: colors.border,
   },
   priceCol: { gap: 1 },
-  priceLabel: { fontSize: 10, color: colors.textMuted, fontFamily: F.semibold, letterSpacing: 0.4 },
-  price: { fontSize: 17, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
+  priceLabel: { fontSize: 12, color: colors.textMuted, fontFamily: F.semibold, letterSpacing: 0.4 },
+  price: { fontSize: 19, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
   actionsRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconAction: {
     width: 40,
@@ -327,7 +327,7 @@ const makeStyles = (colors: LegacyColors) =>
     alignItems: "center",
     justifyContent: "center",
   },
-  bookBtnText: { color: "#fff", fontSize: 13, fontFamily: F.bold, letterSpacing: 0.2 },
+  bookBtnText: { color: "#fff", fontSize: 15, fontFamily: F.bold, letterSpacing: 0.2 },
   lockedAction: {
     height: 40,
     paddingHorizontal: 12,
@@ -338,7 +338,7 @@ const makeStyles = (colors: LegacyColors) =>
     flexDirection: "row",
     gap: 6,
   },
-  lockedActionText: { fontSize: 12, fontFamily: F.bold, color: colors.text },
+  lockedActionText: { fontSize: 14, fontFamily: F.bold, color: colors.text },
 
   // Featured (horizontal card)
   featuredCard: {
@@ -378,12 +378,12 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: 6,
     backgroundColor: colors.ink,
   },
-  tradeChipInkText: { fontSize: 9, fontFamily: F.bold, color: "#fff", letterSpacing: 0.5 },
-  featuredName: { fontSize: 14, fontFamily: F.bold, color: colors.text, letterSpacing: -0.2, marginTop: 6 },
-  featuredMeta: { fontSize: 12, fontFamily: F.semibold, color: colors.text },
-  featuredMetaDim: { fontSize: 11, color: colors.textMuted, fontFamily: F.regular },
-  featuredExp: { fontSize: 11, color: colors.textSecondary, fontFamily: F.regular },
+  tradeChipInkText: { fontSize: 11, fontFamily: F.bold, color: "#fff", letterSpacing: 0.5 },
+  featuredName: { fontSize: 16, fontFamily: F.bold, color: colors.text, letterSpacing: -0.2, marginTop: 6 },
+  featuredMeta: { fontSize: 14, fontFamily: F.semibold, color: colors.text },
+  featuredMetaDim: { fontSize: 13, color: colors.textMuted, fontFamily: F.regular },
+  featuredExp: { fontSize: 13, color: colors.textSecondary, fontFamily: F.regular },
   featuredPriceRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: 4 },
-  featuredPriceLabel: { fontSize: 10, color: colors.textMuted, fontFamily: F.semibold },
-  featuredPrice: { fontSize: 15, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
+  featuredPriceLabel: { fontSize: 12, color: colors.textMuted, fontFamily: F.semibold },
+  featuredPrice: { fontSize: 17, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
 });

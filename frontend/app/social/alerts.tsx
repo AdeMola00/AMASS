@@ -246,10 +246,10 @@ function Stat({ icon, value, label, color, soft }: { icon: IconName; value: numb
 const styles = StyleSheet.create({
   hero: { flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: radii.xl },
   heroIcon: { width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center" },
-  heroTitle: { fontFamily: socialFont.black, fontSize: 22, lineHeight: 26, letterSpacing: -0.5 },
+  heroTitle: { fontFamily: socialFont.black, fontSize: 24, lineHeight: 29, letterSpacing: -0.5 },
   stats: { flexDirection: "row", gap: 10 },
   stat: { flex: 1, alignItems: "center", gap: 2, paddingVertical: 12, borderRadius: radii.lg },
-  statValue: { fontFamily: socialFont.black, fontSize: 22, lineHeight: 26 },
+  statValue: { fontFamily: socialFont.black, fontSize: 24, lineHeight: 29 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   card: { padding: 14, borderRadius: radii.lg, gap: 12 },
   cardIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },

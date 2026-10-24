@@ -981,7 +981,7 @@ const styles = StyleSheet.create({
   },
   attachBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   inputWrap: { flex: 1, minHeight: 44, maxHeight: 130, borderRadius: 22, borderWidth: 1, justifyContent: "center", paddingHorizontal: 16 },
-  input: { fontSize: 15, lineHeight: 20, paddingVertical: Platform.OS === "ios" ? 12 : 10, maxHeight: 120 },
+  input: { fontSize: 17, lineHeight: 23, paddingVertical: Platform.OS === "ios" ? 12 : 10, maxHeight: 120 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   menuItem: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: radii.md, minHeight: 56 },
   menuIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },

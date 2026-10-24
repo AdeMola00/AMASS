@@ -61,7 +61,7 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.red,
   },
   label: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "500",
     color: colors.textSecondary,
     letterSpacing: -0.1,

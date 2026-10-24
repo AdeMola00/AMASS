@@ -1006,3 +1006,12 @@ agent_communication:
       pytest tests/test_notification_read_state_digest.py (11) + test_notification_center.py (13) green. Frontend: Unread filter chip,
       swipe → read/unread · ← dismiss with Undo, Clear read, email summary card + channel chips in preferences, instant badge refresh.
       iteration_67 found slow-swipe navigation/double-count/badge lag → fixed; iteration_68 all pass. Test inbox delivered@resend.dev / Digest2026!.
+
+  - agent: "main"
+    message: |
+      Iterations 69–71 — Global typography overhaul (frontend only). Larger/bolder type scale (tokens.ts typeScale + constants/theme typography),
+      AppText maxFontSizeMultiplier 1.35, Button label shrink, Badge shrink, shop price auto-fit, ≤360 px guards (passport sticky bar, hero chips,
+      ScorePills 2×2, HomeTile actions, Updates/Neighbours headers, tab labels, Market location pill, onboarding hero reserve + scrolling bullets,
+      become-agent stacked buttons, friends row ScrollView). iteration_69 found 4 HIGH/4 MED → fixed; iteration_70 residuals → fixed; iteration_71:
+      10/11 pass, shop/search 1-column at 320 (card minWidth 140 > 138) → minWidth 120 fixed + LOW copy trims. Profile Unlocked tile now uses
+      /unlocks/mine count (matches /unlocks screen). "Chat · Free" variant could not be reached without spending MASS (same layout as "Manage").

@@ -176,7 +176,7 @@ export function ScopeSheet({ visible, onClose, value, onChange, scopes }: { visi
                 <Ionicons name={r.icon} size={18} color={active ? "#FFFFFF" : colors.text} />
               </View>
               <View style={{ flex: 1 }}>
-                <AppText style={{ fontFamily: socialFont.bold, fontSize: 15, lineHeight: 19 }} numberOfLines={1}>
+                <AppText style={{ fontFamily: socialFont.bold, fontSize: 17, lineHeight: 22 }} numberOfLines={1}>
                   {r.label}
                 </AppText>
                 <AppText variant="caption" tone="secondary" numberOfLines={2}>
@@ -230,16 +230,16 @@ export function ReportSheet({ visible, onClose, onSubmit, busy }: { visible: boo
 const styles = StyleSheet.create({
   freeTag: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, height: 26, borderRadius: 8, alignSelf: "flex-start" },
   freeTagSm: { paddingHorizontal: 7, height: 20, borderRadius: 6 },
-  price: { fontFamily: socialFont.black, fontSize: 18, lineHeight: 22, letterSpacing: -0.4 },
-  priceSm: { fontFamily: socialFont.bold, fontSize: 14, lineHeight: 18 },
-  priceLg: { fontFamily: socialFont.black, fontSize: 28, lineHeight: 32, letterSpacing: -0.8 },
+  price: { fontFamily: socialFont.black, fontSize: 20, lineHeight: 25, letterSpacing: -0.4 },
+  priceSm: { fontFamily: socialFont.bold, fontSize: 16, lineHeight: 21 },
+  priceLg: { fontFamily: socialFont.black, fontSize: 30, lineHeight: 34, letterSpacing: -0.8 },
   statusTag: { paddingHorizontal: 9, height: 24, borderRadius: 7, alignItems: "center", justifyContent: "center", alignSelf: "flex-start" },
   pill: { flexDirection: "row", alignItems: "center", gap: 6, height: 44, minWidth: 48, paddingHorizontal: 14, borderRadius: radii.pill },
   pillCompact: { height: 38, paddingHorizontal: 12, minWidth: 42 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 14, borderRadius: radii.pill, borderWidth: 1 },
   heading: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
-  headingLg: { fontFamily: socialFont.black, fontSize: 22, lineHeight: 26, letterSpacing: -0.5 },
-  headingMd: { fontFamily: socialFont.bold, fontSize: 17, lineHeight: 21, letterSpacing: -0.3 },
+  headingLg: { fontFamily: socialFont.black, fontSize: 24, lineHeight: 29, letterSpacing: -0.5 },
+  headingMd: { fontFamily: socialFont.bold, fontSize: 19, lineHeight: 24, letterSpacing: -0.3 },
   photoWrap: { width: "100%", overflow: "hidden", alignItems: "center", justifyContent: "center" },
   more: { backgroundColor: "rgba(17,17,17,0.45)", alignItems: "center", justifyContent: "center" },
   scopeRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radii.lg },

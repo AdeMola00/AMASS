@@ -460,11 +460,11 @@ function DetailRow({ icon, label, value, onPress, missing, last, testID }: { ico
 
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 6 },
-  headerTitle: { flex: 1, textAlign: "center", fontFamily: socialFont.bold, fontSize: 17, lineHeight: 21 },
+  headerTitle: { flex: 1, textAlign: "center", fontFamily: socialFont.bold, fontSize: 19, lineHeight: 24 },
   photo: { width: 120, height: 120, borderRadius: radii.lg, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   addPhoto: { borderWidth: 1.5, borderStyle: "dashed", gap: 6 },
   coverTag: { position: "absolute", left: 8, bottom: 8, backgroundColor: "rgba(17,17,17,0.7)", paddingHorizontal: 8, height: 22, borderRadius: 6, alignItems: "center", justifyContent: "center" },
-  q: { fontFamily: socialFont.black, fontSize: 20, lineHeight: 24, letterSpacing: -0.5 },
+  q: { fontFamily: socialFont.black, fontSize: 22, lineHeight: 27, letterSpacing: -0.5 },
   segment: { flexDirection: "row", padding: 4, borderRadius: radii.pill, gap: 4 },
   segmentItem: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 42, borderRadius: radii.pill },
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 12 },

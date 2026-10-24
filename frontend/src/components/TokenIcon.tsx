@@ -151,7 +151,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderColor: "rgba(255,255,255,0.15)",
   },
   chipText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "800",
     letterSpacing: -0.2,
   },

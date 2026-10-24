@@ -150,6 +150,6 @@ export default function ShopCategoryScreen() {
 const styles = StyleSheet.create({
   chips: { paddingHorizontal: 16, gap: 8, paddingVertical: 10 },
   feedHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
-  feedTitle: { fontFamily: shopFont.bold, fontSize: 16, lineHeight: 20 },
+  feedTitle: { fontFamily: shopFont.bold, fontSize: 18, lineHeight: 23 },
   sortPill: { flexDirection: "row", alignItems: "center", gap: 5, height: 36, paddingHorizontal: 12, borderRadius: radii.pill, borderWidth: 1 },
 });

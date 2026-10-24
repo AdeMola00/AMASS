@@ -20,7 +20,7 @@ import { AppText } from "@/src/ui";
 import { compactPrice, hasNudge, type Pin } from "./pins";
 
 const DISC = 44;
-const PILL_H = 32;
+const PILL_H = 34;
 
 export function PhotoMarker({ pin, active, muted, animate, onImageLoad, testID }: { pin: Pin; active: boolean; muted: boolean; animate?: boolean; onImageLoad?: () => void; testID?: string }) {
   const { colors, isDark } = useTheme();
@@ -85,7 +85,7 @@ export function PhotoMarker({ pin, active, muted, animate, onImageLoad, testID }
         <View style={[styles.nudge, { backgroundColor: colors.brand }]} testID={`pin-nudge-${pin.id}`}>
           <Ionicons name="people" size={9} color="#fff" />
           {pin.friendsSaved > 0 ? (
-            <AppText variant="micro" color="#fff" style={{ fontSize: 9, lineHeight: 11 }} tabular>
+            <AppText variant="micro" color="#fff" style={{ fontSize: 11, lineHeight: 14 }} tabular>
               {pin.friendsSaved}
             </AppText>
           ) : null}
@@ -103,13 +103,13 @@ export function PhotoMarker({ pin, active, muted, animate, onImageLoad, testID }
 /** Cluster disc — count in a white disc with an ink ring; tap zooms in. */
 export function ClusterDisc({ count }: { count: number }) {
   const { colors } = useTheme();
-  const size = count >= 100 ? 56 : count >= 10 ? 50 : 44;
+  const size = count >= 100 ? 62 : count >= 10 ? 56 : 50;
   return (
     <View style={[styles.cluster, { width: size, height: size, borderRadius: size / 2, backgroundColor: "#FFFFFF", borderColor: colors.surfaceInverse }]} collapsable={false} testID={`cluster-${count}`}>
-      <AppText variant={count >= 100 ? "caption" : "title"} color={colors.text} tabular style={{ fontFamily: "PlusJakartaSans-800" }}>
+      <AppText variant={count >= 100 ? "caption" : "title"} color={colors.text} tabular style={{ fontFamily: "PlusJakartaSans-800", lineHeight: count >= 100 ? 17 : 22 }}>
         {count >= 1000 ? `${Math.round(count / 100) / 10}k` : count}
       </AppText>
-      <AppText variant="micro" tone="tertiary" style={{ fontSize: 9, lineHeight: 10 }}>
+      <AppText variant="micro" tone="tertiary" style={{ fontSize: 10.5, lineHeight: 12, marginTop: -1 }}>
         homes
       </AppText>
     </View>
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
-  price: { fontFamily: "PlusJakartaSans-800", fontSize: 14, lineHeight: 17, letterSpacing: -0.2 },
+  price: { fontFamily: "PlusJakartaSans-800", fontSize: 17, lineHeight: 21, letterSpacing: -0.3 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   center: { alignItems: "center", justifyContent: "center" },
   lock: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center" },

@@ -135,7 +135,7 @@ export default function ForgotPassword() {
                 textContentType="oneTimeCode"
                 iconLeft="keypad-outline"
                 size="lg"
-                style={{ letterSpacing: 4, fontSize: 18 }}
+                style={{ letterSpacing: 4, fontSize: 20 }}
                 testID="fp-code"
               />
               <Input

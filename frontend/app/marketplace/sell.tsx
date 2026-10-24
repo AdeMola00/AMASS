@@ -571,8 +571,8 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.surface,
     ...shadows.soft,
   },
-  sectionTitle: { fontSize: 15, fontWeight: "800", color: colors.text, letterSpacing: -0.2 },
-  sectionHint: { fontSize: 11, color: colors.textTertiary, fontWeight: "600", marginTop: 2 },
+  sectionTitle: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.2 },
+  sectionHint: { fontSize: 13, color: colors.textTertiary, fontWeight: "600", marginTop: 2 },
 
   // Photos
   photoThumb: {
@@ -592,7 +592,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: 4,
     backgroundColor: "rgba(10,10,10,0.85)",
   },
-  coverBadgeText: { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 0.4 },
+  coverBadgeText: { color: "#fff", fontSize: 11, fontWeight: "900", letterSpacing: 0.4 },
   removeBtn: {
     position: "absolute",
     top: 4, right: 4,
@@ -622,7 +622,7 @@ const makeStyles = (colors: LegacyColors) =>
     gap: 4,
     backgroundColor: colors.surfaceSecondary,
   },
-  addPhotoText: { fontSize: 11, color: colors.textSecondary, fontWeight: "700" },
+  addPhotoText: { fontSize: 13, color: colors.textSecondary, fontWeight: "700" },
 
   // Chips
   chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -638,17 +638,17 @@ const makeStyles = (colors: LegacyColors) =>
     borderColor: colors.border,
   },
   chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  chipText: { fontSize: 12, fontWeight: "700", color: colors.text },
+  chipText: { fontSize: 14, fontWeight: "700", color: colors.text },
 
   // Field
-  fieldLabel: { fontSize: 12, fontWeight: "800", color: colors.textSecondary, marginBottom: 6, letterSpacing: 0.2 },
+  fieldLabel: { fontSize: 14, fontWeight: "800", color: colors.textSecondary, marginBottom: 6, letterSpacing: 0.2 },
   input: {
     height: 46,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: 14,
-    fontSize: 14,
+    fontSize: 16,
     color: colors.text,
     fontWeight: "500",
     backgroundColor: colors.surface,
@@ -659,7 +659,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,
-    fontSize: 14,
+    fontSize: 16,
     color: colors.text,
     fontWeight: "500",
     textAlignVertical: "top",
@@ -678,7 +678,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderWidth: 1,
     borderColor: colors.red,
   },
-  aiBtnText: { color: colors.red, fontSize: 12, fontWeight: "800" },
+  aiBtnText: { color: colors.red, fontSize: 14, fontWeight: "800" },
 
   // Price
   priceBox: {
@@ -692,8 +692,8 @@ const makeStyles = (colors: LegacyColors) =>
     borderColor: colors.border,
     backgroundColor: colors.surfaceSecondary,
   },
-  currency: { fontSize: 22, fontWeight: "800", color: colors.textSecondary },
-  priceInput: { flex: 1, fontSize: 22, fontWeight: "900", color: colors.text, letterSpacing: -0.3 },
+  currency: { fontSize: 24, fontWeight: "800", color: colors.textSecondary },
+  priceInput: { flex: 1, fontSize: 24, fontWeight: "900", color: colors.text, letterSpacing: -0.3 },
   negoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -701,7 +701,7 @@ const makeStyles = (colors: LegacyColors) =>
     paddingVertical: 10,
     marginTop: 4,
   },
-  negoLabel: { fontSize: 13, color: colors.text, fontWeight: "600" },
+  negoLabel: { fontSize: 15, color: colors.text, fontWeight: "600" },
 
   // Location
   gpsBtn: {
@@ -716,7 +716,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderWidth: 1,
     borderColor: colors.red,
   },
-  gpsBtnText: { color: colors.red, fontSize: 12, fontWeight: "800" },
+  gpsBtnText: { color: colors.red, fontSize: 14, fontWeight: "800" },
 
   previewBanner: {
     flexDirection: "row",
@@ -726,7 +726,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.md,
     backgroundColor: colors.surfaceSecondary,
   },
-  previewText: { fontSize: 12, color: colors.textSecondary, fontWeight: "700", flex: 1 },
+  previewText: { fontSize: 14, color: colors.textSecondary, fontWeight: "700", flex: 1 },
 
   // Publish bar
   publishBar: {

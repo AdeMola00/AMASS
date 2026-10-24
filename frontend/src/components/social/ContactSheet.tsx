@@ -60,7 +60,7 @@ export function ContactSheet({ visible, onClose, post, quickMessages }: { visibl
       <View style={[styles.poster, { backgroundColor: colors.surfaceAlt }]}>
         <Avatar name={post.author.full_name} uri={post.author.avatar_url} size={40} verified={post.author.verified} />
         <View style={{ flex: 1 }}>
-          <AppText style={{ fontFamily: socialFont.bold, fontSize: 15, lineHeight: 19 }} numberOfLines={1}>
+          <AppText style={{ fontFamily: socialFont.bold, fontSize: 17, lineHeight: 22 }} numberOfLines={1}>
             {post.author.full_name}
           </AppText>
           <AppText variant="caption" tone="secondary" numberOfLines={1}>

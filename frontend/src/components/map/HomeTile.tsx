@@ -4,7 +4,7 @@
  * existing paid flow for locked homes (Unlock with MASS) and "View home" for unlocked ones.
  */
 import React from "react";
-import { StyleSheet, View, ViewStyle } from "react-native";
+import { StyleSheet, View, ViewStyle, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
@@ -36,6 +36,8 @@ export function HomeTile({
   style?: ViewStyle;
 }) {
   const { colors, isDark, shadows } = useTheme();
+  // Narrow phones: tighter action row (smaller save circle, md pill, no leading icon on the long unlock label).
+  const narrow = useWindowDimensions().width < 360;
   const locked = !pin.unlocked;
   const specs = specLine(pin);
   const suffix = priceSuffix(pin.listing_type);
@@ -121,17 +123,17 @@ export function HomeTile({
         </View>
       </PressableScale>
       {/* Actions live outside the card pressable (no nested buttons on web) */}
-      <View style={styles.actions}>
-        <PressableScale onPress={onSave} scaleTo={0.9} style={[styles.saveBtn, { backgroundColor: saved ? colors.brandSoft : colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={saved ? "Remove from saved" : "Save home"} accessibilityState={{ selected: saved }} testID={`home-tile-save-${pin.id}`}>
+      <View style={[styles.actions, narrow && { paddingHorizontal: 12 }]}>
+        <PressableScale onPress={onSave} scaleTo={0.9} style={[styles.saveBtn, narrow && { width: 44, height: 44 }, { backgroundColor: saved ? colors.brandSoft : colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={saved ? "Remove from saved" : "Save home"} accessibilityState={{ selected: saved }} testID={`home-tile-save-${pin.id}`}>
           <Ionicons name={saved ? "heart" : "heart-outline"} size={22} color={saved ? colors.brand : colors.text} />
         </PressableScale>
         <View style={{ flex: 1 }}>
           <Button
             label={primaryLabel}
             variant={!locked ? "primary" : noMass ? "premium" : "mass"}
-            size="lg"
+            size={narrow ? "md" : "lg"}
             fullWidth
-            iconLeft={!locked ? "arrow-forward" : noMass ? "add" : "lock-open-outline"}
+            iconLeft={narrow && locked ? undefined : !locked ? "arrow-forward" : noMass ? "add" : "lock-open-outline"}
             onPress={() => {
               Haptics.impactAsync(locked ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
               onPrimary();
@@ -162,9 +164,9 @@ const styles = StyleSheet.create({
   kind: { paddingHorizontal: 8, height: 22, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   heartTop: { position: "absolute", top: 12, right: 12 },
   body: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4, gap: 6 },
-  price: { fontFamily: "PlusJakartaSans-800", fontSize: 28, lineHeight: 32, letterSpacing: -0.8, flexShrink: 1 },
+  price: { fontFamily: "PlusJakartaSans-800", fontSize: 30, lineHeight: 34, letterSpacing: -0.8, flexShrink: 1 },
   specs: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  specText: { fontFamily: "PlusJakartaSans-700", fontSize: 16, lineHeight: 20 },
+  specText: { fontFamily: "PlusJakartaSans-700", fontSize: 18, lineHeight: 23 },
   sep: { width: 4, height: 4, borderRadius: 2, marginHorizontal: 4 },
   placeRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   nudge: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },

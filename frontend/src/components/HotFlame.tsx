@@ -78,7 +78,7 @@ const makeStyles = (colors: LegacyColors) =>
   },
   label: {
     color: "#fff",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.3,
   },

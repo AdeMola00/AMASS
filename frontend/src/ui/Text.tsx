@@ -61,6 +61,8 @@ export function AppText({
   const scaled = factor === 1 ? base : { ...base, fontSize: Math.round(base.fontSize * factor), lineHeight: Math.round(base.lineHeight * factor) };
   return (
     <Text
+      // Honour iOS Dynamic Type / Android font scaling, capped so layouts never break.
+      maxFontSizeMultiplier={1.35}
       {...rest}
       style={[
         scaled,

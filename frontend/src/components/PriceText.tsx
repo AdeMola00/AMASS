@@ -10,7 +10,7 @@ import { useTheme } from "@/src/theme";
 export function PriceText({
   value,
   suffix,
-  size = 26,
+  size = 28,
   style,
   tone = "ink",
 }: {
@@ -26,7 +26,7 @@ export function PriceText({
     <Text style={[styles.price, { fontSize: size, color }, style]}>
       {formatNaira(value)}
       {suffix ? (
-        <Text style={[styles.suffix, { color, fontSize: Math.max(11, size * 0.42) }]}>
+        <Text style={[styles.suffix, { color, fontSize: Math.max(13, size * 0.46) }]}>
           {" "}
           {suffix}
         </Text>
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   suffix: {
-    fontFamily: fontFamily.medium,
+    fontFamily: fontFamily.semibold,
     letterSpacing: 0,
   },
 });

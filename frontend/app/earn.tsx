@@ -425,7 +425,7 @@ function PhoneVerifySheet({ visible, onClose }: { visible: boolean; onClose: () 
           </>
         ) : (
           <>
-            <Input label="Verification code" value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="123456" maxLength={6} iconLeft="keypad-outline" error={error} helper={hint ?? undefined} testID="otp-input" autoFocus style={{ letterSpacing: 6, fontSize: 20 }} />
+            <Input label="Verification code" value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="123456" maxLength={6} iconLeft="keypad-outline" error={error} helper={hint ?? undefined} testID="otp-input" autoFocus style={{ letterSpacing: 6, fontSize: 22 }} />
             <Button label="Verify & earn 5 MASS" variant="mass" size="lg" fullWidth loading={busy} disabled={code.length !== 6} onPress={confirm} testID="confirm-otp" />
             <Pressable onPress={() => setStep("phone")} hitSlop={8} style={{ alignSelf: "center", padding: 8 }} accessibilityRole="button">
               <AppText variant="caption" color={colors.textSecondary}>

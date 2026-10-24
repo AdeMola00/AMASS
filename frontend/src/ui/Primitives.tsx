@@ -88,12 +88,12 @@ export function Badge({
     inverse: { bg: colors.surfaceInverse, fg: colors.textInverse },
   };
   const c = map[tone];
-  const pad = size === "xs" ? { paddingHorizontal: 6, height: 18 } : size === "sm" ? { paddingHorizontal: 8, height: 22 } : { paddingHorizontal: 10, height: 26 };
-  const iconSize = size === "xs" ? 10 : size === "sm" ? 11 : 13;
+  const pad = size === "xs" ? { paddingHorizontal: 7, height: 20 } : size === "sm" ? { paddingHorizontal: 9, height: 24 } : { paddingHorizontal: 12, height: 30 };
+  const iconSize = size === "xs" ? 11 : size === "sm" ? 12 : 15;
   return (
     <View style={[styles.badge, pad, { backgroundColor: c.bg }, style]} testID={testID} accessibilityLabel={label}>
       {icon ? <Ionicons name={icon} size={iconSize} color={c.fg} /> : null}
-      <AppText variant={size === "md" ? "caption" : "micro"} color={c.fg} numberOfLines={1}>
+      <AppText variant={size === "md" ? "caption" : "micro"} color={c.fg} numberOfLines={1} style={styles.badgeLabel}>
         {label}
       </AppText>
     </View>
@@ -197,8 +197,8 @@ export function Chip({
         // glossy sheen on selected pills — same treatment as primary buttons
         <LinearGradient colors={["rgba(255,255,255,0.16)", "rgba(255,255,255,0)"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "50%" }]} />
       ) : null}
-      {icon ? <Ionicons name={icon} size={14} color={selected ? selFg : colors.textSecondary} /> : null}
-      <AppText variant="caption" color={selected ? selFg : colors.textSecondary}>
+      {icon ? <Ionicons name={icon} size={16} color={selected ? selFg : colors.textSecondary} /> : null}
+      <AppText variant="bodySm" weight="semibold" color={selected ? selFg : colors.text}>
         {label}
       </AppText>
       {typeof count === "number" ? (
@@ -247,17 +247,18 @@ export function ProgressBar({
 
 const styles = StyleSheet.create({
   card: { borderRadius: radii.lg, overflow: "hidden" },
-  badge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: radii.pill, alignSelf: "flex-start" },
+  badge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: radii.pill, alignSelf: "flex-start", flexShrink: 1, maxWidth: "100%" },
+  badgeLabel: { flexShrink: 1 },
   avatarFallback: { alignItems: "center", justifyContent: "center" },
   avatarBadge: { position: "absolute", right: -2, bottom: -2, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   chip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    height: 36,
+    height: 40,
     paddingHorizontal: 14,
     borderRadius: radii.pill,
     overflow: "hidden",
   },
-  chipCount: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
+  chipCount: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
 });

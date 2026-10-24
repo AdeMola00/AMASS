@@ -61,8 +61,8 @@ function useBadges(activeIndex: number) {
   return counts;
 }
 
-const INDICATOR_W = 52;
-const INDICATOR_H = 32;
+const INDICATOR_W = 56;
+const INDICATOR_H = 34;
 
 function FloatingTabBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -89,7 +89,7 @@ function FloatingTabBar({ state, navigation }: any) {
               key={r.key}
               route={r}
               active={state.index === i}
-              compact={tabW < 62}
+              compact={tabW < 66}
               badge={r.name === "updates" ? badges.updates : r.name === "neighbours" ? badges.neighbours : 0}
               onPress={() => {
                 const event = navigation.emit({ type: "tabPress", target: r.key, canPreventDefault: true });
@@ -130,7 +130,7 @@ function TabButton({ route, active, onPress, badge, compact }: any) {
       accessibilityLabel={`${cfg.label} tab${badge ? `, ${badge} unread` : ""}`}
     >
       <Animated.View style={[styles.iconWrap, anim]}>
-        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={23} color={iconTint} />
+        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={24} color={iconTint} />
         {badge > 0 ? (
           <View style={[styles.badge, { backgroundColor: colors.brand, borderColor: active ? colors.brandSoft : colors.surface }]} testID={`tab-badge-${route.name}`}>
             <AppText variant="micro" color="#fff" tabular style={styles.badgeText}>
@@ -170,20 +170,20 @@ const styles = StyleSheet.create({
   indicator: { position: "absolute", left: 0, top: 8, width: INDICATOR_W, height: INDICATOR_H, borderRadius: radii.pill },
   tab: { flex: 1, height: "100%", alignItems: "center", justifyContent: "center", paddingTop: 2, gap: 3 },
   iconWrap: { width: INDICATOR_W, height: INDICATOR_H, alignItems: "center", justifyContent: "center" },
-  tabLabel: { fontSize: 11, lineHeight: 13, letterSpacing: 0 },
-  tabLabelCompact: { fontSize: 9.5, letterSpacing: -0.2 },
+  tabLabel: { fontSize: 12.5, lineHeight: 16, letterSpacing: -0.2, fontFamily: "PlusJakartaSans-600" },
+  tabLabelCompact: { fontSize: 10.5, letterSpacing: -0.45 },
   tabLabelActive: { fontFamily: "PlusJakartaSans-700" },
   badge: {
     position: "absolute",
     top: -3,
     right: 4,
-    minWidth: 17,
-    height: 17,
+    minWidth: 18,
+    height: 18,
     borderRadius: 9,
     paddingHorizontal: 4,
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeText: { fontSize: 9.5, lineHeight: 11, fontFamily: "PlusJakartaSans-700" },
+  badgeText: { fontSize: 10.5, lineHeight: 12, fontFamily: "PlusJakartaSans-700" },
 });

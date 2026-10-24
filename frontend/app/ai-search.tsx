@@ -246,6 +246,6 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   inputBar: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: space[4], paddingTop: 10 },
   inputWrap: { flexDirection: "row", alignItems: "flex-end", gap: 8, borderRadius: 26, borderWidth: StyleSheet.hairlineWidth, padding: 6, paddingLeft: 16, minHeight: 52 },
-  input: { flex: 1, fontSize: 15, lineHeight: 20, fontFamily: fontFamilies.regular, maxHeight: 110, paddingVertical: 10 },
+  input: { flex: 1, fontSize: 17, lineHeight: 23, fontFamily: fontFamilies.regular, maxHeight: 110, paddingVertical: 10 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
 });

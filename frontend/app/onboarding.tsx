@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, StyleSheet, Pressable, Platform, useWindowDimensions, type FlatList } from "react-native";
+import { View, StyleSheet, Pressable, Platform, ScrollView, useWindowDimensions, type FlatList } from "react-native";
 import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -167,7 +167,11 @@ export default function Onboarding() {
     else finish();
   };
 
-  const heroH = Math.round(Math.min(560, Math.max(340, height * 0.56)));
+  // Hero fills ~56% of the screen but always leaves room for the copy, the bullet row and the
+  // stacked actions so nothing hides behind the footer on short phones (iPhone SE, 320×568).
+  const reserved = 378 + insets.top + insets.bottom;
+  const heroH = Math.round(Math.min(560, Math.max(200, Math.min(height * 0.56, height - reserved))));
+  const compact = width < 360;
   const isLast = index === SLIDES.length - 1;
   const slide = SLIDES[index];
 
@@ -214,27 +218,27 @@ export default function Onboarding() {
 
             {/* Editorial copy — slides in as the page centres */}
             <Copy i={i} width={width} scrollX={scrollX}>
-              <AppText variant="hero" testID={`onboarding-title-${i}`}>
+              <AppText variant={compact ? "heroSm" : "hero"} testID={`onboarding-title-${i}`} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {item.headline}
               </AppText>
-              <AppText variant="bodyMedium" tone="secondary">
+              <AppText variant="bodyMedium" tone="secondary" numberOfLines={2}>
                 {item.subtitle}
               </AppText>
               {item.bullets ? (
-                <View style={styles.bullets}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bullets} contentContainerStyle={styles.bulletsRow}>
                   {item.bullets.map((b, k) => {
                     const fg = b.tone === "mass" ? colors.massText : b.tone === "fix" ? colors.fixText : colors.text;
                     const bg = b.tone === "mass" ? colors.massSoft : b.tone === "fix" ? colors.fixSoft : colors.surfaceAlt;
                     return (
                       <Animated.View key={b.label} entering={reduce ? undefined : FadeInDown.delay(k * motion.stagger).duration(motion.base)} style={[styles.bullet, { backgroundColor: bg }]}>
                         <Ionicons name={b.icon} size={18} color={fg} />
-                        <AppText variant="caption" color={fg}>
+                        <AppText variant="caption" color={fg} numberOfLines={1}>
                           {b.label}
                         </AppText>
                       </Animated.View>
                     );
                   })}
-                </View>
+                </ScrollView>
               ) : null}
             </Copy>
           </View>
@@ -389,7 +393,7 @@ function FixaHero({ slide, i, width, heroH, scrollX, reduce }: { slide: Slide; i
 
 /* ─── Illustrated slides: section-coloured gradient wash + big floating illustration + glossy chips ─── */
 function IllustrationHero({ slide, i, width, heroH, scrollX, reduce }: { slide: Slide; i: number; width: number; heroH: number; scrollX: SharedValue<number>; reduce: boolean }) {
-  const artSize = Math.round(Math.min(360, Math.max(240, Math.min(width * 0.78, heroH * 0.66))));
+  const artSize = Math.round(Math.min(360, Math.max(160, Math.min(width * 0.78, heroH * 0.66))));
   const wash = [...(slide.wash ?? gradients.brand)] as [string, string, ...string[]];
   return (
     <>
@@ -484,7 +488,8 @@ const styles = StyleSheet.create({
   chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.94)", paddingHorizontal: 14, height: 36, borderRadius: radii.pill, shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
   chipRow: { position: "absolute", left: space[5], right: space[5], bottom: space[6], flexDirection: "row", flexWrap: "wrap", gap: 8 },
   copy: { paddingHorizontal: space[6], paddingTop: space[6], gap: space[3] },
-  bullets: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  bullets: { marginTop: 4, marginHorizontal: -space[6] },
+  bulletsRow: { flexDirection: "row", gap: 8, paddingHorizontal: space[6] },
   bullet: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, height: 40, borderRadius: radii.pill },
   footer: { paddingHorizontal: space[6], paddingTop: space[3], gap: 14 },
   dots: { flexDirection: "row", gap: 6, justifyContent: "center" },

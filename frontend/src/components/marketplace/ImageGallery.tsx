@@ -93,5 +93,5 @@ const makeStyles = (colors: LegacyColors) =>
     paddingVertical: 4,
     borderRadius: 999,
   },
-  counterText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
+  counterText: { color: "#fff", fontSize: 13, fontWeight: "800", letterSpacing: 0.3 },
 });

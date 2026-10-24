@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
-  label: { fontSize: 15, fontWeight: "700", color: colors.text, letterSpacing: 0.2 },
+  label: { fontSize: 17, fontWeight: "700", color: colors.text, letterSpacing: 0.2 },
   soonPill: {
     marginLeft: 4,
     paddingHorizontal: 6,
@@ -62,5 +62,5 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: colors.surfaceSecondary,
   },
-  soonText: { fontSize: 9, fontWeight: "900", color: colors.textSecondary, letterSpacing: 0.6 },
+  soonText: { fontSize: 11, fontWeight: "900", color: colors.textSecondary, letterSpacing: 0.6 },
 });

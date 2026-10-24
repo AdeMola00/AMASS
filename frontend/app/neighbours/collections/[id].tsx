@@ -398,6 +398,6 @@ const styles = StyleSheet.create({
   placeCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radii.lg, borderWidth: 1 },
   thumb: { width: 72, height: 72, borderRadius: radii.sm, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   composer: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 12, paddingBottom: 24, borderTopWidth: StyleSheet.hairlineWidth },
-  input: { flex: 1, height: 44, borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: 14, fontSize: 15 },
+  input: { flex: 1, height: 44, borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: 14, fontSize: 17 },
   bubble: { flex: 1, padding: 10, borderRadius: radii.md, gap: 2 },
 });

@@ -5,7 +5,7 @@
  * The MASS banner / Get MASS button keep their existing testIDs + behaviour.
  */
 import React, { forwardRef, useCallback, useMemo } from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import BottomSheet, { BottomSheetFlatList } from "@gorhom/bottom-sheet";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
@@ -36,6 +36,7 @@ export const HomesSheet = forwardRef<BottomSheet, {
   onExploreWider: () => void;
 }>(function HomesSheet({ pins, totalLoaded, loading, activeId, savedIds, noMass, placeLabel, bottomInset, onChange, onOpen, onPrimary, onSave, onGetMass, onExploreWider }, ref) {
   const { colors, isDark, shadows } = useTheme();
+  const narrow = useWindowDimensions().width < 360;
   const peek = noMass ? SHEET_PEEK_LOCKED : SHEET_PEEK;
   const snapPoints = useMemo(() => [peek, "52%", "90%"], [peek]);
   const sale = pins.filter((p) => p.category === "sale").length;
@@ -53,15 +54,15 @@ export const HomesSheet = forwardRef<BottomSheet, {
     <View style={[styles.header, { backgroundColor: isDark ? colors.bgElevated : "#FFFFFF" }]} testID="homes-sheet-header">
       <View style={[styles.grabber, { backgroundColor: colors.borderStrong }]} />
       <View style={styles.titleRow}>
-        <View style={{ flex: 1 }}>
-          <AppText style={[styles.title, { color: colors.text }]} numberOfLines={1} testID="homes-sheet-title">
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <AppText style={[styles.title, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} testID="homes-sheet-title">
             {loading ? "Finding homes…" : pins.length ? `${pins.length} home${pins.length === 1 ? "" : "s"} here` : "No homes in view"}
           </AppText>
           <AppText variant="caption" tone="secondary" numberOfLines={1}>
             {loading ? "Scanning the area around you" : pins.length ? `${sale} for sale · ${rent} to rent · ${placeLabel}` : totalLoaded ? "Pan the map or explore wider" : "Try clearing a filter"}
           </AppText>
         </View>
-        {!loading && pins.length < 6 && totalLoaded > pins.length ? <Button label="Explore wider" size="sm" variant="secondary" iconLeft="expand-outline" onPress={onExploreWider} testID="explore-wider-btn" /> : null}
+        {!loading && pins.length < 6 && totalLoaded > pins.length ? <Button label={narrow ? "Wider" : "Explore wider"} size="sm" variant="secondary" iconLeft="expand-outline" onPress={onExploreWider} testID="explore-wider-btn" /> : null}
       </View>
       {noMass ? (
         <View style={[styles.lockedBanner, shadows.md, { backgroundColor: colors.surfaceInverse }]} testID="get-mass-banner" accessibilityRole="summary">
@@ -140,7 +141,7 @@ const styles = StyleSheet.create({
   header: { paddingTop: 8, paddingBottom: 12, gap: 12, marginHorizontal: -space[4], paddingHorizontal: space[4] },
   grabber: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, marginBottom: 10 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  title: { fontFamily: "PlusJakartaSans-800", fontSize: 22, lineHeight: 26, letterSpacing: -0.5 },
+  title: { fontFamily: "PlusJakartaSans-800", fontSize: 24, lineHeight: 29, letterSpacing: -0.5 },
   lockedBanner: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radii.lg },
   lockedIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   empty: { alignItems: "center", gap: 10, paddingVertical: 28, paddingHorizontal: 20 },

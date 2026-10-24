@@ -58,8 +58,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   accent: { width: 32, height: 3, borderRadius: 2, marginBottom: 4 },
-  title: { color: "#fff", fontSize: 22, fontWeight: "800", letterSpacing: -0.5 },
-  sub: { color: "rgba(255,255,255,0.85)", fontSize: 13, marginBottom: 8, lineHeight: 18 },
+  title: { color: "#fff", fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
+  sub: { color: "rgba(255,255,255,0.85)", fontSize: 15, marginBottom: 8, lineHeight: 21 },
   cta: {
     flexDirection: "row",
     alignItems: "center",
@@ -67,5 +67,5 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginTop: 4,
   },
-  ctaText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  ctaText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 });

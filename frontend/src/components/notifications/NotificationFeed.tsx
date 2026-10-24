@@ -538,7 +538,7 @@ export const NotificationFeed = forwardRef<
                       </View>
                       <View style={{ flex: 1, gap: 3 }}>
                         <View style={styles.rowTop}>
-                          <AppText variant={n.read ? "bodyMedium" : "title"} numberOfLines={1} style={{ flex: 1 }}>
+                          <AppText variant={n.read ? "bodyMedium" : "title"} numberOfLines={2} style={{ flex: 1 }}>
                             {n.title}
                           </AppText>
                           <AppText variant="caption" tone="tertiary" tabular>
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
   chipDivider: { width: StyleSheet.hairlineWidth, height: 22, marginHorizontal: 2 },
   group: { borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 14 },
-  rowTop: { flexDirection: "row", alignItems: "center", gap: 8 },
+  rowTop: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2, flexWrap: "wrap" },
   icon: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   dot: { position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 2 },

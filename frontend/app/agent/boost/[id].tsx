@@ -405,7 +405,7 @@ function ResultsMock({ p, label }: { p: PromotionPreview["property"]; label: str
         <View style={{ flex: 1, gap: 3 }}>
           <View style={[styles.goldTag, { backgroundColor: GOLD }]}>
             <Ionicons name="trending-up" size={9} color="#111" />
-            <AppText variant="micro" color="#111" style={{ fontSize: 9, lineHeight: 11 }}>
+            <AppText variant="micro" color="#111" style={{ fontSize: 11, lineHeight: 14 }}>
               {label}
             </AppText>
           </View>
@@ -441,7 +441,7 @@ function FeaturedMock({ p, label }: { p: PromotionPreview["property"]; label: st
           <Image source={{ uri: p.image ?? undefined }} style={[styles.featImg, { backgroundColor: colors.skeleton }]} contentFit="cover" />
           <View style={[styles.goldTag, styles.featTag, { backgroundColor: GOLD }]}>
             <Ionicons name="star" size={9} color="#111" />
-            <AppText variant="micro" color="#111" style={{ fontSize: 9, lineHeight: 11 }}>
+            <AppText variant="micro" color="#111" style={{ fontSize: 11, lineHeight: 14 }}>
               {label}
             </AppText>
           </View>
@@ -493,7 +493,7 @@ function MapMock({ p }: { p: PromotionPreview["property"] }) {
         <View style={[styles.boostPinTail, { borderTopColor: GOLD }]} />
         <View style={[styles.goldTag, { backgroundColor: GOLD, marginTop: 4 }]}>
           <Ionicons name="rocket" size={9} color="#111" />
-          <AppText variant="micro" color="#111" style={{ fontSize: 9, lineHeight: 11 }}>
+          <AppText variant="micro" color="#111" style={{ fontSize: 11, lineHeight: 14 }}>
             Boosted · {formatMarkerPrice(p.price ?? 0, p.listing_type ?? "buy")}
           </AppText>
         </View>

@@ -293,9 +293,9 @@ export default function BecomeAgent() {
                 testID="edit-application-btn"
               />
             )}
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <Button label="My representations" iconLeft="ribbon-outline" variant="secondary" style={{ flex: 1 }} onPress={() => router.push("/agent/representations" as any)} testID="my-reps-btn" />
-              <Button label="Plans & upgrade" iconLeft="pricetags-outline" variant="secondary" style={{ flex: 1 }} onPress={() => router.push("/agent-plans")} testID="see-plans-btn" />
+            <View style={{ gap: 10 }}>
+              <Button label="My representations" iconLeft="ribbon-outline" variant="secondary" fullWidth onPress={() => router.push("/agent/representations" as any)} testID="my-reps-btn" />
+              <Button label="Plans & upgrade" iconLeft="pricetags-outline" variant="secondary" fullWidth onPress={() => router.push("/agent-plans")} testID="see-plans-btn" />
             </View>
             {existing.status === "approved" ? (
               <Button label="Edit application" iconLeft="create-outline" variant="ghost" fullWidth onPress={editApplication} testID="edit-application-btn" />
@@ -613,17 +613,17 @@ function TrackerStep({
 const makeStyles = (colors: LegacyColors) =>
   StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  h1: { ...typography.display, fontSize: 26 },
-  sub: { ...typography.body, color: colors.textTertiary, lineHeight: 21 },
-  subheader: { fontSize: 12, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 6 },
+  h1: { ...typography.display, fontSize: 28 },
+  sub: { ...typography.body, color: colors.textTertiary, lineHeight: 24 },
+  subheader: { fontSize: 14, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 6 },
   row2: { flexDirection: "row", gap: 10 },
-  fieldLabel: { fontSize: 12, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.3, marginLeft: 4 },
+  fieldLabel: { fontSize: 14, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.3, marginLeft: 4 },
   input: {
     minHeight: 52,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceSecondary,
     paddingHorizontal: spacing.lg,
-    fontSize: 15,
+    fontSize: 17,
     color: colors.text,
     fontWeight: "500",
   },
@@ -643,7 +643,7 @@ const makeStyles = (colors: LegacyColors) =>
     overflow: "hidden",
   },
   uploadImg: { width: "100%", height: "100%" },
-  uploadLabel: { fontSize: 12, color: colors.textSecondary, fontWeight: "700" },
+  uploadLabel: { fontSize: 14, color: colors.textSecondary, fontWeight: "700" },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     flexDirection: "row",
@@ -656,9 +656,9 @@ const makeStyles = (colors: LegacyColors) =>
     borderColor: colors.border,
   },
   chipOn: { backgroundColor: colors.ink, borderColor: colors.ink },
-  chipText: { fontSize: 12, fontWeight: "600", color: colors.textSecondary },
+  chipText: { fontSize: 14, fontWeight: "600", color: colors.textSecondary },
   mandateBox: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.surface, gap: 12 },
-  mandateQ: { fontSize: 14, fontWeight: "700", color: colors.text, lineHeight: 20 },
+  mandateQ: { fontSize: 16, fontWeight: "700", color: colors.text, lineHeight: 23 },
   mandateOpts: { flexDirection: "row", gap: 10 },
   mandateOpt: {
     flex: 1,
@@ -674,18 +674,18 @@ const makeStyles = (colors: LegacyColors) =>
   },
   mandateOptOn: { backgroundColor: colors.emerald, borderColor: colors.emerald },
   mandateOptNo: { backgroundColor: colors.textTertiary, borderColor: colors.textTertiary },
-  mandateOptText: { fontSize: 14, fontWeight: "800", color: colors.text },
-  mandateHint: { fontSize: 12, color: colors.textTertiary, lineHeight: 17 },
+  mandateOptText: { fontSize: 16, fontWeight: "800", color: colors.text },
+  mandateHint: { fontSize: 14, color: colors.textTertiary, lineHeight: 20 },
   summaryBox: {
     padding: spacing.lg,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceSecondary,
     gap: 4,
   },
-  summaryTitle: { fontSize: 13, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.4, marginBottom: 6 },
+  summaryTitle: { fontSize: 15, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.4, marginBottom: 6 },
   statRow: { flexDirection: "row", justifyContent: "space-between", gap: 12, paddingVertical: 6 },
-  statLabel: { fontSize: 12, color: colors.textTertiary, fontWeight: "600" },
-  statValue: { fontSize: 13, color: colors.text, fontWeight: "700", flex: 1, textAlign: "right" },
+  statLabel: { fontSize: 14, color: colors.textTertiary, fontWeight: "600" },
+  statValue: { fontSize: 15, color: colors.text, fontWeight: "700", flex: 1, textAlign: "right" },
   notice: {
     flexDirection: "row",
     alignItems: "center",
@@ -694,7 +694,7 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.redSurface,
     borderRadius: radius.md,
   },
-  noticeText: { flex: 1, fontSize: 12, color: colors.text, lineHeight: 17 },
+  noticeText: { flex: 1, fontSize: 14, color: colors.text, lineHeight: 20 },
   stickyBar: {
     position: "absolute",
     left: 0,
@@ -714,8 +714,8 @@ const makeStyles = (colors: LegacyColors) =>
     gap: 6,
   },
   statusBannerTop: { flexDirection: "row", alignItems: "center", gap: 8 },
-  statusBannerLabel: { fontSize: 14, fontWeight: "800", letterSpacing: 0.2 },
-  statusBannerMsg: { ...typography.body, color: colors.textSecondary, lineHeight: 20, fontSize: 13 },
+  statusBannerLabel: { fontSize: 16, fontWeight: "800", letterSpacing: 0.2 },
+  statusBannerMsg: { ...typography.body, color: colors.textSecondary, lineHeight: 23, fontSize: 15 },
   tracker: {
     width: "100%",
     flexDirection: "row",
@@ -728,8 +728,8 @@ const makeStyles = (colors: LegacyColors) =>
     width: 30, height: 30, borderRadius: 15,
     alignItems: "center", justifyContent: "center",
   },
-  trackerN: { fontSize: 13, fontWeight: "800" },
-  trackerLabel: { fontSize: 11, color: colors.textTertiary, fontWeight: "600", textAlign: "center" },
+  trackerN: { fontSize: 15, fontWeight: "800" },
+  trackerLabel: { fontSize: 13, color: colors.textTertiary, fontWeight: "600", textAlign: "center" },
   trackerBar: { flex: 1, height: 3, borderRadius: 2, backgroundColor: colors.surfaceSecondary, marginBottom: 20 },
   statusIcon: {
     width: 100,
@@ -739,7 +739,7 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
     marginTop: spacing.md,
   },
-  statusTitle: { ...typography.h1, fontSize: 24, marginTop: 8, textAlign: "center" },
+  statusTitle: { ...typography.h1, fontSize: 26, marginTop: 8, textAlign: "center" },
   statusSub: { ...typography.body, color: colors.textTertiary, textAlign: "center" },
   card: { padding: spacing.lg, borderRadius: radius.md, backgroundColor: colors.surface, width: "100%", gap: 2, marginTop: spacing.md },
   levelsCard: { width: "100%", gap: 10, marginTop: spacing.md },
@@ -761,7 +761,7 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
   },
   lvlNOn: { backgroundColor: colors.ink },
-  lvlNText: { fontSize: 14, fontWeight: "800", color: colors.textTertiary },
-  lvlLabel: { fontSize: 13, fontWeight: "700", color: colors.text },
-  lvlCaption: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
+  lvlNText: { fontSize: 16, fontWeight: "800", color: colors.textTertiary },
+  lvlLabel: { fontSize: 15, fontWeight: "700", color: colors.text },
+  lvlCaption: { fontSize: 13, color: colors.textTertiary, marginTop: 2 },
 });

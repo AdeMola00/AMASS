@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   },
   dot: { width: 6, height: 6, borderRadius: 3 },
   label: {
-    fontSize: 12.5,
+    fontSize: 14.5,
     fontWeight: "800",
     letterSpacing: -0.2,
     includeFontPadding: false,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
     zIndex: 5,
   },
-  labelPor: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.1 },
+  labelPor: { fontSize: 12.5, fontWeight: "700", letterSpacing: 0.1 },
   shadowPin: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -323,9 +323,9 @@ const styles = StyleSheet.create({
   clusterCount: {
     color: "#fff",
     fontWeight: "800",
-    fontSize: 15,
+    fontSize: 17,
     letterSpacing: -0.3,
-    lineHeight: 16,
+    lineHeight: 19,
   },
   clusterUnit: {
     color: "rgba(255,255,255,0.85)",

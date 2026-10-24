@@ -226,7 +226,7 @@ export default function SocialPostScreen() {
 
               {/* Description */}
               {post.body ? (
-                <AppText variant="body" style={{ lineHeight: 24 }} testID="social-post-body">
+                <AppText variant="body" style={{ lineHeight: 27 }} testID="social-post-body">
                   {post.body}
                 </AppText>
               ) : null}
@@ -379,14 +379,14 @@ const styles = StyleSheet.create({
   dots: { position: "absolute", bottom: 14, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6, alignItems: "center" },
   dot: { width: 7, height: 7, borderRadius: 4 },
   kindTag: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, height: 24, borderRadius: 7 },
-  title: { fontFamily: socialFont.black, fontSize: 24, lineHeight: 29, letterSpacing: -0.6 },
+  title: { fontFamily: socialFont.black, fontSize: 26, lineHeight: 32, letterSpacing: -0.6 },
   poster: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radii.lg, borderWidth: 1 },
-  posterName: { fontFamily: socialFont.bold, fontSize: 16, lineHeight: 20 },
+  posterName: { fontFamily: socialFont.bold, fontSize: 18, lineHeight: 23 },
   infoCard: { padding: 12, borderRadius: radii.lg, gap: 10 },
   rowIcon: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   comment: { flexDirection: "row", gap: 10, padding: 10, borderRadius: radii.md, borderWidth: 1, alignItems: "flex-start" },
   replyBox: { flexDirection: "row", alignItems: "flex-end", gap: 8, padding: 8, paddingLeft: 14, borderRadius: radii.lg, borderWidth: 1 },
-  replyInput: { flex: 1, fontSize: 15, fontFamily: "PlusJakartaSans-500", maxHeight: 110, paddingVertical: 8 },
+  replyInput: { flex: 1, fontSize: 17, fontFamily: "PlusJakartaSans-500", maxHeight: 110, paddingVertical: 8 },
   replySend: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   similar: { width: 170, borderRadius: radii.lg, overflow: "hidden", borderWidth: 1 },
   similarImg: { height: 120, alignItems: "center", justifyContent: "center" },

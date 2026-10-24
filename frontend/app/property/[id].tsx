@@ -52,6 +52,8 @@ export default function PropertyDetails() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const GALLERY_H = galleryHeight(height);
+  const tight = width < 360;
+  const ctaIcon = tight ? 46 : 54;
   const { colors, shadows, isDark } = useTheme();
   const toast = useToast();
   const { wallet } = useWallet();
@@ -319,7 +321,7 @@ export default function PropertyDetails() {
               </AppText>
             </View>
           ) : (
-            <View style={styles.photoCounter} testID="hero-locked-photos" accessibilityLabel={`${property.image_count ?? 1} ${(property.image_count ?? 1) === 1 ? "photo unlocks" : "photos unlock"} with MASS`}>
+            <View style={[styles.photoCounter, { bottom: 48 + 38 }]} testID="hero-locked-photos" accessibilityLabel={`${property.image_count ?? 1} ${(property.image_count ?? 1) === 1 ? "photo unlocks" : "photos unlock"} with MASS`}>
               <Ionicons name="lock-closed" size={12} color={colors.mass} />
               <AppText variant="caption" color="#fff" tabular style={{ fontFamily: "PlusJakartaSans-700" }}>
                 {property.image_count && property.image_count > 1 ? `+${property.image_count - 1} photos · unlock` : "Photos unlock with MASS"}
@@ -355,7 +357,7 @@ export default function PropertyDetails() {
 
           {/* Zillow scan order: huge price → bold inline specs → what → where */}
           <View style={{ marginTop: space[4] }}>
-            <PriceText value={property.price} size={44} suffix={priceSuffix} style={{ color: colors.text, lineHeight: 48 }} />
+            <PriceText value={property.price} size={44} suffix={priceSuffix} style={{ color: colors.text, lineHeight: 50 }} />
           </View>
           <View style={styles.specsInline} testID="specs-inline">
             <SpecInline icon="bed-outline" value={property.bedrooms} unit="bd" />
@@ -406,8 +408,9 @@ export default function PropertyDetails() {
           {property.ai_valuation ? (
             <View style={[styles.valPill, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]} accessibilityLabel={`AMASS AI value ${formatNaira(property.ai_valuation)}`}>
               <Ionicons name="sparkles" size={13} color={colors.text} />
-              <AppText variant="caption" weight="semibold">
-                AMASS AI value: {formatNaira(property.ai_valuation)}
+              <AppText variant="caption" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>
+                {tight ? "AI value: " : "AMASS AI value: "}
+                {formatNaira(property.ai_valuation)}
               </AppText>
               <Badge label={property.ai_valuation > property.price ? "Under-priced" : "At market"} tone={property.ai_valuation > property.price ? "success" : "neutral"} size="xs" />
             </View>
@@ -687,14 +690,14 @@ export default function PropertyDetails() {
         </View>
       </ScrollView>
 
-      {/* Sticky CTA */}
+      {/* Sticky CTA — on narrow phones the icon buttons shrink and the main pill drops its icon so the label always reads in full */}
       <View style={[styles.stickyCta, { paddingBottom: ctaBottomPad, backgroundColor: colors.bgElevated }, shadows.lg]}>
         <Animated.View style={heartAnim}>
           <IconButton
             icon={favorited ? "heart" : "heart-outline"}
             label={favorited ? "Remove from saved" : "Save property"}
             variant="secondary"
-            size={54}
+            size={ctaIcon}
             iconSize={22}
             color={favorited ? colors.brand : colors.text}
             onPress={toggleFav}
@@ -703,15 +706,15 @@ export default function PropertyDetails() {
         </Animated.View>
         {hasAccess ? (
           <>
-            <IconButton icon="share-outline" label="Share this property" variant="secondary" size={54} iconSize={22} onPress={onShare} testID="chat-agent-btn" />
+            <IconButton icon="share-outline" label="Share this property" variant="secondary" size={ctaIcon} iconSize={22} onPress={onShare} testID="chat-agent-btn" />
             {isOwnListing ? (
               <>
-                <IconButton icon="rocket" label={property.promotion ? "Extend boost" : "Boost listing"} variant="brand" size={54} iconSize={22} onPress={() => router.push(`/agent/boost/${property.id}` as any)} testID="boost-listing-btn" />
+                <IconButton icon="rocket" label={property.promotion ? "Extend boost" : "Boost listing"} variant="brand" size={ctaIcon} iconSize={22} onPress={() => router.push(`/agent/boost/${property.id}` as any)} testID="boost-listing-btn" />
                 <Button
                   label="Manage"
                   variant="primary"
-                  size="lg"
-                  iconLeft="briefcase"
+                  size={tight ? "md" : "lg"}
+                  iconLeft={tight ? undefined : "briefcase"}
                   onPress={() => router.push(`/agent/listing/${property.id}` as any)}
                   style={{ flex: 1 }}
                   testID="book-tour-btn"
@@ -721,8 +724,8 @@ export default function PropertyDetails() {
               <Button
                 label="Chat · Free"
                 variant="primary"
-                size="lg"
-                iconLeft="chatbubbles"
+                size={tight ? "md" : "lg"}
+                iconLeft={tight ? undefined : "chatbubbles"}
                 loading={chatBusy}
                 onPress={startChat}
                 style={{ flex: 1 }}
@@ -740,12 +743,12 @@ export default function PropertyDetails() {
           >
             <LinearGradient colors={[...gradients.premium]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
             <TokenIcon size={18} tone="white" />
-            <View>
-              <AppText variant="title" color="#fff">
-                Unlock for {accessCost.toLocaleString()} MASS
+            <View style={{ flexShrink: 1, minWidth: 0 }}>
+              <AppText variant={tight ? "bodyMedium" : "title"} color="#fff" numberOfLines={1} tabular>
+                {tight ? `Unlock · ${accessCost.toLocaleString()} MASS` : `Unlock for ${accessCost.toLocaleString()} MASS`}
               </AppText>
-              <AppText variant="micro" color="#fff" style={{ opacity: 0.75, marginTop: 1 }} testID="unlock-cta-balance" tabular>
-                You have {(wallet?.spendable ?? 0).toLocaleString()} MASS · confirm before paying
+              <AppText variant="micro" color="#fff" style={{ opacity: 0.75, marginTop: 1 }} testID="unlock-cta-balance" tabular numberOfLines={1}>
+                {tight ? `You have ${(wallet?.spendable ?? 0).toLocaleString()} MASS` : `You have ${(wallet?.spendable ?? 0).toLocaleString()} MASS · confirm first`}
               </AppText>
             </View>
           </PressableScale>
@@ -868,16 +871,18 @@ function SpecInline({ icon, value, unit }: { icon: IconName; value?: number | nu
 
 function ScorePill({ icon, label, score }: { icon: IconName; label: string; score: number }) {
   const { colors } = useTheme();
+  // 2×2 grid on narrow phones so the labels (SCHOOLS / SAFETY) never truncate.
+  const narrow = useWindowDimensions().width < 400;
   const color = score >= 80 ? colors.success : score >= 65 ? colors.warning : colors.textTertiary;
   return (
-    <View style={[styles.scorePill, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityLabel={`${label} score ${score} out of 100`}>
+    <View style={[styles.scorePill, narrow && { minWidth: "44%" }, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityLabel={`${label} score ${score} out of 100`}>
       <View style={styles.scorePillTop}>
         <Ionicons name={icon} size={14} color={color} />
         <AppText variant="h3" color={color} tabular>
           {score}
         </AppText>
       </View>
-      <AppText variant="micro" tone="tertiary" uppercase numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+      <AppText variant="micro" tone="tertiary" uppercase numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ letterSpacing: 0 }}>
         {label}
       </AppText>
       <View style={[styles.scorePillBar, { backgroundColor: colors.surfaceSunken }]}>
@@ -934,8 +939,8 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   specsInline: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 14, marginTop: 6 },
   specInline: { flexDirection: "row", alignItems: "center", gap: 5 },
-  specInlineText: { fontFamily: "PlusJakartaSans-800", fontSize: 18, lineHeight: 22, letterSpacing: -0.3 },
-  bodyCopy: { fontSize: 16, lineHeight: 26 },
+  specInlineText: { fontFamily: "PlusJakartaSans-800", fontSize: 20, lineHeight: 25, letterSpacing: -0.3 },
+  bodyCopy: { fontSize: 18, lineHeight: 29 },
   locRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
   socialRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, padding: 10, borderRadius: radii.md },
   valPill: {
@@ -992,7 +997,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: "22%",
     paddingVertical: space[3],
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth,
     gap: 4,

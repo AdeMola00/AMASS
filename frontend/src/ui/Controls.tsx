@@ -60,7 +60,7 @@ export function SegmentedControl<T extends string>({
           >
             {o.icon ? <Ionicons name={o.icon} size={14} color={fg} /> : null}
             {o.dot ? <View style={[styles.dot, { backgroundColor: o.dot }]} /> : null}
-            <AppText variant="caption" weight={active ? "bold" : "semibold"} color={fg} numberOfLines={1}>
+            <AppText variant="bodySm" weight={active ? "bold" : "semibold"} color={fg} numberOfLines={1}>
               {o.label}
             </AppText>
           </Pressable>
@@ -121,11 +121,11 @@ export function BalanceChip({ compact, style, testID = "balance-chip" }: { compa
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", padding: 4, borderRadius: radii.md, position: "relative", height: 44 },
+  track: { flexDirection: "row", padding: 4, borderRadius: radii.md, position: "relative", height: 48 },
   thumb: { position: "absolute", top: 4, left: 4, bottom: 4, borderRadius: radii.sm },
   seg: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: radii.sm },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 8, height: 36, paddingHorizontal: 10, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth },
+  chip: { flexDirection: "row", alignItems: "center", gap: 8, height: 40, paddingHorizontal: 12, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth },
   chipPart: { flexDirection: "row", alignItems: "center", gap: 5 },
   chipDivider: { width: StyleSheet.hairlineWidth, height: 16 },
   coin: { width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },

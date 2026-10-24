@@ -151,7 +151,7 @@ export function CategoryRow({ categories, selected, onSelect, size = 64, style }
           <PressableScale
             key={c.key}
             onPress={() => (onSelect ? onSelect(c.key) : router.push(`/shop/category/${c.key}` as any))}
-            style={[styles.cat, { width: size + 14 }]}
+            style={[styles.cat, { width: size + 22 }]}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={`${c.label}${c.count !== undefined ? `, ${c.count} products` : ""}`}
@@ -160,7 +160,7 @@ export function CategoryRow({ categories, selected, onSelect, size = 64, style }
             <View style={[styles.catIcon, { width: size, height: size, borderRadius: size * 0.34, backgroundColor: bg }]}>
               <Ionicons name={(c.icon || CATEGORY_FALLBACK_ICON[c.key] || "pricetag") as any} size={size * 0.46} color={fg} />
             </View>
-            <AppText variant="caption" align="center" numberOfLines={1} color={active ? colors.text : colors.textSecondary} style={{ fontFamily: active ? shopFont.bold : shopFont.semibold }}>
+            <AppText variant="caption" align="center" numberOfLines={2} color={active ? colors.text : colors.textSecondary} style={{ fontFamily: active ? shopFont.bold : shopFont.semibold, lineHeight: 17 }}>
               {c.label}
             </AppText>
           </PressableScale>
@@ -313,8 +313,8 @@ export function PurchaseRoutes({ retailer, routes, productId, compact, testIDPre
 
 const styles = StyleSheet.create({
   heading: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
-  headingLg: { fontFamily: shopFont.black, fontSize: 22, lineHeight: 26, letterSpacing: -0.5 },
-  headingMd: { fontFamily: shopFont.bold, fontSize: 17, lineHeight: 21, letterSpacing: -0.3 },
+  headingLg: { fontFamily: shopFont.black, fontSize: 24, lineHeight: 29, letterSpacing: -0.5 },
+  headingMd: { fontFamily: shopFont.bold, fontSize: 19, lineHeight: 24, letterSpacing: -0.3 },
   headingAction: { flexDirection: "row", alignItems: "center", gap: 2, paddingVertical: 4 },
   offerTag: { backgroundColor: SHOP.yellow, paddingHorizontal: 8, height: 22, borderRadius: 6, alignItems: "center", justifyContent: "center", alignSelf: "flex-start" },
   offerTagXs: { paddingHorizontal: 6, height: 18, borderRadius: 5 },
@@ -322,13 +322,13 @@ const styles = StyleSheet.create({
   chip: { flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 14, borderRadius: radii.pill, borderWidth: 1 },
   chipCount: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
   search: { flexDirection: "row", alignItems: "center", gap: 10, height: 50, paddingHorizontal: 16, borderRadius: radii.pill, borderWidth: 1.5 },
-  searchInput: { flex: 1, fontSize: 15, fontFamily: "PlusJakartaSans-500", paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 17, fontFamily: "PlusJakartaSans-500", paddingVertical: 0 },
   catRow: { paddingHorizontal: 12, gap: 2 },
   cat: { alignItems: "center", gap: 7, paddingVertical: 6 },
   catIcon: { alignItems: "center", justifyContent: "center" },
   banner: { flexDirection: "row", gap: 12, padding: 18, borderRadius: radii.xl, alignItems: "center", overflow: "hidden" },
   bannerBlob: { position: "absolute", right: -40, top: -50, width: 180, height: 180, borderRadius: 90, backgroundColor: "rgba(255,255,255,0.35)" },
-  bannerTitle: { fontFamily: shopFont.black, fontSize: 22, lineHeight: 26, letterSpacing: -0.5 },
+  bannerTitle: { fontFamily: shopFont.black, fontSize: 24, lineHeight: 29, letterSpacing: -0.5 },
   bannerBtn: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 16, height: 38, borderRadius: radii.pill, marginTop: 6 },
   bannerImgWrap: { width: 104, height: 104, borderRadius: radii.lg, backgroundColor: SHOP.white, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   bannerImg: { width: 92, height: 92 },

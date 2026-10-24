@@ -25,7 +25,7 @@ export function RetailerTile({ r, width = 80 }: { r: ShopRetailer; width?: numbe
           </View>
         ) : null}
       </View>
-      <AppText variant="caption" align="center" numberOfLines={1} style={{ marginTop: 8, fontFamily: shopFont.bold }}>
+      <AppText variant="caption" align="center" numberOfLines={2} style={{ marginTop: 8, fontFamily: shopFont.bold, lineHeight: 17 }}>
         {r.short_name}
       </AppText>
       {highlight ? (
@@ -98,5 +98,5 @@ const styles = StyleSheet.create({
   tile: { alignItems: "center" },
   corner: { position: "absolute", top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   row: { flexDirection: "row", gap: 14, alignItems: "flex-start", padding: 12, borderRadius: radii.lg, marginBottom: 10, borderWidth: 1 },
-  rowName: { fontFamily: shopFont.bold, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
+  rowName: { fontFamily: shopFont.bold, fontSize: 18, lineHeight: 23, letterSpacing: -0.2 },
 });

@@ -89,7 +89,7 @@ export default function UnlocksScreen() {
   return (
     <Screen testID="unlocks-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title="My Unlocked Properties" subtitle={items.length ? `${items.length} unlocked · ${totalSpent.toLocaleString()} MASS spent · yours forever` : undefined} />
+      <ScreenHeader title="My unlocks" subtitle={items.length ? `${items.length} unlocked · ${totalSpent.toLocaleString()} MASS spent · yours forever` : undefined} />
 
       {loading ? (
         <View style={{ padding: space[4], gap: space[3] }}>

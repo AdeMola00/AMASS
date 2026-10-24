@@ -492,7 +492,7 @@ function BoostsCard({ promos, listings, onBoost, onAll }: { promos: Awaited<Retu
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="title">Boosts</AppText>
           <AppText variant="caption" tone="secondary">
-            {active.length ? `${active.length} listing${active.length === 1 ? "" : "s"} promoted · ${active.reduce((n, a) => n + a.views_since, 0)} views since` : "Put a listing at the top of results, the Featured rail and the map."}
+            {active.length ? `${active.length} listing${active.length === 1 ? "" : "s"} promoted · ${active.reduce((n, a) => n + a.views_since, 0)} views since boosting` : "Put a listing at the top of results, the Featured rail and the map."}
           </AppText>
         </View>
         {active.length ? (
@@ -511,9 +511,9 @@ function BoostsCard({ promos, listings, onBoost, onAll }: { promos: Awaited<Retu
             <AppText variant="bodyMedium" numberOfLines={1}>
               {a.title}
             </AppText>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <PromotionBadge promotion={a.promotion as PromotionInfo} withDays />
-              <AppText variant="micro" tone="tertiary" tabular>
+              <AppText variant="micro" tone="tertiary" tabular numberOfLines={1}>
                 {a.views_since} views · {a.saves_since} saves
               </AppText>
             </View>
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionAction: { flexDirection: "row", alignItems: "center", gap: 2, paddingVertical: 4 },
   hero: { borderRadius: radii.xl, padding: space[5], gap: 6, overflow: "hidden" },
-  heroFooter: { flexDirection: "row", gap: 8, marginTop: 8 },
+  heroFooter: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   heroPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 28, borderRadius: radii.pill, backgroundColor: "rgba(255,255,255,0.12)" },
   statsRow: { flexDirection: "row", gap: space[3] },
   filterRow: { gap: 8, paddingBottom: space[3] },

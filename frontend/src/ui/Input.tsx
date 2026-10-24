@@ -40,20 +40,20 @@ export function Input({
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
   const borderColor = error ? colors.error : focused ? colors.text : "transparent";
-  const h = size === "lg" ? 56 : 50;
+  const h = size === "lg" ? 60 : 54;
   const multiline = !!rest.multiline;
 
   return (
     <View style={[styles.wrap, containerStyle]}>
       {label ? (
-        <AppText variant="caption" tone="secondary" style={styles.label}>
+        <AppText variant="bodySm" weight="semibold" tone="secondary" style={styles.label}>
           {label}
         </AppText>
       ) : null}
       <View
         style={[
           styles.field,
-          multiline ? { minHeight: 96, alignItems: "flex-start", paddingVertical: 12 } : { height: h },
+          multiline ? { minHeight: 104, alignItems: "flex-start", paddingVertical: 12 } : { height: h },
           {
             backgroundColor: focused ? colors.surface : colors.surfaceAlt,
             borderColor,
@@ -62,11 +62,12 @@ export function Input({
           },
         ]}
       >
-        {iconLeft ? <Ionicons name={iconLeft} size={18} color={focused ? colors.text : colors.textTertiary} style={multiline ? { marginTop: 2 } : null} /> : null}
+        {iconLeft ? <Ionicons name={iconLeft} size={20} color={focused ? colors.text : colors.textTertiary} style={multiline ? { marginTop: 2 } : null} /> : null}
         <TextInput
           {...rest}
           editable={editable}
           placeholderTextColor={colors.textMuted}
+          maxFontSizeMultiplier={1.3}
           onFocus={(e) => {
             setFocused(true);
             onFocus?.(e);
@@ -86,13 +87,13 @@ export function Input({
       </View>
       {error ? (
         <View style={styles.helperRow}>
-          <Ionicons name="alert-circle" size={13} color={colors.error} />
-          <AppText variant="caption" tone="error">
+          <Ionicons name="alert-circle" size={15} color={colors.error} />
+          <AppText variant="bodySm" weight="semibold" tone="error" style={{ flex: 1 }}>
             {error}
           </AppText>
         </View>
       ) : helper ? (
-        <AppText variant="caption" tone="tertiary" style={styles.helper}>
+        <AppText variant="caption" weight="medium" tone="tertiary" style={styles.helper}>
           {helper}
         </AppText>
       ) : null}
@@ -101,7 +102,7 @@ export function Input({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 6 },
+  wrap: { gap: 8 },
   label: { marginLeft: 2 },
   field: {
     flexDirection: "row",
@@ -110,8 +111,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: radii.md,
   },
-  input: { flex: 1, fontSize: 15, height: "100%", paddingVertical: 0 },
-  inputMulti: { height: undefined, minHeight: 72, textAlignVertical: "top", lineHeight: 20 },
+  input: { flex: 1, fontSize: 17, height: "100%", paddingVertical: 0 },
+  inputMulti: { height: undefined, minHeight: 80, textAlignVertical: "top", lineHeight: 24 },
   helperRow: { flexDirection: "row", alignItems: "center", gap: 4, marginLeft: 2 },
   helper: { marginLeft: 2 },
 });

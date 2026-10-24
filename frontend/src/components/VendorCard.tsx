@@ -69,9 +69,9 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
     marginBottom: 6,
   },
-  name: { fontSize: 14, fontWeight: "800", color: colors.text, marginTop: 6 },
-  tag: { fontSize: 11, color: colors.textTertiary, lineHeight: 15 },
+  name: { fontSize: 16, fontWeight: "800", color: colors.text, marginTop: 6 },
+  tag: { fontSize: 13, color: colors.textTertiary, lineHeight: 18 },
   stats: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
-  statText: { fontSize: 11, color: colors.textTertiary, fontWeight: "600" },
+  statText: { fontSize: 13, color: colors.textTertiary, fontWeight: "600" },
   dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.textMuted, marginHorizontal: 3 },
 });

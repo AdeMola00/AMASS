@@ -4,7 +4,7 @@
  * section with a clear next step, and property cards keep their paid action.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, useWindowDimensions } from "react-native";
 import Animated from "react-native-reanimated";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -24,6 +24,7 @@ type Quick = { key: string; label: string; icon: IconName; tone: "default" | "br
 export default function NeighboursTab() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
   const { user } = useAuth();
   const [data, setData] = useState<NeighboursHome | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,8 +68,10 @@ export default function NeighboursTab() {
   return (
     <Screen testID="neighbours-screen">
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <AppText variant="hero">neighbours</AppText>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <AppText variant="hero" style={width < 360 ? { fontSize: 26, lineHeight: 32 } : undefined} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} testID="neighbours-title">
+            neighbours
+          </AppText>
           <AppText variant="bodySm" tone="secondary">
             Decide together · Know your estate · Find local help
           </AppText>
@@ -107,8 +110,8 @@ export default function NeighboursTab() {
                     <View style={[styles.quickIcon, { backgroundColor: colors.surface }]}>
                       <Ionicons name={q.icon} size={18} color={toneColor(colors, q.tone)} />
                     </View>
-                    <AppText variant="micro" numberOfLines={1} align="center">
-                      {q.label}
+                    <AppText variant="micro" numberOfLines={1} align="center" style={{ letterSpacing: 0 }}>
+                      {width < 360 ? q.label.replace("Shared lists", "Lists").replace("Local map", "Map") : q.label}
                     </AppText>
                   </PressableScale>
                 </Appear>
@@ -212,7 +215,7 @@ export default function NeighboursTab() {
                   </View>
                 </Card>
               ) : (
-                <View style={{ flexDirection: "row", gap: 10 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: space[4] }} testID="nb-friends-row">
                   {data.connections.preview.map((u) => (
                     <Pressable key={u.id} onPress={() => router.push(`/neighbours/users/${u.id}` as any)} style={{ alignItems: "center", width: 64, gap: 4 }} accessibilityRole="button" accessibilityLabel={u.full_name}>
                       <Avatar name={u.full_name} uri={u.avatar_url} size={52} verified={u.verified} tone="soft" />
@@ -229,7 +232,7 @@ export default function NeighboursTab() {
                       Add
                     </AppText>
                   </Pressable>
-                </View>
+                </ScrollView>
               )}
             </Section>
 

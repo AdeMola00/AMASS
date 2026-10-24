@@ -65,6 +65,6 @@ const makeStyles = (colors: LegacyColors) =>
     shadowRadius: 6,
     elevation: 3,
   },
-  emoji: { fontSize: 26, lineHeight: 30 },
-  label: { fontSize: 11, color: colors.textSecondary, fontWeight: "600", textAlign: "center" },
+  emoji: { fontSize: 28, lineHeight: 33 },
+  label: { fontSize: 13, color: colors.textSecondary, fontWeight: "600", textAlign: "center" },
 });

@@ -542,7 +542,7 @@ export default function HomeMap() {
           <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(28,28,26,0.92)" : "rgba(255,255,255,0.94)" }]} pointerEvents="none" />
           <AmassLogo size={24} showWordmark={false} style={{ marginLeft: -2, zIndex: 1 }} />
           <TextInput
-            placeholder="Search area, estate or landmark"
+            placeholder="Search area, landmark"
             placeholderTextColor={colors.textSecondary}
             style={[styles.searchInput, { color: colors.text }, Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null]}
             value={query}
@@ -797,7 +797,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   topOverlay: { position: "absolute", left: space[3], right: space[3], gap: 10 },
   searchBar: { flexDirection: "row", alignItems: "center", gap: 8, height: 58, paddingHorizontal: 12, borderRadius: radii.pill, overflow: "hidden" },
-  searchInput: { flex: 1, minWidth: 0, fontSize: 16, fontFamily: "PlusJakartaSans-600", paddingVertical: 0, zIndex: 1 },
+  searchInput: { flex: 1, minWidth: 0, fontSize: 17, fontFamily: "PlusJakartaSans-600", paddingVertical: 0, zIndex: 1 },
   clearBtn: { width: 28, height: 40, alignItems: "center", justifyContent: "center", marginLeft: -6, zIndex: 1 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", zIndex: 1 },
   filterDot: { position: "absolute", top: -3, right: -3, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: "center", justifyContent: "center", borderWidth: 2 },

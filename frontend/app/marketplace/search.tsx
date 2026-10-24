@@ -255,7 +255,7 @@ function ChipWrap({ items, icon, onPress }: { items: string[]; icon: IconName; o
 const styles = StyleSheet.create({
   searchHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space[4], paddingVertical: space[2] },
   searchBar: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, height: 46, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14 },
-  searchInput: { flex: 1, fontSize: 15, fontFamily: fontFamilies.medium, height: "100%", paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 17, fontFamily: fontFamilies.medium, height: "100%", paddingVertical: 0 },
   block: { paddingHorizontal: space[4], paddingTop: space[4] },
   blockHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingHorizontal: 4 },
   chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

@@ -6,11 +6,11 @@ import { useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /** Height of the pill itself. */
-export const TAB_BAR_HEIGHT = 66;
+export const TAB_BAR_HEIGHT = 70;
 /** Gap between the pill and the home indicator / screen edge. */
 export const TAB_BAR_GAP = 10;
 /** Side margin of the pill (it floats, so the content shows around it). */
-export const TAB_BAR_SIDE = 16;
+export const TAB_BAR_SIDE = 12;
 /** Tablets / wide web: the pill stops growing and centres. */
 export const TAB_BAR_MAX_WIDTH = 520;
 

@@ -219,9 +219,9 @@ const styles = StyleSheet.create({
   note: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md },
   group: { padding: 16, borderRadius: radii.xl, gap: 14, borderWidth: 1 },
   groupHead: { flexDirection: "row", alignItems: "center", gap: 10 },
-  groupName: { fontFamily: shopFont.bold, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 },
+  groupName: { fontFamily: shopFont.bold, fontSize: 18, lineHeight: 23, letterSpacing: -0.2 },
   line: { flexDirection: "row", alignItems: "center", gap: 10 },
   thumb: { width: 64, height: 64, borderRadius: radii.md, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   totals: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 4 },
-  subtotal: { fontFamily: shopFont.black, fontSize: 20, lineHeight: 24, letterSpacing: -0.4 },
+  subtotal: { fontFamily: shopFont.black, fontSize: 22, lineHeight: 27, letterSpacing: -0.4 },
 });

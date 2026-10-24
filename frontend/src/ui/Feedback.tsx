@@ -296,7 +296,7 @@ export function StatTile({
       {animate && typeof value === "number" ? (
         <AnimatedNumber value={value} variant="h2" />
       ) : (
-        <AppText variant="h2" tabular numberOfLines={1}>
+        <AppText variant="h2" tabular numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
           {typeof value === "number" ? value.toLocaleString() : value}
         </AppText>
       )}
@@ -329,7 +329,7 @@ export function StatTile({
 const styles = StyleSheet.create({
   empty: { alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: space[10], paddingHorizontal: space[6] },
   emptyIcon: { width: 72, height: 72, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 6 },
-  stat: { flex: 1, padding: 14, borderRadius: radii.lg, gap: 6, minHeight: 100, justifyContent: "space-between" },
+  stat: { flex: 1, minWidth: 0, paddingVertical: 14, paddingHorizontal: 12, borderRadius: radii.lg, gap: 6, minHeight: 100, justifyContent: "space-between" },
   statTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   statIcon: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   delta: { flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 6, height: 18, borderRadius: 9 },

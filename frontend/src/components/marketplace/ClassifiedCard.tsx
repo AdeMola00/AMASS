@@ -258,7 +258,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.pill,
     backgroundColor: colors.ink,
   },
-  pricePillText: { color: "#fff", fontSize: 13, fontFamily: F.bold, letterSpacing: -0.2 },
+  pricePillText: { color: "#fff", fontSize: 17, fontFamily: F.extrabold, letterSpacing: -0.3 },
   badgeStack: { position: "absolute", top: 8, left: 8, flexDirection: "row", gap: 4 },
   heartBtn: {
     position: "absolute",
@@ -272,9 +272,9 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
   },
   gridBody: { padding: 10, gap: 4 },
-  gridTitle: { fontSize: 14, fontFamily: F.medium, color: colors.text, minHeight: 36, lineHeight: 18 },
+  gridTitle: { fontSize: 17, fontFamily: F.semibold, color: colors.text, minHeight: 44, lineHeight: 22 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 3 },
-  metaText: { fontSize: 12, color: colors.textMuted, fontFamily: F.regular },
+  metaText: { fontSize: 14, color: colors.textMuted, fontFamily: F.medium },
   dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.textMuted, marginHorizontal: 3 },
 
   // List row
@@ -303,15 +303,15 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
   },
   rowBody: { flex: 1, gap: 4 },
-  rowPrice: { fontSize: 17, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
-  rowTitle: { fontSize: 14, fontFamily: F.regular, color: colors.text, lineHeight: 18 },
+  rowPrice: { fontSize: 22, fontFamily: F.extrabold, color: colors.text, letterSpacing: -0.5 },
+  rowTitle: { fontSize: 17, fontFamily: F.medium, color: colors.text, lineHeight: 22 },
   chipRow: { flexDirection: "row", gap: 6, marginTop: 2, flexWrap: "wrap" },
   miniChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  miniChipText: { fontSize: 10, fontFamily: F.semibold, letterSpacing: 0.2 },
+  miniChipText: { fontSize: 12, fontFamily: F.semibold, letterSpacing: 0.2 },
 
   // Badges
   badge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  badgeText: { fontSize: 9, fontFamily: F.bold, letterSpacing: 0.5 },
+  badgeText: { fontSize: 11, fontFamily: F.bold, letterSpacing: 0.5 },
 
   // Featured (hero)
   featuredCard: {
@@ -343,6 +343,6 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
   },
   featuredBottom: { position: "absolute", left: 14, right: 14, bottom: 14, gap: 2 },
-  featuredTitle: { color: "#fff", fontSize: 14, fontFamily: F.medium, letterSpacing: -0.2 },
-  featuredPrice: { color: "#fff", fontSize: 22, fontFamily: F.bold, letterSpacing: -0.4 },
+  featuredTitle: { color: "#fff", fontSize: 16, fontFamily: F.medium, letterSpacing: -0.2 },
+  featuredPrice: { color: "#fff", fontSize: 28, fontFamily: F.extrabold, letterSpacing: -0.6 },
 });

@@ -264,7 +264,7 @@ function ToggleRow({ title, sub, value, onChange }: { title: string; sub: string
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space[4], paddingVertical: space[2] },
   searchBar: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, height: 42, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14 },
-  searchInput: { flex: 1, fontSize: 14, fontFamily: fontFamilies.medium, height: "100%", paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 16, fontFamily: fontFamilies.medium, height: "100%", paddingVertical: 0 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: space[4], paddingTop: space[2], paddingBottom: space[3] },
   sortRow: { paddingHorizontal: space[4], gap: 8, paddingBottom: 8 },
   gridRow: { flexDirection: "row", gap: 12 },

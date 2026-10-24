@@ -81,7 +81,8 @@ export default function Profile() {
     useCallback(() => {
       // listFavorites keeps the count consistent with the Saved Properties screen.
       api.listFavorites().then((r) => setSaved(r.length)).catch(() => setSaved(0));
-      api.walletUnlocks().then((r) => setUnlocked((r as any[]).length)).catch(() => setUnlocked(0));
+      // myUnlocks is the same source the Unlocks screen renders, so the tile and the list always agree.
+      api.myUnlocks("property").then((r) => setUnlocked(r.count)).catch(() => setUnlocked(0));
     }, [])
   );
 

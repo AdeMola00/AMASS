@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     borderColor: FLYER.border,
   },
   flyerBrandBar: { flexDirection: "row", alignItems: "center", padding: space[4], backgroundColor: FLYER.ink },
-  flyerBrand: { fontSize: 22, lineHeight: 26, letterSpacing: 3, fontFamily: fontFamilies.extrabold },
+  flyerBrand: { fontSize: 24, lineHeight: 29, letterSpacing: 3, fontFamily: fontFamilies.extrabold },
   flyerVerified: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: FLYER.red, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.pill },
   flyerImage: { width: "100%", aspectRatio: 4 / 3, backgroundColor: FLYER.surface },
   flyerImageFallback: { alignItems: "center", justifyContent: "center" },

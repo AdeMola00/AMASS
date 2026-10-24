@@ -288,7 +288,7 @@ const makeStyles = (colors: LegacyColors) =>
   },
   hdrAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.surface },
   hdrTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  hdrName: { fontSize: 15, fontWeight: "800", color: colors.text, letterSpacing: -0.2, flex: 1 },
+  hdrName: { fontSize: 17, fontWeight: "800", color: colors.text, letterSpacing: -0.2, flex: 1 },
   verifyPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -298,18 +298,18 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: 6,
     backgroundColor: "rgba(34,197,94,0.15)",
   },
-  verifyPillText: { fontSize: 9, fontWeight: "900", color: "#15803D", letterSpacing: 0.5 },
+  verifyPillText: { fontSize: 11, fontWeight: "900", color: "#15803D", letterSpacing: 0.5 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  trade: { fontSize: 11, color: colors.textSecondary, fontWeight: "700" },
-  meta: { fontSize: 11, color: colors.textTertiary, fontWeight: "600" },
-  metaStrong: { fontSize: 11, color: colors.text, fontWeight: "800" },
+  trade: { fontSize: 13, color: colors.textSecondary, fontWeight: "700" },
+  meta: { fontSize: 13, color: colors.textTertiary, fontWeight: "600" },
+  metaStrong: { fontSize: 13, color: colors.text, fontWeight: "800" },
   dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.textMuted, marginHorizontal: 3 },
-  priceLine: { fontSize: 11, color: colors.textTertiary, fontWeight: "600", marginTop: 4 },
-  priceBold: { color: colors.text, fontWeight: "900", fontSize: 13 },
+  priceLine: { fontSize: 13, color: colors.textTertiary, fontWeight: "600", marginTop: 4 },
+  priceBold: { color: colors.text, fontWeight: "900", fontSize: 15 },
 
   // Sections
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.1,
@@ -331,8 +331,8 @@ const makeStyles = (colors: LegacyColors) =>
     gap: 2,
   },
   dateTileActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  dateLabel: { fontSize: 12, fontWeight: "800", color: colors.text },
-  dateSub: { fontSize: 10, color: colors.textTertiary, fontWeight: "600" },
+  dateLabel: { fontSize: 14, fontWeight: "800", color: colors.text },
+  dateSub: { fontSize: 12, color: colors.textTertiary, fontWeight: "600" },
 
   // Time row
   timeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
@@ -345,7 +345,7 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.surface,
   },
   timeChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  timeChipText: { fontSize: 12, fontWeight: "700", color: colors.text },
+  timeChipText: { fontSize: 14, fontWeight: "700", color: colors.text },
 
   // Inputs
   input: {
@@ -355,7 +355,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 14,
+    fontSize: 16,
     color: colors.text,
     marginBottom: 10,
   },
@@ -373,7 +373,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderWidth: 1,
     borderColor: "rgba(34,197,94,0.2)",
   },
-  trustText: { flex: 1, fontSize: 11, color: "#15803D", fontWeight: "700" },
+  trustText: { flex: 1, fontSize: 13, color: "#15803D", fontWeight: "700" },
 
   // Submit
   submitBtn: {
@@ -385,7 +385,7 @@ const makeStyles = (colors: LegacyColors) =>
     justifyContent: "center",
     ...shadows.soft,
   },
-  submitText: { color: "#fff", fontSize: 15, fontWeight: "900", letterSpacing: 0.2 },
+  submitText: { color: "#fff", fontSize: 17, fontWeight: "900", letterSpacing: 0.2 },
 
   // Confirmed
   confirmed: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
@@ -394,6 +394,6 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: "#22C55E",
     alignItems: "center", justifyContent: "center",
   },
-  confirmedTitle: { fontSize: 22, fontWeight: "900", color: colors.text, letterSpacing: -0.4 },
-  confirmedBody: { fontSize: 14, color: colors.textSecondary, fontWeight: "500", textAlign: "center", lineHeight: 20 },
+  confirmedTitle: { fontSize: 24, fontWeight: "900", color: colors.text, letterSpacing: -0.4 },
+  confirmedBody: { fontSize: 16, color: colors.textSecondary, fontWeight: "500", textAlign: "center", lineHeight: 23 },
 });

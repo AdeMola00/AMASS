@@ -94,5 +94,5 @@ function Pane({ progress, side, bg, fg, icon, label, onPress, testID }: { progre
 const styles = StyleSheet.create({
   pane: { width: PANE_W, justifyContent: "center", paddingHorizontal: 14 },
   paneInner: { alignItems: "center", gap: 4, width: PANE_W - 28 },
-  paneLabel: { fontFamily: "PlusJakartaSans-700", fontSize: 10.5 },
+  paneLabel: { fontFamily: "PlusJakartaSans-700", fontSize: 12.5 },
 });

@@ -161,9 +161,9 @@ const makeStyles = (colors: LegacyColors) =>
   sheetBg: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   handle: { backgroundColor: colors.borderStrong, width: 44, height: 5 },
   wrap: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: 8 },
-  title: { fontSize: 20, fontWeight: "800", color: colors.text, letterSpacing: -0.3, marginBottom: 4 },
-  itemName: { fontSize: 14, color: colors.textSecondary, fontWeight: "600" },
-  itemPrice: { fontSize: 12, color: colors.textTertiary, fontWeight: "600", marginTop: 2, marginBottom: 20 },
+  title: { fontSize: 22, fontWeight: "800", color: colors.text, letterSpacing: -0.3, marginBottom: 4 },
+  itemName: { fontSize: 16, color: colors.textSecondary, fontWeight: "600" },
+  itemPrice: { fontSize: 14, color: colors.textTertiary, fontWeight: "600", marginTop: 2, marginBottom: 20 },
   amountBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -175,8 +175,8 @@ const makeStyles = (colors: LegacyColors) =>
     borderColor: colors.border,
     backgroundColor: colors.surfaceSecondary,
   },
-  currency: { fontSize: 26, fontWeight: "800", color: colors.textSecondary },
-  amountInput: { flex: 1, fontSize: 28, fontWeight: "900", color: colors.text, letterSpacing: -0.5 },
+  currency: { fontSize: 28, fontWeight: "800", color: colors.textSecondary },
+  amountInput: { flex: 1, fontSize: 30, fontWeight: "900", color: colors.text, letterSpacing: -0.5 },
   bumpRow: { flexDirection: "row", gap: 8, marginTop: 12 },
   bumpChip: {
     flex: 1,
@@ -188,7 +188,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderColor: colors.border,
   },
   bumpChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  bumpChipText: { fontSize: 12, fontWeight: "800", color: colors.text },
+  bumpChipText: { fontSize: 14, fontWeight: "800", color: colors.text },
   messageInput: {
     marginTop: 16,
     minHeight: 72,
@@ -196,7 +196,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: 14,
-    fontSize: 14,
+    fontSize: 16,
     color: colors.text,
     textAlignVertical: "top",
   },
@@ -210,5 +210,5 @@ const makeStyles = (colors: LegacyColors) =>
     flexDirection: "row",
     gap: 6,
   },
-  ctaText: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
+  ctaText: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: -0.2 },
 });

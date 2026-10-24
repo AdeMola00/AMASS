@@ -617,9 +617,11 @@ export default function Marketplace() {
               testID="location-selector"
             >
               <Ionicons name="location" size={13} color={colors.red} />
-              <Text style={styles.locationText} numberOfLines={1}>
-                {city.replace("Lagos - ", "").replace("Abuja - ", "")}
-              </Text>
+              {winW >= 360 ? (
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {city.replace("Lagos - ", "").replace("Abuja - ", "")}
+                </Text>
+              ) : null}
               <Ionicons name="chevron-down" size={13} color={colors.textSecondary} />
             </Pressable>
             {section === "brands" ? (
@@ -646,7 +648,7 @@ export default function Marketplace() {
             testID="market-search-bar"
           >
             <Ionicons name="search" size={18} color={colors.textSecondary} />
-            <Text style={styles.searchPlaceholder}>
+            <Text style={styles.searchPlaceholder} numberOfLines={1}>
               {section === "brands" ? "Search stores, brands, products…" : "Search homes, services, finds…"}
             </Text>
           </Pressable>
@@ -822,20 +824,22 @@ const makeStyles = (colors: LegacyColors) =>
     gap: 10,
   },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  brandTitle: { fontSize: 20, fontFamily: F.bold, color: colors.text, letterSpacing: -0.4 },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
+  brandTitle: { fontSize: 22, fontFamily: F.bold, color: colors.text, letterSpacing: -0.4 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1, minWidth: 0 },
   locationPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    maxWidth: 130,
+    maxWidth: 156,
+    flexShrink: 1,
+    minWidth: 0,
     height: 34,
     paddingHorizontal: 10,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceSecondary,
   },
-  locationText: { fontSize: 12, fontFamily: F.semibold, color: colors.text, flexShrink: 1 },
+  locationText: { fontSize: 14, fontFamily: F.semibold, color: colors.text, flexShrink: 1 },
   iconBtn: {
     width: 36,
     height: 36,
@@ -857,7 +861,7 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.surfaceSecondary,
     paddingHorizontal: 16,
   },
-  searchPlaceholder: { fontSize: 14, color: colors.textTertiary, fontFamily: F.regular, flex: 1 },
+  searchPlaceholder: { fontSize: 16, color: colors.textTertiary, fontFamily: F.regular, flex: 1 },
   filterBtn: {
     width: 46,
     height: 46,
@@ -881,7 +885,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderWidth: 1.5,
     borderColor: "#fff",
   },
-  filterDotText: { color: "#fff", fontSize: 10, fontFamily: F.bold },
+  filterDotText: { color: "#fff", fontSize: 12, fontFamily: F.bold },
 
   // Segmented control
   segTrack: {
@@ -900,7 +904,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.pill,
   },
   segItemActive: { backgroundColor: colors.surface, ...shadows.soft },
-  segText: { fontSize: 13, fontFamily: F.semibold, color: colors.textTertiary },
+  segText: { fontSize: 15, fontFamily: F.semibold, color: colors.textTertiary },
   segTextActive: { color: colors.text, fontFamily: F.bold },
 
   // City picker
@@ -917,7 +921,7 @@ const makeStyles = (colors: LegacyColors) =>
     ...shadows.floating,
   },
   cityRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 16 },
-  cityRowText: { fontSize: 14, color: colors.text, fontFamily: F.medium },
+  cityRowText: { fontSize: 16, color: colors.text, fontFamily: F.medium },
 
   // Category tiles
   tilesWrap: { paddingTop: 10 },
@@ -945,9 +949,9 @@ const makeStyles = (colors: LegacyColors) =>
     alignItems: "center",
     justifyContent: "center",
   },
-  fixaTitle: { color: "#fff", fontSize: 18, fontFamily: F.extrabold, letterSpacing: -0.3 },
+  fixaTitle: { color: "#fff", fontSize: 20, fontFamily: F.extrabold, letterSpacing: -0.3 },
   fixaPill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.9)", paddingHorizontal: 8, height: 22, borderRadius: 11 },
-  fixaPillText: { color: "#1C5E39", fontSize: 11, fontFamily: F.bold },
+  fixaPillText: { color: "#1C5E39", fontSize: 13, fontFamily: F.bold },
 
   // Section header
   sectionHeader: {
@@ -958,8 +962,8 @@ const makeStyles = (colors: LegacyColors) =>
     paddingTop: 16,
     paddingBottom: 10,
   },
-  sectionTitle: { fontSize: 18, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
-  sectionSub: { fontSize: 13, color: colors.textMuted, fontFamily: F.semibold },
+  sectionTitle: { fontSize: 20, fontFamily: F.bold, color: colors.text, letterSpacing: -0.3 },
+  sectionSub: { fontSize: 15, color: colors.textMuted, fontFamily: F.semibold },
 
   // Featured
   featuredRow: { gap: 12, paddingHorizontal: spacing.lg, paddingBottom: 4 },
@@ -974,8 +978,8 @@ const makeStyles = (colors: LegacyColors) =>
     paddingBottom: 12,
     gap: 12,
   },
-  feedTitle: { fontSize: 20, fontFamily: F.bold, color: colors.text, letterSpacing: -0.4 },
-  feedSub: { fontSize: 13, color: colors.textMuted, fontFamily: F.regular, marginTop: 2 },
+  feedTitle: { fontSize: 22, fontFamily: F.bold, color: colors.text, letterSpacing: -0.4 },
+  feedSub: { fontSize: 15, color: colors.textMuted, fontFamily: F.regular, marginTop: 2 },
   viewToggle: {
     width: 40,
     height: 40,
@@ -997,7 +1001,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderWidth: 1,
     borderColor: colors.border,
   },
-  sortPillText: { fontSize: 13, fontFamily: F.semibold, color: colors.text },
+  sortPillText: { fontSize: 15, fontFamily: F.semibold, color: colors.text },
 
   // Sort modal
   modalBackdrop: { flex: 1, backgroundColor: "rgba(10,10,10,0.35)", justifyContent: "flex-end" },
@@ -1016,7 +1020,7 @@ const makeStyles = (colors: LegacyColors) =>
     backgroundColor: colors.borderStrong,
     marginBottom: 14,
   },
-  sheetTitle: { fontSize: 17, fontFamily: F.bold, color: colors.text, marginBottom: 6, letterSpacing: -0.3 },
+  sheetTitle: { fontSize: 19, fontFamily: F.bold, color: colors.text, marginBottom: 6, letterSpacing: -0.3 },
   sortRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1025,7 +1029,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.divider,
   },
-  sortRowText: { fontSize: 15, fontFamily: F.regular, color: colors.textSecondary },
+  sortRowText: { fontSize: 17, fontFamily: F.regular, color: colors.textSecondary },
 
   // Grid
   gridRow: { flexDirection: "row", gap: 12, marginBottom: 12, paddingHorizontal: spacing.lg },
@@ -1044,7 +1048,7 @@ const makeStyles = (colors: LegacyColors) =>
     overflow: "hidden",
     ...shadows.floating,
   },
-  sellFabText: { color: "#fff", fontSize: 16, fontFamily: F.extrabold, letterSpacing: -0.2 },
+  sellFabText: { color: "#fff", fontSize: 18, fontFamily: F.extrabold, letterSpacing: -0.2 },
 
   loading: { paddingTop: 80, alignItems: "center", justifyContent: "center" },
 });

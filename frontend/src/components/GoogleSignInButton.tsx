@@ -195,5 +195,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
-  label: { fontSize: 15, fontWeight: "700", letterSpacing: 0.2 },
+  label: { fontSize: 17, fontWeight: "700", letterSpacing: 0.2 },
 });

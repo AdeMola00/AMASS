@@ -133,11 +133,11 @@ export function ScreenHeader({
         )}
         {!large ? (
           <View style={styles.headerCenter}>
-            <AppText variant="title" color={fg} numberOfLines={1}>
+            <AppText variant="h3" color={fg} numberOfLines={1}>
               {title}
             </AppText>
             {subtitle ? (
-              <AppText variant="caption" color={sub} numberOfLines={1}>
+              <AppText variant="caption" weight="medium" color={sub} numberOfLines={1}>
                 {subtitle}
               </AppText>
             ) : null}

@@ -264,7 +264,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
   },
-  sponsoredText: { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
+  sponsoredText: { color: "#fff", fontSize: 12, fontWeight: "900", letterSpacing: 0.5 },
   iconBtn: {
     width: 40,
     height: 40,
@@ -294,7 +294,7 @@ const makeStyles = (colors: LegacyColors) =>
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  menuText: { fontSize: 13, fontWeight: "700", color: colors.text },
+  menuText: { fontSize: 15, fontWeight: "700", color: colors.text },
   skipPill: {
     position: "absolute",
     top: 68,
@@ -307,7 +307,7 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: 999,
     backgroundColor: "rgba(0,0,0,0.55)",
   },
-  skipText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  skipText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   bottomText: {
     position: "absolute",
     left: 20,
@@ -315,8 +315,8 @@ const makeStyles = (colors: LegacyColors) =>
     bottom: 20,
     gap: 6,
   },
-  title: { color: "#fff", fontSize: 26, lineHeight: 30, fontFamily: "DMSerifDisplay", letterSpacing: -0.3 },
-  body: { color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 18 },
+  title: { color: "#fff", fontSize: 28, lineHeight: 33, fontFamily: "DMSerifDisplay", letterSpacing: -0.3 },
+  body: { color: "rgba(255,255,255,0.9)", fontSize: 15, lineHeight: 21 },
   ctaRow: {
     flexDirection: "row",
     gap: 10,
@@ -331,7 +331,7 @@ const makeStyles = (colors: LegacyColors) =>
     alignItems: "center",
     justifyContent: "center",
   },
-  ctaSecondaryText: { color: "#5C5C59", fontWeight: "500", fontSize: 13 },
+  ctaSecondaryText: { color: "#5C5C59", fontWeight: "500", fontSize: 15 },
   ctaPrimary: {
     flex: 1,
     flexDirection: "row",
@@ -342,5 +342,5 @@ const makeStyles = (colors: LegacyColors) =>
     borderRadius: radius.pill,
     backgroundColor: "#111111",
   },
-  ctaPrimaryText: { color: "#fff", fontWeight: "500", fontSize: 15, letterSpacing: -0.2 },
+  ctaPrimaryText: { color: "#fff", fontWeight: "500", fontSize: 17, letterSpacing: -0.2 },
 });
