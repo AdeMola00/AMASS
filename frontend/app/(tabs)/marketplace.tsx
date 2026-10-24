@@ -510,7 +510,7 @@ export default function Marketplace() {
         contentContainerStyle={{ paddingTop: headerH + 8, paddingBottom: tabBarOffset + 88 }}
         showsVerticalScrollIndicator={false}
         refreshControl={refreshControl}
-        ListHeaderComponent={loading || fixaLocked ? null : listHeader}
+        ListHeaderComponent={loading || fixaLocked ? undefined : listHeader}
         removeClippedSubviews={Platform.OS !== "web"}
         initialNumToRender={8}
         windowSize={7}

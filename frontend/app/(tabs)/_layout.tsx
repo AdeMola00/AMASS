@@ -8,6 +8,7 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Pressable, Platform, AppState } from "react-native";
 import { Tabs, Redirect } from "expo-router";
+import type { BottomTabBarProps } from "expo-router/js-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { BlurView } from "expo-blur";
@@ -64,7 +65,8 @@ function useBadges(activeIndex: number) {
 const INDICATOR_W = 56;
 const INDICATOR_H = 34;
 
-function FloatingTabBar({ state, navigation }: any) {
+// expo-router 58: custom tabBar receives { state, descriptors, emitter, navigateToTab, insets } (no `navigation`).
+function FloatingTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { colors, shadows, isDark } = useTheme();
   const barW = useTabBarWidth();
@@ -92,8 +94,8 @@ function FloatingTabBar({ state, navigation }: any) {
               compact={tabW < 66}
               badge={r.name === "updates" ? badges.updates : r.name === "neighbours" ? badges.neighbours : 0}
               onPress={() => {
-                const event = navigation.emit({ type: "tabPress", target: r.key, canPreventDefault: true });
-                if (!event.defaultPrevented) navigation.navigate(r.name);
+                const event = emitter.emit({ type: "tabPress", target: r.key, canPreventDefault: true });
+                if (state.index !== i && !event.defaultPrevented) navigateToTab(r.key);
               }}
             />
           ))}

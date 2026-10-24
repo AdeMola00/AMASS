@@ -4,7 +4,7 @@
  * the shareable score gauge on top of an AI value range.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Share, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, Share, StyleSheet, View, type ViewInstance } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Sharing from "expo-sharing";
@@ -54,7 +54,7 @@ export function PropertyScoreCard({
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const shareRef = useRef<View>(null);
+  const shareRef = useRef<ViewInstance>(null);
 
   const load = useCallback(async () => {
     setLoading(true);

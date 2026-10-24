@@ -297,7 +297,7 @@ export default function StoreScreen() {
             ) : (
               <EmptyState icon="search-outline" title="No products match" body="Try a different search or category." actionLabel="Clear" onAction={() => { setQ(""); setCat("all"); setSub(null); }} compact testID="shop-store-empty" />
             )
-          ) : null
+          ) : undefined
         }
         ListFooterComponent={
           store && store.product_count > 0 ? (
@@ -306,7 +306,7 @@ export default function StoreScreen() {
               <PurchaseRoutes retailer={store} routes={store.purchase_routes} compact testIDPrefix="shop-store-route" />
               <VerifiedNote date={store.verification.last_verified_at} source={store.verification.sources?.[0]} label="Store details verified" />
             </View>
-          ) : null
+          ) : undefined
         }
         contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}

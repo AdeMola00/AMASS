@@ -245,7 +245,7 @@ export default function PropertyDetails() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]} testID="property-details">
-      <StatusBar barStyle="light-content" translucent />
+      <StatusBar barStyle="light-content" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 + insets.bottom }}>
         {/* Gallery */}
         <View style={{ height: GALLERY_H, backgroundColor: colors.surfaceSunken }}>

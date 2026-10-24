@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, StyleSheet, Pressable, TextInput, ScrollView, FlatList } from "react-native";
+import { View, StyleSheet, Pressable, TextInput, ScrollView, FlatList, type TextInputInstance } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,7 +22,7 @@ export default function MarketSearch() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   const [q, setQ] = useState("");
   const [suggest, setSuggest] = useState<SearchSuggestions | null>(null);

@@ -3,7 +3,7 @@
  * Asker can accept an answer; managers can pin/hide; anyone can report.
  */
 import React, { useCallback, useRef, useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable, RefreshControl, TextInput } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, RefreshControl, TextInput, type TextInputInstance } from "react-native";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
@@ -31,7 +31,7 @@ export default function PostScreen() {
   const [menu, setMenu] = useState(false);
   const [report, setReport] = useState<{ type: "post" | "reply"; id: string } | null>(null);
   const [isManager, setIsManager] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   const load = useCallback(async () => {
     if (!id) return;

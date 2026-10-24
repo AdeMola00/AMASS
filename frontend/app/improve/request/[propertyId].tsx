@@ -110,7 +110,7 @@ export default function InspectionRequest() {
             reader.readAsDataURL(blob);
           });
         } else {
-          const b64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+          const b64 = await new FileSystem.File(asset.uri).base64();
           dataUrl = `data:${asset.mimeType || "video/mp4"};base64,${b64}`;
         }
       } catch {

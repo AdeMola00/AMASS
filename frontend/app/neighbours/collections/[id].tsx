@@ -5,7 +5,7 @@
  * (love / maybe / no) and discuss; nothing here reveals paid information.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable, RefreshControl, Share, TextInput, Platform } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, RefreshControl, Share, TextInput, Platform, type TextInputInstance } from "react-native";
 import { Image } from "expo-image";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -40,7 +40,7 @@ export default function CollectionDetailScreen() {
   const [comment, setComment] = useState("");
   const [commentFor, setCommentFor] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   const load = useCallback(async () => {
     if (!id) return;

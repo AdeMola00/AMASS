@@ -4,7 +4,7 @@
  * Contact is only ever opened by the viewer tapping the CTA; owners get "Manage" instead.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View, useWindowDimensions, type ScrollViewInstance } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -36,7 +36,7 @@ export default function SocialPostScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const commentsY = useRef(0);
 
   const load = useCallback(async () => {

@@ -2,7 +2,7 @@
  * Phone sign-in · step 2 — one-time code. Resend with cooldown, clear errors, lockout message.
  */
 import React, { useEffect, useRef, useState } from "react";
-import { View, StyleSheet, Pressable, TextInput } from "react-native";
+import { View, StyleSheet, Pressable, TextInput, type TextInputInstance } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -28,7 +28,7 @@ export default function VerifyCode() {
   const [error, setError] = useState<string | null>(null);
   const [left, setLeft] = useState(Number(p.cooldown || 60));
   const [resending, setResending] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     if (left <= 0) return;

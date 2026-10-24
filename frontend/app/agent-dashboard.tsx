@@ -302,7 +302,7 @@ export default function AgentDashboard() {
                 <Chip label="Needs docs" icon="document-outline" selected={filter === "needs_docs"} onPress={() => setFilter("needs_docs")} count={listings.filter((l) => l.status !== "sold" && l.status !== "withdrawn" && (l.documents_status === "none" || l.documents_status === "rejected")).length} testID="listing-filter-needs-docs" />
                 <Chip label="Sold / withdrawn" icon="archive-outline" selected={filter === "closed"} onPress={() => setFilter("closed")} count={listings.filter((l) => l.status === "sold" || l.status === "withdrawn").length} testID="listing-filter-closed" />
               </ScrollView>
-            ) : null
+            ) : undefined
           }
           renderItem={({ item }) => (
             <ListingManagerRow

@@ -1,0 +1,37 @@
+{
+  "summary": "Frontend smoke test on the web preview at 390x844 after the Expo SDK 58 upgrade (RN 0.88, expo-router 58, RNGH 3.3, reanimated 4.7). Found 1 CRITICAL regression and fixed it: tapping ANY tab in the bottom tab bar crashed the app with a red screen ('Uncaught Error: Cannot read properties of undefined (reading emit)', app/(tabs)/_layout.tsx:95). In expo-router 58, a custom tabBar no longer gets a `navigation` prop. It gets { state, descriptors, emitter, navigateToTab, insets } instead. After the fix, everything requested passed with no red screen and no page errors: cold start and onboarding (4 slides, Next/Skip leads to /login, loads in about 6 s); login for demo and fixa; all 5 tabs (navigation, aria-selected, indicator translateX animates, badges Updates=2 and Neighbours=31, re-tapping a tab is safe); Home (map pins, Lekki search filters the homes sheet to '3 homes here', pin opens preview then passport, tile opens passport, back-btn returns home, HomesSheet mouse-drag expands the sheet on web); owned passport 3998e99b (gallery, price, specs, neighborhood-scores, agent card, sticky Save/Share/Boost/Manage, each target route opens); Share /share/{id} card renders (view-shot 6); Updates swipes with RNGH 3 (drag right shows 'Mark read' pane, then 'Marked as read · Undo' toast, unread 2→1, row snaps back to offset 0 within about 1.2 s, Undo works; drag left gives 'Update dismissed · Undo' and rows go 40→39; a slow partial drag does not open the deep link; a normal tap opens the deep link and browser back returns); Unread chip and empty state, Mark-all, Clear-read two-tap confirm (not executed); Nearby SocialFeed; Market (Brands rails, Declutter filter bottom sheet opens and closes via backdrop, /shop/search 'blender' gives 5 products, /shop/product add-to-basket, basket minus removes the line); Neighbours feed, friends row scrolls, find-friends; Profile, wallet (MASS 12,642 / FIX 590), settings, dark/system theme switch; agent-dashboard stats and listings; /agent/listing Leads/Docs tabs; submit-property step 1 to 2 (inputs focus and type); inbox, chat render, sending a text message works, voice-mic present.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "FloatingTabBar (app/(tabs)/_layout.tsx)", "issue": "FIXED BY TESTING AGENT. expo-router 58 changed the custom tabBar props: `navigation` became undefined, so navigation.emit threw on every tab tap and showed a red screen. Replaced it with `emitter.emit` + `navigateToTab(r.key)` and typed the props as BottomTabBarProps from 'expo-router/js-tabs'.", "testID": "tab-index/tab-updates/tab-marketplace/tab-neighbours/tab-profile", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Updates", "issues": ["The success toast ('Marked as read · Undo') shows at the very top and partly covers the 'Updates' title and header icons for a moment. Minor."]},
+      {"screen": "Home", "issues": ["On web, the 'Satellite imagery renders on mobile' caption and a map pin (₦14M) peek out below the floating tab bar at the bottom edge (y≈820-844). This was already present in iteration 71. Minor."]}
+    ],
+    "react_native_issues": [
+      {"component": "expo-file-system/legacy", "issue": "The legacy FileSystem.readAsStringAsync API is still used. It works on SDK 58, but it is deprecated in favour of the new File API. Reference: /app/frontend/app/chat/[conversation_id].tsx:30,345; /app/frontend/src/lib/pickImage.ts:8,23,65; /app/frontend/src/components/VoiceComposer.tsx:21,171; /app/frontend/app/admin/neighbours.tsx:12"},
+      {"component": "Reanimated layout animations", "issue": "Many console warnings: '[Reanimated] Property [transform] may be overwritten by a layout animation' (3-10 per screen on Home, passport, Updates and Market). A component sets both a transform style and entering/layout on the same Animated.View. Wrap it in an outer Animated.View that carries the layout animation."},
+      {"component": "Animated useNativeDriver (web)", "issue": "Warning: 'useNativeDriver is not supported because the native animated module is missing'. This is benign on web, but the RN Animated calls could be guarded with Platform.OS !== 'web'."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/screenshots_iter72/", "/tmp/h58.py (playwright helper header)"],
+  "action_items": [
+    "Review and keep the tab-bar fix in app/(tabs)/_layout.tsx (expo-router 58 BottomTabBarProps: emitter/navigateToTab). Search for any other custom navigator UI that still expects a `navigation` prop.",
+    "Optional: migrate expo-file-system/legacy readAsStringAsync to the new File(uri).base64() API in chat/[conversation_id].tsx, src/lib/pickImage.ts, VoiceComposer.tsx and admin/neighbours.tsx.",
+    "Optional: clean up the Reanimated 'transform may be overwritten by a layout animation' warnings by moving entering/layout onto a wrapper Animated.View.",
+    "Optional: app.config sets android.googleServicesFile './google-services.json' but the file is missing, and the Expo log shows 'Could not parse Expo config'. Add the file or guard the line before native builds."
+  ],
+  "critical_code_review_comments": [
+    "Custom tabBar props must follow the expo-router 58 BottomTabBarProps contract. The old `navigation` prop no longer exists, and there was no TypeScript check because the props were typed as `any`.",
+    "The fixed onPress now skips navigateToTab when the tab is already focused, matching the default BottomTabBar. tabPress is still emitted, so screen listeners such as scroll-to-top still fire."
+  ],
+  "updated_files": ["/app/frontend/app/(tabs)/_layout.tsx"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% after fix (tab navigation was 0% before the fix: crashed on the first tab tap)"},
+  "seed_data_creation": "Sent 1 chat message 'TEST_sdk58 smoke' in conversation 680d60c3; dismissed 1 notification; toggled read state on 1 notification (Undo used); added then removed product 73a29902 in the basket; theme reset to System. No MASS spent.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Helper: exec(open('/tmp/h58.py').read()) gives login(), skip_ad(), has(), redbox(), shot(), dump_errs(); copy it from this report's notes if /tmp was wiped. The Market filter button (market-filter-btn) only exists on the FIXA/Declutter sections, not on Brands. Theme control testIDs are theme-system/theme-light/theme-dark. HomesSheet can be expanded on web by mouse-dragging homes-sheet-header upward. Notification rows: notif-swipe-{id} (gesture container) and notif-{id} (tap target).",
+  "rca_of_issue": "Repro: log in, then tap any bottom tab and get a red screen with 'Cannot read properties of undefined (reading emit)' at app/(tabs)/_layout.tsx:95. Root cause: expo-router 58 ships its own bottom-tabs fork (build/react-navigation/bottom-tabs). It passes the custom tabBar { state, descriptors, emitter, navigateToTab, insets } and no longer passes `navigation`. Fix: use emitter.emit({type:'tabPress',...}) and navigateToTab(route.key). Verified on demo and fixa accounts across all 5 tabs."
+}

@@ -376,7 +376,7 @@ export function SocialFeed() {
                 Only the neighbourhood is shown — never an address. You choose who to contact.
               </AppText>
             </View>
-          ) : null
+          ) : undefined
         }
       />
 

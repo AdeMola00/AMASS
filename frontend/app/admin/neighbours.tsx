@@ -9,7 +9,7 @@ import { Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-na
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import * as FileSystem from "expo-file-system/legacy";
+import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
 import { api, type AdminFunnel, type Estate, type FunnelVia, type PublicUser, type SocialReport } from "@/src/lib/api";
@@ -81,8 +81,9 @@ export default function AdminNeighboursScreen() {
         toast.success("CSV downloaded", filename);
         return;
       }
-      const uri = `${FileSystem.cacheDirectory}${filename}`;
-      await FileSystem.writeAsStringAsync(uri, text, { encoding: FileSystem.EncodingType.UTF8 });
+      const csv = new File(Paths.cache, filename);
+      await csv.write(text);
+      const uri = csv.uri;
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: "text/csv", dialogTitle: "Share funnel CSV", UTI: "public.comma-separated-values-text" });
       } else {

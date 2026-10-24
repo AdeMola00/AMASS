@@ -1015,3 +1015,9 @@ agent_communication:
       become-agent stacked buttons, friends row ScrollView). iteration_69 found 4 HIGH/4 MED → fixed; iteration_70 residuals → fixed; iteration_71:
       10/11 pass, shop/search 1-column at 320 (card minWidth 140 > 138) → minWidth 120 fixed + LOW copy trims. Profile Unlocked tile now uses
       /unlocks/mine count (matches /unlocks screen). "Chat · Free" variant could not be reached without spending MASS (same layout as "Manage").
+
+  - agent: "main"
+    message: |
+      Iteration 72 — Expo SDK 57 → 58 upgrade (RN 0.88, React 19.3, expo-router 58, RNGH 3.3, reanimated 4.7). TS migrations: FlatList
+      header/footer/empty null→undefined, instance ref types, StatusBar prop removals, legacy expo-file-system → File API. Testing agent found
+      and fixed the custom tab bar crash (expo-router 58 tabBar props: emitter/navigateToTab instead of navigation). All smoke flows pass on web.

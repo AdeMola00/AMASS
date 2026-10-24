@@ -145,7 +145,7 @@ function ThemedStack() {
   const { colors, isDark } = useTheme();
   return (
     <>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.bg} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <Stack
         screenOptions={{
           headerShown: false,

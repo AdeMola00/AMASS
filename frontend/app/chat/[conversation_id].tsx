@@ -27,7 +27,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
+import { File } from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { api } from "@/src/lib/api";
@@ -341,10 +341,20 @@ export default function ConversationScreen() {
       setUploading(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-      // Read the picked file as base64 → data URL
-      const b64 = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      // Read the picked file as base64 → data URL (web: via Blob; native: expo-file-system File API)
+      let b64: string;
+      if (Platform.OS === "web") {
+        const blob = await fetch(asset.uri).then((r) => r.blob());
+        const full = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(reader.error);
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        b64 = full.split(",")[1] ?? "";
+      } else {
+        b64 = await new File(asset.uri).base64();
+      }
       const mime = asset.mimeType || "image/jpeg";
       const dataUrl = `data:${mime};base64,${b64}`;
 
@@ -620,7 +630,7 @@ export default function ConversationScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={
             <View style={styles.emptyThread}>
@@ -638,7 +648,7 @@ export default function ConversationScreen() {
                   <TypingDots />
                 </View>
               </Animated.View>
-            ) : null
+            ) : undefined
           }
           renderItem={({ item, index }) => {
             const mine = item.sender_id === user?.id;

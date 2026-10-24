@@ -111,7 +111,7 @@ export default function AdminChatReportsScreen() {
                 <StatTile icon="flag-outline" label="Open reports" value={stats.open_reports ?? 0} tone={stats.open_reports > 0 ? "brand" : "default"} style={styles.stat} />
                 <StatTile icon="ban-outline" label="Blocks" value={stats.total_blocks ?? 0} style={styles.stat} />
               </View>
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={<EmptyState variant="success" compact title="No open reports" body="Nice — the queue is clear." />}
           renderItem={({ item }) => (

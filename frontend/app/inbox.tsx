@@ -150,7 +150,7 @@ export default function InboxScreen() {
               {searching ? "Searching…" : `${searchHits?.length ?? 0} messages match "${q.trim()}"`}
             </AppText>
           }
-          ListEmptyComponent={!searching ? <EmptyState compact icon="search" title="No messages found" body="Try a different keyword." /> : null}
+          ListEmptyComponent={!searching ? <EmptyState compact icon="search" title="No messages found" body="Try a different keyword." /> : undefined}
           renderItem={({ item }) => (
             <Card onPress={() => router.push(`/chat/${item.conversation_id}` as any)} testID={`hit-${item.id}`} elevation="xs" style={{ gap: 6 }}>
               <View style={styles.rowTop}>

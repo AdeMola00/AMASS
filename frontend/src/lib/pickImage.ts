@@ -5,7 +5,7 @@
  */
 import { Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
+import { File } from "expo-file-system";
 import { api } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
 
@@ -20,7 +20,7 @@ export async function pickAndUploadImage(): Promise<string | null> {
   if (Platform.OS === "web") {
     dataUrl = asset.base64 ? `data:${mime};base64,${asset.base64}` : asset.uri;
   } else {
-    const b64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+    const b64 = await new File(asset.uri).base64();
     dataUrl = `data:${mime};base64,${b64}`;
   }
   const up = await api.communityUpload(dataUrl);
@@ -62,7 +62,7 @@ export async function pickImageDataUrl(source: "camera" | "library"): Promise<Pi
     const mime = asset.mimeType || "image/jpeg";
     if (asset.base64) return { ok: true, dataUrl: `data:${mime};base64,${asset.base64}` };
     if (asset.uri.startsWith("data:")) return { ok: true, dataUrl: asset.uri };
-    const b64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+    const b64 = await new File(asset.uri).base64();
     return { ok: true, dataUrl: `data:${mime};base64,${b64}` };
   } catch {
     return { ok: false, reason: "failed" };

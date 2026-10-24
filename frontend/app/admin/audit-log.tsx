@@ -189,7 +189,7 @@ export default function AdminAuditLog() {
           }
           ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 20 }} color={colors.textTertiary} /> : nextCursor ? <View style={{ height: 20 }} /> : rows.length ? (
             <AppText variant="caption" tone="muted" align="center" style={{ marginTop: 16 }}>End of log</AppText>
-          ) : null}
+          ) : undefined}
           renderItem={({ item }: any) =>
             item._header ? (
               <AppText variant="label" tone="tertiary" uppercase style={styles.dayHeader}>{item.label}</AppText>

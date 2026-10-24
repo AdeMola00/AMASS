@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
-import * as FileSystem from "expo-file-system/legacy";
+import { File } from "expo-file-system";
 import {
   useAudioRecorder,
   RecordingPresets,
@@ -151,7 +151,10 @@ export function VoiceComposer({ conversationId, disabled, onSending, onUploaded,
       // best-effort delete the file we just wrote
       try {
         const u = recorder.uri;
-        if (u) await FileSystem.deleteAsync(u, { idempotent: true });
+        if (u) {
+          const f = new File(u);
+          if (f.exists) f.delete();
+        }
       } catch {}
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid).catch(() => {});
       return;
@@ -168,9 +171,7 @@ export function VoiceComposer({ conversationId, disabled, onSending, onUploaded,
     setState("uploading");
     onSending?.(true);
     try {
-      const b64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const b64 = await new File(uri).base64();
       const mime = Platform.OS === "ios" ? "audio/m4a" : "audio/m4a";
       const dataUrl = `data:${mime};base64,${b64}`;
       const uploaded = await api.chatUploadAudio(conversationId, dataUrl, durationMs);
@@ -181,7 +182,10 @@ export function VoiceComposer({ conversationId, disabled, onSending, onUploaded,
     } finally {
       setState("idle");
       onSending?.(false);
-      try { await FileSystem.deleteAsync(uri, { idempotent: true }); } catch {}
+      try {
+        const f = new File(uri);
+        if (f.exists) f.delete();
+      } catch {}
     }
   }, [conversationId, recorder, onSending, onUploaded, onError, slideX, stopPulse]);
 

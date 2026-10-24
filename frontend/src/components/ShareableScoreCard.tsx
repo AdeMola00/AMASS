@@ -9,7 +9,7 @@
  * from `getPropertyScore` + `getPropertyValuation`; no network calls here.
  */
 import React, { forwardRef } from "react";
-import { StyleSheet, Text, View, Image } from "react-native";
+import { StyleSheet, Text, View, Image, type ViewInstance } from "react-native";
 import Svg, { Circle, Defs, LinearGradient, Stop } from "react-native-svg";
 import { colors, formatNaira } from "@/src/constants/theme";
 
@@ -37,7 +37,7 @@ export type ShareableScoreCardProps = {
   cover?: string | null;
 };
 
-export const ShareableScoreCard = forwardRef<View, ShareableScoreCardProps>(
+export const ShareableScoreCard = forwardRef<ViewInstance, ShareableScoreCardProps>(
   function ShareableScoreCard(
     {
       amassId,

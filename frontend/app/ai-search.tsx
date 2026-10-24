@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { View, StyleSheet, TextInput, Pressable, ScrollView } from "react-native";
+import { View, StyleSheet, TextInput, Pressable, ScrollView, type ScrollViewInstance } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
@@ -29,7 +29,7 @@ export default function AiSearch() {
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const sessionId = useRef(`session-${Date.now()}`).current;
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   const send = async (text: string) => {
     if (!text.trim() || thinking) return;
