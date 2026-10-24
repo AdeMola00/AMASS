@@ -946,3 +946,48 @@ agent_communication:
       as cover + image_count; ScorePill label no longer wraps; copy says ~150 m; UnlockDialog fund button label "Get MASS".
       Retest only: search input focus/typing (1 request per pause), Enter, clear, filter chips flying to results, filter button
       visible with bookmark, dark mode search text; quick regression on pin → preview → passport (demo) and locked flow (fixa tester).
+  - agent: "main"
+    message: |
+      AGENT TOOLS DEEP DIVE + DOCUMENTS & KYC — first test pass (backend + frontend).
+      Backend (already compiled, now wired): GET /api/agent/manager {summary{listings,active,boosted,views_30d,saves,leads_30d,
+      leads_total,docs_pending,docs_missing}, listings[{id,title,cover,photo_count,price,status,promotion,boost_active,boost_tier,
+      boost_days_left,views_total,views_30d,saves,leads{chats,unlocks,inspections,total,total_30d},documents_status,documents_verified,
+      verified_documents,documents_pending}]}; GET /api/agent/listings/{id}/leads (chats · MASS unlocks · inspections, owner/admin only → 403 otherwise);
+      PATCH /api/agent/listings/{id}/status {status: available|coming_soon|sold|withdrawn}. KYC: GET /api/kyc/me; POST /api/kyc/identity
+      {id_type, id_document(dataURL), selfie(dataURL), id_number_last4?} → 409 if already pending/approved; GET/POST/DELETE
+      /api/properties/{id}/documents (owner uploads title docs as data URL; non-owner gets file-free summary + documents:[]);
+      admin: GET /api/admin/kyc/queue?status=pending|approved|rejected, POST /api/admin/kyc/identity/{user_id}/review {approve, reason?}
+      (reason REQUIRED when rejecting → 422), POST /api/admin/kyc/documents/{doc_id}/review. Approving a doc stamps
+      properties.documents_verified/documents_status/verified_document_kinds → shows on GET /properties/{id} (documents_verified,
+      verified_documents, agent_identity_verified), /map/markers (documents_verified) and agent-platform public profile (identity_verified).
+      Admin cockpit dashboard now returns kyc_identity_pending / kyc_documents_pending.
+      Frontend screens/testIDs:
+      • /agent-dashboard: stat-views, stat-leads, stat-saves, stat-docs (→ listings tab filtered), trust-card + trust-cta
+        (→ /identity-verification when not verified), boosts-card, recent-view-all; Listings tab: listing-filters with
+        listing-filter-{all|active|boosted|needs-docs|closed}; rows listing-{id} (listing-open-{id} → /agent/listing/{id}),
+        listing-status-badge-{id}, listing-docs-badge-{id}, actions listing-leads-{id}, listing-docs-{id}, boost-{id}, listing-status-{id}
+        → Sheet dash-status-sheet with dash-status-opt-{available|coming_soon|sold|withdrawn} (PATCH + toast + row badge updates).
+      • /agent/listing/{id}?tab=leads|docs: manage-header, manage-status-badge, manage-change-status (status-sheet, status-opt-*,
+        sold/withdrawn need confirm: status-confirm → status-confirm-yes), manage-boost, manage-tab-leads / manage-tab-docs,
+        manage-stat-chats/unlocks/inspections, lead-{id} rows (chat → /chat/{conv}), manage-leads-empty; Documents: docs-summary,
+        docs-upload-btn → upload-doc-sheet (doc-kind-{kind}, doc-title, doc-file + doc-file-library picker (web: file input),
+        doc-submit disabled until a photo is chosen), doc-{id} rows with status badge, doc-remove-{id} → doc-delete-confirm → doc-delete-yes
+        (approved docs have no remove button). /agent/listing-docs/{id} redirects to the docs tab (notification deep link).
+      • /identity-verification: idv-hero, idv-hero-title, idv-status-badge, idv-step-{i} (+ idv-step-cta-2 opens form), idv-cta,
+        idv-form: idv-type-{nin|drivers_licence|passport|voters_card}, idv-last4, idv-id (idv-id-library), idv-selfie (idv-selfie-library;
+        camera button hidden on web), idv-submit disabled until both photos, idv-cancel; after submit → idv-submitted card, hero
+        "Documents under review", status badge "Under review"; rejected → idv-resubmit.
+      • /admin/kyc (admin only, tile tile-kyc on /admin): kyc-stat-identity, kyc-stat-docs, kyc-tab-identity / kyc-tab-documents,
+        kyc-filter-{pending|approved|rejected}, rows kyc-identity-{user_id} / kyc-doc-{id} → kyc-review-sheet with kyc-shot-id /
+        kyc-shot-selfie / kyc-shot-doc (authed images), kyc-approve, kyc-reject (first tap reveals kyc-reason, second tap confirms;
+        disabled until ≥3 chars), kyc-reject-back, kyc-open-profile / kyc-open-listing.
+      • /property/{id}: docs-verified-badge + docs-verified-row when documents_verified; owner sees docs-upload-nudge (→ docs tab)
+        when not verified; agent card shows agent-identity-badge or agent-identity-unverified; "Manage" (book-tour-btn for owners)
+        now opens /agent/listing/{id}. Map tiles: home-tile-docs-{id} frosted "Title docs ✓" label; PreviewTile shows the same tag.
+      • Profile: badge-identity ("ID verified") when user.identity_verified; "Verify ID" step now tracks identity_verified.
+      Photo pickers on web open a native file chooser (set_input_files on input[type=file] works); submit with a tiny PNG data URL via
+      API is fine too. Smoke data: demo's listing 3998e99b-80f9-4ce1-b04e-6f16c4feae01 already has one APPROVED "Survey plan" doc
+      (documents_verified=true) → badges visible on /property/… and the Ikeja map tile.
+      Accounts: demo@amass.africa / amass2026 (admin + agent, 9 listings; KYC status none → good for submit + admin approve flow).
+      Other agents: adaeze.okoye@amass.africa / Agent2026! etc. (see /app/memory/test_credentials.md). PhotoPager swipe on map tiles
+      verified manually on web (counter 1/3 → 2/3 on horizontal scroll).

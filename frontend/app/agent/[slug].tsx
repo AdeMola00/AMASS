@@ -133,6 +133,7 @@ export default function AgentPublicProfile() {
                 {agent.badge.label}
               </AppText>
             </View>
+            {agent.identity_verified && <Badge label="Identity verified" tone="success" icon="shield-checkmark" testID="agent-identity-badge" />}
             {agent.is_founding_agent && <Badge label="Founding agent" tone="mass" icon="star" />}
           </View>
 

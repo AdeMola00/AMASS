@@ -92,6 +92,7 @@ export function PreviewTile({
           </AppText>
           <View style={styles.badges}>
             {pin.verified ? <Tag icon="shield-checkmark" label="Verified" color={colors.success} soft={colors.successSoft} /> : null}
+            {pin.documents_verified ? <Tag icon="document-text" label="Title docs ✓" color={colors.fixText} soft={colors.fixSoft} /> : null}
             {locked ? <Tag icon="locate-outline" label="Approx. location" color={colors.textSecondary} soft={colors.surfaceAlt} /> : <Tag icon="lock-open-outline" label="Unlocked" color={colors.fixText} soft={colors.fixSoft} />}
             {hasNudge(pin) ? <Tag icon="people" label={nudgeText(pin)} color={colors.brand} soft={colors.brandSoft} /> : null}
           </View>

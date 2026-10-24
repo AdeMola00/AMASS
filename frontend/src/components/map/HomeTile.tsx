@@ -3,15 +3,18 @@
  * big photo (badges + save) → price → specs → what & where → actions. The primary action is the
  * existing paid flow for locked homes (Unlock with MASS) and "View home" for unlocked ones.
  */
-import React, { useState } from "react";
-import { Image, StyleSheet, View, ViewStyle } from "react-native";
+import React from "react";
+import { StyleSheet, View, ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/theme";
 import { radii } from "@/src/theme/tokens";
 import { AppText, Button, FrostedCircle, FrostedLabel, PressableScale } from "@/src/ui";
+import { PhotoPager } from "./PhotoPager";
 import { fullPrice, hasNudge, kindLabel, nudgeText, priceSuffix, specLine, typeLabel, type Pin } from "./pins";
+
+const PHOTO_H = 212;
 
 export function HomeTile({
   pin,
@@ -33,43 +36,46 @@ export function HomeTile({
   style?: ViewStyle;
 }) {
   const { colors, isDark, shadows } = useTheme();
-  const [imgFailed, setImgFailed] = useState(false);
   const locked = !pin.unlocked;
   const specs = specLine(pin);
   const suffix = priceSuffix(pin.listing_type);
   const primaryLabel = !locked ? "View home" : noMass ? "Get MASS to unlock" : pin.access_cost ? `Unlock · ${pin.access_cost.toLocaleString()} MASS` : "Unlock";
+  // Unlocked → swipe the gallery right here; locked → cover only (blurred), gallery is part of the unlock.
+  const photos = !locked && pin.images?.length ? pin.images : pin.cover ? [pin.cover] : [];
+  const total = pin.image_count ?? photos.length;
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: active ? colors.brand : isDark ? colors.border : "transparent" }, !isDark && shadows.sm, style]} testID={`home-tile-${pin.id}`}>
-      <PressableScale onPress={onPress} scaleTo={0.985} accessibilityRole="button" accessibilityLabel={`${pin.title ?? "Home"}, ${fullPrice(pin.price)}${suffix}${specs.length ? `, ${specs.map((s) => s.text).join(", ")}` : ""}. ${locked ? "Locked — opens the preview" : "Open listing"}`} testID={`home-tile-open-${pin.id}`}>
-        <View style={[styles.photo, { backgroundColor: colors.surfaceAlt }]}>
-          {pin.cover && !imgFailed ? <Image source={{ uri: pin.cover }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={locked ? 12 : 0} onError={() => setImgFailed(true)} accessibilityIgnoresInvertColors /> : <Ionicons name="home" size={40} color={colors.textTertiary} />}
-          <LinearGradient colors={["rgba(17,17,17,0)", "rgba(17,17,17,0.55)"]} style={styles.scrim} pointerEvents="none" />
-          <View style={styles.topRow} pointerEvents="none">
-            {pin.verified ? <FrostedLabel label="Verified" icon="shield-checkmark" tone="light" color="#1C5E39" size="sm" /> : null}
-            {pin.boosted || pin.promotion_tier === "feature" ? <FrostedLabel label={pin.boosted ? "Boosted" : "Featured"} icon="rocket" tone="dark" color="#F2C94C" size="sm" /> : null}
-            {pin.is_free_amass_sale ? <FrostedLabel label="Free access" icon="ribbon" tone="dark" size="sm" /> : null}
-          </View>
-          {locked ? (
-            <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
-              <View style={[styles.lockBig, { backgroundColor: colors.mass }]}>
-                <Ionicons name="lock-closed" size={20} color="#1A1200" />
-              </View>
-              <AppText variant="caption" color="#fff" style={{ marginTop: 8, fontFamily: "PlusJakartaSans-700", textShadowColor: "rgba(0,0,0,0.5)", textShadowRadius: 6 }}>
-                Photos & address unlock with MASS
-              </AppText>
+      <View style={styles.photo}>
+        <PhotoPager images={photos} total={total} height={PHOTO_H} blur={locked ? 12 : 0} onPress={onPress} accessibilityLabel={`${pin.title ?? "Home"} photos`} testID={`home-tile-photos-${pin.id}`} />
+        <LinearGradient colors={["rgba(17,17,17,0)", "rgba(17,17,17,0.55)"]} style={styles.scrim} pointerEvents="none" />
+        <View style={styles.topRow} pointerEvents="none">
+          {pin.verified ? <FrostedLabel label="Verified" icon="shield-checkmark" tone="light" color="#1C5E39" size="sm" /> : null}
+          {pin.documents_verified ? <FrostedLabel label="Title docs ✓" icon="document-text" tone="light" color="#1C5E39" size="sm" testID={`home-tile-docs-${pin.id}`} /> : null}
+          {pin.boosted || pin.promotion_tier === "feature" ? <FrostedLabel label={pin.boosted ? "Boosted" : "Featured"} icon="rocket" tone="dark" color="#F2C94C" size="sm" /> : null}
+          {pin.is_free_amass_sale ? <FrostedLabel label="Free access" icon="ribbon" tone="dark" size="sm" /> : null}
+        </View>
+        {locked ? (
+          <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
+            <View style={[styles.lockBig, { backgroundColor: colors.mass }]}>
+              <Ionicons name="lock-closed" size={20} color="#1A1200" />
             </View>
-          ) : null}
-          <View style={styles.bottomRow} pointerEvents="none">
-            <View style={[styles.kind, { backgroundColor: pin.category === "sale" ? colors.brand : colors.info }]}>
-              <AppText variant="micro" color="#fff">
-                {kindLabel(pin).toUpperCase()}
-              </AppText>
-            </View>
-            <AppText variant="caption" color="#fff" style={{ fontFamily: "PlusJakartaSans-700" }}>
-              {typeLabel(pin.type)}
+            <AppText variant="caption" color="#fff" style={{ marginTop: 8, fontFamily: "PlusJakartaSans-700", textShadowColor: "rgba(0,0,0,0.5)", textShadowRadius: 6 }}>
+              {total > 1 ? `${total} photos & address unlock with MASS` : "Photos & address unlock with MASS"}
             </AppText>
           </View>
+        ) : null}
+        <View style={styles.bottomRow} pointerEvents="none">
+          <View style={[styles.kind, { backgroundColor: pin.category === "sale" ? colors.brand : colors.info }]}>
+            <AppText variant="micro" color="#fff">
+              {kindLabel(pin).toUpperCase()}
+            </AppText>
+          </View>
+          <AppText variant="caption" color="#fff" style={{ fontFamily: "PlusJakartaSans-700" }}>
+            {typeLabel(pin.type)}
+          </AppText>
         </View>
+      </View>
+      <PressableScale onPress={onPress} scaleTo={0.985} accessibilityRole="button" accessibilityLabel={`${pin.title ?? "Home"}, ${fullPrice(pin.price)}${suffix}${specs.length ? `, ${specs.map((s) => s.text).join(", ")}` : ""}. ${locked ? "Locked — opens the preview" : "Open listing"}`} testID={`home-tile-open-${pin.id}`}>
         <View style={styles.body}>
           <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
             <AppText tabular style={[styles.price, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
@@ -147,7 +153,7 @@ export function HomeTile({
 
 const styles = StyleSheet.create({
   card: { borderRadius: radii.xl, overflow: "hidden", borderWidth: 1.5 },
-  photo: { height: 212, alignItems: "center", justifyContent: "center" },
+  photo: { height: PHOTO_H },
   scrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: "45%" },
   center: { alignItems: "center", justifyContent: "center" },
   lockBig: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },

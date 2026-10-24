@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, RefreshControl, FlatList } from "react-native";
 import { Image } from "expo-image";
 import { Stack, useRouter } from "expo-router";
@@ -6,33 +6,36 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
-import { api, Property, type PromotionInfo } from "@/src/lib/api";
+import { api, type ManagerListing, type ManagerSummary, type PromotionInfo } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import {
   AppText,
-  Badge,
   Button,
   Card,
+  Chip,
   EmptyState,
   IconButton,
   ProgressBar,
   Screen,
   ScreenHeader,
   SegmentedControl,
+  Sheet,
   SkeletonCard,
   SkeletonRows,
   StatTile,
-  PressableScale,
-  type BadgeTone,
+  useToast,
   type IconName,
 } from "@/src/ui";
 import { PromotionBadge, TIER_META } from "@/src/components/PromotionBadge";
 import { AgentScoreCard } from "@/src/components/AgentScoreCard";
+import { ListingManagerRow, normalizeStatus, type ListingStatus } from "@/src/components/agent/ListingManagerRow";
+import { IdentityBadge } from "@/src/components/kyc/badges";
 
 type Tab = "overview" | "listings" | "leads";
+type ListingFilter = "all" | "active" | "boosted" | "needs_docs" | "closed";
 
 type Lead = {
   id: string;
@@ -56,38 +59,30 @@ type Dashboard = {
     favorites_30d: number;
     total_value: number;
   };
-  recent: Property[];
 };
 
-type ListingAnalytics = {
-  property_id: string;
-  title: string;
-  image: string;
-  price: number;
-  status: string;
-  verified: boolean;
-  views: number;
-  favorites: number;
-};
+const STATUS_OPTIONS: { key: ListingStatus; label: string; icon: IconName; destructive?: boolean }[] = [
+  { key: "available", label: "Available", icon: "checkmark-circle-outline" },
+  { key: "coming_soon", label: "Coming soon", icon: "time-outline" },
+  { key: "sold", label: "Mark as sold / let", icon: "ribbon-outline", destructive: true },
+  { key: "withdrawn", label: "Withdraw", icon: "eye-off-outline", destructive: true },
+];
 
-const STATUS_TONE: Record<string, BadgeTone> = {
-  sold: "error",
-  premium: "premium",
-  verified: "success",
-  coming_soon: "mass",
-  available: "info",
-  archived: "neutral",
-};
 
 export default function AgentDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>("overview");
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [listings, setListings] = useState<Property[]>([]);
-  const [analytics, setAnalytics] = useState<ListingAnalytics[]>([]);
+  const [summary, setSummary] = useState<ManagerSummary | null>(null);
+  const [listings, setListings] = useState<ManagerListing[]>([]);
+  const [filter, setFilter] = useState<ListingFilter>("all");
+  const [statusFor, setStatusFor] = useState<ManagerListing | null>(null);
+  const [confirmStatus, setConfirmStatus] = useState<ListingStatus | null>(null);
+  const [savingStatus, setSavingStatus] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -105,17 +100,16 @@ export default function AgentDashboard() {
   const load = useCallback(async () => {
     setError(false);
     try {
-      const [d, l, a, ld, q, pr] = await Promise.all([
+      const [d, m, ld, q, pr] = await Promise.all([
         api.agentDashboard(),
-        api.agentListings(),
-        api.agentListingsAnalytics(),
-        api.agentLeads(),
+        api.agentManager(),
+        api.agentLeads().catch(() => [] as Lead[]),
         api.myQuota().catch(() => null),
         api.myPromotions().catch(() => null),
       ]);
       setDashboard(d);
-      setListings(l);
-      setAnalytics(a);
+      setSummary(m.summary);
+      setListings(m.listings);
       setLeads(ld);
       setQuota(q);
       setPromos(pr);
@@ -139,8 +133,46 @@ export default function AgentDashboard() {
     setTab(t);
   };
 
+  const closeStatus = () => {
+    setStatusFor(null);
+    setConfirmStatus(null);
+  };
+
+  const applyStatus = async (s: ListingStatus) => {
+    if (!statusFor) return;
+    setSavingStatus(true);
+    try {
+      await api.setListingStatus(statusFor.id, s);
+      setListings((rows) => rows.map((r) => (r.id === statusFor.id ? { ...r, status: s } : r)));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      toast.success(s === "sold" ? "Marked as sold" : s === "withdrawn" ? "Listing withdrawn" : s === "coming_soon" ? "Marked coming soon" : "Listing is live again");
+      closeStatus();
+    } catch (e: any) {
+      toast.error("Couldn't update status", e?.message);
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const visibleListings = useMemo(() => {
+    switch (filter) {
+      case "active":
+        return listings.filter((l) => l.status !== "sold" && l.status !== "withdrawn");
+      case "boosted":
+        return listings.filter((l) => l.boost_active);
+      case "needs_docs":
+        return listings.filter((l) => l.status !== "sold" && l.status !== "withdrawn" && (l.documents_status === "none" || l.documents_status === "rejected"));
+      case "closed":
+        return listings.filter((l) => l.status === "sold" || l.status === "withdrawn");
+      default:
+        return listings;
+    }
+  }, [listings, filter]);
+
   const goNew = () => router.push("/agent/onboarding" as any);
+  const openListing = (id: string, t?: "leads" | "docs") => router.push((t ? `/agent/listing/${id}?tab=${t}` : `/agent/listing/${id}`) as any);
   const unreadLeads = leads.filter((l) => l.unread).length;
+  const newLeads30 = summary?.leads_30d ?? 0;
   const bottomPad = 120 + insets.bottom;
   const refresh = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />;
 
@@ -162,7 +194,7 @@ export default function AgentDashboard() {
           options={[
             { value: "overview", label: "Overview" },
             { value: "listings", label: `Listings (${listings.length})` },
-            { value: "leads", label: `Leads (${unreadLeads})` },
+            { value: "leads", label: `Leads (${Math.max(unreadLeads, newLeads30)})` },
           ]}
         />
       </View>
@@ -176,11 +208,22 @@ export default function AgentDashboard() {
         <EmptyState variant="error" title="Couldn't load your dashboard" body="Check your connection and try again." actionLabel="Retry" onAction={() => load()} testID="dashboard-error" />
       ) : tab === "overview" ? (
         <ScrollView contentContainerStyle={{ padding: space[4], paddingBottom: bottomPad, gap: space[4] }} refreshControl={refresh} showsVerticalScrollIndicator={false}>
-          <Overview dashboard={dashboard} onNew={goNew} isDark={isDark} />
+          <Overview dashboard={dashboard} summary={summary} onNew={goNew} isDark={isDark} onListings={(f) => {
+            setFilter(f);
+            setTab("listings");
+          }} />
+
+          <TrustCard summary={summary} identityVerified={!!user?.identity_verified} onIdentity={() => router.push("/identity-verification")} onDocs={() => {
+            setFilter("needs_docs");
+            setTab("listings");
+          }} />
 
           <AgentScoreCard />
 
-          <BoostsCard promos={promos} listings={listings} onBoost={(id) => router.push(`/agent/boost/${id}` as any)} onAll={() => setTab("listings")} />
+          <BoostsCard promos={promos} listings={listings} onBoost={(id) => router.push(`/agent/boost/${id}` as any)} onAll={() => {
+            setFilter("boosted");
+            setTab("listings");
+          }} />
 
           {/* Phase D-5: Verification Task Queue entry */}
           <Card onPress={() => router.push("/agent/tasks" as any)} testID="agent-tasks-entry" tone="soft">
@@ -223,37 +266,60 @@ export default function AgentDashboard() {
             </Card>
           )}
 
-          {dashboard?.recent && dashboard.recent.length > 0 && (
+          {listings.length > 0 && (
             <View style={{ gap: space[3] }}>
               <View style={styles.sectionHead}>
                 <AppText variant="h3">Recent listings</AppText>
-                <Pressable onPress={() => setTab("listings")} hitSlop={8} accessibilityRole="button" style={styles.sectionAction}>
+                <Pressable onPress={() => {
+                  setFilter("all");
+                  setTab("listings");
+                }} hitSlop={8} accessibilityRole="button" style={styles.sectionAction} testID="recent-view-all">
                   <AppText variant="caption" tone="secondary">
                     View all
                   </AppText>
                   <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
                 </Pressable>
               </View>
-              {dashboard.recent.slice(0, 3).map((p) => {
-                const a = analytics.find((x) => x.property_id === p.id);
-                return <ListingRow key={p.id} property={p} views={a?.views ?? 0} favorites={a?.favorites ?? 0} onPress={() => router.push(`/property/${p.id}`)} />;
-              })}
+              {listings.slice(0, 3).map((row) => (
+                <ListingManagerRow key={row.id} row={row} compact onPress={() => openListing(row.id)} />
+              ))}
             </View>
           )}
         </ScrollView>
       ) : tab === "listings" ? (
         <FlatList
-          data={listings}
+          data={visibleListings}
           keyExtractor={(p) => p.id}
           contentContainerStyle={{ padding: space[4], paddingBottom: bottomPad, gap: space[3] }}
           refreshControl={refresh}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => {
-            const a = analytics.find((x) => x.property_id === item.id);
-            return <ListingRow property={item} views={a?.views ?? 0} favorites={a?.favorites ?? 0} onPress={() => router.push(`/property/${item.id}`)} onBoost={() => router.push(`/agent/boost/${item.id}` as any)} />;
-          }}
+          ListHeaderComponent={
+            listings.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} testID="listing-filters">
+                <Chip label="All" selected={filter === "all"} onPress={() => setFilter("all")} count={listings.length} testID="listing-filter-all" />
+                <Chip label="Active" icon="checkmark-circle-outline" selected={filter === "active"} onPress={() => setFilter("active")} count={summary?.active} testID="listing-filter-active" />
+                <Chip label="Boosted" icon="rocket-outline" selected={filter === "boosted"} onPress={() => setFilter("boosted")} count={summary?.boosted} tone="mass" testID="listing-filter-boosted" />
+                <Chip label="Needs docs" icon="document-outline" selected={filter === "needs_docs"} onPress={() => setFilter("needs_docs")} count={listings.filter((l) => l.status !== "sold" && l.status !== "withdrawn" && (l.documents_status === "none" || l.documents_status === "rejected")).length} testID="listing-filter-needs-docs" />
+                <Chip label="Sold / withdrawn" icon="archive-outline" selected={filter === "closed"} onPress={() => setFilter("closed")} count={listings.filter((l) => l.status === "sold" || l.status === "withdrawn").length} testID="listing-filter-closed" />
+              </ScrollView>
+            ) : null
+          }
+          renderItem={({ item }) => (
+            <ListingManagerRow
+              row={item}
+              onPress={() => openListing(item.id)}
+              onLeads={() => openListing(item.id, "leads")}
+              onDocs={() => openListing(item.id, "docs")}
+              onBoost={() => router.push(`/agent/boost/${item.id}` as any)}
+              onStatus={() => setStatusFor(item)}
+            />
+          )}
           ListEmptyComponent={
-            <EmptyState icon="business-outline" title="No listings yet" body="Publish your first property to start receiving leads." actionLabel="New listing" onAction={goNew} testID="empty-new-listing" />
+            listings.length === 0 ? (
+              <EmptyState icon="business-outline" title="No listings yet" body="Publish your first property to start receiving leads." actionLabel="New listing" onAction={goNew} testID="empty-new-listing" />
+            ) : (
+              <EmptyState compact icon="filter-outline" title="Nothing in this filter" actionLabel="Show all" onAction={() => setFilter("all")} testID="empty-filter" />
+            )
           }
         />
       ) : (
@@ -283,11 +349,44 @@ export default function AgentDashboard() {
           ListEmptyComponent={<EmptyState icon="people-outline" title="No leads yet" body="Publish a listing to start receiving inquiries." />}
         />
       )}
+
+      {/* Quick status change (from the listings tab) */}
+      <Sheet visible={!!statusFor} onClose={() => (savingStatus ? null : closeStatus())} title={statusFor ? `Status · ${statusFor.title}` : "Listing status"} testID="dash-status-sheet">
+        <View style={{ gap: 8, paddingBottom: 8 }}>
+          {STATUS_OPTIONS.map((o) => {
+            const active = normalizeStatus(statusFor?.status) === o.key;
+            return (
+              <Pressable key={o.key} onPress={() => (active ? closeStatus() : o.destructive ? setConfirmStatus(o.key) : applyStatus(o.key))} disabled={savingStatus} accessibilityRole="radio" accessibilityState={{ selected: active }} style={({ pressed }) => [styles.statusRow, { backgroundColor: active ? colors.surfaceAlt : "transparent", borderColor: confirmStatus === o.key ? colors.error : colors.border, opacity: pressed ? 0.7 : 1 }]} testID={`dash-status-opt-${o.key}`}>
+                <Ionicons name={o.icon} size={20} color={o.destructive ? colors.error : colors.text} />
+                <AppText variant="title" color={o.destructive ? colors.error : undefined} style={{ flex: 1 }}>
+                  {o.label}
+                </AppText>
+                {active ? <Ionicons name="checkmark-circle" size={20} color={colors.success} /> : null}
+              </Pressable>
+            );
+          })}
+          {confirmStatus ? (
+            <View style={[styles.confirm, { backgroundColor: colors.errorSoft }]} testID="dash-status-confirm">
+              <AppText variant="bodySm" color={colors.error} style={{ flex: 1 }}>
+                {confirmStatus === "sold" ? "Mark this home as sold / let? It leaves the map immediately." : "Withdraw this listing? It's hidden everywhere until you set it back to Available."}
+              </AppText>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Button label="Cancel" size="sm" variant="ghost" onPress={() => setConfirmStatus(null)} disabled={savingStatus} testID="dash-status-confirm-cancel" />
+                <Button label={confirmStatus === "sold" ? "Yes, sold" : "Yes, withdraw"} size="sm" variant="destructive" loading={savingStatus} onPress={() => applyStatus(confirmStatus)} testID="dash-status-confirm-yes" />
+              </View>
+            </View>
+          ) : (
+            <AppText variant="caption" tone="tertiary">
+              Sold and withdrawn homes leave the map immediately. Open the listing for leads, documents and more.
+            </AppText>
+          )}
+        </View>
+      </Sheet>
     </Screen>
   );
 }
 
-function Overview({ dashboard, onNew, isDark }: { dashboard: Dashboard | null; onNew: () => void; isDark: boolean }) {
+function Overview({ dashboard, summary, onNew, isDark, onListings }: { dashboard: Dashboard | null; summary: ManagerSummary | null; onNew: () => void; isDark: boolean; onListings: (f: ListingFilter) => void }) {
   const { colors } = useTheme();
   const s = dashboard?.stats;
   return (
@@ -303,7 +402,13 @@ function Overview({ dashboard, onNew, isDark }: { dashboard: Dashboard | null; o
           <View style={styles.heroPill}>
             <Ionicons name="business" size={12} color="#fff" />
             <AppText variant="caption" color="#fff" tabular>
-              {s?.active ?? 0} active
+              {summary?.active ?? s?.active ?? 0} active
+            </AppText>
+          </View>
+          <View style={styles.heroPill}>
+            <Ionicons name="rocket" size={12} color="#F2C94C" />
+            <AppText variant="caption" color="#fff" tabular>
+              {summary?.boosted ?? 0} boosted
             </AppText>
           </View>
           <View style={styles.heroPill}>
@@ -316,12 +421,12 @@ function Overview({ dashboard, onNew, isDark }: { dashboard: Dashboard | null; o
       </LinearGradient>
 
       <View style={styles.statsRow}>
-        <StatTile icon="eye" tone="info" value={s?.views_30d ?? 0} label="Views · 30d" animate />
-        <StatTile icon="heart" tone="brand" value={s?.favorites_30d ?? 0} label="Saves · 30d" animate />
+        <StatTile icon="eye" tone="info" value={summary?.views_30d ?? s?.views_30d ?? 0} label="Views · 30d" animate testID="stat-views" />
+        <StatTile icon="people" tone="success" value={summary?.leads_30d ?? 0} label="Leads · 30d" animate testID="stat-leads" onPress={() => onListings("active")} />
       </View>
       <View style={styles.statsRow}>
-        <StatTile icon="business" tone="default" value={s?.active ?? 0} label="Active listings" />
-        <StatTile icon="shield-checkmark" tone="success" value={s?.verified ?? 0} label="Verified" />
+        <StatTile icon="heart" tone="brand" value={summary?.saves ?? s?.favorites_30d ?? 0} label="Saves" animate testID="stat-saves" />
+        <StatTile icon="document-text" tone={(summary?.docs_missing ?? 0) > 0 ? "warning" : "success"} value={summary?.docs_missing ?? 0} label="Need title docs" testID="stat-docs" onPress={() => onListings("needs_docs")} />
       </View>
 
       <Card onPress={onNew} testID="quick-new-listing" tone="ink">
@@ -344,68 +449,40 @@ function Overview({ dashboard, onNew, isDark }: { dashboard: Dashboard | null; o
   );
 }
 
-function ListingRow({ property, views, favorites, onPress, onBoost }: { property: Property; views: number; favorites: number; onPress: () => void; onBoost?: () => void }) {
+/** Documents & KYC at a glance: the agent's own identity check + title documents across the portfolio. */
+function TrustCard({ summary, identityVerified, onIdentity, onDocs }: { summary: ManagerSummary | null; identityVerified: boolean; onIdentity: () => void; onDocs: () => void }) {
   const { colors } = useTheme();
-  const status = property.status || "available";
+  const missing = summary?.docs_missing ?? 0;
+  const pending = summary?.docs_pending ?? 0;
   return (
-    <View style={styles.listingWrap}>
-      <Card onPress={onPress} testID={`listing-${property.id}`} elevation="xs" padded={false} style={{ flex: 1 }}>
-        <View style={styles.listing}>
-          <Image source={{ uri: property.images?.[0] }} style={[styles.listingImg, { backgroundColor: colors.skeleton }]} contentFit="cover" transition={200} />
-          <View style={{ flex: 1, gap: 4 }}>
-            <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-              <Badge label={status.replace("_", " ")} tone={STATUS_TONE[status] ?? "neutral"} size="xs" />
-              <PromotionBadge promotion={property.promotion} withDays />
-            </View>
-            <AppText variant="title" numberOfLines={1}>
-              {property.title}
-            </AppText>
-            <AppText variant="caption" tone="tertiary" numberOfLines={1}>
-              {property.location}
-            </AppText>
-            <View style={styles.listingFooter}>
-              <AppText variant="title" tabular style={{ flex: 1 }} numberOfLines={1}>
-                {formatNaira(property.price)}
-              </AppText>
-              <View style={[styles.metricPill, { backgroundColor: colors.surfaceAlt }]}>
-                <Ionicons name="eye" size={11} color={colors.textSecondary} />
-                <AppText variant="micro" tone="secondary" tabular>
-                  {views}
-                </AppText>
-              </View>
-              <View style={[styles.metricPill, { backgroundColor: colors.surfaceAlt }]}>
-                <Ionicons name="heart" size={11} color={colors.brand} />
-                <AppText variant="micro" tone="secondary" tabular>
-                  {favorites}
-                </AppText>
-              </View>
-            </View>
-          </View>
+    <Card tone="soft" style={{ gap: 12 }} testID="trust-card">
+      <View style={styles.rowCenter}>
+        <View style={[styles.roundIcon, { backgroundColor: identityVerified ? colors.success : colors.surface }]}>
+          <Ionicons name="shield-checkmark" size={16} color={identityVerified ? "#fff" : colors.text} />
         </View>
-      </Card>
-      {onBoost ? (
-        <PressableScale
-          onPress={onBoost}
-          scaleTo={0.93}
-          style={[styles.boostBtn, { backgroundColor: colors.surfaceInverse }]}
-          accessibilityRole="button"
-          accessibilityLabel={`Boost ${property.title}`}
-          testID={`boost-${property.id}`}
-        >
-          <Ionicons name={property.promotion ? TIER_META[property.promotion.tier].icon : "rocket"} size={14} color={colors.textInverse} />
-          <AppText variant="micro" color={colors.textInverse}>
-            {property.promotion ? "Extend" : "Boost"}
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="title">Trust & documents</AppText>
+          <AppText variant="caption" tone="secondary">
+            {identityVerified ? "Your identity is verified — buyers see the badge on every listing." : "Verify your identity so buyers see a verified badge on your listings."}
           </AppText>
-        </PressableScale>
-      ) : null}
-    </View>
+        </View>
+        <IdentityBadge status={identityVerified ? "approved" : "none"} />
+      </View>
+      <Pressable onPress={identityVerified ? onDocs : onIdentity} accessibilityRole="button" style={[styles.trustRow, { backgroundColor: colors.surface }]} testID="trust-cta">
+        <Ionicons name={identityVerified ? "document-text-outline" : "card-outline"} size={18} color={missing > 0 && identityVerified ? colors.warning : colors.text} />
+        <AppText variant="bodyMedium" style={{ flex: 1 }}>
+          {identityVerified ? (missing > 0 ? `${missing} active listing${missing === 1 ? "" : "s"} without title documents` : pending > 0 ? `${pending} document${pending === 1 ? "" : "s"} under review` : "All active listings carry title documents") : "Start identity verification"}
+        </AppText>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Pressable>
+    </Card>
   );
 }
 
-function BoostsCard({ promos, listings, onBoost, onAll }: { promos: Awaited<ReturnType<typeof api.myPromotions>> | null; listings: Property[]; onBoost: (id: string) => void; onAll: () => void }) {
+function BoostsCard({ promos, listings, onBoost, onAll }: { promos: Awaited<ReturnType<typeof api.myPromotions>> | null; listings: ManagerListing[]; onBoost: (id: string) => void; onAll: () => void }) {
   const { colors } = useTheme();
   const active = promos?.active ?? [];
-  const candidate = listings.find((l) => !l.promotion && l.status !== "sold");
+  const candidate = listings.find((l) => !l.boost_active && l.status !== "sold" && l.status !== "withdrawn");
   return (
     <Card tone="soft" style={{ gap: 12 }} testID="boosts-card">
       <View style={styles.rowCenter}>
@@ -492,12 +569,10 @@ const styles = StyleSheet.create({
   heroFooter: { flexDirection: "row", gap: 8, marginTop: 8 },
   heroPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 28, borderRadius: radii.pill, backgroundColor: "rgba(255,255,255,0.12)" },
   statsRow: { flexDirection: "row", gap: space[3] },
-  listingWrap: { position: "relative" },
-  listing: { flexDirection: "row", gap: 12, padding: 12 },
-  listingImg: { width: 92, height: 92, borderRadius: radii.sm },
-  listingFooter: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  metricPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, height: 20, borderRadius: radii.pill },
-  boostBtn: { position: "absolute", right: 12, top: 12, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, height: 28, borderRadius: radii.pill },
+  filterRow: { gap: 8, paddingBottom: space[3] },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radii.md, borderWidth: 1 },
+  confirm: { gap: 10, padding: 12, borderRadius: radii.md },
+  trustRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md },
   boostRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 8, borderRadius: radii.md },
   boostImg: { width: 44, height: 44, borderRadius: radii.sm },
   leadAvatar: { width: 44, height: 44, borderRadius: 22 },

@@ -1,0 +1,40 @@
+{
+  "summary": "Sprint 4 (Agent listing manager) + Sprint 5 (KYC identity + title documents) tested end-to-end on backend (7/7 pytest, covering ~45 assertions) and frontend (mobile 375x667). All requested flows work: manager summary/rows, leads 403/404, status PATCH + 422, identity submit→409→reject(422 w/o reason)→resubmit→approve→identity_verified, private file ACL (owner/admin 200, other 403), title doc upload→approve→documents_verified + 'Certificate of Occupancy' on property + map marker flag, non-admin delete of approved doc 409. UI: dashboard stats/trust card/filters/rows/status sheet+toast, manage screen docs upload/delete + leads stats + sold confirm/cancel, identity-verification form gating + submit, admin KYC approve + doc reject with reason gating, property docs badge/row + Manage, map PhotoPager swipe (1/3→2/3), Ikeja tile 'Title docs ✓', pin→preview→property. No 500s, no page errors. Found 1 trust-logic bug (phone step marked Done without verification) and 2 minor UX issues. No deprecated Expo packages detected; no SafeAreaView issues detected in new files.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/agent/manager", "issue": "Legacy listing statuses 'verified' and 'premium' still exist on 4 demo listings (c2337eca, 823dec56, 7aa15f5f, 7d769d80). They are passed through as row.status, so the row badge shows 'verified'/'premium' as a status and the status sheet has nothing selected. Map them to 'available' (or migrate the data)."},
+      {"endpoint": "POST /api/properties/{id}/documents (admin on another agent's listing)", "issue": "The doc's agent_id is set to the uploader (the admin), not prop.agent_id, and the file is stored under the admin's upload path. The real listing agent then can't delete the doc and gets 403 on the file, and the review notification goes to the admin."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "identity-verification steps", "issue": "phoneDone = !!user?.phone (identity-verification.tsx:65). A freshly registered user with an unverified phone (phone_verified=false) sees 'Phone number · Done' and '3 OF 3 STEPS COMPLETE', but Profile shows 'Verify phone' as not done. This breaks the rule that badges only show after real verification. Use user.phone_verified.", "testID": "idv-step-1", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/agent-dashboard status sheet", "issues": ["'Mark as sold / let' and 'Withdraw' apply on a single tap with no confirmation (agent-dashboard.tsx:353), but /agent/listing/{id} asks for confirmation (status-confirm). One mis-tap removes the home from the map. Add the same confirmation step.", "Tapping the status that is already selected does nothing and leaves the sheet open. Close the sheet instead."]},
+      {"screen": "ListingManagerRow metrics", "issue_note": "minor", "issues": ["Views shows the total plus a '+N · 30d' sub-label. When total == 30d (e.g. '3' and '+3 · 30d') this reads oddly. Consider '3 in 30d'."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_agent_manager_kyc_docs.py", "/app/test_reports/pytest/pytest_iteration65.xml"],
+  "action_items": [
+    "Fix identity-verification.tsx:65: phoneDone should use user.phone_verified (and recompute verifiedCount).",
+    "Add the sold/withdraw confirmation to the /agent-dashboard status sheet to match the manage screen.",
+    "Normalise legacy property statuses ('verified', 'premium') to 'available' in /api/agent/manager rows, or migrate the data.",
+    "Optional: when an admin uploads a doc on someone else's listing, set agent_id = prop.agent_id."
+  ],
+  "critical_code_review_comments": [
+    "kyc_documents.py: an admin can approve or reject an identity/doc in any state (not only pending). Harmless but no guard.",
+    "Review notifications link to /agent/listing-docs/{id} (the legacy route, which still exists). Consider /agent/listing/{id}?tab=docs for consistency.",
+    "pytest.ini forces xdist ('-n auto --dist loadscope'). The new suite shares module state, so run it with '-n 0'."
+  ],
+  "updated_files": ["/app/backend/tests/test_agent_manager_kyc_docs.py (new)"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "~95% (all requested flows pass; 1 trust-logic UI bug)"},
+  "seed_data_creation": "Created throwaway users test_kyc_*@amass.africa (identity approved via API test), test_kyc2_*, and test_idv_83336@amass.africa / TestPass2026! (id dc36c21f-e9e3-4321-9289-f1f8390bc855, identity APPROVED via the UI). All test title docs were deleted (admin DELETE). Demo KYC was NOT submitted (still 'none'). Demo listing 1a1f82cc was 'coming_soon' before testing and is now 'available'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login response key is 'access_token' (not 'token'). Run the new suite with: cd /app/backend && EXPO_PUBLIC_BACKEND_URL=... pytest -n 0 tests/test_agent_manager_kyc_docs.py. On web, use page.expect_file_chooser() around clicking '*-library' buttons (expo-image-picker creates the input dynamically). For PhotoPager swipe, use page.mouse.wheel(width, 0) over home-tile-photos-{id}-scroll; JS scrollTo did not trigger onScroll. Zoom out once from the default map to get multi-photo tiles (7d769d80 has 3 photos). Login helper: /app/tests/i64_login.py.",
+  "rca_of_issue": "Phone step bug: identity-verification.tsx:65 derives completion from the presence of user.phone (set at registration) instead of user.phone_verified (set by OTP). Repro: register with a phone, open /identity-verification, and the Phone step shows Done."
+}

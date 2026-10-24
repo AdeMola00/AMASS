@@ -34,3 +34,37 @@ export async function authedImageSource(url: string): Promise<{ uri: string; hea
   const token = await storage.secureGet<string>("amass_auth_token", "");
   return token ? { uri, headers: { Authorization: `Bearer ${token}` } } : { uri };
 }
+
+export type PickResult = { ok: true; dataUrl: string } | { ok: false; reason: "cancelled" | "denied" | "blocked" | "failed" };
+
+/**
+ * Pick a photo and return it as a base64 data URL WITHOUT uploading it anywhere — for flows
+ * whose endpoint stores the file privately itself (identity documents, title documents).
+ * `camera` follows the permission contract: check → request once → report `blocked` when the
+ * user can no longer be asked (caller shows an "Open Settings" button). Gallery uses the
+ * system Photo Picker (no permission). On web the camera falls back to the file picker.
+ */
+export async function pickImageDataUrl(source: "camera" | "library"): Promise<PickResult> {
+  try {
+    const useCamera = source === "camera" && Platform.OS !== "web";
+    if (useCamera) {
+      let perm = await ImagePicker.getCameraPermissionsAsync();
+      if (!perm.granted) {
+        if (!perm.canAskAgain) return { ok: false, reason: "blocked" };
+        perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) return { ok: false, reason: perm.canAskAgain ? "denied" : "blocked" };
+      }
+    }
+    const opts = { quality: 0.6, base64: true, allowsEditing: false } as const;
+    const res = useCamera ? await ImagePicker.launchCameraAsync({ ...opts, cameraType: ImagePicker.CameraType.front }) : await ImagePicker.launchImageLibraryAsync({ ...opts, mediaTypes: ["images"] });
+    if (res.canceled || !res.assets?.length) return { ok: false, reason: "cancelled" };
+    const asset = res.assets[0];
+    const mime = asset.mimeType || "image/jpeg";
+    if (asset.base64) return { ok: true, dataUrl: `data:${mime};base64,${asset.base64}` };
+    if (asset.uri.startsWith("data:")) return { ok: true, dataUrl: asset.uri };
+    const b64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+    return { ok: true, dataUrl: `data:${mime};base64,${b64}` };
+  } catch {
+    return { ok: false, reason: "failed" };
+  }
+}

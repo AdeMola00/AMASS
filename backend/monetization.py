@@ -860,7 +860,7 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
             query["latitude"] = {"$gte": min_lat, "$lte": max_lat}
             query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
         docs = await db.properties.find(query, {"_id": 0, "id": 1, "title": 1, "listing_type": 1, "property_type": 1, "latitude": 1, "longitude": 1, "agent_id": 1, "verified": 1, "promotion": 1,
-                                               "price": 1, "image": 1, "images": 1, "bedrooms": 1, "bathrooms": 1, "size_sqm": 1, "city": 1, "state": 1, "location": 1, "status": 1, "is_amass_exclusive": 1}).limit(min(limit, 500)).to_list(500)
+                                               "price": 1, "image": 1, "images": 1, "bedrooms": 1, "bathrooms": 1, "size_sqm": 1, "city": 1, "state": 1, "location": 1, "status": 1, "is_amass_exclusive": 1, "documents_verified": 1}).limit(min(limit, 500)).to_list(500)
         from promotions import active_promotion as _active_promo
         from tokens import is_free_amass_sale as _is_free_sale
         ent_ids = {e["target_id"] for e in await db.entitlements.find({"user_id": user["id"], "feature_key": "property", "status": "active"}, {"_id": 0, "target_id": 1}).to_list(2000)}
@@ -887,6 +887,7 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
             if is_free:
                 unlocked = True
                 lat, lng = d["latitude"], d["longitude"]
+            gallery = [u for u in (d.get("images") or []) if u]
             out.append({
                 "id": d["id"], "category": cat, "type": d.get("property_type"), "lat": lat, "lng": lng, "unlocked": unlocked,
                 "verified": bool(d.get("verified")), "approx": not unlocked,
@@ -894,7 +895,11 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
                 "promotion_tier": (_active_promo(d) or {}).get("tier"),
                 # Public teaser tier — identical to what the locked detail preview already shows. Address + agent stay gated.
                 "title": d.get("title"), "price": d.get("price"), "listing_type": d.get("listing_type"),
-                "cover": d.get("image") or (d.get("images") or [None])[0],
+                "cover": d.get("image") or (gallery[0] if gallery else None),
+                # The gallery itself is part of the unlock: only unlocked/free homes get it; everyone learns the count.
+                "images": gallery[:8] if unlocked else None,
+                "image_count": len(gallery) or (1 if d.get("image") else 0),
+                "documents_verified": bool(d.get("documents_verified")),
                 "bedrooms": d.get("bedrooms"), "bathrooms": d.get("bathrooms"), "size_sqm": d.get("size_sqm"),
                 "city": d.get("city"), "place": d.get("location") if unlocked else d.get("city"),
                 "status": d.get("status", "available"), "access_cost": 0 if is_free else fee_cache[(cat, zone)], "is_free_amass_sale": is_free,

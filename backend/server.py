@@ -94,6 +94,7 @@ class UserOut(BaseModel):
     is_agent: bool = False
     is_admin: bool = False
     referral_code: Optional[str] = None
+    identity_verified: bool = False
     created_at: datetime
 
 
@@ -346,6 +347,7 @@ def user_to_out(u: dict) -> UserOut:
         city=u.get("city"),
         is_agent=u.get("is_agent", False),
         is_admin=is_admin,
+        identity_verified=bool(u.get("identity_verified")),
         created_at=u["created_at"],
     )
 
@@ -466,7 +468,7 @@ async def list_properties(
     limit: int = 100,
     creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
 ):
-    query: dict = {}
+    query: dict = {"status": {"$ne": "withdrawn"}}  # hidden by the agent via the listing manager
     if listing_type:
         query["listing_type"] = listing_type
     if property_type:
@@ -628,12 +630,17 @@ async def get_property(
             "unlocked": False,
             "agent_unlocked": False,
             "promotion": doc.get("promotion"),
+            **_docs_summary(doc),
         }
 
     # Access unlocked → full basic details + agent PUBLIC identity.
     # Agent PRIVATE contact (phone/email) stays gated behind the agent tier.
     doc["views_recent"] = doc.get("views_recent", 0)
     doc["favorites_recent"] = doc.get("favorites_recent", 0)
+    doc.update(_docs_summary(doc))
+    if doc.get("agent_id"):
+        _agent_user = await db.users.find_one({"id": doc["agent_id"]}, {"_id": 0, "identity_verified": 1})
+        doc["agent_identity_verified"] = bool((_agent_user or {}).get("identity_verified"))
     if agent_unlocked:
         contact = await agent_contact_for(db, doc)
         doc["agent_phone"] = (contact or {}).get("phone")
@@ -844,6 +851,7 @@ class AgentPublic(BaseModel):
     total_rented: int = 0
     mandate_verification_rate: float = 0.0
     rejection_reason: Optional[str] = None
+    identity_verified: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -956,6 +964,7 @@ async def agent_me(user: dict = Depends(get_current_user)):
     if not doc:
         raise HTTPException(404, "No agent application yet")
     out = _agent_to_public(doc)
+    out.identity_verified = bool(user.get("identity_verified"))
     stats = await _agent_stats(user["id"])
     out.active_listings = stats["active_listings"]
     out.total_sold = stats["total_sold"]
@@ -970,6 +979,8 @@ async def get_agent(user_id: str):
     if not doc:
         raise HTTPException(404, "Agent not found")
     out = _agent_to_public(doc)
+    _u = await db.users.find_one({"id": user_id}, {"_id": 0, "identity_verified": 1})
+    out.identity_verified = bool((_u or {}).get("identity_verified"))
     stats = await _agent_stats(user_id)
     out.active_listings = stats["active_listings"]
     out.total_sold = stats["total_sold"]
@@ -1994,8 +2005,23 @@ async def root():
     return {"app": "AMASS API", "version": "1.0.0"}
 
 
+from demo_homes_seed import seed_demo_homes, purge_test_listings  # noqa: E402
+from kyc_documents import register_kyc_routes, ensure_kyc_indexes, docs_summary as _docs_summary  # noqa: E402
+from agent_listing_manager import register_listing_manager_routes  # noqa: E402
+
+
+@api.post("/admin/maintenance/purge-test-listings")
+async def admin_purge_test_listings(_admin: dict = Depends(require_admin)):
+    """Remove automated-test fixtures (TEST_* titles, example.com photos) and re-run the demo-homes seed."""
+    purged = await purge_test_listings(db)
+    seeded = await seed_demo_homes(db, Property, hash_password)
+    return {"purged": purged, "seeded": seeded}
+
+
 # ─── Mount ────────────────────────────────────────────────
 app.include_router(api)
+app.include_router(register_kyc_routes(db, get_current_user, require_admin))
+app.include_router(register_listing_manager_routes(db, get_current_user))
 app.include_router(register_token_routes(db))
 
 
@@ -2321,6 +2347,12 @@ async def on_startup():
             logger.info("social feed seed: %s", await seed_social_feed(db, (_demo_sf or {}).get("id"), hash_password))
         except Exception as _e:  # never block boot
             logger.warning("social feed seed failed: %s", _e)
+        try:
+            await db.properties.create_index("seed_key", sparse=True)
+            await ensure_kyc_indexes(db)
+            logger.info("demo homes seed: %s", await seed_demo_homes(db, Property, hash_password))
+        except Exception as _e:  # never block boot
+            logger.warning("demo homes seed failed: %s", _e)
 
         async def _reminder_loop():
             while True:
@@ -2539,11 +2571,11 @@ async def on_startup():
         await db.advertisements.insert_one(demo_ad.model_dump())
 
     # Assign 2 seed properties to the demo user so /agent-dashboard is
-    # populated for demo E2E flow (Boost / Leads UI).
+    # populated for demo E2E flow (Boost / Leads UI) — only when the demo user owns none yet.
     demo_user = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0})
-    if demo_user:
+    if demo_user and await db.properties.count_documents({"agent_id": demo_user["id"]}) < 2:
         demo_props = await db.properties.find(
-            {"agent_id": {"$ne": demo_user["id"]}}, {"_id": 0}
+            {"agent_id": {"$ne": demo_user["id"]}, "seed_key": {"$exists": False}}, {"_id": 0}
         ).sort("price", -1).limit(2).to_list(2)
         if demo_props:
             await db.properties.update_many(

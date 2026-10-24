@@ -119,6 +119,8 @@ class PublicAgentOut(BaseModel):
     response_rate: float = 0.0
     joined_at: Optional[str] = None
     share_url: str
+    # Government ID + selfie reviewed and approved by the AMASS team (Documents & KYC).
+    identity_verified: bool = False
 
 
 class BadgeProgressOut(BaseModel):
@@ -262,7 +264,9 @@ def register_agent_platform_v2_routes(
             {"_id": 0, "id": 1},
         )
         joined = agent_doc.get("created_at")
+        _u = await db.users.find_one({"id": agent_doc["user_id"]}, {"_id": 0, "identity_verified": 1})
         return PublicAgentOut(
+            identity_verified=bool((_u or {}).get("identity_verified")),
             user_id=agent_doc["user_id"],
             slug=slug,
             full_name=agent_doc.get("full_name", "AMASS Agent"),

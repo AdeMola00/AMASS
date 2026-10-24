@@ -43,7 +43,7 @@ export type Property = {
   longitude: number;
   images: string[];
   amenities: string[];
-  status: "available" | "coming_soon" | "verified" | "premium" | "sold";
+  status: "available" | "coming_soon" | "verified" | "premium" | "sold" | "withdrawn";
   verified: boolean;
   listing_source?: "owner_listed" | "mandated" | "independent" | "pending";
   mandate?: {
@@ -79,6 +79,12 @@ export type Property = {
   approx?: boolean;
   /** Locked preview: how many photos unlock (the full gallery is gated). */
   image_count?: number;
+  /** Title documents (C of O, survey plan…) reviewed by AMASS — public trust signal, no files. */
+  documents_verified?: boolean;
+  documents_status?: "none" | "pending" | "verified" | "rejected";
+  verified_documents?: string[];
+  /** Listing agent passed the ID + selfie check. */
+  agent_identity_verified?: boolean;
 };
 
 export type Currency = "MASS" | "FIX";
@@ -155,7 +161,95 @@ export type UserProfile = {
   city?: string | null;
   is_agent: boolean;
   is_admin?: boolean;
+  /** Government ID + selfie reviewed and approved by the AMASS team. */
+  identity_verified?: boolean;
   created_at: string;
+};
+
+// ─── Documents & KYC ─────────────────────────────────────
+export type KycStatus = "none" | "pending" | "approved" | "rejected";
+export type KycMe = {
+  status: KycStatus;
+  identity_verified: boolean;
+  id_type?: string | null;
+  id_type_label?: string | null;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+  reason?: string | null;
+  id_document_url?: string | null;
+  selfie_url?: string | null;
+  id_types: { key: string; label: string }[];
+};
+export type DocKind = "c_of_o" | "governors_consent" | "deed_of_assignment" | "survey_plan" | "building_plan_approval" | "mandate_letter" | "other";
+export type PropertyDocument = {
+  id: string;
+  property_id: string;
+  kind: DocKind;
+  kind_label: string;
+  title?: string | null;
+  url?: string | null;
+  status: "pending" | "approved" | "rejected";
+  reason?: string | null;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+};
+export type PropertyDocuments = {
+  owner: boolean;
+  documents_verified: boolean;
+  documents_status: "none" | "pending" | "verified" | "rejected";
+  verified_documents: string[];
+  documents: PropertyDocument[];
+  kinds: { key: DocKind; label: string }[];
+};
+export type KycQueue = {
+  identity: (KycMe & { id: string; user_id: string; full_name: string; avatar_url?: string | null; email?: string | null; phone?: string | null; is_agent: boolean; attempts: number })[];
+  documents: (PropertyDocument & { property_title: string; property_city?: string | null; property_location?: string | null; property_cover?: string | null; agent_name: string; agent_avatar?: string | null; agent_id: string })[];
+  counts: { identity_pending: number; documents_pending: number };
+};
+
+// ─── Agent listing manager ───────────────────────────────
+export type ManagerLeads = { chats: number; unlocks: number; inspections: number; total: number; total_30d: number; last_at?: string | null };
+export type ManagerListing = {
+  id: string;
+  title: string;
+  cover?: string | null;
+  photo_count: number;
+  price: number;
+  listing_type: string;
+  property_type: string;
+  status: "available" | "coming_soon" | "verified" | "premium" | "sold" | "withdrawn";
+  verified: boolean;
+  city?: string | null;
+  location?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  size_sqm?: number | null;
+  promotion?: PromotionInfo | null;
+  boost_active: boolean;
+  boost_tier?: PromotionTier | null;
+  boost_days_left?: number | null;
+  views_total: number;
+  views_30d: number;
+  saves: number;
+  leads: ManagerLeads;
+  documents_verified: boolean;
+  documents_status: "none" | "pending" | "verified" | "rejected";
+  verified_documents: string[];
+  documents_pending: number;
+  created_at?: string | null;
+};
+export type ManagerSummary = { listings: number; active: number; boosted: number; views_30d: number; saves: number; leads_30d: number; leads_total: number; docs_pending: number; docs_missing: number };
+export type ListingLead = {
+  id: string;
+  kind: "chat" | "unlock" | "inspection";
+  user_id?: string | null;
+  name: string;
+  avatar?: string | null;
+  identity_verified: boolean;
+  detail: string;
+  at?: string | null;
+  conversation_id?: string;
+  inspection_id?: string;
 };
 
 // ─── Neighbours (social) types ───────────────────────────
@@ -491,6 +585,7 @@ export type AgentPublic = {
   total_rented: number;
   mandate_verification_rate: number;
   rejection_reason?: string;
+  identity_verified?: boolean;
   created_at: string;
   updated_at?: string;
 };
@@ -652,6 +747,10 @@ export type MapMarker = {
   price?: number | null;
   listing_type?: string | null;
   cover?: string | null;
+  /** Full gallery — only sent for homes the viewer has unlocked (or free listings). */
+  images?: string[] | null;
+  /** Total photos on the listing (locked homes still learn how many unlock). */
+  image_count?: number;
   bedrooms?: number | null;
   bathrooms?: number | null;
   size_sqm?: number | null;
@@ -662,6 +761,7 @@ export type MapMarker = {
   /** MASS needed to unlock this home (0 when free). */
   access_cost?: number;
   is_free_amass_sale?: boolean;
+  documents_verified?: boolean;
 };
 export type ProviderPreview = {
   id: string;
@@ -1204,6 +1304,26 @@ export const api = {
         unread: boolean;
       }[]
     >("/agent/leads"),
+
+  // ─── Agent listing manager (real leads: chats · unlocks · inspections) ───
+  agentManager: () => req<{ summary: ManagerSummary; listings: ManagerListing[] }>("/agent/manager"),
+  agentListingLeads: (property_id: string) => req<{ property_id: string; title: string; leads: ListingLead[]; counts: { chats: number; unlocks: number; inspections: number } }>(`/agent/listings/${property_id}/leads`),
+  setListingStatus: (property_id: string, status: "available" | "coming_soon" | "sold" | "withdrawn") =>
+    req<{ id: string; status: string }>(`/agent/listings/${property_id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+
+  // ─── Documents & KYC ─────────────────────────────────────
+  kycMe: () => req<KycMe>("/kyc/me"),
+  kycSubmitIdentity: (body: { id_type: string; id_document: string; selfie: string; id_number_last4?: string }) =>
+    req<KycMe>("/kyc/identity", { method: "POST", body: JSON.stringify(body) }),
+  propertyDocuments: (property_id: string) => req<PropertyDocuments>(`/properties/${property_id}/documents`),
+  uploadPropertyDocument: (property_id: string, body: { kind: DocKind; file: string; title?: string }) =>
+    req<PropertyDocument & { documents_status: string; documents_verified: boolean }>(`/properties/${property_id}/documents`, { method: "POST", body: JSON.stringify(body) }),
+  deletePropertyDocument: (property_id: string, doc_id: string) => req<{ documents_status: string; documents_verified: boolean }>(`/properties/${property_id}/documents/${doc_id}`, { method: "DELETE" }),
+  adminKycQueue: (status: "pending" | "approved" | "rejected" = "pending") => req<KycQueue>(`/admin/kyc/queue?status=${status}`),
+  adminReviewIdentity: (user_id: string, approve: boolean, reason?: string) =>
+    req<KycMe>(`/admin/kyc/identity/${user_id}/review`, { method: "POST", body: JSON.stringify({ approve, reason }) }),
+  adminReviewDocument: (doc_id: string, approve: boolean, reason?: string) =>
+    req<PropertyDocument>(`/admin/kyc/documents/${doc_id}/review`, { method: "POST", body: JSON.stringify({ approve, reason }) }),
 
   // AI
   aiSearchSync: (query: string, session_id?: string) =>
@@ -1931,6 +2051,7 @@ export const api = {
       response_rate: number;
       joined_at?: string | null;
       share_url: string;
+      identity_verified?: boolean;
     }>(`/agent-platform/public/${encodeURIComponent(slug)}`),
   publicAgentListings: (slug: string) =>
     req<Property[]>(`/agent-platform/public/${encodeURIComponent(slug)}/listings`),
@@ -2354,6 +2475,8 @@ export const api = {
       merged_properties: number;
       pending_estates: number;
       open_social_reports: number;
+      kyc_identity_pending?: number;
+      kyc_documents_pending?: number;
       generated_at: string;
     }>("/admin/cockpit/dashboard"),
   adminDuplicateQueue: (limit = 50) =>

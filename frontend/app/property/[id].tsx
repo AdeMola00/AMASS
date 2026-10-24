@@ -347,6 +347,7 @@ export default function PropertyDetails() {
             <StatusBadge status={property.status} />
             <PromotionBadge promotion={property.promotion} withDays={isOwnListing} testID="detail-promo-badge" />
             {property.verified && property.status !== "verified" && <Badge label="Verified" tone="success" icon="shield-checkmark" />}
+            {property.documents_verified && <Badge label="Title docs verified" tone="fix" icon="document-text" testID="docs-verified-badge" />}
             {property.is_free_amass_sale && (
               <Badge label="Listed by AMASS · Free access" tone="fix" icon="ribbon" />
             )}
@@ -554,15 +555,43 @@ export default function PropertyDetails() {
                 testID="agent-profile-link"
                 accessibilityLabel={`View ${property.agent_name}'s profile`}
               >
-                <Avatar name={property.agent_name} uri={property.agent_avatar} size={52} verified={!!property.verified} />
+                <Avatar name={property.agent_name} uri={property.agent_avatar} size={52} verified={!!property.agent_identity_verified} />
                 <View style={{ flex: 1 }}>
                   <AppText variant="title">{property.agent_name}</AppText>
-                  <AppText variant="caption" tone="brand" style={{ marginTop: 2 }}>
-                    Verified AMASS Agent · View profile
-                  </AppText>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                    {property.agent_identity_verified ? <Badge label="Identity verified" tone="success" icon="shield-checkmark" size="xs" testID="agent-identity-badge" /> : <Badge label="AMASS agent" tone="neutral" icon="briefcase-outline" size="xs" testID="agent-identity-unverified" />}
+                    <AppText variant="caption" tone="brand">
+                      View profile
+                    </AppText>
+                  </View>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
               </Card>
+
+              {/* Title documents — verified by the AMASS team (files stay private; only the badge is public) */}
+              {property.documents_verified ? (
+                <View style={[styles.docsRow, { backgroundColor: colors.fixSoft }]} testID="docs-verified-row">
+                  <Ionicons name="document-text" size={18} color={colors.fixText} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <AppText variant="bodyMedium" color={colors.fixText}>
+                      Title documents verified by AMASS
+                    </AppText>
+                    {property.verified_documents?.length ? (
+                      <AppText variant="caption" color={colors.fixText} style={{ opacity: 0.85 }}>
+                        {property.verified_documents.join(" · ")}
+                      </AppText>
+                    ) : null}
+                  </View>
+                </View>
+              ) : isOwnListing ? (
+                <Pressable onPress={() => router.push(`/agent/listing/${property.id}?tab=docs` as any)} accessibilityRole="button" style={[styles.docsRow, { backgroundColor: colors.warningSoft }]} testID="docs-upload-nudge">
+                  <Ionicons name="document-outline" size={18} color={colors.warning} />
+                  <AppText variant="bodySm" color={colors.warning} style={{ flex: 1 }}>
+                    {property.documents_status === "pending" ? "Your title documents are under review." : "Upload the C of O or survey plan to earn the Title documents verified badge."}
+                  </AppText>
+                  <Ionicons name="chevron-forward" size={16} color={colors.warning} />
+                </Pressable>
+              ) : null}
 
               {isOwnListing ? (
                 <View style={[styles.ownerNote, { backgroundColor: colors.infoSoft }]} testID="own-listing-note">
@@ -683,7 +712,7 @@ export default function PropertyDetails() {
                   variant="primary"
                   size="lg"
                   iconLeft="briefcase"
-                  onPress={() => router.push("/agent-dashboard" as any)}
+                  onPress={() => router.push(`/agent/listing/${property.id}` as any)}
                   style={{ flex: 1 }}
                   testID="book-tour-btn"
                 />
@@ -815,6 +844,7 @@ function StatusBadge({ status }: { status: Property["status"] }) {
     verified: { label: "Verified", tone: "success", icon: "shield-checkmark" },
     premium: { label: "Premium", tone: "premium", icon: "diamond" },
     sold: { label: "Sold", tone: "inverse", icon: "lock-closed" },
+    withdrawn: { label: "Withdrawn", tone: "neutral", icon: "eye-off" },
   };
   const cfg = map[status] ?? map.available;
   return <Badge label={cfg.label} tone={cfg.tone} icon={cfg.icon} />;
@@ -974,6 +1004,7 @@ const styles = StyleSheet.create({
   scoreCircle: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
   mapMini: { height: 220, borderRadius: radii.lg, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
   agentCard: { flexDirection: "row", alignItems: "center", gap: space[3] },
+  docsRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: space[3], padding: space[3], borderRadius: radii.md },
   ownerNote: {
     flexDirection: "row",
     alignItems: "center",

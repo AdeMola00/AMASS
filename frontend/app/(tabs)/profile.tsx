@@ -93,7 +93,7 @@ export default function Profile() {
     { key: "photo", label: "Add photo", done: !!user?.avatar_url, icon: "camera-outline" as IconName, route: "/settings" },
     { key: "phone", label: "Verify phone", done: !!user?.phone_verified, icon: "call-outline" as IconName, route: "/(auth)/phone" },
     { key: "save", label: "Save a home", done: (saved ?? 0) > 0, icon: "heart-outline" as IconName, route: "/(tabs)" },
-    { key: "id", label: "Verify ID", done: !!user?.is_agent, icon: "shield-checkmark-outline" as IconName, route: "/identity-verification" },
+    { key: "id", label: "Verify ID", done: !!user?.identity_verified, icon: "shield-checkmark-outline" as IconName, route: "/identity-verification" },
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const nextStep = steps.find((s) => !s.done);
@@ -121,7 +121,7 @@ export default function Profile() {
         {/* Identity */}
         <View style={styles.header}>
           <View style={styles.identity}>
-            <Avatar name={user?.full_name} uri={user?.avatar_url} size={72} verified={!!user?.is_agent} />
+            <Avatar name={user?.full_name} uri={user?.avatar_url} size={72} verified={!!user?.identity_verified} />
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="caption" tone="tertiary" testID="profile-greeting">
                 {greeting()} 👋
@@ -130,7 +130,8 @@ export default function Profile() {
                 {firstName}
               </AppText>
               <View style={styles.badges}>
-                {user?.is_agent ? <Badge label="Verified Agent" tone="success" icon="shield-checkmark" testID="badge-agent" /> : <Badge label="Member" tone="neutral" icon="person" />}
+                {user?.is_agent ? <Badge label="Agent" tone="success" icon="briefcase" testID="badge-agent" /> : <Badge label="Member" tone="neutral" icon="person" />}
+                {user?.identity_verified ? <Badge label="ID verified" tone="fix" icon="shield-checkmark" testID="badge-identity" /> : null}
                 {user?.is_admin ? <Badge label="Admin" tone="brand" icon="key" /> : null}
                 {(user as any)?.phone_verified ? <Badge label="Phone" tone="info" icon="call" /> : null}
               </View>
