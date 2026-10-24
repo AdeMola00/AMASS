@@ -1,0 +1,37 @@
+{
+  "summary": "Frontend-only retest at 390x844 (web preview) of the 5 fixes from iteration 75. All 5 fixes PASS and the regression check passes. FIX-1: /buy-tokens shows exactly 4 bundles (bundle-explorer ₦1,000, bundle-hunter ₦2,500, bundle-investor ₦5,000, bundle-professional ₦10,000) and no Starter. /buy-fix shows exactly 3 (fix_pro ₦2,000, fix_team ₦5,000, fix_enterprise ₦12,500) and no fix_starter. All 7 listed bundles return 200 from POST /api/payments/initialize, with no 422. FIX-2: the UnlockDialog heading reads 'Unlock this home'. FIX-3: the success sheet body is on separate lines ('₦1,000 paid.' / 'Receipt AMS-20261024-13947E is in your Wallet (and your email).' / 'Your wallet is topped up and ready to use.'), and no line starts with '·'. FIX-4: CTA width was sampled every 250ms during processing and stayed 219-226px wide and 60-62px tall (the small change is press-scale), with the spinner centred and no collapse to a circle. FIX-5: fixa tester was set to 50 MASS and opened from Home via pin -> preview-open (history.length 3). The dialog showed 'Short by 70 MASS = ₦7,000 · nothing charged'. Get MASS led to /buy-tokens?returnTo=...&unlock=1 (history.length 4). Buying Explorer showed a success sheet with 'Let's finish what you started.' and a Continue button. Continue returned to /property/f2342766...?unlock=1 with history.length still 4 (the entry was replaced, not pushed), exactly 1 unlock-cta-btn, and the dialog re-opened with 'Your balance 60 MASS · Short by 60 MASS'. The only POST was /unlocks/cancel and nothing was charged. Browser Back went to '/' (Home map with the preview card still open), not to the same property, so there is no duplicate history entry. Regression: demo Explorer purchase took the balance from 13,600 to 13,610 (exactly +10, checked via API). The /wallet top row is 'Purchased Explorer — 10 MASS +10 ≈ ₦1,000', and receipt-sheet shows AMS-20261024-13947E, Balance after 13,610, completed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "buy-tokens / buy-fix bundle grid", "issues": ["The BEST VALUE badge is hardcoded through config.bestBundleId (TokenPurchaseScreen.tsx:239). Since Starter was removed, FIX Pro (₦9.1/FIX, the most expensive per unit, with no 'save %') still carries BEST VALUE. On MASS, Investor (₦87.7/MASS) has the badge but Professional is cheaper per unit (₦80.0/MASS, save 20%). Either compute the badge from the lowest ₦/unit or relabel it 'Most popular'. LOW."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/helper_iter76_adjust.py",
+    "/app/backend/tests/helper_iter76_init_all.py",
+    "/app/test_reports/i76_processing.jpg",
+    "/app/test_reports/i76_success.jpg",
+    "/app/test_reports/i76_buy_fix.jpg",
+    "/app/test_reports/i76_short_dialog.jpg",
+    "/app/test_reports/i76_return.jpg",
+    "/app/test_reports/i76_after_back.jpg",
+    "/app/test_reports/i76_receipt.jpg"
+  ],
+  "action_items": [
+    "LOW (optional): Make the BEST VALUE badge accurate. Compute it from the lowest ₦/unit, or rename it 'Most popular'. FIX Pro is currently the most expensive per unit."
+  ],
+  "critical_code_review_comments": [
+    "tokens.bundles_with_bonus filters out bundles below topup_min_ngn, so catalog and initialize now agree. Any code path that reads TOKEN_BUNDLES/FIX_BUNDLES directly (instead of bundles_with_bonus) would still expose starter. initialize correctly rejects it.",
+    "Button.tsx keeps the label row laid out with opacity 0 and puts the spinner in an absoluteFill overlay. Width is preserved, and aria-busy is not exposed on web (accessibilityState busy) but that is not blocking.",
+    "After Continue the URL keeps ?unlock=1. Refreshing the property page re-opens the dialog. This is harmless but could be cleared with router.setParams({unlock: undefined}) once the dialog opens."
+  ],
+  "updated_files": ["/app/backend/tests/helper_iter76_adjust.py (new, test-only)", "/app/backend/tests/helper_iter76_init_all.py (new, test-only)"],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100% (5/5 fixes + regression)"},
+  "seed_data_creation": "fixa.tester+15339 (f26f8364-...): admin -230 MASS ('TEST iter76 insufficient-balance setup'), +10 Explorer purchase, then +220 ('TEST iter76 restore'), so spendable is back to 280. Demo: +10 MASS Explorer purchase (13,610). helper_iter76_init_all.py left 7 orphan PENDING payment intents for demo (one per bundle, never paid).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Locked Zone A sale property visible on fixa tester's Home map: pin-f2342766-9443-44ee-929c-a1b46b830f29 -> preview-open-<id> -> property page (dialog auto-opens). 7d769d80 isn't in the default map viewport. Use helper_iter76_adjust.py <amount> <reason> to change fixa's MASS. Success sheet button label is 'Go to wallet' without returnTo and 'Continue' with returnTo; the testID is purchase-success-continue in both cases."
+}

@@ -67,7 +67,7 @@ export default function WalletScreen() {
   const [txError, setTxError] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [txFilter, setTxFilter] = useState<TxFilter>("all");
-  const [conversion, setConversion] = useState<{ MASS_ngn: number; FIX_ngn: number }>({ MASS_ngn: 10, FIX_ngn: 10 });
+  const [conversion, setConversion] = useState<{ MASS_ngn: number; FIX_ngn: number }>({ MASS_ngn: 100, FIX_ngn: 10 });
   const [earn, setEarn] = useState<EarnInfo | null>(null);
   const [receipt, setReceipt] = useState<WalletTransaction | null>(null);
 
@@ -457,8 +457,18 @@ function ReceiptSheet({ tx, onClose, ngn }: { tx: WalletTransaction | null; onCl
   const ref = tx.meta?.reference || tx.meta?.transaction_id || tx.id;
   const context = tx.feature_key ? [tx.feature_key === "property" ? (tx.category === "sale" ? "Sale listing" : "Rental listing") : `Provider tier ${tx.category}`, tx.zone_tier ? `Zone ${tx.zone_tier}` : null, tx.auto_credit ? "Auto-credit" : null].filter(Boolean).join(" · ") : null;
   const share = () =>
-    Share.share({ message: `AMASS receipt · ${tx.description}\n${positive ? "+" : ""}${tx.amount.toLocaleString()} ${ccy} (${ngn(Math.abs(tx.amount), ccy)})\n${when.toLocaleString()}\nRef ${ref}` }).catch(() => {});
+    Share.share({ message: `AMASS receipt${tx.receipt_no ? ` ${tx.receipt_no}` : ""} · ${tx.description}\n${positive ? "+" : ""}${tx.amount.toLocaleString()} ${ccy} (${ngn(Math.abs(tx.amount), ccy)})\n${when.toLocaleString()}\nRef ${ref}` }).catch(() => {});
+  const emailCopy = async () => {
+    if (!tx.receipt_no) return;
+    try {
+      await api.emailReceipt(tx.receipt_no);
+      toast.success("Receipt sent", "A copy is on its way to your email.");
+    } catch (e: any) {
+      toast.error("Couldn't email the receipt", e?.message ?? "Try again shortly.");
+    }
+  };
   const rows: { k: string; v: string }[] = [
+    ...(tx.receipt_no ? [{ k: "Receipt no.", v: tx.receipt_no }] : []),
     { k: "Type", v: meta.label },
     { k: "When", v: when.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
     { k: "Token", v: ccy },
@@ -494,13 +504,16 @@ function ReceiptSheet({ tx, onClose, ngn }: { tx: WalletTransaction | null; onCl
               <AppText variant="caption" tone="tertiary">
                 {r.k}
               </AppText>
-              <AppText variant="caption" weight="bold" style={{ flex: 1, textAlign: "right" }} numberOfLines={2} selectable>
+              <AppText variant="caption" weight="bold" style={{ flex: 1, textAlign: "right" }} numberOfLines={r.k === "Reference" || r.k === "Receipt no." ? 1 : 2} ellipsizeMode="middle" selectable>
                 {r.v}
               </AppText>
             </View>
           ))}
         </View>
-        <Button label="Share receipt" variant="secondary" iconLeft="share-outline" fullWidth onPress={share} testID="receipt-share" />
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <Button label="Share" variant="secondary" iconLeft="share-outline" onPress={share} style={{ flex: 1 }} testID="receipt-share" />
+          {tx.receipt_no ? <Button label="Email copy" variant="secondary" iconLeft="mail-outline" onPress={emailCopy} style={{ flex: 1.15 }} testID="receipt-email" /> : null}
+        </View>
         <SheetLink
           label="Done"
           onPress={() => {

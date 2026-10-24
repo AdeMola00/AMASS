@@ -24,7 +24,10 @@ export default function PaymentCallback() {
 
   useEffect(() => {
     // Ensure the in-app browser is dismissed if still open
-    WebBrowser.dismissBrowser().catch(() => {});
+    // dismissBrowser() returns undefined on web (no Promise) — guard so the screen doesn't crash.
+    try {
+      Promise.resolve(WebBrowser.dismissBrowser() as any).catch(() => {});
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function PaymentCallback() {
           setDetails(s);
           if (s.status === "paid") {
             setState("success");
-            celebrate({ title: s.credits ? `+${s.credits} ${s.currency ?? ""}`.trim() : "Paid!", icon: "wallet", tone: s.currency === "FIX" ? "fix" : "mass" });
+            celebrate({ title: s.credits ? `+${(s.credits + (s.bonus ?? 0)).toLocaleString()} ${s.currency ?? ""}`.trim() : "Paid!", icon: "wallet", tone: s.currency === "FIX" ? "fix" : "mass" });
             await refresh();
             return;
           }
@@ -81,10 +84,18 @@ export default function PaymentCallback() {
             <EmptyState
               variant="success"
               title="Payment successful"
-              body={details?.credits ? `+${details.credits} ${details?.currency ?? ""}`.trim() : "Tokens added to your wallet."}
+              body={[
+                details?.credits ? `+${(details.credits + (details.bonus ?? 0)).toLocaleString()} ${details?.currency ?? ""}`.trim() : "Tokens added to your wallet.",
+                details?.amount_ngn ? `₦${details.amount_ngn.toLocaleString()} paid` : null,
+                details?.receipt_no ? `Receipt ${details.receipt_no} — a copy is in your Wallet and your email.` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
               testID="payment-success"
             />
-            <Button label="View wallet" size="lg" fullWidth iconLeft="wallet" iconRight="arrow-forward" onPress={toWallet} style={{ marginHorizontal: space[6] }} />
+            <View style={{ paddingHorizontal: space[6] }}>
+              <Button label="View wallet" size="lg" fullWidth iconLeft="wallet" iconRight="arrow-forward" onPress={toWallet} testID="payment-view-wallet" />
+            </View>
           </Animated.View>
         ) : state === "pending" ? (
           <Animated.View entering={FadeIn.duration(220)}>
@@ -94,12 +105,16 @@ export default function PaymentCallback() {
               body="We're waiting on the payment provider's confirmation. Your balance will update automatically the moment it clears."
               testID="payment-pending"
             />
-            <Button label="OK" size="lg" fullWidth onPress={toWallet} style={{ marginHorizontal: space[6] }} />
+            <View style={{ paddingHorizontal: space[6] }}>
+              <Button label="OK" size="lg" fullWidth onPress={toWallet} />
+            </View>
           </Animated.View>
         ) : (
           <Animated.View entering={FadeIn.duration(220)}>
             <EmptyState variant="error" title="Payment failed" body="We couldn't confirm your payment. No charge has been made — please try again." testID="payment-failed" />
-            <Button label="Try again" size="lg" fullWidth onPress={() => (router.canGoBack() ? router.back() : toWallet())} style={{ marginHorizontal: space[6] }} />
+            <View style={{ paddingHorizontal: space[6] }}>
+              <Button label="Try again" size="lg" fullWidth onPress={() => (router.canGoBack() ? router.back() : toWallet())} />
+            </View>
           </Animated.View>
         )}
       </View>

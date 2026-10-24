@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { storage } from "@/src/utils/storage";
 
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
@@ -111,6 +112,10 @@ export type TokenBundle = {
   tokens: number;
   bonus: number;
   price_ngn: number;
+  /** Admin top-up tier bonus the server will add (disclosed before payment). */
+  tier_bonus?: number;
+  /** tokens + bonus + tier_bonus — exactly what gets credited. */
+  total?: number;
 };
 
 export type FixEarnRule = {
@@ -149,6 +154,24 @@ export type WalletTransaction = {
   price_snapshot?: { amount: number; currency: string; token_ngn: number; ngn: number } | null;
   status?: string;
   auto_credit?: boolean;
+  receipt_no?: string | null;
+};
+
+/* ─── Payment receipts (one per successful payment) ─── */
+export type Receipt = {
+  receipt_no: string;
+  kind: "topup" | "property_access";
+  reference: string;
+  description: string;
+  amount_ngn: number;
+  tokens: number;
+  currency: Currency;
+  rate_ngn: number;
+  items: { label: string; value: string }[];
+  provider?: string | null;
+  balance_after?: number | null;
+  email_status: "pending" | "sent" | "failed" | "no_email";
+  created_at: string;
 };
 
 export type UserProfile = {
@@ -732,7 +755,7 @@ export type UnlockResult = {
   currency: "MASS" | "FIX";
   balance_after: number;
   free_reason?: string | null;
-  entitlement?: { id: string; status: string; amount_paid: number; created_at: string } | null;
+  entitlement?: { id: string; status: string; amount_paid: number; created_at: string; receipt_no?: string | null } | null;
   details: any;
 };
 export type MapMarker = {
@@ -1514,7 +1537,7 @@ export const api = {
       "/payments/initialize",
       {
         method: "POST",
-        body: JSON.stringify({ provider, currency, bundle_id }),
+        body: JSON.stringify({ provider, currency, bundle_id, platform: Platform.OS === "web" ? "web" : "native" }),
       }
     ),
   paymentStatus: (reference: string) =>
@@ -1526,7 +1549,18 @@ export const api = {
       credits: number;
       bonus: number;
       amount_ngn: number;
+      receipt_no?: string | null;
     }>(`/payments/status/${reference}`),
+  listReceipts: (limit = 50) => req<{ items: Receipt[]; count: number }>(`/receipts?limit=${limit}`),
+  getReceipt: (receiptNo: string) => req<Receipt>(`/receipts/${encodeURIComponent(receiptNo)}`),
+  emailReceipt: (receiptNo: string) => req<{ ok: boolean }>(`/receipts/${encodeURIComponent(receiptNo)}/email`, { method: "POST" }),
+  priceTable: () =>
+    req<{
+      currency: "MASS";
+      mass_ngn: number;
+      city: string;
+      zones: { zone: "A" | "B" | "C" | "D"; label: string; areas: string[]; rent: { mass: number; ngn: number }; sale: { mass: number; ngn: number } }[];
+    }>("/monetization/price-table"),
 
   // ─── Property Improvement · Inspection · Finance · Projects ───
   improveCatalog: () =>

@@ -1,0 +1,51 @@
+{
+  "summary": "Tested MASS-only property access (₦100/MASS) end to end. Backend: the existing suite test_mass_property_payments.py passes 11/11 against the public URL. It only runs when EXPO_BACKEND_URL is exported; frontend/.env has only EXPO_PUBLIC_BACKEND_URL, and with no URL set the suite fails with 5 failures and 5 errors. New suites: spot-check 7/7, concurrency 2/2. Verified: config (MASS_ngn 100, welcome 30), the A–D price table, bundles at ₦100/MASS, quotes and access-info in MASS only, 402 on insufficient balance with no charge, no unlock and no receipt, cancel costs nothing, a charge happens exactly once with the same or a new Idempotency-Key, one receipt, receipt hidden (404) from other users, spend_unlock ledger row has receipt_no and token_ngn 100, mock top-up credited once even with 5 parallel loads, starter bundle 422, webhooks return 401/503 when the signature is missing or bogus, unknown mock ref 404, FIXA still on FIX (₦10, welcome 100). Frontend at 390x844: the Zone A unlock dialog shows every disclosure correctly; Cancel leaves the balance at 300 and the home locked; the Zone D rental unlock charged exactly 10 MASS, unlocked the passport and produced one receipt row. The insufficient dialog is correct and Get MASS opens buy-tokens. Admin pricing grid and Config tab are correct. FIXA dialog still charges in FIX. Bugs found: (1) RED SCREEN on /payment/callback on web (WebBrowser.dismissBrowser().catch on undefined). I fixed it and re-verified; the callback now shows 'Payment successful +57 MASS · ₦5,000 paid · Receipt AMS-…'. (2) The buy screen shows the ₦2,500 Hunter bundle as '₦3k'. (3) The buy screen promises 55 MASS for Investor but the server credits 57 (tier bonus not disclosed). (4) On web the purchase spinner never resolves after the mock checkout (the popup redirects to amass://), so the success sheet never shows even though the wallet is credited. (5) The unlock request takes about 7s because the receipt email is sent inside the request.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/unlocks (and payment _fulfill)", "issue": "issue_receipt() waits for the Resend email inside the request. The tester's unlock took 7.3s (unlock_requests created 17:15:11.33 → finished 17:15:18.59), so the UI spinner sat on Confirm for about 7s. The charge itself is correct. Fix: send the email in the background (asyncio.create_task / BackgroundTasks)."},
+      {"endpoint": "POST /api/payments/initialize", "issue": "topup_bonus_tiers adds round(tokens*5%) on top of the bundle bonus: Investor gets 50+5+2 = 57. That makes the bonus differ from the bonus listed in GET /api/tokens/bundles (5), and Python round(2.5) == 2 (banker's rounding). Expose the effective bonus in the bundles response, or drop the tier bonus for bundles."},
+      {"endpoint": "GET /api/settings/pricing", "issue": "Still returns legacy property_access_fee: 5, which matches no row in the approved table. It could mislead any client that reads it; remove it or replace it with the zone table."},
+      {"endpoint": "monetization._unlock_inner", "issue": "If the process dies between inserting the pending entitlement and the debit, a stale 'pending' entitlement blocks future unlocks with 409. Add TTL or cleanup for pending entitlements older than N seconds."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "app/payment/callback.tsx:27", "issue": "RED SCREEN 'Cannot read properties of undefined (reading catch)'. WebBrowser.dismissBrowser() returns undefined on web. FIXED by T1 with a Promise.resolve guard; re-verified.", "testID": "payment-callback-screen", "priority": "CRITICAL (fixed)"},
+      {"component": "TokenPurchaseScreen bundle price (formatNaira in src/constants/theme.ts:171)", "issue": "The ₦2,500 Hunter bundle shows as '₦3k' because of toFixed(0) on thousands. This is a wrong naira disclosure on a payment screen. Use exact ₦2,500 (toLocaleString) for payment amounts.", "testID": "bundle-hunter", "priority": "HIGH"},
+      {"component": "TokenPurchaseScreen total + success sheet (line 128)", "issue": "Before paying, the Investor total says '55 MASS', but the server credits 57 (tier bonus). The success sheet uses chosen.tokens+chosen.bonus (55) instead of the server's status.credits+bonus (57). The callback's celebrate() uses s.credits only (+50). Use server numbers everywhere and show the tier bonus before payment.", "testID": "buy-total", "priority": "HIGH"},
+      {"component": "Receipt sheet (wallet.tsx:515)", "issue": "The 'Email me a copy' label is truncated to 'Email me a c…' at 390px.", "testID": "receipt-email", "priority": "LOW"},
+      {"component": "Receipt sheet email error", "issue": "Tapping Email returns 503 as expected, but no error toast was visible over the receipt Modal (it likely renders under the RN-web Modal).", "testID": "receipt-email", "priority": "LOW"},
+      {"component": "payment/callback.tsx 'View wallet' button", "issue": "fullWidth plus marginHorizontal makes the button overflow the right edge (bbox x=24, w=390 in a 390px viewport).", "testID": "payment-view-wallet", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Buy MASS on web preview (openAuthSessionAsync)", "issue": "The mock checkout opens and fulfils (the wallet went 30 → 87 for both UI test users). The popup then redirects to amass://payment/callback, which never resolves on web, so the Pay button spins forever and the purchase-success sheet never appears; buy-balance stayed 30. Native is likely fine. On web, poll /payments/status alongside the auth session, or redirect to the https /payment/callback route.", "affected_testIDs": ["confirm-purchase-btn", "purchase-success"]}
+    ],
+    "design_issues": [
+      {"screen": "UnlockDialog (insufficient)", "issues": ["'Balance after 0 MASS' in red is misleading when nothing will be charged; consider hiding the balance-after row or showing the current balance."]},
+      {"screen": "UnlockDialog", "issues": ["The title is lowercase ('unlock this home' / 'unlock this provider'); confirm this is intended."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_mass_property_payments.py", "/app/backend/tests/test_iter73_mass_spotcheck.py", "/app/backend/tests/test_iter73_concurrency.py", "/app/test_reports/pytest/iter73_mass.xml", "/app/test_reports/pytest/iter73_spot.xml", "/app/test_reports/pytest/iter73_cc.xml"],
+  "action_items": [
+    "HIGH: Show exact naira on bundle cards and totals: ₦2,500 is shown as '₦3k' (formatNaira toFixed(0)).",
+    "HIGH: Disclose the effective bonus (including topup_bonus_tiers) before payment: Investor shows 55 but 57 is credited. Use server credits+bonus in the success sheet and in callback celebrate().",
+    "HIGH: Web purchase flow hangs after the mock checkout because openAuthSessionAsync waits for amass://. Poll payment status in parallel, or use a web callback URL on Platform.OS==='web'.",
+    "MEDIUM: Move the receipt email out of the request path (unlock took ~7s).",
+    "LOW: Fix the truncated 'Email me a copy' label, the email error toast hidden under the Modal, and the 'View wallet' overflow; remove legacy property_access_fee: 5 from /settings/pricing.",
+    "LOW: Export EXPO_BACKEND_URL (or read EXPO_PUBLIC_BACKEND_URL) in the test env. test_mass_property_payments.py falls back to an empty BASE and fails when only EXPO_PUBLIC_BACKEND_URL is set."
+  ],
+  "critical_code_review_comments": [
+    "monetization.py is 1350 lines; split pricing, entitlement engine and routes.",
+    "payments._fulfill: a status of 'verification_failed' is never re-verified by /payments/status (only 'initialized' is), so a genuine later webhook still works but polling won't.",
+    "Receipts, ledger and idempotency design is solid: unique (kind, reference), ledger insert before credit, pending-entitlement lock. Parallel tests confirmed one charge and one receipt."
+  ],
+  "updated_files": ["/app/frontend/app/payment/callback.tsx (dismissBrowser web guard + testID payment-view-wallet)", "/app/backend/tests/test_iter73_mass_spotcheck.py", "/app/backend/tests/test_iter73_concurrency.py"],
+  "success_rate": {"backend": "100% (20/20 tests)", "frontend": "~75% (core unlock, cancel, insufficient, receipts, admin and FIXA flows pass; payment-callback red screen fixed; buy-screen disclosure and web purchase completion fail)"},
+  "seed_data_creation": "Fresh TEST_*/massqa users @amass-qa.africa. fixa.tester+15339 unlocked AM-44333F (Zone D rent, 10 MASS) → now 290 MASS. Demo account MASS not spent.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest with EXPO_BACKEND_URL=https://property-os-africa.preview.emergentagent.com (pytest.ini adds -n xdist). Wallet tx rows use field 'kind', not 'type'. Cheap Zone D rentals: 44333fd0-541e-4496-8676-ae220892c5fc (already unlocked by the tester), 70beb1b0-c57e-4b2d-b953-8c63ea04d154. The web purchase popup is not capturable by Playwright; verify credit via the API and the callback via /payment/callback?ref=…",
+  "rca_of_issue": "Callback red screen: expo-web-browser's dismissBrowser() is a no-op returning undefined on web, so chaining .catch threw during render effects. '₦3k' comes from formatNaira rounding thousands with toFixed(0). 55 vs 57: the client computes credited = bundle.tokens + bundle.bonus, while the server adds topup_bonus_tiers (5% at ≥₦5,000)."
+}

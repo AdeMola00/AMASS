@@ -1,0 +1,43 @@
+{
+  "summary": "Frontend-only test at 390x844 (web preview) of the MASS purchase + property unlock flows. PASS: 5 MASS bundle cards (bundle-starter/explorer/hunter/investor/professional) with exact naira ₦500/₦1,000/₦2,500/₦5,000/₦10,000; Explorer selection -> buy-total ₦1,000, buy-total-tokens '10 MASS · Paystack'; confirm-purchase-btn -> POST /api/payments/initialize 200 with https public checkout_url, popup opened and self-closed, status poll -> purchase-success '10 MASS credited · ₦1,000 paid · Receipt AMS-20261024-B6D46A'; balance 13,650 -> 13,660 (credited exactly once); purchase-success-continue -> /wallet. buy-open-checkout link visible while processing. Wallet receipt row + receipt-sheet show AMS receipt no., wallet hero shows '1 MASS = ₦100', Reference ellipsized with no overflow. Property unlock (detail page): dialog shows '60 MASS = ₦6,000', '₦100 = 1 MASS · Zone B · Sale', Cancel -> only POST /unlocks/cancel, balance unchanged; Confirm -> balance 13,660 -> 13,600 (exactly 60), receipt AMS-20261024-3F8C3C in ledger. Home map pin -> preview-primary 'Unlock · 120 MASS' -> UnlockDialog (Zone A · Sale) -> Cancel, nothing charged. Insufficient balance (fixa tester temporarily set to 50 MASS): 'Short by 70 MASS = ₦7,000 · nothing charged', Cancel + Get MASS (no confirm button); Get MASS -> /buy-tokens?currency=MASS&returnTo=/property/<id>&unlock=1; purchase -> success sheet 'Continue' -> back to property with dialog re-opened (now 60 MASS, short by 60), no POST /unlocks issued, property still locked. /buy-fix renders 4 fix-bundle-* cards and confirm-fix-purchase. FAIL: Starter Pack (₦500, MASS) and FIX Starter (₦500) are shown and selectable but POST /api/payments/initialize returns 422 'Minimum top-up is ₦1,000'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/payments/initialize", "issue": "Returns 422 'Minimum top-up is ₦1,000' for bundle_id=starter (MASS ₦500) and fix_starter (FIX ₦500). The bundle catalog advertises these bundles but the server's topup_min_ngn default (1000) rejects them. Reference: /app/backend/payments.py:285-288"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "TokenPurchaseScreen - Starter bundles", "issue": "bundle-starter (₦500) and fix-bundle-fix_starter (₦500) can be selected and paid for, but every attempt ends in a 'Purchase failed · Minimum top-up is ₦1,000' toast. Either take bundles below topup_min_ngn out of the catalog (or disable them in the UI with a 'min ₦1,000' note), or lower the minimum to ₦500.", "testID": "bundle-starter, fix-bundle-fix_starter", "priority": "HIGH"},
+      {"component": "UnlockDialog heading", "issue": "The heading is all lowercase: 'unlock this home' / 'unlock this provider'. It should probably read 'Unlock this home'. Reference: /app/frontend/src/ui/UnlockDialog.tsx:153", "testID": "unlock-dialog", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Insufficient balance -> Get MASS -> Continue", "issue": "finish() calls router.replace(returnTo), but the original property screen is still in the stack under /buy-tokens. After Continue you end up with two property/[id] screens, and the page has 2 unlock-cta-btn elements. Pressing Back shows the same property again. Use router.back() (or dismissTo) when returnTo matches the previous route. Reference: /app/frontend/src/components/TokenPurchaseScreen.tsx:160-167", "affected_testIDs": ["purchase-success-continue", "unlock-cta-btn"]}
+    ],
+    "design_issues": [
+      {"screen": "purchase-success sheet", "issues": ["The body text is joined with ' · ', so the second line starts with a stray dot: '... (and your email). · Your wallet is topped up and ready to use.' / '· Let's finish what you started.' Use a line break or a full stop instead."]},
+      {"screen": "buy-tokens processing state", "issues": ["While processing, the CTA shrinks to a ~72px spinner circle to make room for 'Checkout didn't open? Tap here'. It works, but the CTA width jumps; consider keeping the full width and putting the link underneath."]},
+      {"screen": "Home map (web)", "issues": ["The web fallback map background is a generic Europe map tile ('Satellite imagery renders on mobile') behind Lagos pins. This is web-only and expected, noted for awareness."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/helper_iter75_probe.py", "/app/test_reports/i75_buy_success.jpg", "/app/test_reports/i75_receipt_sheet.jpg", "/app/test_reports/i75_unlock_dialog.jpg", "/app/test_reports/i75_short_dialog.jpg", "/app/test_reports/i75_short_return.jpg", "/app/test_reports/i75_starter_fail.jpg", "/app/test_reports/i75_buy_fix.jpg", "/app/test_reports/i75_home_dialog.jpg"],
+  "action_items": [
+    "HIGH: Make the bundle catalog match the top-up minimum. MASS 'starter' (₦500) and FIX 'fix_starter' (₦500) are listed but /api/payments/initialize rejects them with 422 because topup_min_ngn defaults to 1000 (payments.py:286). Either drop or disable bundles below the minimum in GET bundles, or set the minimum to 500.",
+    "LOW: Capitalise the UnlockDialog heading ('Unlock this home') at UnlockDialog.tsx:153.",
+    "LOW: When the purchase came from an unlock flow (returnTo), return with router.back()/dismissTo instead of router.replace so the property screen isn't duplicated in the stack.",
+    "LOW: Fix the stray ' · ' separator in the purchase-success sheet body copy."
+  ],
+  "critical_code_review_comments": [
+    "TokenPurchaseScreen.tsx:120: on web, openAuthSessionAsync is fire-and-forget and the 40x1.5s poll is the source of truth. That is correct, and the pending/failed states are handled.",
+    "wallet.tsx:507: react-native-web does not support ellipsizeMode='middle' and falls back to tail ellipsis. The Reference doesn't overflow, but the end of the reference is hidden. Acceptable.",
+    "AnimatedNumber (buy-balance) counts up from an intermediate value on mount, so a read right after load shows e.g. 10,810 before it settles at 13,650. It's cosmetic only; tests should read balances from the API or wait about 1.5s."
+  ],
+  "updated_files": ["/app/backend/tests/helper_iter75_probe.py (new helper, test-only)"],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "92% (all 6 requested flows pass; the ₦500 Starter bundles fail at initialize)"},
+  "seed_data_creation": "Admin adjustments on fixa.tester+15339 (id f26f8364-...): -230 MASS ('TEST iter75 insufficient-balance setup') and then +220 MASS ('TEST iter75 restore'). Together with the 10 MASS Explorer purchase, spendable is back to 280, but the bonus 130 is now mostly primary balance. Demo: +10 MASS purchase, -60 MASS unlock of 01909724 (Osapa Terrace). Fixa tester: +10 MASS purchase. Adaeze: no change. There is 1 orphan pending payment intent from a curl initialize (explorer, demo).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login returns access_token (not token). Bundle testIDs: bundle-<id> for MASS, fix-bundle-<id> for FIX, confirm: confirm-purchase-btn / confirm-fix-purchase. Unlock: unlock-cta-btn on property/[id] (dialog may auto-open ~600ms after load), unlock-dialog/unlock-fee/unlock-cancel/unlock-confirm/unlock-fund. Map: pin-<id> -> preview-primary-<id>. Locked property for fixa tester: 7d769d80 (Zone A sale 120 MASS) and f2342766 (Zone A sale 120). Use POST /api/admin/wallet/{user_id}/adjust (demo admin) to set up the insufficient-balance case, because fixa tester has 280 MASS > max fee 120.",
+  "rca_of_issue": "Starter purchase 422: payments.initialize reads monetization.topup_min_ngn (default 1000) and rejects amount_ngn < min, while the MASS/FIX bundle catalogs still include ₦500 starter bundles. Repro: /buy-tokens -> bundle-starter -> confirm-purchase-btn -> toast 'Purchase failed · Minimum top-up is ₦1,000'."
+}

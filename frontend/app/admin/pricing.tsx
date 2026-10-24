@@ -72,7 +72,7 @@ function PricesTab() {
   const { colors } = useTheme();
   const toast = useToast();
   const [prices, setPrices] = useState<Price[]>([]);
-  const [conversion, setConversion] = useState<{ MASS_ngn: number; FIX_ngn: number }>({ MASS_ngn: 10, FIX_ngn: 10 });
+  const [conversion, setConversion] = useState<{ MASS_ngn: number; FIX_ngn: number }>({ MASS_ngn: 100, FIX_ngn: 10 });
   const [history, setHistory] = useState<Price[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -462,7 +462,7 @@ function ConfigTab() {
         setCfg(c);
         setFreeSale(!!c.free_amass_sale);
         setForm({
-          MASS_ngn: String(c.conversion?.MASS_ngn ?? 10),
+          MASS_ngn: String(c.conversion?.MASS_ngn ?? 100),
           FIX_ngn: String(c.conversion?.FIX_ngn ?? 10),
           welcome_MASS: String(c.welcome_bonus?.MASS ?? 0),
           welcome_FIX: String(c.welcome_bonus?.FIX ?? 0),

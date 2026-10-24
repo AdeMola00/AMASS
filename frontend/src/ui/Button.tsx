@@ -129,21 +129,23 @@ export function Button({
         <LinearGradient colors={["rgba(255,255,255,0.14)", "rgba(255,255,255,0)"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: "50%" }]} />
       ) : null}
       {showShimmer ? <Shimmer intensity={variant === "mass" ? 0.6 : 0.9} /> : null}
+      {/* The label row stays laid out (invisible) while loading so the button keeps its width. */}
+      <View style={[styles.row, { gap: s.gap }, loading && { opacity: 0 }]}>
+        {iconLeft && <Ionicons name={iconLeft} size={s.icon} color={p.fg} />}
+        <AppText
+          style={{ fontSize: s.fs, lineHeight: s.fs + 4, fontFamily: fontFamilies.bold, letterSpacing: -0.2, flexShrink: 1 }}
+          color={p.fg}
+          numberOfLines={1}
+        >
+          {label}
+        </AppText>
+        {iconRight && <Ionicons name={iconRight} size={s.icon} color={p.fg} />}
+      </View>
       {loading ? (
-        <ActivityIndicator color={p.fg} />
-      ) : (
-        <View style={[styles.row, { gap: s.gap }]}>
-          {iconLeft && <Ionicons name={iconLeft} size={s.icon} color={p.fg} />}
-          <AppText
-            style={{ fontSize: s.fs, lineHeight: s.fs + 4, fontFamily: fontFamilies.bold, letterSpacing: -0.2, flexShrink: 1 }}
-            color={p.fg}
-            numberOfLines={1}
-          >
-            {label}
-          </AppText>
-          {iconRight && <Ionicons name={iconRight} size={s.icon} color={p.fg} />}
+        <View style={[StyleSheet.absoluteFill, styles.spinner]} pointerEvents="none">
+          <ActivityIndicator color={p.fg} />
         </View>
-      )}
+      ) : null}
     </AnimatedPressable>
   );
 }
@@ -259,6 +261,7 @@ const styles = StyleSheet.create({
   base: { alignItems: "center", justifyContent: "center", alignSelf: "flex-start", minWidth: 44 },
   full: { alignSelf: "stretch", width: "100%" },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "center", flexShrink: 1, maxWidth: "100%" },
+  spinner: { alignItems: "center", justifyContent: "center" },
   iconBtn: { alignItems: "center", justifyContent: "center" },
   badge: {
     position: "absolute",

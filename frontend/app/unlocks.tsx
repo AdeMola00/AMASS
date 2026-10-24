@@ -17,7 +17,7 @@ type Entitlement = {
   id: string;
   status: "active" | "refunded" | "revoked" | "pending";
   amount_paid: number;
-  currency: "MASS" | "FIX";
+  currency: "MASS"; // property access is MASS-only
   created_at: string;
   refund_reason?: string | null;
   source?: string;

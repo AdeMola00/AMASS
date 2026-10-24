@@ -159,13 +159,18 @@ def register_property_access_routes(
     @router.get("/settings/pricing")
     async def public_pricing():
         pricing = await get_wallet_pricing(db)
-        from monetization import PricingEngine
-        mon = await PricingEngine(db).config()
+        from monetization import PricingEngine, PROPERTY_CURRENCY
+        engine = PricingEngine(db)
+        mon = await engine.config()
+        table = await engine.lagos_price_table()
         return {
-            "property_access_fee": int(pricing.get("property_access_fee", 5)),
+            # Lowest fee in the approved table (Zone D rent) — the legacy "minimum access fee" field.
+            "property_access_fee": min(z["rent"]["mass"] for z in table["zones"]),
             "agent_contact_fee": 0,
             "access_period_days": 0,
-            "currency": pricing.get("currency", "MASS"),
+            "currency": PROPERTY_CURRENCY,  # property access is MASS-only
+            "mass_ngn": table["mass_ngn"],
+            "price_table": table["zones"],
             "privacy_policy_url": pricing.get("privacy_policy_url", ""),
             "free_amass_sale": bool(mon.get("free_amass_sale", False)),
             "conversion": mon.get("conversion"),
@@ -186,21 +191,23 @@ def register_property_access_routes(
                 user_id = await _current_user_id(creds)
             except HTTPException:
                 user_id = None
-        pricing = await get_wallet_pricing(db)
-        from monetization import property_fee
+        from monetization import property_fee, PricingEngine, PROPERTY_CURRENCY
         fee, is_free = await property_fee(db, prop)
+        rate = await PricingEngine(db).token_ngn(PROPERTY_CURRENCY)
         flags = await unlock_flags(db, user_id, property_id)
         contact = await agent_contact_for(db, prop)
         balance = await _spendable(user_id) if user_id else 0
         return {
             "property_id": property_id,
             "is_free": is_free,
-            "currency": pricing.get("currency", "MASS"),
+            "currency": PROPERTY_CURRENCY,  # MASS only — FIX is never accepted for property access
+            "mass_ngn": rate,
             "access_period_days": 0,
             "balance": balance,
             "access": {
                 "unlocked": is_free or flags["access"],
                 "fee": fee,
+                "fee_ngn": fee * rate,
             },
             "agent_contact": {
                 "unlocked": is_free or flags["access"],

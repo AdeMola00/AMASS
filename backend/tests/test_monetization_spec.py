@@ -88,10 +88,10 @@ def _find_prop(props, pred):
 # ─── Welcome bonus & config ─────────────────────────────────────────────
 def test_welcome_bonus_from_config():
     tok, _ = _new_user()
-    assert _balance(tok, "MASS") == 300
+    assert _balance(tok, "MASS") == 30  # ₦3,000 at ₦100/MASS
     assert _balance(tok, "FIX") == 100
     cfg = requests.get(f"{BASE}/api/monetization/config").json()
-    assert cfg["conversion"]["MASS_ngn"] == 10 and cfg["conversion"]["FIX_ngn"] == 10
+    assert cfg["conversion"]["MASS_ngn"] == 100 and cfg["conversion"]["FIX_ngn"] == 10
     assert cfg["topup_min_ngn"] == 1000
 
 
@@ -100,8 +100,8 @@ def test_fees_per_zone_and_sale_ge_rent(admin_tok):
     r = requests.get(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok))
     assert r.status_code == 200
     prices = {(p["feature_key"], p["category"], p["zone_tier"]): p["amount"] for p in r.json()["prices"]}
-    assert prices[("property", "rent", "A")] == 800 and prices[("property", "sale", "A")] == 1200
-    assert prices[("property", "rent", "D")] == 100 and prices[("property", "sale", "D")] == 150
+    assert prices[("property", "rent", "A")] == 80 and prices[("property", "sale", "A")] == 120
+    assert prices[("property", "rent", "D")] == 10 and prices[("property", "sale", "D")] == 15
     for z in "ABCD":
         assert prices[("property", "sale", z)] >= prices[("property", "rent", z)]
     assert prices[("fixa_provider", "1", "A")] == 80 and prices[("fixa_provider", "4", "D")] == 400
@@ -112,8 +112,8 @@ def test_quote_zone_resolution(admin_tok, props):
     ikoyi = _find_prop(props, lambda p: "ikoyi" in (p.get("city", "") + p.get("location", "")).lower())
     q = requests.get(f"{BASE}/api/unlocks/quote", headers=_hdr(tok), params={"featureKey": "property", "targetId": ikoyi["id"]}).json()
     assert q["zone_tier"] == "A"
-    assert q["fee"] in (800, 1200)
-    assert q["fee_ngn"] == q["fee"] * 10
+    assert q["fee"] in (80, 120)
+    assert q["fee_ngn"] == q["fee"] * 100
     assert q["currency"] == "MASS"
 
 

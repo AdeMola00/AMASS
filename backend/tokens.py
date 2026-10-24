@@ -93,12 +93,14 @@ def compute_token_cost(prop: dict) -> int:
     return DEFAULT_TOKEN_COSTS["basic"]
 
 
+# ─── MASS bundles — ₦100 = 1 MASS (the sole property-access currency) ───
+# Naira price points are fixed; MASS = price ÷ 100. Bonus MASS is a small loyalty extra.
 TOKEN_BUNDLES = [
-    {"id": "starter", "name": "Starter Pack", "tokens": 20, "bonus": 0, "price_ngn": 500},
-    {"id": "explorer", "name": "Explorer", "tokens": 50, "bonus": 0, "price_ngn": 1_000},
-    {"id": "hunter", "name": "Property Hunter", "tokens": 150, "bonus": 10, "price_ngn": 2_500},
-    {"id": "investor", "name": "Investor", "tokens": 350, "bonus": 50, "price_ngn": 5_000},
-    {"id": "professional", "name": "Professional", "tokens": 800, "bonus": 150, "price_ngn": 10_000},
+    {"id": "starter", "name": "Starter Pack", "tokens": 5, "bonus": 0, "price_ngn": 500},
+    {"id": "explorer", "name": "Explorer", "tokens": 10, "bonus": 0, "price_ngn": 1_000},
+    {"id": "hunter", "name": "Property Hunter", "tokens": 25, "bonus": 1, "price_ngn": 2_500},
+    {"id": "investor", "name": "Investor", "tokens": 50, "bonus": 5, "price_ngn": 5_000},
+    {"id": "professional", "name": "Professional", "tokens": 100, "bonus": 15, "price_ngn": 10_000},
 ]
 
 # ─── FIX bundles (customers can also purchase FIX for premium FIXA features) ─
@@ -163,9 +165,36 @@ SUBSCRIPTION_PLANS = [
     },
 ]
 
-WELCOME_TOKENS = 300  # Default welcome MASS (admin-editable: app_settings.monetization.welcome_bonus)
+WELCOME_TOKENS = 30   # Default welcome MASS = ₦3,000 at ₦100/MASS (admin-editable: app_settings.monetization.welcome_bonus)
 WELCOME_FIX = 100     # Default welcome FIX (admin-editable)
 DEFAULT_UNLOCK_PERMANENCE_DAYS = 0  # 0 = forever
+
+
+def tier_bonus_for(bundle: dict, mcfg: dict) -> int:
+    """Admin top-up tier bonus (monetization.topup_bonus_tiers) for a bundle — the single
+    place this is computed so the catalog shown before payment and the credit after payment agree."""
+    amount_ngn = int(bundle["price_ngn"])
+    tier_bonus = 0
+    for tier in sorted(mcfg.get("topup_bonus_tiers") or [], key=lambda t: int(t.get("min_ngn", 0))):
+        if amount_ngn >= int(tier.get("min_ngn", 0)):
+            tier_bonus = int(round(int(bundle["tokens"]) * float(tier.get("bonus_pct", 0)) / 100.0))
+    return tier_bonus
+
+
+async def bundles_with_bonus(db: AsyncIOMotorDatabase, currency: str) -> list[dict]:
+    """Catalog rows + `tier_bonus` and `total` (tokens + bundle bonus + tier bonus).
+    Bundles under the admin top-up minimum are omitted — /payments/initialize would reject them,
+    so the app must never offer them."""
+    mcfg = ((await db.app_settings.find_one({"key": "monetization"}, {"_id": 0, "value": 1})) or {}).get("value") or {}
+    min_ngn = int(mcfg.get("topup_min_ngn", 1000) or 1000)
+    src = FIX_BUNDLES if currency.upper() == "FIX" else TOKEN_BUNDLES
+    out = []
+    for b in src:
+        if int(b["price_ngn"]) < min_ngn:
+            continue
+        tb = tier_bonus_for(b, mcfg)
+        out.append({**b, "tier_bonus": tb, "total": int(b["tokens"]) + int(b.get("bonus", 0)) + tb})
+    return out
 
 
 # ─── Pydantic ───────────────────────────────────────────────────
@@ -552,11 +581,13 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
 
     @router.get("/tokens/bundles")
     async def list_bundles(currency: str = "MASS"):
-        return FIX_BUNDLES if currency.upper() == "FIX" else TOKEN_BUNDLES
+        """Bundle catalog with the FULL credit the buyer will receive (incl. the admin top-up tier
+        bonus) so the app can disclose the exact total before any payment."""
+        return await bundles_with_bonus(db, "FIX" if currency.upper() == "FIX" else "MASS")
 
     @router.get("/wallet/fix/bundles")
     async def list_fix_bundles():
-        return FIX_BUNDLES
+        return await bundles_with_bonus(db, "FIX")
 
     @router.get("/wallet/fix/earn-rules")
     async def list_fix_earn_rules():

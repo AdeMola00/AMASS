@@ -19,7 +19,7 @@ import { TokenIcon } from "@/src/components/TokenIcon";
  * Rules enforced here (the backend enforces them again):
  *  • Live values only — a fresh quote is fetched every time the sheet opens.
  *  • Shows item, fee (tokens + naira), balance, balance after and the deduction line.
- *  • Nothing is charged until "Confirm and View"; Confirm is disabled after the first tap.
+ *  • Nothing is charged until "Confirm & View"; Confirm is disabled after the first tap.
  *  • Cancellations are logged server-side; insufficient balance never charges.
  *  • Idempotency key per attempt — a retry after an unknown outcome is free.
  */
@@ -150,7 +150,7 @@ export function UnlockDialog({
           {isMass ? <TokenIcon size={30} /> : <Ionicons name="construct" size={24} color={accentText} />}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <AppText variant="heroSm">{isMass ? "unlock this home" : "unlock this provider"}</AppText>
+          <AppText variant="heroSm">{isMass ? "Unlock this home" : "Unlock this provider"}</AppText>
           <AppText variant="bodySm" tone="secondary" numberOfLines={2} testID="unlock-item-label">
             {loading || !quote ? "Checking the live price…" : quote.label}
           </AppText>
@@ -168,31 +168,52 @@ export function UnlockDialog({
       ) : (
         <>
           <View style={[styles.ledger, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="summary">
-            <Row label="Fee" value={`${fmt(quote.fee)} ${currency}`} sub={`≈ ₦${fmt(quote.fee_ngn)}`} strong color={accentText} testID="unlock-fee" />
-            <Row label="Your balance" value={`${fmt(quote.balance)} ${currency}`} sub={`≈ ₦${fmt(quote.balance * quote.token_ngn)}`} testID="unlock-balance" />
+            {/* Exact fee — tokens AND naira carry equal weight; the rate makes the conversion auditable. */}
+            <View style={styles.feeBlock} testID="unlock-fee-block">
+              <AppText variant="bodySm" tone="secondary" weight="medium">
+                Fee
+              </AppText>
+              <View style={styles.feeAmounts}>
+                <AppText variant="h2" color={accentText} tabular testID="unlock-fee">
+                  {fmt(quote.fee)} {currency}
+                </AppText>
+                <AppText variant="h3" tabular testID="unlock-fee-ngn">
+                  = ₦{fmt(quote.fee_ngn)}
+                </AppText>
+              </View>
+              <AppText variant="micro" tone="tertiary" tabular testID="unlock-rate">
+                ₦{fmt(quote.token_ngn)} = 1 {currency}
+                {isMass ? ` · Zone ${quote.zone_tier} · ${quote.category === "sale" ? "Sale" : "Rent"}` : ""}
+              </AppText>
+            </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <Row
-              label="Balance after"
-              value={`${fmt(Math.max(0, quote.balance_after))} ${currency}`}
-              sub={canAfford ? `≈ ₦${fmt(Math.max(0, quote.balance_after) * quote.token_ngn)}` : `${fmt(quote.fee - quote.balance)} ${currency} short`}
-              strong
-              color={canAfford ? colors.text : colors.error}
-              testID="unlock-balance-after"
-            />
+            <Row label="Your balance" value={`${fmt(quote.balance)} ${currency}`} sub={`= ₦${fmt(quote.balance * quote.token_ngn)}`} testID="unlock-balance" />
+            {canAfford ? (
+              <Row label="Balance after" value={`${fmt(quote.balance_after)} ${currency}`} sub={`= ₦${fmt(quote.balance_after * quote.token_ngn)}`} strong testID="unlock-balance-after" />
+            ) : (
+              <Row
+                label="Short by"
+                value={`${fmt(quote.fee - quote.balance)} ${currency}`}
+                sub={`= ₦${fmt((quote.fee - quote.balance) * quote.token_ngn)} · nothing charged`}
+                strong
+                color={colors.error}
+                testID="unlock-balance-after"
+              />
+            )}
           </View>
 
           {canAfford ? (
             <View style={styles.noteRow}>
               <Ionicons name="information-circle-outline" size={15} color={colors.textTertiary} />
               <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
-                Confirming deducts {fmt(quote.fee)} {currency} from your wallet. One-time — this {isMass ? "property" : "provider"} stays unlocked forever.
+                Confirming deducts {fmt(quote.fee)} {currency} (₦{fmt(quote.fee_ngn)}) from your wallet. One-time — this {isMass ? "property" : "provider"} stays unlocked forever. Cancel costs nothing.
               </AppText>
             </View>
           ) : (
             <View style={[styles.noteRow, { backgroundColor: colors.warningSoft, borderRadius: radii.sm, padding: 10 }]} accessibilityRole="alert">
               <Ionicons name="wallet-outline" size={15} color={colors.warning} />
               <AppText variant="caption" style={{ flex: 1 }}>
-                You need {fmt(quote.fee)} {currency} (≈ ₦{fmt(quote.fee_ngn)}). Nothing has been charged.
+                You need {fmt(quote.fee)} {currency} (₦{fmt(quote.fee_ngn)}). Nothing has been charged and nothing is unlocked.
               </AppText>
             </View>
           )}
@@ -207,13 +228,13 @@ export function UnlockDialog({
             <Button label="Cancel" variant="secondary" size="lg" onPress={cancel} style={{ flex: 1 }} testID="unlock-cancel" />
             {canAfford ? (
               <Button
-                label={confirming ? "Unlocking…" : "Confirm and View"}
+                label={confirming ? "Unlocking…" : "Confirm & View"}
                 variant="premium"
                 size="lg"
                 onPress={confirm}
                 disabled={confirming}
                 loading={confirming}
-                style={{ flex: 1.4 }}
+                style={{ flex: 1.5 }}
                 testID="unlock-confirm"
               />
             ) : (
@@ -252,6 +273,8 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: space[3] },
   icon: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
   ledger: { borderRadius: radii.md, padding: space[3], gap: 12 },
+  feeBlock: { gap: 4 },
+  feeAmounts: { flexDirection: "row", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 36 },
   divider: { height: StyleSheet.hairlineWidth },
   noteRow: { flexDirection: "row", gap: 8, alignItems: "flex-start", marginTop: space[3] },

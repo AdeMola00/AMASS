@@ -1,0 +1,42 @@
+{
+  "summary": "Frontend-only retest of the iteration_73 fixes at 390x844 on the web preview. All 7 fixes pass in the automation browser. FIXED-1: bundle cards show exact naira (₦500, ₦1,000, ₦2,500, ₦5,000, ₦10,000) and the TOTAL bar reads '₦5,000 · 57 MASS (incl. 7 bonus) · via Paystack'. The Investor card shows '+7 bonus'. FIXED-2/3: the web purchase completes. The popup opened, ran the mock checkout, landed on the self-closing 'Payment received' page and closed. The purchase-success sheet ('57 MASS credited · ₦5,000 paid · Receipt AMS-20261024-24182C') appeared 2.5s after the tap. The balance went from 30 to 87 (+57, credited once: tx +50 and tx +7, same receipt_no). 'Go to wallet' goes to /wallet. FIXED-4: the Zone D rental (10 MASS) dialog closed 0.36s after the tap. The property unlocked, the balance went from 290 to 280 and the receipt row shows AMS-20261024-F7F2B0. FIXED-5: the 120 MASS dialog for a 30 MASS user shows 'Short by 90 MASS = ₦9,000 · nothing charged' with Cancel and Get MASS. Cancel charged nothing. FIXED-6: the callback 'View wallet' button sits inside the screen (342px wide). The receipt sheet's 'Share' and 'Email copy' labels are fully readable, and the 'Receipt sent' toast shows above the sheet. FIXED-7: /api/settings/pricing returns property_access_fee 10, MASS, mass_ngn 100 and a price_table. Regressions pass: Zone A dialog 'Confirm & View' is readable, the FIXA provider dialog charges FIX (100 FIX = ₦1,000), and the wallet shows '1 MASS = ₦100'. NEW HIGH: the checkout_url and return URL point to http://localhost:8001 because PUBLIC_API_BASE is not set in backend/.env. The web flow only worked because the test browser runs inside the container. A real phone or desktop browser cannot open localhost:8001, so the payment is never marked paid and the user gets 'Payment pending'.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/payments/initialize (payments.py _api_base, lines 50-62)", "issue": "PUBLIC_API_BASE and EXPO_BACKEND_URL are missing from backend/.env. With MOCK_PAYMENT=true the code falls back to http://localhost:8001, so checkout_url = http://localhost:8001/api/payments/mock/{ref}. That page also 307-redirects to http://localhost:8001/api/payments/redirect. Real users on the web preview or Expo Go cannot reach localhost, so a web or device purchase never completes. The public URL itself works: GET {public}/api/payments/redirect returns the HTML page.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "payment/callback.tsx celebrate()", "issue": "The celebration chip shows '+50 MASS' (s.credits only) while the body says '+57 MASS'. The two numbers disagree and the chip covers the body text while it animates. iteration_73 asked for credits+bonus here. Reference: /app/frontend/app/payment/callback.tsx:48", "testID": "payment-success", "priority": "MEDIUM"},
+      {"component": "wallet ReceiptSheet Reference row", "issue": "A purchase reference with no break points (amass_3c6fd3bb0ad8460f8d79a585201be2ff) runs past the card's right edge and is cut off. UUID references wrap fine. Fix: add flexShrink:1 plus a wrapping style, or numberOfLines with ellipsizeMode='middle'. Reference: /app/frontend/app/wallet.tsx:479", "testID": "receipt-sheet", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Web/device MASS purchase", "issue": "Depends on the backend localhost checkout_url issue above. It only passes in the in-container automation browser.", "affected_testIDs": ["purchase-success"]}
+    ],
+    "design_issues": [
+      {"screen": "/buy-tokens", "issues": ["The total sub-line '57 MASS (incl. 7 bonus) · via Paystack' wraps onto 3 lines in the bottom bar at 390px. Consider moving '· via Paystack' to its own line or using a smaller variant."]},
+      {"screen": "UnlockDialog", "issues": ["The rate line reads 'Lagos zone D' for non-Lagos listings, e.g. Trans Amadi (Port Harcourt) and Katampe (Abuja). It is accurate as a price tier but wrong as a location."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_74.json"],
+  "action_items": [
+    "HIGH: Set PUBLIC_API_BASE=https://property-os-africa.preview.emergentagent.com in backend/.env (keep the existing keys) and restart the backend. Then check that POST /api/payments/initialize returns a public https checkout_url and the mock page redirects to the public /api/payments/redirect.",
+    "MEDIUM: In payment/callback.tsx:48, set the celebrate title to (s.credits + s.bonus), so it matches the '+57 MASS' body.",
+    "LOW: Wrap or ellipsize long Reference values in the wallet receipt sheet (wallet.tsx:479).",
+    "LOW (optional): On web, openAuthSessionAsync is called after `await api.initPayment`, so Safari or strict popup blockers may block it because the user gesture is gone. Polling still covers this, but there is no fallback link to the checkout. Consider opening the window synchronously first, or showing an 'Open checkout' link."
+  ],
+  "critical_code_review_comments": [
+    "payments.py _api_base silently uses http://localhost:8001 when MOCK_PAYMENT=true. This hides a missing-env problem in preview. Fail fast or log a warning.",
+    "TokenPurchaseScreen web polling runs up to 40×1.5s = 60s. If the user closes the popup, nothing short-circuits the loop: result.type stays 'opened' on web, so the user waits about 60s for 'Payment pending'.",
+    "The receipt email returns 200 and the UI shows 'Receipt sent' even though delivery to QA addresses fails in the background. That is acceptable for async sending, but the copy could say 'on its way'. It already does."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only; pricing API spot-checked OK)", "frontend": "100% of requested retest items in the automation browser (7/7 fixes + 3/3 regressions); real-device web purchase blocked by the localhost checkout_url"},
+  "seed_data_creation": "Fresh users test_it74_a_1792863112@amass.africa and test_it74_b_1792863112@amass.africa (password Test2026!). User a bought Investor and now has 87 MASS (ref amass_3c6fd3bb0ad8460f8d79a585201be2ff). fixa.tester unlocked 0c48dc2a-e3a9-4db7-8b9a-0d320ef90e73 (−10), balance now 280 MASS.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login inputs are input[data-testid=login-email] and login-password, then login-submit-button. Bundle testIDs are bundle-{starter|explorer|hunter|investor|professional}. The pay button is text 'Pay & get MASS'. Wait about 2s after opening the receipt sheet before tapping receipt-email, or Playwright reports the element outside the viewport. In the automation browser the popup opens the localhost checkout and closes itself. Remaining locked Zone D targets for fixa.tester: 70beb1b0-c57e-4b2d-b953-8c63ea04d154 (10), 16ff4c62-7917-44cf-bcbd-5062015767f9 (15).",
+  "rca_of_issue": "Web purchase on real clients: backend/.env has no PUBLIC_API_BASE or EXPO_BACKEND_URL, and payments._api_base() falls back to http://localhost:8001 under MOCK_PAYMENT. Both the checkout URL and the return URL are therefore unreachable outside the container. Reproduce by calling POST /api/payments/initialize and inspecting checkout_url. Fix: add PUBLIC_API_BASE to the env."
+}

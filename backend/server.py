@@ -2085,6 +2085,8 @@ app.include_router(register_saved_search_routes(db, get_current_user))
 # ─── Real payments (Paystack + Flutterwave) with MOCK_PAYMENT fallback
 from payments import register_payment_routes
 app.include_router(register_payment_routes(db, get_current_user))
+from receipts import register_receipt_routes, ensure_receipt_indexes
+app.include_router(register_receipt_routes(db, get_current_user))
 
 # ─── Property Improvement, Inspection, Finance & Renovation Projects
 from property_improvement import register_property_improvement_routes
@@ -2289,9 +2291,10 @@ app.add_middleware(
 
 
 async def _monetization_startup():
-    """Indexes → default prices → legacy unlock migration → reconciliation loop."""
+    """Indexes → ₦100/MASS migration → default prices → legacy unlock migration → reconciliation loop."""
     try:
         await ensure_monetization_indexes(db)
+        await ensure_receipt_indexes(db)
         seeded = await _unlock_svc.pricing.seed_defaults()
         migrated = await _unlock_svc.migrate_legacy_unlocks()
         rec = await _unlock_svc.reconcile()

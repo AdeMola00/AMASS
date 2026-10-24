@@ -20,6 +20,9 @@ DEMO = ("demo@amass.africa", "amass2026")
 BUYER = ("tunde.showcase@amass.africa", "Showcase2026!")
 
 
+WELCOME = 30  # welcome MASS = ₦3,000 at ₦100/MASS
+
+
 def _login(email, pwd):
     r = requests.post(f"{BASE}/api/auth/login", json={"email": email, "password": pwd})
     assert r.status_code == 200, r.text
@@ -51,7 +54,7 @@ def _balance(tok):
 def test_welcome_bonus_from_config():
     cfg = requests.get(f"{BASE}/api/monetization/config").json()
     welcome = cfg["welcome_bonus"]["MASS"]
-    assert welcome == 300
+    assert welcome == WELCOME
     tok, _ = _new_user()
     assert _balance(tok) == welcome
 
@@ -109,7 +112,7 @@ def test_map_markers_mutate_after_unlock():
     tok, _ = _new_user()
     # pick a property we can afford (sort by lowest token_cost > 0)
     props = requests.get(f"{BASE}/api/properties?limit=50", headers=_hdr(tok)).json()
-    paid = sorted([p for p in props if p["token_cost"] > 0 and p["token_cost"] <= 300],
+    paid = sorted([p for p in props if p["token_cost"] > 0 and p["token_cost"] <= WELCOME],
                   key=lambda x: x["token_cost"])
     assert paid, "need at least one affordable paid listing"
     p = paid[0]
@@ -143,17 +146,17 @@ def test_quote_shape_for_fresh_user():
                      params={"featureKey": "property", "targetId": p["id"]})
     assert r.status_code == 200
     q = r.json()
-    assert q["fee"] > 0 and q["fee_ngn"] == q["fee"] * 10
-    assert q["balance"] == 300
-    assert q["balance_after"] == 300 - q["fee"]
-    assert q["can_afford"] is (q["fee"] <= 300)
+    assert q["fee"] > 0 and q["fee_ngn"] == q["fee"] * 100
+    assert q["balance"] == WELCOME
+    assert q["balance_after"] == WELCOME - q["fee"]
+    assert q["can_afford"] is (q["fee"] <= WELCOME)
     assert q["already_unlocked"] is False
 
 
 def test_unlock_idempotency_and_already():
     tok, _ = _new_user()
     props = requests.get(f"{BASE}/api/properties?limit=50", headers=_hdr(tok)).json()
-    affordable = sorted([p for p in props if 0 < p["token_cost"] <= 300],
+    affordable = sorted([p for p in props if 0 < p["token_cost"] <= WELCOME],
                         key=lambda x: x["token_cost"])
     assert affordable
     p = affordable[0]
@@ -164,16 +167,16 @@ def test_unlock_idempotency_and_already():
     assert r1.status_code == 200, r1.text
     body1 = r1.json()
     assert body1["charged"] == fee
-    assert body1["balance_after"] == 300 - fee
+    assert body1["balance_after"] == WELCOME - fee
     assert body1["entitlement"]["status"] == "active"
-    assert _balance(tok) == 300 - fee
+    assert _balance(tok) == WELCOME - fee
 
     # Same key → identical result, no second charge
     r2 = requests.post(f"{BASE}/api/unlocks", headers=_hdr(tok, **{"Idempotency-Key": key1}),
                        json={"featureKey": "property", "targetId": p["id"]})
     assert r2.status_code == 200
     assert r2.json()["charged"] == fee
-    assert _balance(tok) == 300 - fee
+    assert _balance(tok) == WELCOME - fee
 
     # Different key same property → free (already_unlocked)
     r3 = requests.post(f"{BASE}/api/unlocks", headers=_hdr(tok, **{"Idempotency-Key": uuid.uuid4().hex}),
@@ -181,7 +184,7 @@ def test_unlock_idempotency_and_already():
     assert r3.status_code == 200
     assert r3.json()["charged"] == 0
     assert r3.json().get("free_reason") == "already_unlocked"
-    assert _balance(tok) == 300 - fee
+    assert _balance(tok) == WELCOME - fee
 
 
 def test_unlock_missing_idempotency_key_422():
@@ -196,7 +199,7 @@ def test_unlock_missing_idempotency_key_422():
 def test_unlock_402_when_unaffordable_wallet_unchanged():
     tok, _ = _new_user()
     props = requests.get(f"{BASE}/api/properties?limit=100", headers=_hdr(tok)).json()
-    too_expensive = [p for p in props if p["token_cost"] > 300]
+    too_expensive = [p for p in props if p["token_cost"] > WELCOME]
     assert too_expensive, "need at least one property above welcome bonus"
     p = too_expensive[0]
     before = _balance(tok)
@@ -212,7 +215,7 @@ def test_unlock_402_when_unaffordable_wallet_unchanged():
 def test_details_before_and_after_unlock_and_mine():
     tok, _ = _new_user()
     props = requests.get(f"{BASE}/api/properties?limit=50", headers=_hdr(tok)).json()
-    affordable = sorted([p for p in props if 0 < p["token_cost"] <= 300],
+    affordable = sorted([p for p in props if 0 < p["token_cost"] <= WELCOME],
                         key=lambda x: x["token_cost"])
     p = affordable[0]
     # before: /details 403 w/ UNLOCK_REQUIRED
@@ -243,7 +246,7 @@ def test_details_before_and_after_unlock_and_mine():
 def test_legacy_properties_unlock_alias_charges_once():
     tok, _ = _new_user()
     props = requests.get(f"{BASE}/api/properties?limit=50", headers=_hdr(tok)).json()
-    affordable = sorted([p for p in props if 0 < p["token_cost"] <= 300],
+    affordable = sorted([p for p in props if 0 < p["token_cost"] <= WELCOME],
                         key=lambda x: x["token_cost"])
     p = affordable[0]
     fee = p["token_cost"]
@@ -254,7 +257,7 @@ def test_legacy_properties_unlock_alias_charges_once():
     # charges once (either 'tokens_paid' or 'charged')
     paid1 = b1.get("tokens_paid", b1.get("charged"))
     assert paid1 == fee
-    assert _balance(tok) == 300 - fee
+    assert _balance(tok) == WELCOME - fee
     # second call → already unlocked, 0 charge
     r2 = requests.post(f"{BASE}/api/properties/unlock", headers=_hdr(tok),
                        json={"property_id": p["id"]})
@@ -262,13 +265,13 @@ def test_legacy_properties_unlock_alias_charges_once():
     b2 = r2.json()
     assert b2.get("already_unlocked") is True
     assert b2.get("tokens_paid", b2.get("charged")) == 0
-    assert _balance(tok) == 300 - fee
+    assert _balance(tok) == WELCOME - fee
 
 
 def test_legacy_properties_unlock_402_shape():
     tok, _ = _new_user()
     props = requests.get(f"{BASE}/api/properties?limit=100", headers=_hdr(tok)).json()
-    too_expensive = [p for p in props if p["token_cost"] > 300]
+    too_expensive = [p for p in props if p["token_cost"] > WELCOME]
     assert too_expensive
     p = too_expensive[0]
     r = requests.post(f"{BASE}/api/properties/unlock", headers=_hdr(tok),

@@ -39,10 +39,16 @@ from tokens import WalletService
 FeatureKey = Literal["property", "fixa_provider"]
 FEATURE_CURRENCY: dict[str, str] = {"property": "MASS", "fixa_provider": "FIX"}
 
+# ─── MASS — the sole property-access currency ────────────────────────────
+# ₦100 = 1 MASS. Property fees are quoted, disclosed and charged in MASS only;
+# FIX is the FIXA services currency and is never accepted for property access.
+PROPERTY_CURRENCY = "MASS"
+MASS_NGN = 100
+
 # ─── Defaults (admin-editable; persisted in app_settings) ───────────────
 DEFAULT_MONETIZATION = {
-    "conversion": {"MASS_ngn": 10, "FIX_ngn": 10},
-    "welcome_bonus": {"MASS": 300, "FIX": 100},
+    "conversion": {"MASS_ngn": MASS_NGN, "FIX_ngn": 10},
+    "welcome_bonus": {"MASS": 30, "FIX": 100},
     "topup_min_ngn": 1000,
     "topup_bonus_tiers": [
         {"min_ngn": 5000, "bonus_pct": 5},
@@ -53,8 +59,25 @@ DEFAULT_MONETIZATION = {
     "map_markers_per_minute": 90,
     "free_amass_sale": False,
 }
-PROPERTY_BASE = {"rent": 100, "sale": 150}
+# Approved Lagos price table (MASS). Base × zone multiplier:
+#   Zone A (prime)    rent 80 · sale 120   = ₦8,000 / ₦12,000
+#   Zone B (high)     rent 40 · sale 60    = ₦4,000 / ₦6,000
+#   Zone C (mid)      rent 20 · sale 30    = ₦2,000 / ₦3,000
+#   Zone D (standard) rent 10 · sale 15    = ₦1,000 / ₦1,500
+PROPERTY_BASE = {"rent": 10, "sale": 15}
 PROPERTY_ZONE_MULT = {"A": 8, "B": 4, "C": 2, "D": 1}
+ZONE_LABELS = {"A": "Prime", "B": "High", "C": "Mid", "D": "Standard"}
+# Lagos areas per zone — the human-readable face of the approved table (zone lookup is admin-editable).
+LAGOS_ZONE_AREAS: dict[str, list[str]] = {
+    "A": ["Ikoyi", "Victoria Island", "Banana Island", "Lekki Phase 1"],
+    "B": ["Lekki", "Lekki-Ajah", "Ajah", "Ikeja GRA", "Magodo"],
+    "C": ["Yaba", "Surulere", "Ikeja", "Festac"],
+    "D": ["Everywhere else in Lagos"],
+}
+# Pre-June-2026 scale (₦10 = 1 MASS, base 100/150) — used once by the startup migration.
+_LEGACY_PROPERTY_BASE = {"rent": 100, "sale": 150}
+_LEGACY_MASS_NGN = 10
+_LEGACY_WELCOME_MASS = 300
 PROVIDER_TIER_BASE = {"1": 50, "2": 100, "3": 200, "4": 400}
 PROVIDER_ZONE_MULT = {"A": 1.5, "B": 1.25, "C": 1.0, "D": 1.0}
 DEFAULT_ZONE_LOOKUP: dict[str, str] = {
@@ -144,7 +167,23 @@ class PricingEngine:
 
     async def token_ngn(self, currency: str) -> int:
         cfg = await self.config()
-        return int(cfg["conversion"].get(f"{currency}_ngn", 10))
+        return int(cfg["conversion"].get(f"{currency}_ngn", MASS_NGN if currency == PROPERTY_CURRENCY else 10))
+
+    async def lagos_price_table(self) -> dict:
+        """The approved Lagos property-access table: live MASS fees per zone with their exact naira value."""
+        rate = await self.token_ngn(PROPERTY_CURRENCY)
+        zones = []
+        for zone in ZONE_ORDER:
+            rent = int((await self.active_price("property", "rent", zone))["amount"])
+            sale = int((await self.active_price("property", "sale", zone))["amount"])
+            zones.append({
+                "zone": zone,
+                "label": ZONE_LABELS[zone],
+                "areas": LAGOS_ZONE_AREAS[zone],
+                "rent": {"mass": rent, "ngn": rent * rate},
+                "sale": {"mass": sale, "ngn": sale * rate},
+            })
+        return {"currency": PROPERTY_CURRENCY, "mass_ngn": rate, "city": "Lagos", "zones": zones}
 
     async def zone_lookup(self) -> dict[str, str]:
         z = await get_setting(self.db, "zone_lookup", DEFAULT_ZONE_LOOKUP)
@@ -440,6 +479,9 @@ class UnlockService:
 
     async def _unlock_inner(self, user: dict, feature_key: str, target_id: str, currency: str, idem: str) -> dict:
         uid = user["id"]
+        if feature_key == "property" and currency != PROPERTY_CURRENCY:
+            # Property access is MASS-only — no other token (FIX) or path may charge for it.
+            raise HTTPException(422, "Property access is charged in MASS only")
         t = await self.resolve_target(feature_key, target_id)
         # 1. validate
         if not t.available:
@@ -516,6 +558,32 @@ class UnlockService:
         ent = await self.db.entitlements.find_one({"id": ent_id}, {"_id": 0})
         await self._event(uid, feature_key, target_id, "paid", fee, currency, t, {"transaction_id": ent.get("transaction_id")})
         balance_after = int(updated["balance"] + updated["bonus_balance"])
+        # Receipt — issued only now, after the debit + ledger row are committed (one per entitlement).
+        receipt_no = None
+        if feature_key == "property":
+            try:
+                from receipts import issue_receipt
+                rec = await issue_receipt(
+                    self.db, user_id=uid, kind="property_access", reference=ent.get("transaction_id") or ent_id,
+                    amount_ngn=fee * token_ngn, tokens=fee, currency=currency, rate_ngn=token_ngn,
+                    description=f"Property access · {t.label}",
+                    items=[
+                        {"label": "Property", "value": t.label},
+                        {"label": "Zone", "value": f"Zone {t.zone_tier} · {ZONE_LABELS.get(t.zone_tier, '')}".strip(" ·")},
+                        {"label": "Fee", "value": f"{fee:,} MASS = ₦{fee * token_ngn:,}"},
+                    ],
+                    balance_after=balance_after,
+                    meta={"property_id": target_id, "entitlement_id": ent_id, "category": t.category, "zone_tier": t.zone_tier},
+                )
+                receipt_no = rec.get("receipt_no")
+                if receipt_no:
+                    await self.db.entitlements.update_one({"id": ent_id}, {"$set": {"receipt_no": receipt_no}})
+                    if ent.get("transaction_id"):
+                        await self.db.token_transactions.update_one({"id": ent["transaction_id"]}, {"$set": {"receipt_no": receipt_no}})
+                    ent["receipt_no"] = receipt_no
+            except Exception as e:  # never block the unlock
+                import logging
+                logging.getLogger("amass.monetization").warning("unlock receipt failed: %s", e)
         # Receipt in the Notification Center (never pushed — the user just did this on-screen).
         try:
             from notification_center import emit
@@ -523,7 +591,7 @@ class UnlockService:
                 self.db, uid, "UNLOCK_RECEIPT",
                 f"Receipt · {fee} {currency} spent",
                 f"Unlocked {t.label}. Balance now {balance_after} {currency}.",
-                {"reference": ent.get("transaction_id") or ent_id, "feature_key": feature_key, "target_id": target_id, "amount": fee, "currency": currency, **({"property_id": target_id} if feature_key == "property" else {})},
+                {"reference": ent.get("transaction_id") or ent_id, "receipt_no": receipt_no, "feature_key": feature_key, "target_id": target_id, "amount": fee, "currency": currency, **({"property_id": target_id} if feature_key == "property" else {})},
                 action_url="/wallet",
                 push=False,
             )
@@ -657,8 +725,54 @@ async def ensure_monetization_defaults(db: AsyncIOMotorDatabase) -> None:
             await db.app_settings.insert_one({"key": key, "value": value, "is_system": True, "created_at": _now(), "updated_at": _now()})
 
 
+async def migrate_mass_ngn_100(db: AsyncIOMotorDatabase) -> Optional[dict]:
+    """One-off: move persisted pricing from ₦10/MASS to the approved ₦100/MASS scale.
+
+    Naira fees stay identical (Zone A rent ₦8,000 → 800 MASS before, 80 MASS now); only the
+    MASS numbers shrink ×10. Welcome bonus keeps its ₦3,000 value (300 → 30 MASS). Wallet
+    balances and the historical ledger are NOT touched. Guarded by a `migrations` row so it
+    runs exactly once; a fresh database (already on the new defaults) is a no-op.
+    """
+    key = "mass_ngn_100_v1"
+    if await db.migrations.find_one({"key": key}):
+        return None
+    report = {"key": key, "applied_at": _now(), "conversion": False, "welcome_bonus": False, "fee_prices": 0}
+    cfg = await db.app_settings.find_one({"key": "monetization"}, {"_id": 0, "value": 1})
+    if cfg:
+        value = dict(cfg.get("value") or {})
+        conv = dict(value.get("conversion") or {})
+        wb = dict(value.get("welcome_bonus") or {})
+        if int(conv.get("MASS_ngn", _LEGACY_MASS_NGN)) == _LEGACY_MASS_NGN:
+            conv["MASS_ngn"] = MASS_NGN
+            report["conversion"] = True
+        if int(wb.get("MASS", _LEGACY_WELCOME_MASS)) == _LEGACY_WELCOME_MASS:
+            wb["MASS"] = DEFAULT_MONETIZATION["welcome_bonus"]["MASS"]
+            report["welcome_bonus"] = True
+        if report["conversion"] or report["welcome_bonus"]:
+            await db.app_settings.update_one(
+                {"key": "monetization"},
+                {"$set": {"value": {**value, "conversion": conv, "welcome_bonus": wb}, "updated_at": _now()}},
+            )
+    # Property fee rows: legacy default → new default; admin overrides scale ÷10 (min 1 MASS).
+    async for row in db.fee_prices.find({"feature_key": "property", "active": True}):
+        cat, zone, amount = row.get("category"), row.get("zone_tier"), int(row.get("amount", 0))
+        legacy_default = _LEGACY_PROPERTY_BASE.get(cat, _LEGACY_PROPERTY_BASE["rent"]) * PROPERTY_ZONE_MULT.get(zone, 1)
+        new_default = PROPERTY_BASE.get(cat, PROPERTY_BASE["rent"]) * PROPERTY_ZONE_MULT.get(zone, 1)
+        if amount == new_default or amount < legacy_default / 2:
+            continue  # already on the new scale
+        new_amount = new_default if amount == legacy_default else max(1, int(round(amount / 10)))
+        await db.fee_prices.update_one(
+            {"_id": row["_id"]},
+            {"$set": {"amount": new_amount, "legacy_amount": amount, "note": f"{row.get('note') or ''} · rescaled to ₦100/MASS".strip(" ·")}},
+        )
+        report["fee_prices"] += 1
+    await db.migrations.insert_one(dict(report))
+    return report
+
+
 async def ensure_monetization_indexes(db: AsyncIOMotorDatabase) -> None:
     await ensure_monetization_defaults(db)
+    await migrate_mass_ngn_100(db)
     await db.entitlements.create_index([("user_id", ASCENDING), ("feature_key", ASCENDING), ("target_id", ASCENDING)], unique=True, name="entitlement_uniq")
     await db.entitlements.create_index([("target_id", ASCENDING), ("status", ASCENDING)], name="entitlement_target")
     await db.unlock_requests.create_index([("key", ASCENDING)], unique=True, name="unlock_request_key_uniq")
@@ -744,6 +858,11 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
     async def public_config():
         cfg = await pricing.config()
         return {"conversion": cfg["conversion"], "welcome_bonus": cfg["welcome_bonus"], "topup_min_ngn": cfg["topup_min_ngn"], "topup_bonus_tiers": cfg["topup_bonus_tiers"]}
+
+    @router.get("/monetization/price-table")
+    async def public_price_table():
+        """Approved Lagos property-access fees — MASS with exact naira value (₦100 = 1 MASS)."""
+        return await pricing.lagos_price_table()
 
     # ── quotes & unlocks ──
     @router.get("/unlocks/quote")

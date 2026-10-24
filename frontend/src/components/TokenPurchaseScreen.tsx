@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,7 +8,6 @@ import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import { api, TokenBundle } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
-import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import {
@@ -72,7 +71,11 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
   const [selected, setSelected] = useState<string | null>(null);
   const [provider, setProvider] = useState<PaymentProviderId>(config.providers[0]);
   const [processing, setProcessing] = useState(false);
-  const [credited, setCredited] = useState<number | null>(null);
+  // Web only: the checkout URL while we wait, so a blocked popup can be opened by hand.
+  const [pendingCheckout, setPendingCheckout] = useState<string | null>(null);
+  const [credited, setCredited] = useState<{ tokens: number; receiptNo: string | null; amountNgn?: number } | null>(null);
+  // Payment screens always show the exact naira amount — never a rounded "₦3k".
+  const exactNaira = (n: number) => `₦${n.toLocaleString()}`;
 
   const load = async () => {
     setLoading(true);
@@ -97,9 +100,18 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
   const chosen = bundles.find((b) => b.id === selected);
   // Highest ₦ per token (the smallest bundle) — savings are relative to it.
   const baseUnit = useMemo(
-    () => (bundles.length ? Math.max(...bundles.map((b) => b.price_ngn / (b.tokens + b.bonus))) : 0),
+    () => (bundles.length ? Math.max(...bundles.map((b) => b.price_ngn / (b.total ?? b.tokens + b.bonus))) : 0),
     [bundles]
   );
+  // "Best value" is worked out from the catalog — the bundle with the lowest ₦ per token.
+  const bestValueId = useMemo(() => {
+    let best: TokenBundle | undefined;
+    for (const b of bundles) {
+      const unit = b.price_ngn / (b.total ?? b.tokens + b.bonus);
+      if (!best || unit < best.price_ngn / (best.total ?? best.tokens + best.bonus)) best = b;
+    }
+    return best?.id ?? null;
+  }, [bundles]);
 
   const handlePurchase = async () => {
     if (!chosen) return;
@@ -108,44 +120,58 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
     try {
       // 1. Initialize server-side payment intent
       const init = await api.initPayment(provider as any, config.currency, chosen.id);
-      // 2. Open hosted checkout in in-app browser (real or mock)
-      const result = await WebBrowser.openAuthSessionAsync(init.checkout_url, "amass://payment/callback");
-      // 3. Poll server-side status (source of truth — never trust redirect)
-      let paid = false;
-      for (let i = 0; i < 5; i++) {
+      // 2. Open hosted checkout (real or mock). Native: the auth session returns when the
+      //    provider redirects back to amass://. Web: the checkout runs in a popup that has no
+      //    app scheme to return to, so we don't wait on it — the server status is the truth.
+      let result: { type: string } = { type: "opened" };
+      if (Platform.OS === "web") {
+        setPendingCheckout(init.checkout_url);
+        WebBrowser.openAuthSessionAsync(init.checkout_url, "amass://payment/callback").catch(() => {});
+      } else {
+        result = await WebBrowser.openAuthSessionAsync(init.checkout_url, "amass://payment/callback");
+      }
+      // 3. Poll server-side status (source of truth — never trust the redirect)
+      let paidStatus: Awaited<ReturnType<typeof api.paymentStatus>> | null = null;
+      const attempts = Platform.OS === "web" ? 40 : 5;
+      for (let i = 0; i < attempts; i++) {
         try {
           const s = await api.paymentStatus(init.reference);
           if (s.status === "paid") {
-            paid = true;
+            paidStatus = s;
             break;
           }
+          if (s.status === "verification_failed") break;
         } catch {}
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, 1500));
       }
-      if (paid) {
+      if (paidStatus) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         await refresh();
-        setCredited(chosen.tokens + chosen.bonus);
+        // Show exactly what the server credited (bundle + bonus + tier bonus) and the receipt number.
+        setCredited({ tokens: (paidStatus.credits ?? 0) + (paidStatus.bonus ?? 0), receiptNo: paidStatus.receipt_no ?? null, amountNgn: paidStatus.amount_ngn });
       } else if (result.type === "cancel" || result.type === "dismiss") {
         toast.info("Checkout closed", "No payment was made.");
       } else {
         toast.show({
           kind: "warning",
           title: "Payment pending",
-          body: "We're still confirming your payment. Your balance will update automatically once complete.",
+          body: "We're still confirming your payment. Your balance will update automatically once complete — nothing is charged twice.",
         });
       }
     } catch (e: any) {
       toast.error("Purchase failed", e?.message ?? "Please try again.");
     } finally {
       setProcessing(false);
+      setPendingCheckout(null);
     }
   };
 
   const finish = () => {
     setCredited(null);
     if (config.onSuccessRoute) {
-      router.replace({ pathname: config.onSuccessRoute.pathname as any, params: config.onSuccessRoute.params ?? {} } as any);
+      // Pop back to the screen that sent us here (no duplicate in history) and hand it the
+      // `unlock` param so it re-opens the confirmation.
+      router.dismissTo({ pathname: config.onSuccessRoute.pathname as any, params: config.onSuccessRoute.params ?? {} } as any);
     } else {
       router.replace("/wallet");
     }
@@ -219,8 +245,9 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
           <View style={[styles.grid, { padding: space[4] }]}>
             {bundles.map((b, i) => {
               const isSelected = selected === b.id;
-              const isBest = b.id === config.bestBundleId;
-              const total = b.tokens + b.bonus;
+              const isBest = b.id === bestValueId;
+              const total = b.total ?? b.tokens + b.bonus; // exactly what the server credits
+              const bonusTotal = b.bonus + (b.tier_bonus ?? 0);
               const unit = b.price_ngn / total;
               const savePct = baseUnit > 0 ? Math.round((1 - unit / baseUnit) * 100) : 0;
               return (
@@ -232,7 +259,7 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
                     }}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: isSelected }}
-                    accessibilityLabel={`${b.name}: ${total} ${config.currency} for ${formatNaira(b.price_ngn)}`}
+                    accessibilityLabel={`${b.name}: ${total} ${config.currency} for ${exactNaira(b.price_ngn)}`}
                     testID={`${config.testIDs.bundle}-${b.id}`}
                     style={({ pressed }) => [
                       styles.bundle,
@@ -281,14 +308,14 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
                         {config.currency}
                       </AppText>
                     </View>
-                    {b.bonus > 0 ? (
-                      <Badge label={`+${b.bonus} bonus`} tone={isMass ? "mass" : "fix"} icon="gift" size="xs" />
+                    {bonusTotal > 0 ? (
+                      <Badge label={`+${bonusTotal} bonus`} tone={isMass ? "mass" : "fix"} icon="gift" size="xs" />
                     ) : (
                       <View style={{ height: 18 }} />
                     )}
                     <View style={[styles.priceRow, { borderTopColor: colors.divider }]}>
                       <AppText variant="title" tabular>
-                        {formatNaira(b.price_ngn)}
+                        {exactNaira(b.price_ngn)}
                       </AppText>
                       <AppText variant="micro" tone="tertiary" tabular>
                         ₦{unit.toFixed(1)} / {config.currency}
@@ -385,21 +412,31 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
               Total
             </AppText>
             <AppText variant="h2" tabular testID="buy-total">
-              {formatNaira(chosen.price_ngn)}
+              {exactNaira(chosen.price_ngn)}
             </AppText>
-            <AppText variant="caption" tone="tertiary" tabular>
-              {(chosen.tokens + chosen.bonus).toLocaleString()} {config.currency} · via {PROVIDER_META[provider].name}
+            <AppText variant="caption" tone="tertiary" tabular numberOfLines={2} testID="buy-total-tokens">
+              {(chosen.total ?? chosen.tokens + chosen.bonus).toLocaleString()} {config.currency}
+              {(chosen.bonus + (chosen.tier_bonus ?? 0)) > 0 ? ` (${chosen.bonus + (chosen.tier_bonus ?? 0)} bonus)` : ""} · {PROVIDER_META[provider].name}
             </AppText>
           </View>
-          <Button
-            label={`Pay & get ${config.currency}`}
-            variant="premium"
-            size="lg"
-            iconLeft="lock-closed"
-            loading={processing}
-            onPress={handlePurchase}
-            testID={config.testIDs.confirm}
-          />
+          <View style={{ alignItems: "flex-end", gap: 6 }}>
+            <Button
+              label={`Pay & get ${config.currency}`}
+              variant="premium"
+              size="lg"
+              iconLeft="lock-closed"
+              loading={processing}
+              onPress={handlePurchase}
+              testID={config.testIDs.confirm}
+            />
+            {pendingCheckout ? (
+              <Pressable onPress={() => Linking.openURL(pendingCheckout).catch(() => {})} accessibilityRole="link" testID="buy-open-checkout" hitSlop={8}>
+                <AppText variant="micro" color={colors.brand}>
+                  {"Checkout didn't open? Tap here"}
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       ) : null}
 
@@ -407,12 +444,14 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
       <Sheet visible={credited !== null} onClose={finish} testID="purchase-success">
         <EmptyState
           variant="success"
-          title={`${(credited ?? 0).toLocaleString()} ${config.currency} credited`}
-          body={
-            config.onSuccessRoute
-              ? "Your wallet is topped up. Let's finish what you started."
-              : "Your wallet is topped up and ready to use."
-          }
+          title={`${(credited?.tokens ?? 0).toLocaleString()} ${config.currency} credited`}
+          body={[
+            credited?.amountNgn ? `${exactNaira(credited.amountNgn)} paid.` : null,
+            credited?.receiptNo ? `Receipt ${credited.receiptNo} is in your Wallet (and your email).` : null,
+            config.onSuccessRoute ? "Let's finish what you started." : "Your wallet is topped up and ready to use.",
+          ]
+            .filter(Boolean)
+            .join("\n")}
           compact
           style={{ paddingBottom: 8 }}
         />
