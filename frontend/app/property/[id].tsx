@@ -19,15 +19,16 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from "react-native-reanimated";
-import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
+import { MapView, Marker, Circle, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { api, Property } from "@/src/lib/api";
-import { formatNaira, formatMarkerPrice } from "@/src/constants/theme";
+import { formatNaira } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { useTheme } from "@/src/theme";
 import { gradients, motion, radii, space } from "@/src/theme/tokens";
-import { AppText, Avatar, Badge, Button, Card, EmptyState, IconButton, PressableScale, Skeleton, UnlockDialog, useToast } from "@/src/ui";
+import { AppText, Avatar, Badge, Button, Card, EmptyState, FrostedCircle, FrostedLabel, IconButton, PressableScale, Skeleton, UnlockDialog, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
-import { PropertyMarker } from "@/src/components/PropertyMarker";
+import { PhotoMarker } from "@/src/components/map/PhotoMarker";
+import { toPin } from "@/src/components/map/pins";
 import { PriceText } from "@/src/components/PriceText";
 import { ListingCard } from "@/src/components/ListingCard";
 import { HotFlame } from "@/src/components/HotFlame";
@@ -40,15 +41,17 @@ import { track, viaFrom } from "@/src/lib/analytics";
 import { AddToCollectionSheet } from "@/src/components/neighbours/AddToCollectionSheet";
 import type { PropertySocialContext } from "@/src/lib/api";
 
-const GALLERY_H = 400;
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
+/** Photo-led hero: ~58% of the screen, clamped so tablets don't get a wall of photo. */
+const galleryHeight = (h: number) => Math.min(Math.max(Math.round(h * 0.58), 420), 560);
 
 export default function PropertyDetails() {
   const { id, unlock, via } = useLocalSearchParams<{ id: string; unlock?: string; via?: string }>();
   const arrivedVia = viaFrom(via);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const GALLERY_H = galleryHeight(height);
   const { colors, shadows, isDark } = useTheme();
   const toast = useToast();
   const { wallet } = useWallet();
@@ -207,9 +210,36 @@ export default function PropertyDetails() {
   };
 
   const priceSuffix = property.listing_type === "rent" ? "/year" : property.listing_type === "shortlet" ? "/night" : "";
+  const kindLabel = property.listing_type === "shortlet" ? "Short let" : property.listing_type === "rent" || property.listing_type === "lease" ? "To rent" : "For sale";
   const accessCost = property.access_cost ?? property.token_cost ?? 0;
   const hasAccess = !!(property.unlocked || property.is_free_amass_sale);
   const ctaBottomPad = Math.max(insets.bottom, 16);
+  /** Mini-map pin — same picture-rich marker as the Home map, same gating (approximate when locked). */
+  const miniPin = toPin({
+    id: property.id,
+    category: property.listing_type === "rent" || property.listing_type === "lease" || property.listing_type === "shortlet" ? "rent" : "sale",
+    type: property.property_type,
+    lat: property.latitude,
+    lng: property.longitude,
+    unlocked: hasAccess,
+    verified: !!property.verified,
+    approx: !hasAccess,
+    friends_saved: 0,
+    in_shared_list: false,
+    promotion_tier: property.promotion?.tier ?? null,
+    title: property.title,
+    price: property.price,
+    listing_type: property.listing_type,
+    cover: images[0] || null,
+    bedrooms: property.bedrooms,
+    bathrooms: property.bathrooms,
+    size_sqm: property.size_sqm,
+    city: property.city,
+    place: hasAccess ? property.location : property.city,
+    status: property.status,
+    access_cost: accessCost,
+    is_free_amass_sale: !!property.is_free_amass_sale,
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]} testID="property-details">
@@ -243,24 +273,28 @@ export default function PropertyDetails() {
           <SafeAreaView edges={["top"]} style={styles.topBar} pointerEvents="box-none">
             <Pressable
               onPress={() => router.back()}
-              style={styles.glassBtn}
               testID="back-btn"
               accessibilityRole="button"
               accessibilityLabel="Go back"
               hitSlop={8}
             >
-              <Ionicons name="chevron-back" size={22} color="#fff" />
+              <FrostedCircle size={44} tone="dark">
+                <Ionicons name="chevron-back" size={24} color="#fff" />
+              </FrostedCircle>
             </Pressable>
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <Pressable style={styles.glassBtn} onPress={() => { Haptics.selectionAsync().catch(() => {}); setListOpen(true); }} testID="add-to-list-btn" accessibilityRole="button" accessibilityLabel="Add to a shared list" hitSlop={8}>
-                <Ionicons name="albums-outline" size={20} color="#fff" />
+              <Pressable onPress={() => { Haptics.selectionAsync().catch(() => {}); setListOpen(true); }} testID="add-to-list-btn" accessibilityRole="button" accessibilityLabel="Add to a shared list" hitSlop={8}>
+                <FrostedCircle size={44} tone="dark">
+                  <Ionicons name="albums-outline" size={20} color="#fff" />
+                </FrostedCircle>
               </Pressable>
-              <Pressable style={styles.glassBtn} onPress={onShare} testID="share-btn" accessibilityRole="button" accessibilityLabel="Share this property" hitSlop={8}>
-                <Ionicons name="share-outline" size={20} color="#fff" />
+              <Pressable onPress={onShare} testID="share-btn" accessibilityRole="button" accessibilityLabel="Share this property" hitSlop={8}>
+                <FrostedCircle size={44} tone="dark">
+                  <Ionicons name="share-outline" size={20} color="#fff" />
+                </FrostedCircle>
               </Pressable>
               <Animated.View style={heartAnim}>
                 <Pressable
-                  style={styles.glassBtn}
                   onPress={toggleFav}
                   testID="fav-btn"
                   accessibilityRole="button"
@@ -268,20 +302,31 @@ export default function PropertyDetails() {
                   accessibilityState={{ selected: favorited }}
                   hitSlop={8}
                 >
-                  <Ionicons name={favorited ? "heart" : "heart-outline"} size={20} color={favorited ? colors.brand : "#fff"} />
+                  <FrostedCircle size={44} tone="dark">
+                    <Ionicons name={favorited ? "heart" : "heart-outline"} size={21} color={favorited ? colors.brand : "#fff"} />
+                  </FrostedCircle>
                 </Pressable>
               </Animated.View>
             </View>
           </SafeAreaView>
 
-          {/* Photo counter + dots */}
-          <View style={styles.photoCounter} accessibilityLabel={`Photo ${galleryIndex + 1} of ${images.length}`}>
-            <Ionicons name="images" size={12} color="#fff" />
-            <AppText variant="caption" color="#fff" tabular>
-              {galleryIndex + 1} / {images.length}
-            </AppText>
-          </View>
-          {images.length > 1 && images.length <= 8 ? (
+          {/* Photo counter + dots · locked homes show how many photos the unlock reveals */}
+          {hasAccess ? (
+            <View style={styles.photoCounter} accessibilityLabel={`Photo ${galleryIndex + 1} of ${images.length}`}>
+              <Ionicons name="images" size={12} color="#fff" />
+              <AppText variant="caption" color="#fff" tabular>
+                {galleryIndex + 1} / {images.length}
+              </AppText>
+            </View>
+          ) : (
+            <View style={styles.photoCounter} testID="hero-locked-photos" accessibilityLabel={`${property.image_count ?? 1} ${(property.image_count ?? 1) === 1 ? "photo unlocks" : "photos unlock"} with MASS`}>
+              <Ionicons name="lock-closed" size={12} color={colors.mass} />
+              <AppText variant="caption" color="#fff" tabular style={{ fontFamily: "PlusJakartaSans-700" }}>
+                {property.image_count && property.image_count > 1 ? `+${property.image_count - 1} photos · unlock` : "Photos unlock with MASS"}
+              </AppText>
+            </View>
+          )}
+          {hasAccess && images.length > 1 && images.length <= 8 ? (
             <View style={styles.dots} pointerEvents="none">
               {images.map((_, i) => (
                 <View key={i} style={[styles.dot, { opacity: i === galleryIndex ? 1 : 0.45, width: i === galleryIndex ? 16 : 6 }]} />
@@ -289,12 +334,11 @@ export default function PropertyDetails() {
             </View>
           ) : null}
 
-          {/* Hot home / premium badge */}
-          {(isHot || property.status === "premium") && (
-            <View style={styles.heroBadge}>
-              {isHot ? <HotFlame /> : <Badge label="Premium" tone="premium" icon="diamond" size="md" />}
-            </View>
-          )}
+          {/* Kind + hot / premium labels */}
+          <View style={styles.heroBadge} pointerEvents="none">
+            <FrostedLabel label={kindLabel.toUpperCase()} tone="dark" size="sm" testID="hero-kind-label" />
+            {isHot ? <HotFlame /> : property.status === "premium" ? <Badge label="Premium" tone="premium" icon="diamond" size="md" /> : null}
+          </View>
         </View>
 
         {/* Sheet content */}
@@ -308,16 +352,24 @@ export default function PropertyDetails() {
             )}
           </View>
 
+          {/* Zillow scan order: huge price → bold inline specs → what → where */}
           <View style={{ marginTop: space[4] }}>
-            <PriceText value={property.price} size={38} suffix={priceSuffix} style={{ color: colors.text }} />
+            <PriceText value={property.price} size={44} suffix={priceSuffix} style={{ color: colors.text, lineHeight: 48 }} />
           </View>
-          <AppText variant="h3" style={{ marginTop: space[1] }}>
+          <View style={styles.specsInline} testID="specs-inline">
+            <SpecInline icon="bed-outline" value={property.bedrooms} unit="bd" />
+            <SpecInline icon="water-outline" value={property.bathrooms} unit="ba" />
+            <SpecInline icon="resize-outline" value={property.size_sqm} unit="m²" />
+            {property.parking ? <SpecInline icon="car-outline" value={property.parking} unit="parking" /> : null}
+          </View>
+          <AppText variant="h2" style={{ marginTop: space[3] }}>
             {property.title}
           </AppText>
-          <View style={styles.locRow}>
-            <Ionicons name="location" size={14} color={colors.brand} />
-            <AppText variant="bodySm" tone="secondary" style={{ flex: 1 }}>
+          <View style={styles.locRow} testID={hasAccess ? "address-revealed" : "address-approx"}>
+            <Ionicons name={hasAccess ? "location" : "locate-outline"} size={16} color={hasAccess ? colors.brand : colors.textTertiary} />
+            <AppText variant="bodyMedium" tone="secondary" style={{ flex: 1 }}>
               {property.location}
+              {hasAccess ? "" : " · exact address unlocks with MASS"}
             </AppText>
           </View>
 
@@ -397,33 +449,23 @@ export default function PropertyDetails() {
             </View>
           )}
 
-          {/* Specs strip */}
-          <View style={[styles.specsRow, { backgroundColor: colors.surfaceAlt }]}>
-            <SpecCell icon="bed-outline" value={String(property.bedrooms)} label="Beds" />
-            <SpecDivider />
-            <SpecCell icon="water-outline" value={String(property.bathrooms)} label="Baths" />
-            <SpecDivider />
-            <SpecCell icon="resize-outline" value={`${property.size_sqm}`} label="sqm" />
-            {property.parking ? (
-              <>
-                <SpecDivider />
-                <SpecCell icon="car-outline" value={String(property.parking)} label="Parking" />
-              </>
+          <View style={styles.section}>
+            <AppText variant="h2">About this home</AppText>
+            <AppText variant="body" tone="secondary" style={styles.bodyCopy}>
+              {property.description}
+            </AppText>
+            {!hasAccess ? (
+              <AppText variant="caption" tone="tertiary" testID="about-locked-hint">
+                Full description, all photos, the exact address and the agent unlock together — one payment, yours forever.
+              </AppText>
             ) : null}
           </View>
 
-          <View style={styles.section}>
-            <AppText variant="h3">About this home</AppText>
-            <AppText variant="body" tone="secondary">
-              {property.description}
-            </AppText>
-          </View>
-
-          {property.amenities.length > 0 && (
+          {(property.amenities?.length ?? 0) > 0 && (
             <View style={styles.section}>
-              <AppText variant="h3">Home highlights</AppText>
+              <AppText variant="h2">Home highlights</AppText>
               <View style={styles.amenities}>
-                {property.amenities.map((a) => (
+                {(property.amenities ?? []).map((a) => (
                   <View key={a} style={[styles.amenity, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <Ionicons name="checkmark-circle" size={14} color={colors.success} />
                     <AppText variant="caption" weight="semibold">
@@ -438,7 +480,7 @@ export default function PropertyDetails() {
           {/* Neighborhood insights — real scores from /intelligence */}
           {intel?.scores ? (
             <View style={styles.section} testID="neighborhood-scores">
-              <AppText variant="h3">Neighborhood{intel.neighborhood_name ? ` · ${intel.neighborhood_name}` : ""}</AppText>
+              <AppText variant="h2">Neighborhood{intel.neighborhood_name ? ` · ${intel.neighborhood_name}` : ""}</AppText>
               <View style={styles.scoresGrid}>
                 <ScorePill icon="walk" label="Walk" score={Math.round(intel.scores.walk)} />
                 <ScorePill icon="school" label="Schools" score={Math.round(intel.scores.school)} />
@@ -456,7 +498,7 @@ export default function PropertyDetails() {
 
           {property.investment_score != null && (
             <View style={styles.section}>
-              <AppText variant="h3">Investment insight</AppText>
+              <AppText variant="h2">Investment insight</AppText>
               <Card elevation="xs" style={styles.insightCard}>
                 <View style={[styles.scoreCircle, { backgroundColor: colors.surfaceInverse }]}>
                   <AppText variant="h2" color={colors.textInverse} tabular>
@@ -477,29 +519,34 @@ export default function PropertyDetails() {
           )}
 
           <View style={styles.section}>
-            <AppText variant="h3">Location</AppText>
-            <View style={[styles.mapMini, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+            <AppText variant="h2">{hasAccess ? "Location" : "Approximate area"}</AppText>
+            <View style={[styles.mapMini, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]} testID={hasAccess ? "mini-map-exact" : "mini-map-approx"}>
               <MapView
                 style={StyleSheet.absoluteFill}
                 provider={PROVIDER_DEFAULT}
+                mapType="hybrid"
                 pointerEvents="none"
                 initialRegion={{
                   latitude: property.latitude,
                   longitude: property.longitude,
-                  latitudeDelta: 0.02,
-                  longitudeDelta: 0.02,
+                  latitudeDelta: hasAccess ? 0.012 : 0.02,
+                  longitudeDelta: hasAccess ? 0.012 : 0.02,
                 }}
               >
-                <Marker coordinate={{ latitude: property.latitude, longitude: property.longitude }}>
-                  <PropertyMarker property={property} label={formatMarkerPrice(property.price, property.listing_type)} active verified={!!property.verified} />
+                {!hasAccess ? <Circle center={{ latitude: property.latitude, longitude: property.longitude }} radius={160} fillColor="rgba(232,52,52,0.16)" strokeColor="rgba(232,52,52,0.6)" strokeWidth={1.5} /> : null}
+                <Marker coordinate={{ latitude: property.latitude, longitude: property.longitude }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges>
+                  <PhotoMarker pin={miniPin} active muted={false} />
                 </Marker>
               </MapView>
             </View>
+            <AppText variant="bodySm" tone="secondary">
+              {hasAccess ? property.location : `${property.city || property.location} · the pin sits within ~150 m of the home. Unlock to see the exact address.`}
+            </AppText>
           </View>
 
           {property.agent_name && (
             <View style={styles.section}>
-              <AppText variant="h3">Listing agent</AppText>
+              <AppText variant="h2">Listing agent</AppText>
               <Card
                 elevation="xs"
                 onPress={() => property.agent_id && router.push(`/agent/${property.agent_id}` as any)}
@@ -597,7 +644,7 @@ export default function PropertyDetails() {
 
           {similar.length > 0 && (
             <View style={styles.section}>
-              <AppText variant="h3">Nearby homes</AppText>
+              <AppText variant="h2">Nearby homes</AppText>
               <FlatList
                 data={similar}
                 keyExtractor={(p) => p.id}
@@ -773,24 +820,20 @@ function StatusBadge({ status }: { status: Property["status"] }) {
   return <Badge label={cfg.label} tone={cfg.tone} icon={cfg.icon} />;
 }
 
-function SpecCell({ icon, value, label }: { icon: IconName; value: string; label: string }) {
+function SpecInline({ icon, value, unit }: { icon: IconName; value?: number | null; unit: string }) {
   const { colors } = useTheme();
+  if (value == null || Number.isNaN(Number(value)) || Number(value) <= 0) return null;
   return (
-    <View style={styles.specCell} accessibilityLabel={`${value} ${label}`}>
-      <Ionicons name={icon} size={20} color={colors.text} />
-      <AppText variant="h3" tabular>
-        {value}
+    <View style={styles.specInline} accessibilityLabel={`${Number(value).toLocaleString()} ${unit}`}>
+      <Ionicons name={icon} size={18} color={colors.textSecondary} />
+      <AppText tabular style={[styles.specInlineText, { color: colors.text }]}>
+        {Number(value).toLocaleString()}
       </AppText>
-      <AppText variant="micro" tone="tertiary" uppercase>
-        {label}
+      <AppText variant="bodySm" tone="secondary" style={{ fontFamily: "PlusJakartaSans-600" }}>
+        {unit}
       </AppText>
     </View>
   );
-}
-
-function SpecDivider() {
-  const { colors } = useTheme();
-  return <View style={[styles.specDivider, { backgroundColor: colors.border }]} />;
 }
 
 function ScorePill({ icon, label, score }: { icon: IconName; label: string; score: number }) {
@@ -804,7 +847,7 @@ function ScorePill({ icon, label, score }: { icon: IconName; label: string; scor
           {score}
         </AppText>
       </View>
-      <AppText variant="micro" tone="tertiary" uppercase>
+      <AppText variant="micro" tone="tertiary" uppercase numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
         {label}
       </AppText>
       <View style={[styles.scorePillBar, { backgroundColor: colors.surfaceSunken }]}>
@@ -827,29 +870,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  glassBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(17,17,17,0.4)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   photoCounter: {
     position: "absolute",
-    bottom: 44,
+    bottom: 48,
     right: space[4],
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    height: 30,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(17,17,17,0.55)",
+    backgroundColor: "rgba(17,17,17,0.6)",
   },
   dots: {
     position: "absolute",
-    bottom: 48,
+    bottom: 56,
     left: 0,
     right: 0,
     flexDirection: "row",
@@ -858,15 +893,20 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   dot: { height: 6, borderRadius: 3, backgroundColor: "#fff" },
-  heroBadge: { position: "absolute", top: 64, left: space[4] },
+  heroBadge: { position: "absolute", left: space[4], bottom: 48, flexDirection: "row", alignItems: "center", gap: 8 },
   sheet: {
-    marginTop: -32,
+    marginTop: -28,
     borderTopLeftRadius: radii.xxl,
     borderTopRightRadius: radii.xxl,
     padding: space[5],
+    paddingTop: space[5] + 4,
   },
   badgeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  locRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  specsInline: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 14, marginTop: 6 },
+  specInline: { flexDirection: "row", alignItems: "center", gap: 5 },
+  specInlineText: { fontFamily: "PlusJakartaSans-800", fontSize: 18, lineHeight: 22, letterSpacing: -0.3 },
+  bodyCopy: { fontSize: 16, lineHeight: 26 },
+  locRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
   socialRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, padding: 10, borderRadius: radii.md },
   valPill: {
     flexDirection: "row",
@@ -906,16 +946,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     borderWidth: 1,
   },
-  specsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[2],
-    padding: space[4],
-    borderRadius: radii.md,
-    marginTop: space[4],
-  },
-  specCell: { flex: 1, alignItems: "center", gap: 4 },
-  specDivider: { width: StyleSheet.hairlineWidth, height: 36 },
   section: { marginTop: space[7], gap: space[3] },
   amenities: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   amenity: {
@@ -931,7 +961,8 @@ const styles = StyleSheet.create({
   scorePill: {
     flex: 1,
     minWidth: "22%",
-    padding: space[3],
+    paddingVertical: space[3],
+    paddingHorizontal: 10,
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth,
     gap: 4,
@@ -941,7 +972,7 @@ const styles = StyleSheet.create({
   scorePillFill: { height: "100%", borderRadius: 2 },
   insightCard: { flexDirection: "row", alignItems: "center", gap: space[3] },
   scoreCircle: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
-  mapMini: { height: 200, borderRadius: radii.md, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
+  mapMini: { height: 220, borderRadius: radii.lg, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
   agentCard: { flexDirection: "row", alignItems: "center", gap: space[3] },
   ownerNote: {
     flexDirection: "row",

@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 64 retest of the Map/Home/Passport fixes on web preview at 390x844. All 4 retest fixes PASS: (1) a real click on home-search-input focuses it with elementFromPoint, and typed text is readable in light (rgb 17,17,17) and dark (rgb 247,246,243). (2) With a term or an active chip, save-search-btn shows and open-filter-sheet stays fully inside the viewport (x 326-366 of 390) and can be hit-tested. home-search-clear empties the input and reloads markers. (3) Typing 'Lekki' char by char sends exactly 1 /api/map/markers?q=Lekki request, and Enter on the unchanged term sends 0 more. (4) 'Ikoyi' + Enter gives the title '1 home here'. The To Rent chip sends listing_type=rent and shows '1 home here, 0 for sale, 1 to rent'. Tapping it again reloads all markers ('4 homes here'). Regressions PASS: demo pin tap opens the preview tile, preview-open goes to /property/{id}, and back-btn returns home. Cluster tap zooms in (cluster-4 becomes 4 pins). home-tile-save toggles (Save home, Remove from saved, Save home). Locked user: the preview shows 'Unlock · 1,200 MASS' and the UnlockDialog shows a 1,200 fee against a 300 balance. Cancel closed it and the balance is still 300 spendable. The locked Passport has hero-locked-photos, address-approx, locked-banner, mini-map-approx and unlock-cta-btn, and none of the revealed IDs. Broken-cover pins show the fallback icon. No console errors. Backend: 12/12 pytest pass, including no 500s on 20 locked detail ids and no gallery leak. No doc in the DB has `image` set without `images`, so the image-fallback path could not be exercised with real data.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "data hygiene / GET /api/map/markers", "issue": "Still not cleaned up: 73 of the 147 markers sit at the same coordinate (6.4361,3.4739). They are TEST_* listings (TEST_fav, TEST_dash_*, TEST_iso_* ...) created by earlier pytest runs. There is also a stack of 4 'Phase2 Chat Duplex' listings with broken covers at the default Lagos view, so the first thing users see is 4 stacked pins with placeholder icons. Only the top pin can be tapped, and the cluster can never split them."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "UnlockDialog title", "issue": "Copy is still lowercase: 'unlock this home' / 'unlock this provider'. This was flagged in iteration 63 and is not fixed. Reference: /app/frontend/src/ui/UnlockDialog.tsx:153", "testID": "unlock-item-label", "priority": "LOW"},
+      {"component": "Passport hero photo counter", "issue": "The accessibilityLabel reads '1 photos unlock with MASS' (no pluralisation). Reference: /app/frontend/app/property/[id].tsx:322", "testID": "hero-locked-photos", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home (dark mode)", "issues": [
+        "The search placeholder uses colors.textMuted (rgb 92,92,89) on the dark glass (rgba 28,28,26,0.92). That is about 2.7:1 contrast, below 4.5:1. Use textSecondary for the placeholder in dark mode.",
+        "On web, the browser's default white rectangular focus outline shows around the focused TextInput in dark mode. Add outlineStyle:'none' (web) to styles.searchInput.",
+        "The black parts of the AmassLogo mark are nearly invisible on the dark search bar."
+      ]},
+      {"screen": "Home (web stand-in map)", "issues": [
+        "The stand-in backdrop is a world-map Unsplash photo showing Europe/Africa while the pins are in Lagos. It is acceptable for the preview only.",
+        "The 'Satellite imagery renders on mobile' hint (map.web.tsx:61) is at bottom:10 and is hidden behind the bottom sheet and tab bar."
+      ]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_map_passport_redesign.py", "/app/test_reports/pytest/iteration_64.xml", "/app/tests/i64_login.py"],
+  "action_items": [
+    "Delete the TEST_* listings and the 'Phase2 Chat Duplex' duplicates (identical coordinates, broken covers) from the properties collection. Make the related pytest suites clean up after themselves.",
+    "Capitalise the UnlockDialog title ('Unlock this home' / 'Unlock this provider') at UnlockDialog.tsx:153.",
+    "Dark mode search bar: give the placeholder more contrast, add outlineStyle:'none' on web, and add a light variant of the logo mark.",
+    "Optional: pluralise the hero-locked-photos label, and move the web stand-in hint above the sheet."
+  ],
+  "critical_code_review_comments": [
+    "The debounce (index.tsx:257-261) plus commitSearch setting the same searchTerm value correctly avoids a duplicate request on Enter.",
+    "fitToPins only flies when none of the results are in the current view. So after Ikoyi, clearing the search reloads all markers but the map stays on Ikoyi and the title stays '1 home here'. This is acceptable, but worth knowing.",
+    "web Marker (map.web.tsx) drops accessibilityLabel/testID, so clusters could not be targeted on web. I added testID cluster-{count} to ClusterDisc."
+  ],
+  "updated_files": ["/app/frontend/src/components/map/PhotoMarker.tsx (added testID cluster-{count} to ClusterDisc)", "/app/backend/tests/test_map_passport_redesign.py (+3 tests)"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% of requested retest + regression flows; 2 low copy bugs + design nits"},
+  "seed_data_creation": "None. Toggled demo's dark theme and reverted it. Favourite toggled twice (net unchanged). No unlocks confirmed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login helper for browser_automation: exec(open('/app/tests/i64_login.py').read(), g); await g['login'](page, email, pw). Pins are stacked at identical coords, so pick the top pin with elementFromPoint. Clusters have testID cluster-{count}. Zoom buttons have aria-label 'Zoom in'/'Zoom out'. Quick chips have testID filter-chip-{label-kebab} (e.g. filter-chip-to-rent)."
+}

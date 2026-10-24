@@ -1,0 +1,51 @@
+{
+  "summary": "Tested the Map/Home/Property Passport redesign on the backend (new pytest file, 9/9 pass) and on the frontend (web preview at 390x844, demo user plus fixa tester). Backend: logins work. The markers endpoint returns every teaser field. Fixa: 147/147 markers are locked and approx, place is the city only, and coordinates are jittered (they differ from demo's exact ones). Demo: 147/147 unlocked. Locked GET /api/properties/{id} returns approx:true, image_count, at most 1 image, location equal to city, agent_name null, amenities [] and lat/lng EQUAL to the marker's for all 147 properties. Unlocked returns exact coordinates. No 500s in either case. Frontend: there are no MASS/FIX chips in the Home chrome. Chips, FABs, the greeting pill, pins, clusters (zoom-out, then a cluster tap zooms in), the preview tile (View home / Unlock · 1,200 MASS, Approx. location), preview-close, the backdrop deselect, preview-open and home-tile-open to the Passport, and back-btn all work. HomesSheet title/subtitle, home-tile-save toggles (POST /favorites/toggle 200), explore-wider-btn, the To Rent chip (reloads with listing_type=rent, tap again clears), the save-search toast, the FilterSheet, the full locked Passport (hero-locked-photos, address-approx, locked-banner, about-locked-hint, mini-map-approx, unlock-cta-btn 'Unlock for 1,200 MASS · You have 300 MASS') and the UnlockDialog (opened and cancelled from the preview, the sheet tile and the CTA) all work. Only /unlocks/cancel was POSTed and the fixa balance is still 300. Regression: Social/Market (ad dismissed)/Neighbours/Profile load, and Profile still shows the MASS balance 12,642 and 590 FIX. Main bug (WEB): the search bar's background overlay View covers the TextInput, so a real tap cannot focus the input, and the placeholder and typed text are washed out (invisible in dark mode). Other bugs: a markers request fires on every keystroke (no debounce), the filter button overflows off-screen when save-search-btn shows, and searching 'Ikoyi' doesn't move the map, so it shows 'No homes in view'. No deprecated packages and no SafeAreaView issues detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/properties/{id} (locked)", "issue": "first_image uses only doc.images[0], but the marker cover uses doc.image OR images[0]. Docs that have only an 'image' field return images:[] on the locked Passport even though the marker shows a cover. Reference: /app/backend/server.py ~line 581"},
+      {"endpoint": "GET /api/map/markers", "issue": "Data hygiene: 73 markers share the exact coordinate 6.4361,3.4739, 22 share 6.6018,3.3515, and the 4 'Phase2 Chat Duplex' TEST listings share 6.4474,3.4723 with a broken cover https://example.com/img.jpg. 40 markers have no cover. The Home view opens on these 4 stacked test pins with empty photo discs, and the 77-home cluster can never split into pins."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Home search bar", "issue": "WEB: the absoluteFill background View (index.tsx:508, rgba(255,255,255,0.94) / dark 0.92) is position:absolute and the RN-web <input> is position:static, so the overlay is painted ON TOP of the input. elementFromPoint at the input's centre returns the overlay div. A real tap on the search bar does not focus the input (activeElement null), and Playwright click() times out because the overlay intercepts it. Placeholder and typed text are washed out, and fully invisible in dark mode. Fix: add pointerEvents=\"none\" to that overlay View and give the logo/TextInput/buttons position:'relative' and zIndex:1 (or move the colour into searchBar's backgroundColor).", "testID": "home-search-input", "priority": "HIGH"},
+      {"component": "Home search bar", "issue": "When save-search-btn appears (filter or query active), open-filter-sheet is pushed to x=367..407 inside a 390px viewport and gets clipped by overflow:hidden. The TextInput keeps its intrinsic width (~195px) because flex:1 has no minWidth:0. Fix: add minWidth:0 to styles.searchInput. Reference: index.tsx:751", "testID": "open-filter-sheet", "priority": "MEDIUM"},
+      {"component": "UnlockDialog title", "issue": "Title is lowercase: 'unlock this home' / 'unlock this provider'. Reference: src/ui/UnlockDialog.tsx:153", "testID": "unlock-dialog", "priority": "LOW"},
+      {"component": "Map pins / tiles with broken cover URL", "issue": "PhotoMarker, PreviewTile and HomeTile only show the home-icon fallback when cover is falsy. A cover that fails to load (e.g. example.com/img.jpg) leaves an empty grey disc or tile. Add an onError -> fallback state.", "testID": "pin-{id}", "priority": "LOW"},
+      {"component": "Stacked pins at identical coordinates", "issue": "At the default view, 4 pins with the same lat/lng render as separate, perfectly stacked markers. Only the top one can be tapped, and it differs from the first one in the DOM. Consider spiderfying them, or opening the sheet list for identical-coordinate groups.", "testID": "pin-{id}", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Search typing", "issue": "load() depends on `query` and useEffect([load]) runs on every change, so typing 'Lekki' fired 5 /api/map/markers requests, and Enter fires one more (a duplicate). This risks the 90/min rate limit (429 'You're moving fast'). Debounce it, or only load on submit. Reference: index.tsx:196-224", "affected_testIDs": ["home-search-input"]},
+      {"flow": "Search 'Ikoyi' + Enter", "issue": "Markers reload with q=Ikoyi (1 result), but the map region stays where it was, so the sheet shows 'No homes in view'. Fit or recenter the map to the result pins after a query or filter load returns, at least when none of the results are in view. 'To Rent' behaves the same way (2 rentals exist but are outside the view).", "affected_testIDs": ["home-search-input", "homes-sheet-title"]}
+    ],
+    "design_issues": [
+      {"screen": "Property Passport - Neighborhood scores", "issues": ["At 390px wide, the 'SCHOOLS' label wraps to 'SCHOOL S' in its score card. Reduce letter-spacing, add numberOfLines={1} with adjustsFontSizeToFit, or use a 2x2 grid."]},
+      {"screen": "UnlockDialog", "issues": ["The 'Fund Wallet · MASS' primary button label runs to the right edge (clipped or tight) at 390px."]},
+      {"screen": "Locked Passport", "issues": ["The mini-map copy says 'within ~200 m', but markers report approx_radius_m:150. Align the copy."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_map_passport_redesign.py", "/app/test_reports/pytest/pytest_map_passport.xml"],
+  "action_items": [
+    "HIGH (web): Home search bar overlay (index.tsx:508) covers the TextInput. Add pointerEvents=\"none\" to the overlay and position:'relative'/zIndex:1 to the logo, input and buttons, so the input is tappable and the placeholder/typed text are legible (light and dark).",
+    "Add minWidth:0 to styles.searchInput so open-filter-sheet isn't clipped off-screen when save-search-btn is visible.",
+    "Debounce marker reloads on query typing (or load only on onSubmitEditing). Currently 1 request per keystroke plus a duplicate on Enter.",
+    "After a search or filter reload, fit or recenter the map to the returned markers when none are in the current view (Ikoyi search shows 'No homes in view').",
+    "Locked get_property: use doc.image as a fallback for first_image, to match the marker cover.",
+    "Clean up TEST/seed listings with identical coordinates and the example.com cover (the 'Phase2 Chat Duplex' x4 at 6.4474,3.4723 are the first thing users see), and add an onError image fallback in PhotoMarker, PreviewTile and HomeTile.",
+    "Minor: capitalise 'Unlock this home' (UnlockDialog.tsx:153), fix the 'SCHOOLS' wrap in the neighborhood score cards, and align the ~200 m copy with the 150 m radius."
+  ],
+  "critical_code_review_comments": [
+    "index.tsx is 771 lines and property/[id].tsx is 1045 lines, both over 700. Consider extracting the search/filter chrome and the Passport sections into components.",
+    "index.tsx:220-224: the load callback is recreated when the query changes, and the effect auto-fires it, so onSubmitEditing={load} is redundant.",
+    "map.web.tsx Marker uses a web-only onClick on View (ts-ignore). Works on web; fine as a stand-in."
+  ],
+  "updated_files": ["/app/backend/tests/test_map_passport_redesign.py"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "~88% (core map, preview, passport, locked and unlock-dialog flows pass; search input tap, filter-button overflow and search recenter fail)"},
+  "seed_data_creation": "No seed data. A saved search 'rent' was created for demo via the save-search-btn test. Favorite was toggled on and off (net unchanged). No MASS was spent: only /api/unlocks/cancel was called and fixa is still at 300 MASS.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login: on onboarding click 'Sign in' (retry), fill [data-testid=login-email]/[data-testid=login-password], click login-submit-button. Auth response key is access_token (not token). Run the backend tests with EXPO_PUBLIC_BACKEND_URL exported: pytest tests/test_map_passport_redesign.py -n 0. Tabs: tab-index/tab-social/tab-marketplace/tab-neighbours/tab-profile. Clusters have no testID, so select get_by_text('homes', exact=True). The initial view stacks 4 pins at one coordinate, so click locator(P).last. Use page.fill for home-search-input, because click() is intercepted by the overlay bug.",
+  "rca_of_issue": "Search input not tappable on web: in index.tsx:506-520 the searchBar's first child is an absoluteFill tint View. On native, later siblings paint above it. On RN-web, absolutely positioned elements paint above non-positioned (static) siblings, and the <input> rendered by TextInput is position:static, so the tint covers the input and the logo and swallows pointer events. Reproduced via document.elementFromPoint and a real mouse tap at (160,35) leaving activeElement null. Mitigation: pointerEvents='none' on the tint, plus position:'relative'/zIndex on the content."
+}

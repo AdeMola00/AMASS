@@ -859,11 +859,17 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
         if None not in (min_lat, max_lat, min_lng, max_lng):
             query["latitude"] = {"$gte": min_lat, "$lte": max_lat}
             query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
-        docs = await db.properties.find(query, {"_id": 0, "id": 1, "listing_type": 1, "property_type": 1, "latitude": 1, "longitude": 1, "agent_id": 1, "verified": 1, "promotion": 1}).limit(min(limit, 500)).to_list(500)
+        docs = await db.properties.find(query, {"_id": 0, "id": 1, "title": 1, "listing_type": 1, "property_type": 1, "latitude": 1, "longitude": 1, "agent_id": 1, "verified": 1, "promotion": 1,
+                                               "price": 1, "image": 1, "images": 1, "bedrooms": 1, "bathrooms": 1, "size_sqm": 1, "city": 1, "state": 1, "location": 1, "status": 1, "is_amass_exclusive": 1}).limit(min(limit, 500)).to_list(500)
         from promotions import active_promotion as _active_promo
+        from tokens import is_free_amass_sale as _is_free_sale
         ent_ids = {e["target_id"] for e in await db.entitlements.find({"user_id": user["id"], "feature_key": "property", "status": "active"}, {"_id": 0, "target_id": 1}).to_list(2000)}
         # Friend nudges: counts only (friends who share their saves + my shared lists). Never reveals paid data.
         social = await marker_social_context(db, user["id"], [d["id"] for d in docs])
+        # Zone/category fee per marker (same O(1)-per-zone cache as list endpoints) so tiles can say "Unlock · N MASS".
+        lookup = await pricing.zone_lookup()
+        free_flag = bool(cfg.get("free_amass_sale"))
+        fee_cache: dict[tuple[str, str], int] = {}
         out = []
         for d in docs:
             if d.get("latitude") is None or d.get("longitude") is None:
@@ -873,11 +879,25 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
             if not unlocked:
                 lat, lng = _jitter(d["id"], lat, lng)
             s = social.get(d["id"], {})
+            cat = property_category(d)
+            zone = zone_from_lookup(lookup, d.get("location"), d.get("city"), d.get("state"))
+            if (cat, zone) not in fee_cache:
+                fee_cache[(cat, zone)] = int((await pricing.active_price("property", cat, zone))["amount"])
+            is_free = free_flag and _is_free_sale(d)
+            if is_free:
+                unlocked = True
+                lat, lng = d["latitude"], d["longitude"]
             out.append({
-                "id": d["id"], "category": property_category(d), "type": d.get("property_type"), "lat": lat, "lng": lng, "unlocked": unlocked,
+                "id": d["id"], "category": cat, "type": d.get("property_type"), "lat": lat, "lng": lng, "unlocked": unlocked,
                 "verified": bool(d.get("verified")), "approx": not unlocked,
                 "friends_saved": int(s.get("friends_saved", 0)), "in_shared_list": bool(s.get("in_shared_list", False)),
                 "promotion_tier": (_active_promo(d) or {}).get("tier"),
+                # Public teaser tier — identical to what the locked detail preview already shows. Address + agent stay gated.
+                "title": d.get("title"), "price": d.get("price"), "listing_type": d.get("listing_type"),
+                "cover": d.get("image") or (d.get("images") or [None])[0],
+                "bedrooms": d.get("bedrooms"), "bathrooms": d.get("bathrooms"), "size_sqm": d.get("size_sqm"),
+                "city": d.get("city"), "place": d.get("location") if unlocked else d.get("city"),
+                "status": d.get("status", "available"), "access_cost": 0 if is_free else fee_cache[(cat, zone)], "is_free_amass_sale": is_free,
             })
         return {"markers": out, "count": len(out), "approx_radius_m": 150}
 

@@ -326,6 +326,7 @@ from monetization import (
     property_fee,
     annotate_properties,
     UnlockService as _UnlockService,
+    _jitter as approx_location,
 )
 _mon_router, _mon_admin, _unlock_svc, require_fix_access = register_monetization_routes(db, get_current_user, require_admin)
 app.include_router(_mon_router)
@@ -576,28 +577,33 @@ async def get_property(
     annotate_promotion([doc])
 
     if not access_unlocked:
-        # Public preview only — strip premium info + agent identity.
-        first_image = doc["images"][0] if doc.get("images") else None
+        # Public preview only — strip premium info + agent identity. Same approximate pin as /map/markers.
+        gallery = [u for u in (doc.get("images") or []) if u]
+        first_image = doc.get("image") or (gallery[0] if gallery else None)
+        exact_lat, exact_lng = doc.get("latitude"), doc.get("longitude")
+        approx_lat, approx_lng = approx_location(doc["id"], exact_lat, exact_lng) if exact_lat is not None and exact_lng is not None else (exact_lat, exact_lng)
         preview_desc = (doc.get("description") or "")[:120]
         if len(doc.get("description") or "") > 120:
             preview_desc += "…"
         return {
             "id": doc["id"],
-            "title": doc["title"],
+            "title": doc.get("title") or "Home",
             "description": preview_desc,
-            "price": doc["price"],
+            "price": doc.get("price") or 0,
             "currency": doc.get("currency", "NGN"),
-            "listing_type": doc["listing_type"],
-            "property_type": doc["property_type"],
-            "bedrooms": doc["bedrooms"],
+            "listing_type": doc.get("listing_type") or "buy",
+            "property_type": doc.get("property_type") or "residential",
+            "bedrooms": doc.get("bedrooms", 0),
             "bathrooms": doc.get("bathrooms", 0),
             "size_sqm": doc.get("size_sqm", 0),
             "location": doc.get("city", ""),  # City-level only
             "city": doc.get("city", ""),
             "state": doc.get("state", ""),
             "country": doc.get("country", "Nigeria"),
-            "latitude": doc["latitude"],
-            "longitude": doc["longitude"],
+            "latitude": approx_lat,
+            "longitude": approx_lng,
+            "approx": True,
+            "image_count": max(len(gallery), 1 if first_image else 0),
             "images": [first_image] if first_image else [],
             "amenities": [],
             "status": doc.get("status", "available"),

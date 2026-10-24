@@ -1,6 +1,15 @@
+/**
+ * Home — satellite-first discovery. Nearby-first opening (≈2 km around you), picture-rich
+ * property pins, a compact preview tile on tap and a Zillow-style "homes here" sheet.
+ *
+ * Money rules are unchanged: the map + teaser tier (cover, price, specs, city) are free; the
+ * exact address, all photos and the agent unlock through `UnlockDialog` (MASS). Pins for
+ * locked homes sit at an approximate, server-jittered spot.
+ */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, Pressable, TextInput, ScrollView, Platform, Linking, Animated, ActivityIndicator, Image } from "react-native";
 import Reanimated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
+import type BottomSheet from "@gorhom/bottom-sheet";
 import { MapView, Marker, PROVIDER_DEFAULT, Region, IS_MAP_LIMITED_IN_EXPO_GO } from "@/src/lib/map";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,31 +17,34 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { api, MapMarker, Property, UnlockResult } from "@/src/lib/api";
+import { api, UnlockResult } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
 import { useAuth } from "@/src/contexts/auth";
 import { useWallet } from "@/src/contexts/wallet";
 import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, BalanceChip, Button, ILLUSTRATIONS, UnlockDialog, useToast } from "@/src/ui";
+import { AppText, Button, ILLUSTRATIONS, UnlockDialog, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
-import { ClusterMarker } from "@/src/components/PropertyMarker";
 import { FilterChip } from "@/src/components/FilterChip";
 import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
 import { AmassLogo } from "@/src/components/AmassLogo";
-import { TokenIcon } from "@/src/components/TokenIcon";
+import { ClusterDisc, PhotoMarker } from "@/src/components/map/PhotoMarker";
+import { PreviewTile } from "@/src/components/map/PreviewTile";
+import { HomesSheet, SHEET_PEEK, SHEET_PEEK_LOCKED } from "@/src/components/map/HomesSheet";
+import { hasNudge, nudgeText, pinVia, toPin, type Pin } from "@/src/components/map/pins";
 import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 import { track, trackMarkerImpressions } from "@/src/lib/analytics";
 
 const LAST_REGION_KEY = "amass_map_last_region";
-const MAP_LAYER_KEY = "amass_map_layer_v1";
 
 // Lekki Phase 1 — Nigeria's most active market. Delta ~0.014 ≈ zoom 15.
 const DEFAULT_MARKET_REGION: Region = { latitude: 6.4494, longitude: 3.4739, latitudeDelta: 0.014, longitudeDelta: 0.014 };
 const BOOTSTRAP_REGION: Region = { latitude: 6.4494, longitude: 3.4739, latitudeDelta: 0.06, longitudeDelta: 0.06 };
-const DEFAULT_PITCH_DEG = 40;
+/** Nearby-first: ≈2 km across. The user's own streets stay in focus before the city does. */
+const NEARBY_DELTA = 0.018;
+const DEFAULT_PITCH_DEG = 30;
 const zoomFromDelta = (delta: number) => Math.max(0, Math.min(21, Math.log2(360 / Math.max(delta, 0.00005))));
 
 type ChipConf = { key: string; label: string; icon?: IconName; apply: (f: FilterState) => FilterState; isActive: (f: FilterState) => boolean };
@@ -45,36 +57,12 @@ const QUICK_FILTERS: ChipConf[] = [
   { key: "ver", label: "Verified", icon: "shield-checkmark", apply: (f) => ({ ...f, verifiedOnly: !f.verifiedOnly }), isActive: (f) => !!f.verifiedOnly },
 ];
 
-/** Lean marker → minimal Property shape so the cluster index & markers can reuse it. No price/title is ever prefetched. */
-type Pin = Property & { unlocked: boolean; approx: boolean; category: "sale" | "rent"; friendsSaved: number; inSharedList: boolean; boosted: boolean };
-const toPin = (m: MapMarker): Pin =>
-  ({
-    id: m.id,
-    latitude: m.lat,
-    longitude: m.lng,
-    listing_type: m.category === "sale" ? "sale" : "rent",
-    property_type: m.type ?? "property",
-    verified: m.verified,
-    unlocked: m.unlocked,
-    approx: m.approx,
-    category: m.category,
-    friendsSaved: m.friends_saved ?? 0,
-    inSharedList: !!m.in_shared_list,
-    boosted: m.promotion_tier === "boost",
-  }) as unknown as Pin;
-const hasNudge = (p: Pin) => p.friendsSaved > 0 || p.inSharedList;
 const greeting = () => {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 };
-/** Attribution for the conversion funnel: a friend's save beats a shared list beats direct. */
-const pinVia = (p: Pin): "friend" | "collection" | "direct" => (p.friendsSaved > 0 ? "friend" : p.inSharedList ? "collection" : "direct");
-const nudgeText = (p: Pin) => {
-  const parts: string[] = [];
-  if (p.friendsSaved > 0) parts.push(`${p.friendsSaved} friend${p.friendsSaved === 1 ? "" : "s"} saved this`);
-  if (p.inSharedList) parts.push("in one of your shared lists");
-  return parts.join(" · ");
-};
+
+const inRegion = (p: Pin, r: Region) => Math.abs(p.lat - r.latitude) <= r.latitudeDelta / 2 && Math.abs(p.lng - r.longitude) <= r.longitudeDelta / 2;
 
 export default function HomeMap() {
   const { colors, shadows, isDark } = useTheme();
@@ -92,26 +80,35 @@ export default function HomeMap() {
   const searchParams = useLocalSearchParams<{ ai_filters?: string }>();
   const { mass, loading: walletLoading } = useWallet();
   const massBalance = mass?.spendable ?? 0;
-  const locked = !walletLoading && massBalance <= 0;
+  const noMass = !walletLoading && massBalance <= 0;
 
   const mapRef = useRef<MapView>(null);
+  const sheetRef = useRef<BottomSheet>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
   const [filters, setFilters] = useState<FilterState>({});
   const [query, setQuery] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [pins, setPins] = useState<Pin[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [region, setRegion] = useState<Region>(BOOTSTRAP_REGION);
+  const regionRef = useRef<Region>(BOOTSTRAP_REGION);
+  regionRef.current = region;
   const [heading, setHeading] = useState(0);
-  const [mapLayer, setMapLayer] = useState<"hybrid" | "satellite">("hybrid");
   const [showSearchArea, setShowSearchArea] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermission, setLocationPermission] = useState<"unknown" | "granted" | "denied" | "blocked">("unknown");
   const [unlockTarget, setUnlockTarget] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [friendsOnly, setFriendsOnly] = useState(false);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [sheetIndex, setSheetIndex] = useState(0);
+  const [settling, setSettling] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState<Record<string, boolean>>({});
   const initialRegionRef = useRef<Region>(BOOTSTRAP_REGION);
   const introDoneRef = useRef(false);
+  /** True while the map is being driven by code (intro zoom, locate) — region callbacks then never show "Search this area". */
+  const programmaticUntilRef = useRef(0);
   const lastRegionSaveRef = useRef(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -121,24 +118,25 @@ export default function HomeMap() {
       introDoneRef.current = true;
       const startRegion: Region = { ...target, latitudeDelta: Math.max(target.latitudeDelta * 4, 0.05), longitudeDelta: Math.max(target.longitudeDelta * 4, 0.05) };
       initialRegionRef.current = target;
+      programmaticUntilRef.current = Date.now() + 1600;
       setRegion(startRegion);
       mapRef.current?.animateToRegion(startRegion, 60);
       setTimeout(() => {
-        mapRef.current?.animateToRegion(target, 550);
+        mapRef.current?.animateToRegion(target, 650);
         setTimeout(() => {
           if (Platform.OS !== "web") {
             try {
               mapRef.current?.animateCamera({ pitch: DEFAULT_PITCH_DEG, heading: 0 } as any, { duration: 500 });
             } catch {}
           }
-        }, 620);
+        }, 700);
       }, 120);
       Animated.timing(fadeAnim, { toValue: 0, duration: 500, useNativeDriver: Platform.OS !== "web" }).start();
     },
     [fadeAnim]
   );
 
-  // Smart bootstrap: last viewed → default market; then user location if granted.
+  // Nearby-first bootstrap: last viewed → default market; then tighten onto the user's own area when allowed.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -176,9 +174,10 @@ export default function HomeMap() {
         const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
         setUserLocation(coords);
         setLocationPermission("granted");
-        const userTarget: Region = { ...coords, latitudeDelta: 0.012, longitudeDelta: 0.012 };
+        const userTarget: Region = { ...coords, latitudeDelta: NEARBY_DELTA, longitudeDelta: NEARBY_DELTA };
         initialRegionRef.current = userTarget;
-        setTimeout(() => mapRef.current?.animateToRegion(userTarget, 700), 900);
+        programmaticUntilRef.current = Date.now() + 2200;
+        setTimeout(() => mapRef.current?.animateToRegion(userTarget, 800), 900);
       } catch {
         if (!cancelled) setLocationPermission("denied");
       }
@@ -188,33 +187,78 @@ export default function HomeMap() {
     };
   }, [performIntroAnimation]);
 
-  // Markers: authenticated, lean, free. Never prefetches details.
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const params: Record<string, any> = { limit: 400 };
-      if (filters.listingType && filters.listingType !== "land" && filters.listingType !== "commercial") params.listing_type = filters.listingType === "buy" ? "sale" : filters.listingType;
-      if (filters.propertyType) params.property_type = filters.propertyType;
-      if (filters.bedrooms) params.bedrooms = filters.bedrooms;
-      if (filters.minPrice) params.min_price = filters.minPrice;
-      if (filters.maxPrice) params.max_price = filters.maxPrice;
-      if (filters.verifiedOnly) params.verified = true;
-      if (query.trim()) params.q = query.trim();
-      const res = await api.mapMarkers(params);
-      setPins(res.markers.map(toPin));
-      setShowSearchArea(false);
-    } catch (e: any) {
-      setPins([]);
-      setLoadError(e?.status === 429 ? "You're moving fast — give the map a second." : "Couldn't load the map.");
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, query]);
-
+  // Saved homes (hearts) — ids only.
   useEffect(() => {
-    load();
+    api
+      .favoriteIds()
+      .then((r) => setSavedIds(new Set(r.ids)))
+      .catch(() => {});
+  }, []);
+
+  /** Fly to where the loaded homes are when none of them sit in the current viewport (search / filter changes). */
+  const fitToPins = useCallback((list: Pin[]) => {
+    const r = regionRef.current;
+    if (!list.length || list.some((p) => inRegion(p, r))) return;
+    const lats = list.map((p) => p.lat);
+    const lngs = list.map((p) => p.lng);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const next: Region = {
+      latitude: (minLat + maxLat) / 2,
+      longitude: (minLng + maxLng) / 2,
+      latitudeDelta: Math.min(Math.max((maxLat - minLat) * 1.4, 0.012), 1.2),
+      longitudeDelta: Math.min(Math.max((maxLng - minLng) * 1.4, 0.012), 1.2),
+    };
+    initialRegionRef.current = next;
+    programmaticUntilRef.current = Date.now() + 900;
+    mapRef.current?.animateToRegion(next, 600);
+  }, []);
+
+  // Markers: authenticated, lean teaser tier (cover · price · specs · city). Address + agent stay gated.
+  const load = useCallback(
+    async (opts?: { fit?: boolean }) => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const params: Record<string, any> = { limit: 400 };
+        if (filters.listingType && filters.listingType !== "land" && filters.listingType !== "commercial") params.listing_type = filters.listingType === "buy" ? "sale" : filters.listingType;
+        if (filters.propertyType) params.property_type = filters.propertyType;
+        if (filters.bedrooms) params.bedrooms = filters.bedrooms;
+        if (filters.minPrice) params.min_price = filters.minPrice;
+        if (filters.maxPrice) params.max_price = filters.maxPrice;
+        if (filters.verifiedOnly) params.verified = true;
+        if (searchTerm) params.q = searchTerm;
+        const res = await api.mapMarkers(params);
+        const mapped = res.markers.map(toPin);
+        setPins(mapped);
+        setShowSearchArea(false);
+        if (opts?.fit) fitToPins(mapped);
+        // Pins pop in; keep marker views live just long enough for the spring, then freeze them (perf).
+        setSettling(true);
+        setTimeout(() => setSettling(false), 1100);
+      } catch (e: any) {
+        setPins([]);
+        setLoadError(e?.status === 429 ? "You're moving fast — give the map a second." : "Couldn't load the map.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filters, searchTerm, fitToPins]
+  );
+
+  // First load stays nearby-first; later filter / search changes also fly to the results.
+  const firstLoadRef = useRef(true);
+  useEffect(() => {
+    const fit = !firstLoadRef.current;
+    firstLoadRef.current = false;
+    load({ fit });
   }, [load]);
+
+  // Typing is debounced into `searchTerm`; Enter commits immediately.
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(query.trim()), 500);
+    return () => clearTimeout(t);
+  }, [query]);
+  const commitSearch = () => setSearchTerm(query.trim());
 
   // AI search handoff
   useEffect(() => {
@@ -236,27 +280,70 @@ export default function HomeMap() {
 
   const nudgeCount = useMemo(() => pins.filter(hasNudge).length, [pins]);
   const visiblePins = useMemo(() => (friendsOnly ? pins.filter(hasNudge) : pins), [pins, friendsOnly]);
-  const clusterIndex = useMemo(() => buildIndex(visiblePins), [visiblePins]);
+  const clusterIndex = useMemo(() => buildIndex(visiblePins.map((p) => ({ ...p, id: p.id, latitude: p.lat, longitude: p.lng })) as any), [visiblePins]);
   const clusters = useMemo(() => getClusters(clusterIndex, region), [clusterIndex, region]);
   useEffect(() => {
     trackMarkerImpressions(clusters.length);
   }, [clusters]);
+  /** Homes in the current viewport — what the sheet lists. Active pin first, then unlocked, then boosted. */
+  const inView = useMemo(() => {
+    const list = visiblePins.filter((p) => inRegion(p, region));
+    return list.sort((a, b) => (a.id === activeId ? -1 : b.id === activeId ? 1 : Number(b.unlocked) - Number(a.unlocked) || Number(b.boosted) - Number(a.boosted) || Number(b.verified) - Number(a.verified)));
+  }, [visiblePins, region, activeId]);
+  const activePin = useMemo(() => (activeId ? pins.find((p) => p.id === activeId) ?? null : null), [pins, activeId]);
+  const placeLabel = useMemo(() => {
+    const cities = new Map<string, number>();
+    inView.forEach((p) => p.city && cities.set(p.city, (cities.get(p.city) ?? 0) + 1));
+    const top = [...cities.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    return top ?? (query.trim() || "around you");
+  }, [inView, query]);
 
-  const onMarkerPress = (p: Pin) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setActiveId(p.id);
+  const openPin = (p: Pin) => {
     const via = pinVia(p);
-    track("marker_tap", { property_id: p.id, unlocked: p.unlocked, category: p.category, arrived_via: via });
+    router.push(`/property/${p.id}?via=${via}` as any);
+  };
+
+  /** Primary action — unchanged money path: unlocked → open; 0 MASS → Get MASS; else the paid UnlockDialog. */
+  const primaryAction = (p: Pin) => {
+    const via = pinVia(p);
     if (p.unlocked) {
-      router.push(`/property/${p.id}?via=${via}` as any);
+      openPin(p);
       return;
     }
-    if (locked) {
-      toast.show({ kind: "info", title: "Get MASS to unlock details", body: "The map is free — property details need MASS tokens.", actionLabel: "Get MASS", onAction: () => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any) });
+    if (noMass) {
+      toast.show({ kind: "info", title: "Get MASS to unlock details", body: "The map is free — the address, photos and agent need MASS tokens.", actionLabel: "Get MASS", onAction: () => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any) });
       return;
     }
     track("paid_action_start", { property_id: p.id, arrived_via: via });
     setUnlockTarget(p.id);
+  };
+
+  const onMarkerPress = (p: Pin) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setActiveId(p.id);
+    sheetRef.current?.snapToIndex(0);
+    track("marker_tap", { property_id: p.id, unlocked: p.unlocked, category: p.category, arrived_via: pinVia(p) });
+  };
+
+  const setSaved = (id: string, saved: boolean) =>
+    setSavedIds((prev) => {
+      const s = new Set(prev);
+      if (saved) s.add(id);
+      else s.delete(id);
+      return s;
+    });
+
+  const toggleSave = async (p: Pin) => {
+    const next = !savedIds.has(p.id);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setSaved(p.id, next);
+    try {
+      const r = await api.toggleFavorite(p.id);
+      setSaved(p.id, r.favorited);
+    } catch (e: any) {
+      setSaved(p.id, !next);
+      toast.error("Couldn't save", e?.message ?? "Please try again.");
+    }
   };
 
   const onUnlocked = (res: UnlockResult) => {
@@ -282,6 +369,7 @@ export default function HomeMap() {
       storage.setItem(LAST_REGION_KEY, r);
     }
     const ir = initialRegionRef.current;
+    if (now < programmaticUntilRef.current) return;
     const zoomChange = Math.abs(r.latitudeDelta - ir.latitudeDelta) / Math.max(ir.latitudeDelta, 0.001);
     if (Math.abs(r.latitude - ir.latitude) > r.latitudeDelta * 0.35 || Math.abs(r.longitude - ir.longitude) > r.longitudeDelta * 0.35 || zoomChange > 0.5) setShowSearchArea(true);
   };
@@ -296,26 +384,10 @@ export default function HomeMap() {
     setHeading(0);
   };
 
-  useEffect(() => {
-    storage
-      .getItem<"hybrid" | "satellite">(MAP_LAYER_KEY, "hybrid")
-      .then((v) => (v === "satellite" || v === "hybrid") && setMapLayer(v))
-      .catch(() => {});
-  }, []);
-
-  const toggleMapLayer = () => {
-    Haptics.selectionAsync().catch(() => {});
-    setMapLayer((prev) => {
-      const next = prev === "hybrid" ? "satellite" : "hybrid";
-      storage.setItem(MAP_LAYER_KEY, next);
-      return next;
-    });
-  };
-
   const recenter = async () => {
     Haptics.selectionAsync().catch(() => {});
     if (userLocation) {
-      const next = { ...userLocation, latitudeDelta: 0.012, longitudeDelta: 0.012 };
+      const next = { ...userLocation, latitudeDelta: NEARBY_DELTA, longitudeDelta: NEARBY_DELTA };
       initialRegionRef.current = next;
       mapRef.current?.animateToRegion(next, 500);
       setShowSearchArea(false);
@@ -328,7 +400,7 @@ export default function HomeMap() {
         const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
         setUserLocation(coords);
         setLocationPermission("granted");
-        const next = { ...coords, latitudeDelta: 0.012, longitudeDelta: 0.012 };
+        const next = { ...coords, latitudeDelta: NEARBY_DELTA, longitudeDelta: NEARBY_DELTA };
         initialRegionRef.current = next;
         mapRef.current?.animateToRegion(next, 500);
         return;
@@ -341,6 +413,24 @@ export default function HomeMap() {
   const zoomBy = (factor: number) => {
     Haptics.selectionAsync().catch(() => {});
     mapRef.current?.animateToRegion({ ...region, latitudeDelta: Math.max(0.001, region.latitudeDelta * factor), longitudeDelta: Math.max(0.001, region.longitudeDelta * factor) }, 300);
+  };
+
+  /** Widen from the nearby ring to the wider area (≈3.5×) — or to where the loaded homes actually are. */
+  const exploreWider = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    track("explore_wider", { zoom: Math.round(zoomFromDelta(region.latitudeDelta)) });
+    if (!inView.length && visiblePins.length) {
+      const lats = visiblePins.map((p) => p.lat);
+      const lngs = visiblePins.map((p) => p.lng);
+      const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+      const next: Region = { latitude: (minLat + maxLat) / 2, longitude: (minLng + maxLng) / 2, latitudeDelta: Math.max((maxLat - minLat) * 1.4, 0.02), longitudeDelta: Math.max((maxLng - minLng) * 1.4, 0.02) };
+      initialRegionRef.current = next;
+      mapRef.current?.animateToRegion(next, 600);
+      return;
+    }
+    const next: Region = { ...region, latitudeDelta: Math.min(region.latitudeDelta * 3.5, 1.2), longitudeDelta: Math.min(region.longitudeDelta * 3.5, 1.2) };
+    initialRegionRef.current = next;
+    mapRef.current?.animateToRegion(next, 600);
   };
 
   const activeQuickFilterCount = useMemo(() => Object.values(filters).filter((v) => v !== undefined && v !== null && v !== false && v !== "").length, [filters]);
@@ -377,10 +467,11 @@ export default function HomeMap() {
 
   const zoomLevel = zoomFromDelta(region.latitudeDelta);
   const searchTop = insets.top + 6;
-  const bottomStack = 66 + Math.max(insets.bottom, 12) + 14;
-  const saleCount = visiblePins.filter((p) => p.category === "sale").length;
-  const rentCount = visiblePins.length - saleCount;
+  const tabBarH = 64 + Math.max(insets.bottom, 10);
+  const peek = noMass ? SHEET_PEEK_LOCKED : SHEET_PEEK;
   const unlockPin = unlockTarget ? pins.find((p) => p.id === unlockTarget) : undefined;
+  const showPreview = !!activePin && sheetIndex === 0;
+  const showExploreWider = !loading && !loadError && zoomLevel >= 14 && inView.length < 4 && visiblePins.length > inView.length;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]} testID="home-map-screen">
@@ -388,7 +479,7 @@ export default function HomeMap() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_DEFAULT}
-        mapType={mapLayer}
+        mapType="hybrid"
         initialRegion={BOOTSTRAP_REGION}
         showsCompass={false}
         showsMyLocationButton={false}
@@ -401,6 +492,7 @@ export default function HomeMap() {
         rotateEnabled
         toolbarEnabled={false}
         onRegionChangeComplete={onRegionChangeComplete}
+        onPress={() => setActiveId(null)}
       >
         {clusters.map((c: any) => {
           if (c.properties?.cluster) {
@@ -417,24 +509,26 @@ export default function HomeMap() {
                   const d = 360 / Math.pow(2, Math.max(zoom, 8));
                   mapRef.current?.animateToRegion({ latitude: lat, longitude: lng, latitudeDelta: d, longitudeDelta: d }, 380);
                 }}
+                anchor={{ x: 0.5, y: 0.5 }}
                 tracksViewChanges={false}
               >
-                <ClusterMarker count={count} />
+                <ClusterDisc count={count} />
               </Marker>
             );
           }
           const p = c.properties.property as Pin;
+          const active = p.id === activeId;
           return (
             <Marker
               key={p.id}
-              coordinate={{ latitude: p.latitude, longitude: p.longitude }}
-              accessibilityLabel={`${p.category === "sale" ? "For sale" : "To rent"} ${p.property_type}. ${hasNudge(p) ? `${nudgeText(p)}. ` : ""}${p.unlocked ? "Unlocked — tap to view." : locked ? "Locked — get MASS to unlock." : "Tap to unlock details."}`}
+              coordinate={{ latitude: p.lat, longitude: p.lng }}
+              accessibilityLabel={`${p.category === "sale" ? "For sale" : "To rent"} ${p.type ?? "home"}${p.price ? `, ${p.price.toLocaleString()} naira` : ""}. ${hasNudge(p) ? `${nudgeText(p)}. ` : ""}${p.unlocked ? "Unlocked — tap to preview." : "Approximate location — tap to preview."}`}
               onPress={() => onMarkerPress(p)}
-              anchor={{ x: 0.5, y: 1 }}
-              tracksViewChanges={Platform.OS === "android" || p.id === activeId}
-              zIndex={p.id === activeId ? 10 : 3}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={settling || active || (!!p.cover && !imgLoaded[p.id])}
+              zIndex={active ? 20 : p.boosted ? 6 : p.unlocked ? 4 : 3}
             >
-              <PinMarker pin={p} muted={locked && !p.unlocked} active={p.id === activeId} />
+              <PhotoMarker pin={p} active={active} muted={noMass && !p.unlocked} animate={settling} onImageLoad={() => setImgLoaded((m) => (m[p.id] ? m : { ...m, [p.id]: true }))} testID={p.boosted ? `pin-boosted-${p.id}` : `pin-${p.id}`} />
             </Marker>
           );
         })}
@@ -442,23 +536,46 @@ export default function HomeMap() {
 
       {/* Floating glass search + filters */}
       <View style={[styles.topOverlay, { top: searchTop }]} pointerEvents="box-none">
-        <View style={[styles.searchBar, shadows.md]}>
-          {Platform.OS !== "web" ? <BlurView intensity={85} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : null}
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(28,28,26,0.9)" : "rgba(255,255,255,0.88)" }]} />
-          <AmassLogo size={22} showWordmark={false} style={{ marginLeft: -2 }} />
+        <View style={[styles.searchBar, shadows.lg]}>
+          {Platform.OS !== "web" ? <BlurView intensity={90} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} pointerEvents="none" /> : null}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(28,28,26,0.92)" : "rgba(255,255,255,0.94)" }]} pointerEvents="none" />
+          <AmassLogo size={24} showWordmark={false} style={{ marginLeft: -2, zIndex: 1 }} />
           <TextInput
-            placeholder="Search city, area or landmark"
-            placeholderTextColor={colors.textMuted}
-            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search area, estate or landmark"
+            placeholderTextColor={colors.textSecondary}
+            style={[styles.searchInput, { color: colors.text }, Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null]}
             value={query}
             onChangeText={setQuery}
-            onSubmitEditing={load}
+            onSubmitEditing={commitSearch}
             returnKeyType="search"
             accessibilityLabel="Search by city, neighborhood or landmark"
             testID="home-search-input"
           />
+          {query.trim() ? (
+            <Pressable
+              onPress={() => {
+                setQuery("");
+                setSearchTerm("");
+              }}
+              style={styles.clearBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              testID="home-search-clear"
+            >
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            </Pressable>
+          ) : null}
+          {query.trim() || activeQuickFilterCount > 0 ? (
+            <Pressable onPress={saveCurrentSearch} style={[styles.iconBtn, { backgroundColor: colors.surfaceAlt }]} hitSlop={6} accessibilityRole="button" accessibilityLabel="Save this search" testID="save-search-btn">
+              <Ionicons name="bookmark" size={16} color={colors.text} />
+            </Pressable>
+          ) : null}
+          <Pressable onPress={() => router.push("/ai-search")} style={[styles.iconBtn, { backgroundColor: colors.brand }]} testID="home-ai-btn" accessibilityRole="button" accessibilityLabel="AI-powered search">
+            <Ionicons name="sparkles" size={16} color="#fff" />
+          </Pressable>
           <Pressable onPress={() => filterSheetRef.current?.open()} style={[styles.iconBtn, { backgroundColor: colors.primary }]} testID="open-filter-sheet" accessibilityRole="button" accessibilityLabel="Open filters">
-            <Ionicons name="options" size={16} color={colors.onPrimary} />
+            <Ionicons name="options" size={17} color={colors.onPrimary} />
             {activeQuickFilterCount > 0 ? (
               <View style={[styles.filterDot, { backgroundColor: colors.brand, borderColor: colors.surface }]}>
                 <AppText variant="micro" color="#fff" tabular>
@@ -467,19 +584,11 @@ export default function HomeMap() {
               </View>
             ) : null}
           </Pressable>
-          <Pressable onPress={() => router.push("/ai-search")} style={[styles.iconBtn, { backgroundColor: colors.brand }]} testID="home-ai-btn" accessibilityRole="button" accessibilityLabel="AI-powered search">
-            <Ionicons name="sparkles" size={14} color="#fff" />
-          </Pressable>
-          {query.trim() || activeQuickFilterCount > 0 ? (
-            <Pressable onPress={saveCurrentSearch} style={[styles.iconBtn, { backgroundColor: colors.surfaceAlt }]} hitSlop={6} accessibilityRole="button" accessibilityLabel="Save this search" testID="save-search-btn">
-              <Ionicons name="bookmark" size={15} color={colors.text} />
-            </Pressable>
-          ) : null}
         </View>
-        <View style={styles.chipsRowWrap}>
-          <View style={[styles.chipsGlass, shadows.sm]}>
-            {Platform.OS !== "web" ? <BlurView intensity={70} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.glass }]} />}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow} style={{ flex: 1 }}>
+        <View style={[styles.chipsGlass, shadows.md]}>
+          {Platform.OS !== "web" ? <BlurView intensity={80} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} pointerEvents="none" /> : null}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(28,28,26,0.82)" : "rgba(255,255,255,0.86)" }]} pointerEvents="none" />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow} style={{ flex: 1, zIndex: 1 }}>
             {QUICK_FILTERS.map((f) => (
               <FilterChip
                 key={f.key}
@@ -504,42 +613,44 @@ export default function HomeMap() {
               />
             ) : null}
           </ScrollView>
-          </View>
-          <BalanceChip compact style={styles.balanceChip} testID="map-balance-chip" />
         </View>
         {greet && user ? (
           <Reanimated.View entering={FadeInDown.delay(400).duration(300)} exiting={FadeOutUp.duration(250)} style={styles.greetRow} pointerEvents="none" testID="home-greeting">
-            <View style={[styles.greetPill, shadows.sm, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.92)" }]}>
-              <Image source={ILLUSTRATIONS["mascot-wave"]} style={{ width: 28, height: 28 }} resizeMode="contain" />
-              <AppText variant="caption">
-                {greeting()}, {firstName} 👋
-              </AppText>
+            <View style={[styles.greetPill, shadows.md, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.94)" }]}>
+              <Image source={ILLUSTRATIONS["mascot-wave"]} style={{ width: 30, height: 30 }} resizeMode="contain" />
+              <View>
+                <AppText variant="caption" style={{ fontFamily: "PlusJakartaSans-700" }}>
+                  {greeting()}, {firstName} 👋
+                </AppText>
+                <AppText variant="micro" tone="tertiary">
+                  {locationPermission === "granted" ? "Showing homes around you" : "Showing the busiest market near you"}
+                </AppText>
+              </View>
             </View>
           </Reanimated.View>
         ) : null}
       </View>
 
       {Math.abs(heading) > 2 ? (
-        <View style={[styles.compassWrap, { top: searchTop + 96 }]} pointerEvents="box-none">
+        <View style={[styles.compassWrap, { top: searchTop + 118 }]} pointerEvents="box-none">
           <ActionBtn icon="compass" onPress={resetNorth} testID="fab-compass" label="Reset map to face north" iconRotation={-heading} />
         </View>
       ) : null}
 
-      <View style={[styles.rightActions, { top: searchTop + 150 }]} pointerEvents="box-none">
-        <ActionBtn icon="layers" onPress={toggleMapLayer} testID="fab-map-layer" highlight={mapLayer === "hybrid"} label={mapLayer === "hybrid" ? "Hide street labels" : "Show street labels"} />
-        <ActionBtn icon="locate" onPress={recenter} testID="fab-locate" label="Center map on my location" />
+      <View style={[styles.rightActions, { top: searchTop + 172 }]} pointerEvents="box-none">
+        <ActionBtn icon="locate" onPress={recenter} testID="fab-locate" label="Center map on my location" highlight={locationPermission === "granted"} />
         <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" label="Zoom in" />
         <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" label="Zoom out" />
       </View>
 
       {/* Centered status: loading / error / empty */}
       {loading || loadError || pins.length === 0 ? (
-        <View style={styles.mapStatusWrap} pointerEvents="box-none">
+        <View style={[styles.mapStatusWrap, { paddingBottom: peek + tabBarH }]} pointerEvents="box-none">
           {loading ? (
-            <View style={[styles.statusPill, shadows.md, { backgroundColor: colors.glass }]} testID="map-status-loading">
+            <View style={[styles.statusPill, shadows.md, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.94)" }]} testID="map-status-loading">
               <ActivityIndicator size="small" color={colors.text} />
-              <AppText variant="caption" weight="semibold">
-                Finding homes…
+              <AppText variant="caption" weight="bold">
+                Finding homes near you…
               </AppText>
             </View>
           ) : loadError ? (
@@ -549,7 +660,7 @@ export default function HomeMap() {
               <AppText variant="caption" tone="secondary" align="center">
                 Check your connection and try again.
               </AppText>
-              <Button label="Retry" size="sm" iconLeft="refresh" onPress={load} testID="map-retry-btn" />
+              <Button label="Retry" size="sm" iconLeft="refresh" onPress={() => load()} testID="map-retry-btn" />
             </View>
           ) : (
             <View style={[styles.statusCard, shadows.md, { backgroundColor: colors.bgElevated }]} testID="map-status-empty">
@@ -577,7 +688,7 @@ export default function HomeMap() {
       ) : null}
 
       {showSearchArea && !loading ? (
-        <View style={[styles.searchAreaWrap, { top: searchTop + 138 }]} pointerEvents="box-none">
+        <View style={[styles.searchAreaWrap, { top: searchTop + (greet && user ? 186 : 128) }]} pointerEvents="box-none">
           <SearchThisArea
             onPress={() => {
               initialRegionRef.current = region;
@@ -589,16 +700,16 @@ export default function HomeMap() {
       ) : null}
 
       {IS_MAP_LIMITED_IN_EXPO_GO ? (
-        <View style={[styles.expoGoHint, { top: searchTop + 100 }]} pointerEvents="none" testID="expo-go-map-hint">
+        <View style={[styles.expoGoHint, { top: searchTop + 122 }]} pointerEvents="none" testID="expo-go-map-hint">
           <Ionicons name="information-circle" size={14} color="#fff" />
           <AppText variant="micro" color="#fff">
-            Google Maps activates in the dev / production build.
+            Satellite imagery activates in the dev / production build.
           </AppText>
         </View>
       ) : null}
 
       {locationPermission === "blocked" ? (
-        <View style={[styles.permBanner, shadows.md, { top: searchTop + 150, backgroundColor: colors.bgElevated, borderColor: colors.border }]} testID="location-perm-banner">
+        <View style={[styles.permBanner, shadows.md, { top: searchTop + 172, backgroundColor: colors.bgElevated, borderColor: colors.border }]} testID="location-perm-banner">
           <View style={[styles.permIcon, { backgroundColor: colors.brand }]}>
             <Ionicons name="location" size={16} color="#fff" />
           </View>
@@ -614,64 +725,46 @@ export default function HomeMap() {
         </View>
       ) : null}
 
-      {/* Bottom stack: legend + locked banner */}
-      <View style={[styles.bottomStack, { bottom: bottomStack }]} pointerEvents="box-none">
-        {!loading && pins.length > 0 ? (
-          <View style={[styles.legend, shadows.sm, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.9)" }]} testID="map-legend" accessibilityLabel={`${saleCount} for sale, ${rentCount} to rent in view`}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-              <AppText variant="micro" weight="bold" tabular>
-                {saleCount} sale
+      {/* Above the sheet: Explore wider pill · compact preview tile */}
+      <View style={[styles.aboveSheet, { bottom: tabBarH + peek + 12 }]} pointerEvents="box-none">
+        {showExploreWider && !showPreview ? (
+          <Reanimated.View entering={FadeInDown.duration(220)} exiting={FadeOutUp.duration(160)} style={{ alignItems: "center" }}>
+            <Pressable onPress={exploreWider} style={[styles.widerPill, shadows.lg, { backgroundColor: colors.surfaceInverse }]} accessibilityRole="button" accessibilityLabel="Explore a wider area" testID="explore-wider-pill">
+              <Ionicons name="expand-outline" size={16} color={colors.textInverse} />
+              <AppText variant="caption" color={colors.textInverse} style={{ fontFamily: "PlusJakartaSans-700" }}>
+                {inView.length ? `Only ${inView.length} nearby · Explore wider` : "Explore wider"}
               </AppText>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: colors.info }]} />
-              <AppText variant="micro" weight="bold" tabular>
-                {rentCount} rent
-              </AppText>
-            </View>
-            {nudgeCount > 0 ? (
-              <View style={styles.legendItem} testID="map-legend-friends">
-                <Ionicons name="people" size={11} color={colors.brand} />
-                <AppText variant="micro" weight="bold" color={colors.brand} tabular>
-                  {nudgeCount} by friends
-                </AppText>
-              </View>
-            ) : null}
-            {zoomLevel < 12 ? (
-              <AppText variant="micro" tone="tertiary">
-                Zoom in for pins
-              </AppText>
-            ) : (
-              <View style={styles.legendItem}>
-                <Ionicons name="lock-open-outline" size={11} color={colors.success} />
-                <AppText variant="micro" tone="secondary">
-                  unlocked
-                </AppText>
-              </View>
-            )}
-          </View>
+            </Pressable>
+          </Reanimated.View>
         ) : null}
-        {locked ? (
-          <View style={[styles.lockedBanner, shadows.lg, { backgroundColor: colors.surfaceInverse }]} testID="get-mass-banner" accessibilityRole="summary">
-            <View style={[styles.lockedIcon, { backgroundColor: colors.massSoft }]}>
-              <TokenIcon size={24} animated />
-            </View>
-            <View style={{ flex: 1 }}>
-              <AppText variant="title" color={colors.textInverse}>
-                Unlock homes with MASS
-              </AppText>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-                <Ionicons name="lock-closed" size={12} color={colors.mass} />
-                <AppText variant="caption" color={colors.textInverse} style={{ opacity: 0.75 }} tabular>
-                  0 MASS
-                </AppText>
-              </View>
-            </View>
-            <Button label="Get MASS" variant="premium" size="sm" iconLeft="add" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="get-mass-btn" />
-          </View>
+        {showPreview && activePin ? (
+          <PreviewTile pin={activePin} saved={savedIds.has(activePin.id)} noMass={noMass} onOpen={() => openPin(activePin)} onPrimary={() => primaryAction(activePin)} onSave={() => toggleSave(activePin)} onClose={() => setActiveId(null)} />
         ) : null}
       </View>
+
+      <HomesSheet
+        ref={sheetRef}
+        pins={inView}
+        totalLoaded={visiblePins.length}
+        loading={loading}
+        activeId={activeId}
+        savedIds={savedIds}
+        noMass={noMass}
+        placeLabel={placeLabel}
+        bottomInset={tabBarH}
+        onChange={(i) => {
+          setSheetIndex(i);
+          if (i > 0) setActiveId(null);
+        }}
+        onOpen={openPin}
+        onPrimary={primaryAction}
+        onSave={toggleSave}
+        onGetMass={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)}
+        onExploreWider={() => {
+          sheetRef.current?.snapToIndex(0);
+          exploreWider();
+        }}
+      />
 
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg, opacity: fadeAnim, zIndex: 5 }]} testID="map-fade-curtain" />
 
@@ -690,45 +783,11 @@ export default function HomeMap() {
   );
 }
 
-/** Category pin — never shows price or title before unlock. A small people badge marks homes friends saved / shared lists hold. */
-function PinMarker({ pin, muted, active }: { pin: Pin; muted: boolean; active: boolean }) {
-  const { colors } = useTheme();
-  const sale = pin.category === "sale";
-  const fill = pin.unlocked ? colors.success : muted ? colors.borderStrong : sale ? colors.primary : colors.info;
-  const fg = muted ? colors.textSecondary : pin.unlocked || !sale ? "#fff" : colors.onPrimary;
-  const icon: IconName = pin.unlocked ? "lock-open" : muted ? "lock-closed" : sale ? "home" : "key";
-  const nudge = hasNudge(pin);
-  const boosted = pin.boosted && !muted;
-  return (
-    <View style={styles.pinWrap} testID={boosted ? `pin-boosted-${pin.id}` : `pin-${pin.id}`}>
-      <View style={[styles.pin, { backgroundColor: fill, borderColor: active ? colors.brand : boosted ? colors.mass : nudge ? colors.brand : "rgba(255,255,255,0.85)", borderWidth: boosted ? 2.5 : 2, transform: [{ scale: active ? 1.12 : boosted ? 1.06 : 1 }], opacity: muted ? 0.75 : 1 }]}>
-        {boosted ? <Ionicons name="rocket" size={11} color={colors.mass} /> : null}
-        <Ionicons name={icon} size={12} color={fg} />
-        <AppText variant="micro" color={fg} weight="extrabold">
-          {sale ? "Sale" : "Rent"}
-        </AppText>
-        {pin.verified && !muted ? <Ionicons name="shield-checkmark" size={11} color={fg} /> : null}
-      </View>
-      {nudge ? (
-        <View style={[styles.pinNudge, { backgroundColor: colors.brand, borderColor: "#fff" }]} testID={`pin-nudge-${pin.id}`}>
-          <Ionicons name="people" size={9} color="#fff" />
-          {pin.friendsSaved > 0 ? (
-            <AppText variant="micro" color="#fff" weight="extrabold" style={{ fontSize: 9, lineHeight: 11 }} tabular>
-              {pin.friendsSaved}
-            </AppText>
-          ) : null}
-        </View>
-      ) : null}
-      <View style={[styles.pinTail, { borderTopColor: fill }]} />
-    </View>
-  );
-}
-
 function ActionBtn({ icon, onPress, testID, highlight = false, label, iconRotation }: { icon: IconName; onPress: () => void; testID?: string; highlight?: boolean; label?: string; iconRotation?: number }) {
-  const { colors, shadows } = useTheme();
+  const { colors, shadows, isDark } = useTheme();
   return (
-    <Pressable onPress={onPress} style={[styles.actionBtn, shadows.md, { backgroundColor: highlight ? colors.primary : colors.bgElevated }]} testID={testID} accessibilityRole="button" accessibilityLabel={label} hitSlop={6}>
-      <Ionicons name={icon} size={19} color={highlight ? colors.onPrimary : colors.text} style={iconRotation != null ? { transform: [{ rotate: `${iconRotation}deg` }] } : undefined} />
+    <Pressable onPress={onPress} style={[styles.actionBtn, shadows.lg, { backgroundColor: highlight ? colors.primary : isDark ? colors.bgElevated : "#FFFFFF" }]} testID={testID} accessibilityRole="button" accessibilityLabel={label} hitSlop={6}>
+      <Ionicons name={icon} size={21} color={highlight ? colors.onPrimary : colors.text} style={iconRotation != null ? { transform: [{ rotate: `${iconRotation}deg` }] } : undefined} />
     </Pressable>
   );
 }
@@ -736,35 +795,26 @@ function ActionBtn({ icon, onPress, testID, highlight = false, label, iconRotati
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topOverlay: { position: "absolute", left: space[3], right: space[3], gap: 10 },
-  searchBar: { flexDirection: "row", alignItems: "center", gap: 8, height: 54, paddingHorizontal: 12, borderRadius: radii.pill, overflow: "hidden" },
-  searchInput: { flex: 1, fontSize: 15, fontFamily: "PlusJakartaSans-500", paddingVertical: 0 },
-  iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  searchBar: { flexDirection: "row", alignItems: "center", gap: 8, height: 58, paddingHorizontal: 12, borderRadius: radii.pill, overflow: "hidden" },
+  searchInput: { flex: 1, minWidth: 0, fontSize: 16, fontFamily: "PlusJakartaSans-600", paddingVertical: 0, zIndex: 1 },
+  clearBtn: { width: 28, height: 40, alignItems: "center", justifyContent: "center", marginLeft: -6, zIndex: 1 },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", zIndex: 1 },
   filterDot: { position: "absolute", top: -3, right: -3, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: "center", justifyContent: "center", borderWidth: 2 },
-  chipsRowWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
   greetRow: { flexDirection: "row", justifyContent: "flex-start" },
-  greetPill: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 14, height: 40, borderRadius: radii.pill },
-  chipsGlass: { flex: 1, borderRadius: radii.pill, overflow: "hidden", paddingVertical: 5, paddingHorizontal: 5 },
+  greetPill: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 14, height: 48, borderRadius: radii.pill },
+  chipsGlass: { borderRadius: radii.pill, overflow: "hidden", paddingVertical: 5, paddingHorizontal: 5 },
   chipsRow: { gap: 6, paddingRight: 4 },
-  balanceChip: { flexShrink: 0 },
   compassWrap: { position: "absolute", right: space[3] },
   rightActions: { position: "absolute", right: space[3], gap: 10 },
-  actionBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  actionBtn: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
   mapStatusWrap: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", paddingHorizontal: space[6] },
-  statusPill: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, height: 44, borderRadius: radii.pill },
+  statusPill: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, height: 46, borderRadius: radii.pill },
   statusCard: { alignItems: "center", gap: 8, padding: space[5], borderRadius: radii.lg, maxWidth: 320 },
   searchAreaWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   expoGoHint: { position: "absolute", left: space[3], flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(17,17,17,0.72)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill },
   permBanner: { position: "absolute", left: space[3], right: 72, flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth },
   permIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  bottomStack: { position: "absolute", left: space[3], right: space[3], gap: 10, alignItems: "flex-start" },
-  legend: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, height: 34, borderRadius: radii.pill },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  lockedBanner: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radii.lg },
-  lockedIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  pinWrap: { alignItems: "center", paddingTop: 6, paddingHorizontal: 6 },
-  pin: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, height: 28, borderRadius: radii.pill, borderWidth: 2 },
-  pinNudge: { position: "absolute", top: 0, right: 0, flexDirection: "row", alignItems: "center", gap: 2, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, borderWidth: 1.5 },
+  aboveSheet: { position: "absolute", left: space[3], right: space[3], gap: 10 },
+  widerPill: { flexDirection: "row", alignItems: "center", gap: 8, height: 44, paddingHorizontal: 18, borderRadius: radii.pill },
   nudge: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: radii.sm, marginTop: space[3] },
-  pinTail: { width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 6, borderLeftColor: "transparent", borderRightColor: "transparent", marginTop: -1 },
 });

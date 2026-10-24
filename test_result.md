@@ -909,3 +909,40 @@ agent_communication:
       Compose success toast now says "N neighbours following X got a nudge" when alerted>0.
       Notification preferences now lists the "Free items nearby" category (prefs-cat-nearby_free, with Instant/Daily/Weekly).
       Demo demo@amass.africa / amass2026 (member of Lekki Gardens Phase 2; currently follows furniture + kitchen from smoke test).
+  - agent: "main"
+    message: |
+      MAP / HOME / PROPERTY PASSPORT REDESIGN — first test pass. Home tab (tabs)/index.tsx rebuilt: satellite ("hybrid") map,
+      nearby-first open (~2 km), picture-rich PhotoMarker pins (disc photo + price pill; locked = blurred + gold lock, approx
+      location), ClusterDisc (tap zooms in), compact PreviewTile docked above the sheet on marker tap, Zillow-style HomesSheet
+      (@gorhom/bottom-sheet; header "N homes here", HomeTile photo-led cards). MASS/FIX balance chips REMOVED from Home chrome
+      only (wallet logic untouched; "Get MASS" banner still appears when the viewer has 0 MASS). Money path unchanged:
+      locked → "Unlock · N MASS" → UnlockDialog (ChargeConfirm) → /property/{id}; 0 MASS → "Get MASS" → /buy-tokens.
+      Backend: GET /api/map/markers now returns teaser fields (title, price, listing_type, cover, bedrooms, bathrooms, size_sqm,
+      city, place, status, access_cost, is_free_amass_sale). GET /api/properties/{id} locked preview now returns the SAME
+      jittered approximate lat/lng as the marker (+ approx:true, image_count) and tolerates docs missing bedrooms/title (was 500).
+      Web stand-in map (src/lib/map.web.tsx) now projects markers by lat/lng into the current region so pins/clusters sit on the
+      map in the browser; zoom FABs (fab-zoom-in/out), fab-locate, backdrop tap (web-map-backdrop) deselects.
+      testIDs — Home: home-map-screen, home-search-input, open-filter-sheet, home-ai-btn, save-search-btn, fab-locate,
+      fab-zoom-in, fab-zoom-out, pin-{id} / pin-boosted-{id}, preview-tile-{id}, preview-open-{id} (→ detail), preview-primary-{id}
+      (View home / Unlock · N MASS / Get MASS to unlock), preview-save-{id}, preview-close, homes-sheet-header, homes-sheet-title,
+      homes-sheet-list, home-tile-{id}, home-tile-open-{id}, home-tile-primary-{id}, home-tile-save-{id}, home-tile-heart-{id},
+      explore-wider-btn / explore-wider-pill, get-mass-banner + get-mass-btn (0-MASS viewers only), map-status-loading/error/empty,
+      map-clear-filters-btn. Greeting pill home-greeting shows ~6 s. NOTE: on web the bottom sheet cannot be dragged; tiles are
+      still in the DOM (scroll inside homes-sheet-list) — opening the sheet by drag is native-only.
+      Property Passport /property/[id]: taller photo hero (~58% screen), frosted circle buttons (back-btn, add-to-list-btn,
+      share-btn, fav-btn), hero-kind-label, hero-locked-photos ("+N photos · unlock") when locked, 44px price, bold inline
+      specs (specs-inline), address-revealed / address-approx, locked-banner, about-locked-hint, section headings h2,
+      mini map mini-map-exact / mini-map-approx (approx = ~200 m circle + locked pin), sticky unlock-cta-btn unchanged.
+      Accounts: demo@amass.africa / amass2026 (owns/unlocked everything → all pins unlocked, "View home");
+      fixa.tester+15339@amass.africa / Fixa2026! (300 MASS welcome bonus, nothing unlocked → locked pins, "Unlock · 1,200 MASS").
+      Do NOT actually confirm a paid unlock on the fixa tester unless needed (it spends MASS); if you do, note the charge.
+  - agent: "main"
+    message: |
+      REDESIGN — fixes after iteration_63: (1) search bar tint overlays are pointerEvents=none + input/buttons zIndex 1 → input
+      focusable, text visible (light+dark); (2) searchInput minWidth:0 → filter button no longer clipped when the bookmark shows;
+      new clear button home-search-clear; (3) typing is debounced 500 ms into the marker request, Enter commits once (no duplicate);
+      (4) after a search / filter change the map flies to the results when none are in view (fitToPins) — first load stays
+      nearby-first. Minor: image onError fallback icon on PhotoMarker / PreviewTile / HomeTile; locked detail uses `image` field
+      as cover + image_count; ScorePill label no longer wraps; copy says ~150 m; UnlockDialog fund button label "Get MASS".
+      Retest only: search input focus/typing (1 request per pause), Enter, clear, filter chips flying to results, filter button
+      visible with bookmark, dark mode search text; quick regression on pin → preview → passport (demo) and locked flow (fixa tester).

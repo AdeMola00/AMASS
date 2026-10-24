@@ -217,7 +217,7 @@ export function UnlockDialog({
                 testID="unlock-confirm"
               />
             ) : (
-              <Button label={`Fund Wallet · ${currency}`} variant="premium" size="lg" iconLeft="add-circle" onPress={fund} style={{ flex: 1.4 }} testID="unlock-fund" />
+              <Button label={`Get ${currency}`} variant="premium" size="lg" iconLeft="add-circle" onPress={fund} style={{ flex: 1.4 }} testID="unlock-fund" />
             )}
           </View>
         </>

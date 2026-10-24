@@ -1,132 +1,38 @@
 {
   "app_name": "Amass",
-  "personality": "3 Editorial structure with 1 iOS-Native Clean utility",
-  "personality_one_liner": "Warm, premium, photo-led real estate marketplace with editorial elegance and ink-black tactility.",
+  "personality": "3 Editorial structure with 6 Glass / Luxe surfaces",
+  "personality_one_liner": "A premium, photo-first real estate map that combines crisp editorial typography with cinematic glassmorphism floating above satellite imagery.",
   "color": {
-    "surface": "#FFFFFF",
+    "surface": "#F7F6F3",
     "onSurface": "#111111",
     "surfaceSecondary": "#EAE8E3",
     "onSurfaceSecondary": "#111111",
-    "surfaceTertiary": "#E3E1DC",
-    "onSurfaceTertiary": "#5C5C59",
+    "surfaceTertiary": "#DFDDD8",
+    "onSurfaceTertiary": "#111111",
     "surfaceInverse": "#111111",
     "onSurfaceInverse": "#FFFFFF",
     "brand": "#E11B22",
-    "brandPrimary": "#111111",
+    "brandPrimary": "#E11B22",
     "onBrandPrimary": "#FFFFFF",
-    "brandSecondary": "#EAE8E3",
-    "onBrandSecondary": "#111111",
-    "brandTertiary": "#FCE8E9",
+    "brandSecondary": "#C2151D",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#FAD4D5",
     "onBrandTertiary": "#E11B22",
     "success": "#2E8B57",
     "onSuccess": "#FFFFFF",
-    "warning": "#E8B815",
+    "warning": "#D4AF37",
     "onWarning": "#111111",
     "error": "#E11B22",
     "onError": "#FFFFFF",
-    "info": "#4F46E5",
+    "info": "#2B547E",
     "onInfo": "#FFFFFF",
-    "border": "#E5E3DE",
-    "borderStrong": "#CCC9C2",
-    "divider": "#EAE8E3",
-    "muted": "#A3A39E",
-    "onBrand": "#FFFFFF"
-  },
-  "lightTheme": {
-    "bg": "#F7F6F3",
-    "bgElevated": "#FFFFFF",
-    "surface": "#FFFFFF",
-    "surfaceAlt": "#EAE8E3",
-    "surfaceSunken": "#E3E1DC",
-    "surfaceInverse": "#111111",
-    "overlay": "rgba(17, 17, 17, 0.4)",
-    "scrim": "rgba(17, 17, 17, 0.7)",
-    "glass": "rgba(255, 255, 255, 0.75)",
-    "text": "#111111",
-    "textSecondary": "#5C5C59",
-    "textTertiary": "#8A8A85",
-    "textMuted": "#A3A39E",
-    "textInverse": "#FFFFFF",
-    "primary": "#111111",
-    "primaryPressed": "#2A2A2A",
-    "primarySoft": "#EAE8E3",
-    "onPrimary": "#FFFFFF",
-    "brand": "#E11B22",
-    "brandPressed": "#B8151A",
-    "brandSoft": "#FCE8E9",
+    "border": "#EAE8E3",
+    "borderStrong": "#111111",
+    "divider": "#DFDDD8",
+    "muted": "#757575",
     "onBrand": "#FFFFFF",
-    "mass": "#D4AF37",
-    "massText": "#8A6D14",
-    "massSoft": "#FAF5E5",
-    "fix": "#2E8B57",
-    "fixText": "#1C5E39",
-    "fixSoft": "#EAF4ED",
-    "success": "#2E8B57",
-    "successSoft": "#EAF4ED",
-    "warning": "#E8B815",
-    "warningSoft": "#FCF7E6",
-    "error": "#E11B22",
-    "errorSoft": "#FCE8E9",
-    "info": "#4F46E5",
-    "infoSoft": "#EEF2FF",
-    "premium": "#4F46E5",
-    "premiumSoft": "#EEF2FF",
-    "border": "#E5E3DE",
-    "borderStrong": "#CCC9C2",
-    "divider": "#EAE8E3",
-    "focusRing": "rgba(225, 27, 34, 0.3)",
-    "skeleton": "#E5E3DE",
-    "skeletonHighlight": "#F7F6F3",
-    "tabBar": "rgba(247, 246, 243, 0.9)",
-    "tabBarBorder": "transparent"
-  },
-  "darkTheme": {
-    "bg": "#111111",
-    "bgElevated": "#1C1C1A",
-    "surface": "#1C1C1A",
-    "surfaceAlt": "#292926",
-    "surfaceSunken": "#0A0A09",
-    "surfaceInverse": "#F7F6F3",
-    "overlay": "rgba(0, 0, 0, 0.6)",
-    "scrim": "rgba(0, 0, 0, 0.8)",
-    "glass": "rgba(28, 28, 26, 0.8)",
-    "text": "#F7F6F3",
-    "textSecondary": "#A3A39E",
-    "textTertiary": "#7A7A75",
-    "textMuted": "#5C5C59",
-    "textInverse": "#111111",
-    "primary": "#F7F6F3",
-    "primaryPressed": "#E0DFDC",
-    "primarySoft": "#292926",
-    "onPrimary": "#111111",
-    "brand": "#E11B22",
-    "brandPressed": "#FA3D44",
-    "brandSoft": "#3D1012",
-    "onBrand": "#FFFFFF",
-    "mass": "#E8C95C",
-    "massText": "#F2E3A3",
-    "massSoft": "#362E10",
-    "fix": "#40B575",
-    "fixText": "#9EE6C0",
-    "fixSoft": "#123321",
-    "success": "#40B575",
-    "successSoft": "#123321",
-    "warning": "#E8C95C",
-    "warningSoft": "#362E10",
-    "error": "#FA3D44",
-    "errorSoft": "#3D1012",
-    "info": "#6366F1",
-    "infoSoft": "#23224F",
-    "premium": "#6366F1",
-    "premiumSoft": "#23224F",
-    "border": "#333330",
-    "borderStrong": "#4D4D47",
-    "divider": "#292926",
-    "focusRing": "rgba(225, 27, 34, 0.5)",
-    "skeleton": "#292926",
-    "skeletonHighlight": "#3D3D39",
-    "tabBar": "rgba(17, 17, 17, 0.9)",
-    "tabBarBorder": "transparent"
+    "massGold": "#D4AF37",
+    "fixGreen": "#2E8B57"
   },
   "typography": {
     "displayFontFamily": "DM Serif Display",
@@ -136,16 +42,13 @@
       "base": 14,
       "lg": 16,
       "xl": 20,
-      "2xl": 24
+      "2xl": 24,
+      "3xl": 32,
+      "4xl": 48
     }
   },
-  "typography_adjustments": {
-    "editorial_usage": "Use lowercase DM Serif Display exclusively for expressive large bottom sheet headlines and onboarding primary questions. Everything else uses Plus Jakarta Sans.",
-    "weight_restrictions": "Cap font weight at 500. Use typography scale instead of heavy weights to establish hierarchy. Bolder variants from the old theme should map to 500, tighter tracking for headers.",
-    "serif_usage": "Keep DM Serif Display ONLY for 'premium' touchpoints: onboarding hero text, massive numeric stats (wallet balance), and bottom sheet expressive titles."
-  },
   "spacing": {
-    "rule": "Generous spacing. Off-white canvas acts as a breathing frame around soft grey cards. Minimum md (12pt) padding inside cards, xl (24pt) between distinct sections.",
+    "rule": "Handle spacing correctly dont have extra spaces where its not required, handle padding and margin corectly and subtle for buttons and components",
     "xs": 4,
     "sm": 8,
     "md": 12,
@@ -159,30 +62,28 @@
     "md": 12,
     "lg": 20,
     "xl": 24,
-    "xxl": 32,
     "pill": 999
   },
-  "shadow_tier": "1",
+  "shadow_tier": 3,
   "navigation": "bottom_tabs",
   "icon_set": "Ionicons",
   "glassmorphism": {
     "enabled": "true",
     "do's": [
-      "Floating map filters",
-      "Tab bar (edge-to-edge)",
-      "Sticky bottom sheets"
+      "Use heavily tinted glass (min 70% opacity white/surface) for floating search bars, filter rails, map FABs, and the compact preview tile to maintain high contrast over satellite imagery.",
+      "Apply frosted glass to the bottom sheet handle/header area when over scrolling map.",
+      "Use subtle blur backdrops on the property detail hero buttons (back, heart, share)."
     ],
     "dont's": [
-      "Dense form inputs",
-      "Data-heavy wallet lists",
-      "Standard cards"
+      "Don't use low-opacity blurs over the satellite map; text will become unreadable.",
+      "Don't use glassmorphism on the main content area of the Property Detail screen or dense lists."
     ]
   },
   "platform_libraries": {
     "glass": {
-      "ios": "expo-glass-effect",
+      "ios": "expo-blur",
       "android": "expo-blur",
-      "low_end_android_fallback": "solid surfaceSecondary"
+      "low_end_android_fallback": "solid surface with Shadow Tier 3"
     },
     "image": "expo-image",
     "blur": "expo-blur",
@@ -190,99 +91,81 @@
     "animation": "react-native-reanimated",
     "gesture": "react-native-gesture-handler"
   },
-  "component_treatments": {
-    "buttons": "Primary buttons are pill radius (999), Ink Black (primary) background, white text. Secondary/ghost buttons use surfaceAlt or transparent.",
-    "chips": "Soft-grey (surfaceAlt) background, ink text (textSecondary). Selected state is Ink Black (primary) background with white text.",
-    "photo_led_cards": "Image is on the left (rounded square) OR full-bleed cover with vertical scrim (transparent to 70% black). Bold Plus Jakarta title. Small context line. Avatar stack + 'N saves' bottom aligned.",
-    "bottom_sheets": "White (bgElevated) background, generous 28-32pt top radii. Visible handle. Expressive lowercase editorial headline (DM Serif). Pill CTA + subtle text link ('maybe later').",
-    "map_markers": "Selected/Saved/Friends: Circular photo markers with thin white border. Default/Unselected: simple pill with bold price/label in primary (black).",
-    "floating_filters": "Floating pill row docked at the bottom or top of the map. Blur/glass container with soft-grey chips inside.",
-    "tab_bar": "Floating pill or edge-to-edge glass container. Ink Black active state icons, textSecondary inactive. No borders.",
-    "skeletons": "Use skeleton (soft grey) and skeletonHighlight. Do not use generic spinners for cards."
-  },
-  "motion_spec": {
-    "durations": "fast: 150ms (micro-interactions), base: 220ms (standard), slow: 300ms (sheets/page transitions).",
-    "stagger": "List and card grids enter with a 50ms stagger per item.",
-    "press_scale": "0.97 scale on Cards and Pill buttons. 0.93 for smaller icon buttons.",
-    "pops": "Heart (save) and Add actions get a quick overshoot spring (tension 200, friction 10).",
-    "sheets": "iOS native-feeling spring for bottom sheets. Gentle, non-bouncy settling.",
-    "reduced_motion": "Fallback to opacity cross-fades (150ms) for all structural layout shifts and sheet presentations."
-  },
-  "onboarding_blueprint": {
-    "concept": "Immersive, photo-led preferences.",
-    "flow": "Non-blocking. 1-2 screens maximum.",
-    "imagery": "Use ONLY real listing photos from the property API, the AMASS emblem, and FIXA logo. No unbranded stock.",
-    "layout": "Large editorial headline (lowercase DM Serif). Full-width black pill buttons stacked for single-choice questions. Selectable interest/housing-preference tiles in a grid.",
-    "actions": "Blue-to-violet gradient pill (premium token) CTA for completion/premium gates, otherwise primary Ink Black pill."
-  },
   "screens": [
     {
-      "name": "Auth / Onboarding",
-      "purpose": "Immersive preference gathering and access.",
+      "name": "Home Map",
+      "purpose": "A highly polished, satellite-only discovery surface focused on proximity, letting users browse distinct picture-rich property markers and quick compact previews without navigating away.",
       "states": {
-        "loading": "Skeleton preference tiles.",
-        "empty": "N/A",
-        "error": "Standard inline error messages."
+        "loading": "Skeletal layout of floating glass search bar and map FABs over an initial loading map state.",
+        "empty": "No homes in the immediate area: 'Search this area' pill or 'Explore wider' action appears to zoom out.",
+        "error": "Toast overlay with a retry option to fetch map bounds."
       },
-      "layout": "Off-white canvas, full-bleed property imagery, stacked pill buttons, bold lowercase serif questions."
-    },
-    {
-      "name": "Home / Map",
-      "purpose": "Map-first discovery and quick filtering.",
-      "states": {
-        "loading": "Skeleton markers and card previews.",
-        "empty": "Empty state illustration for 'no homes found'.",
-        "error": "Map reload prompt."
-      },
-      "layout": "Spacious map, photo-markers for saved properties, floating pill filter row, white bottom sheet for quick unlocks."
+      "layout": "Map background: flex: 1, react-native-maps (satellite provider). Top absolute: Glassmorphic Search Bar (incorporating AI search icon, no balance chips) followed by a horizontal glassmorphic FilterChip rail. Right absolute (centered vertically): Stacked glass FABs (Locate, Compass, Layers). Bottom absolute: 'Explore wider' pill floating above the bottom sheet. Z-index order is critical to keep overlays above the map. Bottom Sheet: @gorhom/bottom-sheet snaps at 15% (header only), 50% (half map visible), 90% (browsing mode). Bottom sheet lists full-width photo-led ListingCards."
     },
     {
       "name": "Property Detail",
-      "purpose": "Detailed exploration and social context.",
+      "purpose": "A deep dive into a selected listing featuring a full-bleed photo gallery, bold pricing, clear spec hierarchy, and distinct transaction CTAs.",
       "states": {
-        "loading": "Skeleton gallery and text lines.",
+        "loading": "Skeleton UI matching the hero image and typographic structure.",
         "empty": "N/A",
-        "error": "Card overlay with retry."
+        "error": "Error fetching property details, with a full-screen retry state."
       },
-      "layout": "Layered panels. Full-bleed gallery with gradient scrim, social context row, paid access (MASS) floating gate, clear save/share affordances."
-    },
-    {
-      "name": "Market / Shop",
-      "purpose": "Marketplace for brands and services.",
-      "states": {
-        "loading": "Skeleton logo grids.",
-        "empty": "No deals illustration.",
-        "error": "Reload section."
-      },
-      "layout": "Grey tiles on off-white canvas. Instacart-style retailer logo grid (real PNGs), deal banners, product rails."
-    },
-    {
-      "name": "Neighbours Hub",
-      "purpose": "Community interaction and shared collections.",
-      "states": {
-        "loading": "Skeleton feed items.",
-        "empty": "Prompt to invite friends.",
-        "error": "Retry feed fetch."
-      },
-      "layout": "Social feed with avatar stacks, friends-saved context, soft-grey shared collection cards."
-    },
-    {
-      "name": "Wallet",
-      "purpose": "Manage balances and transactions.",
-      "states": {
-        "loading": "Skeleton balances.",
-        "empty": "No transactions state.",
-        "error": "Retry fetch."
-      },
-      "layout": "Ink black and Off-white contrast cards. DM Serif Display for large token balances (MASS/FIX). Clean ledger lists."
+      "layout": "Top: Full-bleed expo-image carousel with floating glass frosted circular buttons (back, heart, share). Overlapping white 'Sheet' container pulling up from the bottom over the image. Huge bold Price (h1/display size) and inline specs row (Beds, Baths, Sqft). Sticky bottom container: CTA row with Contact (outline) and Tour (filled brandPrimary) or Unlock (MASS gold)."
     }
   ],
-  "images": {},
+  "components": {
+    "map_markers": {
+      "base": "Composite layout. Left: 36x36pt circular photo (`expo-image`) with 1pt `surface` border. Right: Overlapping pill (radius `pill`) containing Price text (12pt, weight 700). High contrast drop shadow `Shadow Tier 3` required to separate from satellite background.",
+      "states": {
+        "unlocked": "Photo is clear. Pill uses `surface` background, `onSurface` text.",
+        "locked": "Photo uses `blurRadius={10}`. A MASS gold lock icon is centered on the photo. Price is approximated (e.g. `~ 850k`).",
+        "verified": "Blue check badge overlaps top-right of the photo circle.",
+        "boosted": "Pill has a subtle `brandTertiary` glow or gradient.",
+        "friends_saved": "Small overlapping avatar cluster (initials/photos) at the bottom left of the marker.",
+        "selected": "Scale marker to 1.15x. Z-index to front. Price pill background inverts to `brandPrimary`, text to `onBrandPrimary`.",
+        "cluster": "Circular white/surface badge with count. Tap zooms map bounding box."
+      },
+      "animation": "Appear: scale 0 -> 1 spring. Tap: scale 1 -> 1.15 -> 1.05 spring. Use `react-native-reanimated` with `mass: 1, damping: 15, stiffness: 250`."
+    },
+    "compact_preview_tile": {
+      "layout": "Appears docked above the bottom sheet upon tapping a marker. Glass container (`expo-blur` tint=light, intensity=80, fallback `surface`). Width ~92%, absolute positioned. Row direction: 80x80pt rounded photo on left, content column on right. Content: Price (Base 20pt, 800 weight), Spec row (14pt muted), Address line. Top-right absolute: Save icon button. Bottom-right: Unlock (MASS gold) or Open (brandPrimary) button.",
+      "animation": "Slides up from the bottom / scales up slightly. Bottom sheet handle ducks out of the way to 15% snap if currently higher."
+    },
+    "bottom_sheet_tiles": {
+      "layout": "Zillow-inspired. Full-width photo (16:9 or 4:3) with subtle dark bottom scrim for carousel dots. Below photo: Price (24pt+, 800 weight, Plus Jakarta Sans) + Specs inline (Beds, Baths). Next row: Address. Next row: Amenities/labels. Action Row: 'Contact' (icon) and 'Check availability' / 'Unlock'.",
+      "typography_bump": "Ensure Price is large and bold to establish immediate hierarchy. Reduce margin between Price and Specs, increase margin before Action Row."
+    }
+  },
+  "images": {
+    "hero_property_1": {
+      "url": "https://images.unsplash.com/photo-1628744448839-a475cc0e90c3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjByZWFsJTIwZXN0YXRlJTIwZXh0ZXJpb3IlMjBob21lfGVufDB8fHx8MTc5MjgyMjM5NHww&ixlib=rb-4.1.0&q=85",
+      "alt": "white and brown wooden house near green trees under blue sky during daytime"
+    },
+    "hero_property_2": {
+      "url": "https://images.unsplash.com/photo-1706164971309-fb4785fe6ceb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjByZWFsJTIwZXN0YXRlJTIwZXh0ZXJpb3IlMjBob21lfGVufDB8fHx8MTc5MjgyMjM5NHww&ixlib=rb-4.1.0&q=85",
+      "alt": "a modern house with a walkway leading to the front door"
+    },
+    "interior_luxury": {
+      "url": "https://images.pexels.com/photos/8135492/pexels-photo-8135492.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Spacious modern living room featuring elegant chandeliers, plush sofa, and contemporary decor"
+    }
+  },
+  "haptics": {
+    "map_marker_tap": "impactLight",
+    "compact_preview_open": "selection",
+    "bottom_sheet_snap": "impactMedium",
+    "save_property": "notificationSuccess",
+    "unlock_mass": "impactHeavy"
+  },
   "instructions_to_main_agent": [
-    "Reskin the UI strictly using the provided lightTheme and darkTheme hex maps directly into your theme.ts override.",
-    "No generic indigo/purple unless specifically tied to the 'premium' token gradient CTA.",
-    "Base background must be off-white (bg: #F7F6F3), cards must be soft-grey (surfaceAlt: #EAE8E3) or white for contrast.",
-    "Typography: Use Plus Jakarta Sans up to 500 weight. DM Serif Display ONLY for expressive large headers and wallet balances.",
-    "Convert all primary CTAs to Ink Black (primary: #111111 in light mode) fully rounded pill buttons."
+    "Strictly adhere to the Amass design system tokens (ink, Amass red, warm stone neutral #F7F6F3). Do not invent a new palette.",
+    "Implement the map as a satellite-only view. Crucial: Apply heavy shadow (Shadow Tier 3) and highly tinted glassmorphism to ALL floating map elements (search bar, filter chips, FABs, markers, preview tile) so they remain legible and distinct over the busy, dark satellite imagery.",
+    "Completely remove the MASS and FIX balance displays from the Home page chrome. Keep the logic intact but do not render them visually on this screen.",
+    "Construct the Map Markers as composite elements: A circular photo disc + an attached price pill. Differentiate 'locked' markers using a blurred photo, lock icon, and an approximated price format (e.g., '~ $900K'). Include a `selected` scale animation using `react-native-reanimated`.",
+    "Build the Compact Preview Tile as a floating glass card that appears on marker tap, docking slightly above the bottom sheet. It must include a left-aligned photo, bold right-aligned price/specs, and a primary CTA (Unlock with MASS / Open).",
+    "Design the Bottom Sheet ('N homes here') property tiles following the Zillow reference: Large leading photo, carousel dots over a bottom scrim, bold typography for the Price/Specs row, and a clear action row at the bottom.",
+    "Typography Bump: As requested, utilize larger, bolder weights (up to 700/800 for Prices and Titles using Plus Jakarta Sans) to create a distinct, scan-friendly visual hierarchy. Use DM Serif Display for major editorial headlines where appropriate.",
+    "Keep the 'Unlock homes with MASS' banner untouched in behavior/revenue logic, merely ensuring it fits seamlessly into the updated visual hierarchy.",
+    "Ensure the application opens with a proximity-first view (~2km radius) and includes a floating 'Explore wider' pill to prompt further discovery."
   ]
 }

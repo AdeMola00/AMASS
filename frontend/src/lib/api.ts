@@ -75,6 +75,10 @@ export type Property = {
   agent_contact_cost?: number;
   unlocked?: boolean;
   agent_unlocked?: boolean;
+  /** Locked preview: coordinates are approximate (≈150 m) and only the cover photo is returned. */
+  approx?: boolean;
+  /** Locked preview: how many photos unlock (the full gallery is gated). */
+  image_count?: number;
 };
 
 export type Currency = "MASS" | "FIX";
@@ -643,6 +647,21 @@ export type MapMarker = {
   in_shared_list: boolean;
   /** Active paid promotion tier (boost → gold pin). */
   promotion_tier?: PromotionTier | null;
+  /** Public teaser tier (same as the locked detail preview): never the address or agent. */
+  title?: string | null;
+  price?: number | null;
+  listing_type?: string | null;
+  cover?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  size_sqm?: number | null;
+  city?: string | null;
+  /** Street/area when unlocked, city only when locked. */
+  place?: string | null;
+  status?: string | null;
+  /** MASS needed to unlock this home (0 when free). */
+  access_cost?: number;
+  is_free_amass_sale?: boolean;
 };
 export type ProviderPreview = {
   id: string;
