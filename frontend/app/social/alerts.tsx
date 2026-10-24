@@ -16,7 +16,7 @@ import { getPushPermission, pushSupported, type PushPermission } from "@/src/lib
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Appear, Button, EmptyState, Screen, ScreenHeader, SegmentedControl, SheetLink, Skeleton, Tile, useCelebrate, useToast, type IconName } from "@/src/ui";
-import { FIXA, socialFont } from "@/src/components/social/socialTheme";
+import { socialFont } from "@/src/components/social/socialTheme";
 
 const FREQ: { value: NotifFrequency; label: string; icon: IconName }[] = [
   { value: "immediate", label: "Instant", icon: "flash" },
@@ -77,7 +77,7 @@ export default function NearbyAlertsScreen() {
       setData(r);
       track(r.now_following ? "social_alert_follow" : "social_alert_unfollow", { category: key });
       if (r.now_following && firstEver) {
-        celebrate({ title: "You'll hear first 🎁", icon: "gift", tone: "fix" });
+        celebrate({ title: "You'll hear first 🎁", icon: "gift", tone: "brand" });
         if (!promptedRef.current && pushSupported && perm.status !== "granted") {
           promptedRef.current = true;
           const res = await requestContextualPush("nearby_alert");
@@ -135,16 +135,16 @@ export default function NearbyAlertsScreen() {
         <EmptyState variant="error" title="Couldn't load alerts" body="Check your connection and try again." actionLabel="Retry" onAction={load} testID="social-alerts-error" />
       ) : (
         <ScrollView contentContainerStyle={{ alignSelf: "center", width: maxW, paddingHorizontal: gutter, paddingBottom: 48, gap: space[5] }} showsVerticalScrollIndicator={false}>
-          {/* Hero — lime surface, ink text */}
-          <View style={[styles.hero, shadows.sm]} testID="social-alerts-hero">
-            <View style={styles.heroIcon}>
-              <Ionicons name="gift" size={30} color={FIXA.ink} />
+          {/* Hero — AMASS ink surface, white text, red gift disc */}
+          <View style={[styles.hero, { backgroundColor: colors.surfaceInverse }, shadows.sm]} testID="social-alerts-hero">
+            <View style={[styles.heroIcon, { backgroundColor: colors.brand }]}>
+              <Ionicons name="gift" size={30} color={colors.onBrand} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
-              <AppText style={styles.heroTitle} color={FIXA.ink}>
+              <AppText style={styles.heroTitle} color={colors.textInverse}>
                 Hear it first
               </AppText>
-              <AppText variant="caption" color="rgba(17,17,17,0.78)">
+              <AppText variant="caption" color="rgba(255,255,255,0.78)">
                 {`Tap what you'd love to find free around ${data?.scope_label ?? "your city"}. We'll nudge you the moment a neighbour posts one you can see.`}
               </AppText>
             </View>
@@ -153,7 +153,7 @@ export default function NearbyAlertsScreen() {
           {/* Stats strip (only when there is something to say) */}
           {data && (following.length > 0 || data.alerts_7d > 0) ? (
             <View style={styles.stats} testID="social-alerts-stats">
-              <Stat icon="gift" value={liveTotal} label="free now" color={colors.fix} soft={colors.fixSoft} />
+              <Stat icon="gift" value={liveTotal} label="free now" color={colors.brand} soft={colors.brandSoft} />
               <Stat icon="notifications" value={data.alerts_7d} label="this week" color={colors.brand} soft={colors.brandSoft} />
               <Stat icon="heart" value={following.length} label="following" color={colors.premium} soft={colors.premiumSoft} />
             </View>
@@ -188,8 +188,8 @@ export default function NearbyAlertsScreen() {
           {data ? (
             <View style={[styles.card, { backgroundColor: colors.surface }, shadows.xs]} testID="social-alerts-frequency">
               <View style={styles.rowBetween}>
-                <View style={[styles.cardIcon, { backgroundColor: colors.fixSoft }]}>
-                  <Ionicons name="time" size={18} color={colors.fix} />
+                <View style={[styles.cardIcon, { backgroundColor: colors.brandSoft }]}>
+                  <Ionicons name="time" size={18} color={colors.brand} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <AppText variant="bodyMedium">How often</AppText>
@@ -204,20 +204,20 @@ export default function NearbyAlertsScreen() {
 
           {/* Phone alerts */}
           {data ? (
-            <View style={[styles.card, { backgroundColor: phoneOn ? colors.fixSoft : colors.surface }, shadows.xs]} testID="social-alerts-phone">
+            <View style={[styles.card, { backgroundColor: phoneOn ? colors.brandSoft : colors.surface }, shadows.xs]} testID="social-alerts-phone">
               <View style={styles.rowBetween}>
-                <View style={[styles.cardIcon, { backgroundColor: phoneOn ? colors.fix : colors.surfaceAlt }]}>
-                  <Ionicons name={phoneOn ? "notifications" : "notifications-off-outline"} size={18} color={phoneOn ? FIXA.white : colors.textTertiary} />
+                <View style={[styles.cardIcon, { backgroundColor: phoneOn ? colors.brand : colors.surfaceAlt }]}>
+                  <Ionicons name={phoneOn ? "notifications" : "notifications-off-outline"} size={18} color={phoneOn ? colors.onBrand : colors.textTertiary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <AppText variant="bodyMedium" color={phoneOn ? colors.fixText : colors.text}>
+                  <AppText variant="bodyMedium" color={phoneOn ? colors.brandText : colors.text}>
                     {phoneOn ? "Phone alerts on" : "Phone alerts off"}
                   </AppText>
                   <AppText variant="caption" tone="tertiary">
                     {phoneOn ? "Your phone buzzes — quiet hours respected." : !perm.supported ? (Platform.OS === "web" ? "Available in the AMASS app on your phone." : "Available on a real device.") : blocked ? "Blocked in your phone settings." : "Alerts still show in your notification centre."}
                   </AppText>
                 </View>
-                {!phoneOn ? <Button label={blocked ? "Settings" : "Turn on"} variant="fix" size="sm" iconLeft={blocked ? "settings-outline" : "notifications-outline"} onPress={turnOnPhone} testID="social-alerts-phone-btn" /> : null}
+                {!phoneOn ? <Button label={blocked ? "Settings" : "Turn on"} variant="brand" size="sm" iconLeft={blocked ? "settings-outline" : "notifications-outline"} onPress={turnOnPhone} testID="social-alerts-phone-btn" /> : null}
               </View>
             </View>
           ) : null}
@@ -244,8 +244,8 @@ function Stat({ icon, value, label, color, soft }: { icon: IconName; value: numb
 }
 
 const styles = StyleSheet.create({
-  hero: { flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: radii.xl, backgroundColor: FIXA.lime },
-  heroIcon: { width: 60, height: 60, borderRadius: 30, backgroundColor: FIXA.white, alignItems: "center", justifyContent: "center" },
+  hero: { flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: radii.xl },
+  heroIcon: { width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center" },
   heroTitle: { fontFamily: socialFont.black, fontSize: 22, lineHeight: 26, letterSpacing: -0.5 },
   stats: { flexDirection: "row", gap: 10 },
   stat: { flex: 1, alignItems: "center", gap: 2, paddingVertical: 12, borderRadius: radii.lg },

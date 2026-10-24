@@ -15,7 +15,7 @@ import { PostCard } from "@/src/components/social/PostCard";
 import { PostMenuSheet } from "@/src/components/social/PostMenuSheet";
 import { SocialChip } from "@/src/components/social/SocialBits";
 import { socialFeedSignal } from "@/src/components/social/socialFeedSignal";
-import { FIXA, socialFont } from "@/src/components/social/socialTheme";
+import { socialFont } from "@/src/components/social/socialTheme";
 
 type Filter = "all" | "active" | "reserved" | "gone" | "paused";
 const FILTERS: { key: Filter; label: string; icon: string }[] = [
@@ -88,7 +88,7 @@ export default function MyPostsScreen() {
 
   const header = (
     <View style={{ alignSelf: "center", width: maxW }}>
-      <View style={[styles.stats, { marginHorizontal: gutter, backgroundColor: colors.fixSoft }]} testID="social-mine-stats">
+      <View style={[styles.stats, { marginHorizontal: gutter, backgroundColor: colors.brandSoft }]} testID="social-mine-stats">
         <Stat icon="albums-outline" value={total} label={total === 1 ? "post" : "posts"} />
         <Stat icon="gift-outline" value={given} label="given away" />
         <Stat icon="eye-outline" value={views} label="views" />
@@ -111,11 +111,11 @@ export default function MyPostsScreen() {
       <ScreenHeader
         title="My posts"
         subtitle="Items you've shared with neighbours"
-        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/social" as any))}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/updates?tab=nearby" as any))}
         backTestID="social-mine-back"
         right={
-          <Pressable onPress={() => router.push("/social/compose" as any)} style={[styles.newBtn, { backgroundColor: colors.fix }]} accessibilityRole="button" accessibilityLabel="Share an item" testID="social-mine-new">
-            <Ionicons name="add" size={24} color={FIXA.white} />
+          <Pressable onPress={() => router.push("/social/compose" as any)} style={[styles.newBtn, { backgroundColor: colors.brand }]} accessibilityRole="button" accessibilityLabel="Share an item" testID="social-mine-new">
+            <Ionicons name="add" size={24} color={colors.onBrand} />
           </Pressable>
         }
       />
@@ -125,7 +125,7 @@ export default function MyPostsScreen() {
         ListHeaderComponent={header}
         contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fix} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />}
         renderItem={({ item }) => (
           <View style={{ alignSelf: "center", width: maxW, paddingHorizontal: gutter, marginTop: 12 }}>
             <PostCard post={item} onChange={updatePost} onMore={setMenuPost} />
@@ -176,11 +176,11 @@ function Stat({ icon, value, label }: { icon: any; value: number; label: string 
   const { colors } = useTheme();
   return (
     <View style={{ flex: 1, alignItems: "center", gap: 2 }}>
-      <Ionicons name={icon} size={18} color={colors.fix} />
-      <AppText tabular style={[styles.statValue, { color: colors.fixText }]}>
+      <Ionicons name={icon} size={18} color={colors.brand} />
+      <AppText tabular style={[styles.statValue, { color: colors.brandText }]}>
         {value}
       </AppText>
-      <AppText variant="micro" color={colors.fixText}>
+      <AppText variant="micro" color={colors.brandText}>
         {label}
       </AppText>
     </View>

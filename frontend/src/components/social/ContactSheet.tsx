@@ -13,7 +13,7 @@ import { track } from "@/src/lib/analytics";
 import { useTheme } from "@/src/theme";
 import { radii } from "@/src/theme/tokens";
 import { AppText, Avatar, Button, Input, Sheet, SheetLink, useToast } from "@/src/ui";
-import { FIXA, socialFont } from "./socialTheme";
+import { socialFont } from "./socialTheme";
 
 export function ContactSheet({ visible, onClose, post, quickMessages }: { visible: boolean; onClose: () => void; post: SocialPost; quickMessages: string[] }) {
   const router = useRouter();
@@ -75,16 +75,16 @@ export function ContactSheet({ visible, onClose, post, quickMessages }: { visibl
             Send a message in AMASS
           </AppText>
           {quickMessages.map((q, i) => (
-            <Pressable key={q} onPress={() => sendChat(q)} disabled={!!busy} style={[styles.quick, { backgroundColor: colors.fixSoft }]} accessibilityRole="button" accessibilityLabel={`Send: ${q}`} testID={`social-quick-${i}`}>
-              <Ionicons name="chatbubble-ellipses" size={16} color={colors.fix} />
-              <AppText variant="bodySm" color={colors.fixText} style={{ flex: 1, fontFamily: socialFont.semibold }}>
+            <Pressable key={q} onPress={() => sendChat(q)} disabled={!!busy} style={[styles.quick, { backgroundColor: colors.brandSoft }]} accessibilityRole="button" accessibilityLabel={`Send: ${q}`} testID={`social-quick-${i}`}>
+              <Ionicons name="chatbubble-ellipses" size={16} color={colors.brand} />
+              <AppText variant="bodySm" color={colors.brandText} style={{ flex: 1, fontFamily: socialFont.semibold }}>
                 {q}
               </AppText>
-              <Ionicons name="send" size={14} color={colors.fix} />
+              <Ionicons name="send" size={14} color={colors.brand} />
             </Pressable>
           ))}
           <Input value={text} onChangeText={setText} placeholder="Or write your own…" multiline containerStyle={{ marginTop: 4, marginBottom: 0 }} testID="social-contact-text" />
-          <Button label="Send message" variant="fix" size="lg" fullWidth iconLeft="send" disabled={text.trim().length < 2} loading={busy === "chat"} onPress={() => sendChat(text)} testID="social-contact-send" />
+          <Button label="Send message" variant="brand" size="lg" fullWidth iconLeft="send" disabled={text.trim().length < 2} loading={busy === "chat"} onPress={() => sendChat(text)} testID="social-contact-send" />
         </View>
       ) : null}
 
@@ -101,7 +101,7 @@ export function ContactSheet({ visible, onClose, post, quickMessages }: { visibl
       ) : null}
 
       <View style={[styles.safety, { backgroundColor: colors.surfaceAlt }]}>
-        <Ionicons name="shield-checkmark" size={16} color={FIXA.hat} />
+        <Ionicons name="shield-checkmark" size={16} color={colors.brand} />
         <AppText variant="micro" tone="secondary" style={{ flex: 1 }}>
           Meet in a public spot or at the estate gate, check the item before paying, and never send money in advance.
         </AppText>

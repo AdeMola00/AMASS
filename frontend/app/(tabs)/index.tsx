@@ -36,6 +36,7 @@ import { HomesSheet, SHEET_PEEK, SHEET_PEEK_LOCKED } from "@/src/components/map/
 import { hasNudge, nudgeText, pinVia, toPin, type Pin } from "@/src/components/map/pins";
 import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 import { track, trackMarkerImpressions } from "@/src/lib/analytics";
+import { useTabBarOffset } from "@/src/lib/tabBar";
 
 const LAST_REGION_KEY = "amass_map_last_region";
 
@@ -467,7 +468,7 @@ export default function HomeMap() {
 
   const zoomLevel = zoomFromDelta(region.latitudeDelta);
   const searchTop = insets.top + 6;
-  const tabBarH = 64 + Math.max(insets.bottom, 10);
+  const tabBarH = useTabBarOffset();
   const peek = noMass ? SHEET_PEEK_LOCKED : SHEET_PEEK;
   const unlockPin = unlockTarget ? pins.find((p) => p.id === unlockTarget) : undefined;
   const showPreview = !!activePin && sheetIndex === 0;

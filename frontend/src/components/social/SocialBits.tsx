@@ -1,39 +1,22 @@
-/** Shared Social pieces — FIXA mark, price/status tags, action pills, chips, scope + report sheets. */
+/** Shared Nearby-feed pieces — price/status tags, action pills, chips, scope + report sheets (AMASS ink/red). */
 import React, { useState } from "react";
-import { Image as RNImage, ImageStyle, Pressable, StyleProp, StyleSheet, View, ViewStyle, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, View, ViewStyle, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import type { SocialPost, SocialScope } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
 import { radii } from "@/src/theme/tokens";
 import { AppText, Button, Input, PressableScale, Sheet, SheetLink } from "@/src/ui";
-import { FIXA, naira, photoUrl, socialFont } from "./socialTheme";
-
-const FIXA_LOCKUP = require("../../../assets/images/fixa-pro-lockup.png");
-const FIXA_HAT = require("../../../assets/images/fixa-hat.png");
-
-/** The FIXA PRO lockup (hat + PRO. + FIXA®) at its native 468×429 proportions, never stretched. */
-export function FixaLockup({ height = 44, style }: { height?: number; style?: StyleProp<ImageStyle> }) {
-  return <RNImage source={FIXA_LOCKUP} style={[{ height, width: Math.round(height * (468 / 429)) }, style]} resizeMode="contain" accessibilityLabel="FIXA PRO" />;
-}
-
-/** Round FIXA mark — the lime disc with the hard hat (used as the Social "neighbourhood avatar"). */
-export function FixaMark({ size = 36, style, testID }: { size?: number; style?: ViewStyle; testID?: string }) {
-  return (
-    <View style={[styles.mark, { width: size, height: size, borderRadius: size / 2 }, style]} testID={testID} accessibilityLabel="FIXA Social">
-      <RNImage source={FIXA_HAT} style={{ width: size * 0.72, height: size * 0.72 * (320 / 468), marginTop: size * 0.04 }} resizeMode="contain" />
-    </View>
-  );
-}
+import { naira, photoUrl, socialFont } from "./socialTheme";
 
 /** FREE (soft green) or ₦ price (ink, bold) + optional "Negotiable". */
 export function PriceTag({ post, size = "md", style }: { post: Pick<SocialPost, "kind" | "price" | "negotiable">; size?: "sm" | "md" | "lg"; style?: ViewStyle }) {
   const { colors } = useTheme();
   if (post.kind === "give") {
     return (
-      <View style={[styles.freeTag, size === "sm" && styles.freeTagSm, { backgroundColor: colors.fixSoft }, style]} accessibilityLabel="Free">
-        <Ionicons name="gift" size={size === "sm" ? 12 : 14} color={colors.fixText} />
-        <AppText variant={size === "sm" ? "micro" : "caption"} color={colors.fixText} style={{ fontFamily: socialFont.black, letterSpacing: 0.4 }}>
+      <View style={[styles.freeTag, size === "sm" && styles.freeTagSm, { backgroundColor: colors.successSoft }, style]} accessibilityLabel="Free">
+        <Ionicons name="gift" size={size === "sm" ? 12 : 14} color={colors.success} />
+        <AppText variant={size === "sm" ? "micro" : "caption"} color={colors.success} style={{ fontFamily: socialFont.black, letterSpacing: 0.4 }}>
           FREE
         </AppText>
       </View>
@@ -59,7 +42,7 @@ export function StatusTag({ status, kind, style }: { status: SocialPost["status"
   if (status === "active") return null;
   const label = status === "gone" ? (kind === "give" ? "Given away" : "Sold") : status === "reserved" ? "Reserved" : status === "paused" ? "Paused" : "Removed";
   const bg = status === "reserved" ? colors.warning : status === "paused" ? colors.surfaceAlt : colors.surfaceInverse;
-  const fg = status === "reserved" ? FIXA.ink : status === "paused" ? colors.text : colors.textInverse;
+  const fg = status === "reserved" ? "#111111" : status === "paused" ? colors.text : colors.textInverse;
   return (
     <View style={[styles.statusTag, { backgroundColor: bg }, style]} accessibilityLabel={label}>
       <AppText variant="micro" color={fg} style={{ fontFamily: socialFont.bold }}>
@@ -73,10 +56,10 @@ export function StatusTag({ status, kind, style }: { status: SocialPost["status"
 export function ActionPill({ icon, label, active, onPress, accessibilityLabel, testID, style, compact }: { icon: any; label?: string | number; active?: boolean; onPress?: () => void; accessibilityLabel: string; testID?: string; style?: ViewStyle; compact?: boolean }) {
   const { colors } = useTheme();
   return (
-    <PressableScale onPress={onPress} scaleTo={0.92} style={[styles.pill, compact && styles.pillCompact, { backgroundColor: active ? colors.fixSoft : colors.surfaceAlt }, style]} accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ selected: !!active }} testID={testID}>
-      <Ionicons name={icon} size={19} color={active ? colors.fix : colors.text} />
+    <PressableScale onPress={onPress} scaleTo={0.92} style={[styles.pill, compact && styles.pillCompact, { backgroundColor: active ? colors.brandSoft : colors.surfaceAlt }, style]} accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ selected: !!active }} testID={testID}>
+      <Ionicons name={icon} size={19} color={active ? colors.brand : colors.text} />
       {label !== undefined && label !== "" && label !== 0 ? (
-        <AppText variant="caption" color={active ? colors.fixText : colors.text} tabular style={{ fontFamily: socialFont.semibold }}>
+        <AppText variant="caption" color={active ? colors.brand : colors.text} tabular style={{ fontFamily: socialFont.semibold }}>
           {label}
         </AppText>
       ) : null}
@@ -84,17 +67,17 @@ export function ActionPill({ icon, label, active, onPress, accessibilityLabel, t
   );
 }
 
-/** Filter chip — white bordered pill; selected = FIXA green with white text. */
+/** Filter chip — white bordered pill; selected = ink with white text. */
 export function SocialChip({ label, icon, selected, onPress, testID, style, count }: { label: string; icon?: string; selected?: boolean; onPress?: () => void; testID?: string; style?: ViewStyle; count?: number }) {
   const { colors, shadows, isDark } = useTheme();
   return (
-    <PressableScale onPress={() => onPress?.()} accessibilityRole="button" accessibilityState={{ selected: !!selected }} testID={testID} style={[styles.chip, { backgroundColor: selected ? colors.fix : colors.surface, borderColor: selected ? colors.fix : colors.border }, !selected && !isDark && shadows.xs, style]}>
-      {icon ? <Ionicons name={icon as any} size={15} color={selected ? FIXA.white : colors.fix} /> : null}
-      <AppText variant="caption" color={selected ? FIXA.white : colors.text} style={{ fontFamily: socialFont.semibold }}>
+    <PressableScale onPress={() => onPress?.()} accessibilityRole="button" accessibilityState={{ selected: !!selected }} testID={testID} style={[styles.chip, { backgroundColor: selected ? colors.surfaceInverse : colors.surface, borderColor: selected ? colors.surfaceInverse : colors.border }, !selected && !isDark && shadows.xs, style]}>
+      {icon ? <Ionicons name={icon as any} size={15} color={selected ? colors.textInverse : colors.brand} /> : null}
+      <AppText variant="caption" color={selected ? colors.textInverse : colors.text} style={{ fontFamily: socialFont.semibold }}>
         {label}
       </AppText>
       {typeof count === "number" && count > 0 ? (
-        <AppText variant="micro" color={selected ? FIXA.white : colors.textTertiary} tabular>
+        <AppText variant="micro" color={selected ? colors.textInverse : colors.textTertiary} tabular>
           {count}
         </AppText>
       ) : null}
@@ -102,7 +85,7 @@ export function SocialChip({ label, icon, selected, onPress, testID, style, coun
   );
 }
 
-/** Bold section title (22/800) with optional green action link. */
+/** Bold section title (22/800) with optional red action link. */
 export function SocialHeading({ title, subtitle, actionLabel, onAction, actionTestID, style, size = "lg" }: { title: string; subtitle?: string | null; actionLabel?: string; onAction?: () => void; actionTestID?: string; style?: ViewStyle; size?: "lg" | "md" }) {
   const { colors } = useTheme();
   return (
@@ -119,10 +102,10 @@ export function SocialHeading({ title, subtitle, actionLabel, onAction, actionTe
       </View>
       {actionLabel && onAction ? (
         <Pressable onPress={onAction} hitSlop={8} style={{ flexDirection: "row", alignItems: "center", gap: 2, paddingVertical: 4 }} accessibilityRole="button" accessibilityLabel={`${actionLabel} ${title}`} testID={actionTestID}>
-          <AppText variant="caption" color={colors.fix} style={{ fontFamily: socialFont.bold }}>
+          <AppText variant="caption" color={colors.brand} style={{ fontFamily: socialFont.bold }}>
             {actionLabel}
           </AppText>
-          <Ionicons name="chevron-forward" size={14} color={colors.fix} />
+          <Ionicons name="chevron-forward" size={14} color={colors.brand} />
         </Pressable>
       ) : null}
     </View>
@@ -136,9 +119,9 @@ export function PostPhotos({ photos, categoryIcon, onPress, height = 260, radius
   const h = Math.min(height, Math.round(Math.min(width, 700) * 0.72));
   const srcs = photos.map(photoUrl).filter(Boolean) as string[];
   const inner = !srcs.length ? (
-    <View style={[styles.photoWrap, { height: Math.round(h * 0.6), borderRadius: radius, backgroundColor: colors.fixSoft }]}>
-      <Ionicons name={(categoryIcon || "cube") as any} size={44} color={colors.fix} />
-      <AppText variant="micro" color={colors.fixText} style={{ fontFamily: socialFont.semibold, marginTop: 6 }}>
+    <View style={[styles.photoWrap, { height: Math.round(h * 0.6), borderRadius: radius, backgroundColor: colors.brandSoft }]}>
+      <Ionicons name={(categoryIcon || "cube") as any} size={44} color={colors.brand} />
+      <AppText variant="micro" color={colors.brand} style={{ fontFamily: socialFont.semibold, marginTop: 6 }}>
         No photo yet
       </AppText>
     </View>
@@ -156,7 +139,7 @@ export function PostPhotos({ photos, categoryIcon, onPress, height = 260, radius
             <Image source={{ uri: srcs[2] }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} accessibilityIgnoresInvertColors />
             {srcs.length > 3 ? (
               <View style={[StyleSheet.absoluteFill, styles.more]}>
-                <AppText variant="h3" color={FIXA.white}>
+                <AppText variant="h3" color="#FFFFFF">
                   +{srcs.length - 3}
                 </AppText>
               </View>
@@ -174,7 +157,7 @@ export function PostPhotos({ photos, categoryIcon, onPress, height = 260, radius
   );
 }
 
-/** Scope picker — Estate · Area · City with radio rows (FIXA green check). */
+/** Scope picker — Estate · Area · City with radio rows. */
 export function ScopeSheet({ visible, onClose, value, onChange, scopes }: { visible: boolean; onClose: () => void; value: SocialScope; onChange: (s: SocialScope) => void; scopes: { estates: { id: string; name: string; area?: string | null }[]; areas: string[]; city: string } }) {
   const { colors } = useTheme();
   const rows: { key: SocialScope; label: string; caption: string; icon: any; disabled?: boolean }[] = [
@@ -188,9 +171,9 @@ export function ScopeSheet({ visible, onClose, value, onChange, scopes }: { visi
         {rows.map((r) => {
           const active = value === r.key;
           return (
-            <Pressable key={r.key} disabled={r.disabled} onPress={() => { onChange(r.key); onClose(); }} style={[styles.scopeRow, { backgroundColor: active ? colors.fixSoft : colors.surfaceAlt, opacity: r.disabled ? 0.55 : 1 }]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled: r.disabled }} testID={`social-scope-${r.key}`}>
-              <View style={[styles.scopeIcon, { backgroundColor: active ? colors.fix : colors.surface }]}>
-                <Ionicons name={r.icon} size={18} color={active ? FIXA.white : colors.text} />
+            <Pressable key={r.key} disabled={r.disabled} onPress={() => { onChange(r.key); onClose(); }} style={[styles.scopeRow, { backgroundColor: active ? colors.brandSoft : colors.surfaceAlt, opacity: r.disabled ? 0.55 : 1 }]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled: r.disabled }} testID={`social-scope-${r.key}`}>
+              <View style={[styles.scopeIcon, { backgroundColor: active ? colors.brand : colors.surface }]}>
+                <Ionicons name={r.icon} size={18} color={active ? "#FFFFFF" : colors.text} />
               </View>
               <View style={{ flex: 1 }}>
                 <AppText style={{ fontFamily: socialFont.bold, fontSize: 15, lineHeight: 19 }} numberOfLines={1}>
@@ -200,7 +183,7 @@ export function ScopeSheet({ visible, onClose, value, onChange, scopes }: { visi
                   {r.caption}
                 </AppText>
               </View>
-              <Ionicons name={active ? "checkmark-circle" : "ellipse-outline"} size={22} color={active ? colors.fix : colors.textMuted} />
+              <Ionicons name={active ? "checkmark-circle" : "ellipse-outline"} size={22} color={active ? colors.brand : colors.textMuted} />
             </Pressable>
           );
         })}
@@ -229,8 +212,8 @@ export function ReportSheet({ visible, onClose, onSubmit, busy }: { visible: boo
       </AppText>
       <View style={{ gap: 6 }}>
         {REPORT_REASONS.map((r) => (
-          <Pressable key={r.key} onPress={() => setReason(r.key)} style={[styles.reasonRow, { backgroundColor: reason === r.key ? colors.fixSoft : colors.surfaceAlt }]} accessibilityRole="radio" accessibilityState={{ selected: reason === r.key }} testID={`social-report-${r.key}`}>
-            <Ionicons name={reason === r.key ? "radio-button-on" : "radio-button-off"} size={18} color={reason === r.key ? colors.fix : colors.textMuted} />
+          <Pressable key={r.key} onPress={() => setReason(r.key)} style={[styles.reasonRow, { backgroundColor: reason === r.key ? colors.brandSoft : colors.surfaceAlt }]} accessibilityRole="radio" accessibilityState={{ selected: reason === r.key }} testID={`social-report-${r.key}`}>
+            <Ionicons name={reason === r.key ? "radio-button-on" : "radio-button-off"} size={18} color={reason === r.key ? colors.brand : colors.textMuted} />
             <AppText variant="bodySm" style={{ flex: 1 }}>
               {r.label}
             </AppText>
@@ -245,7 +228,6 @@ export function ReportSheet({ visible, onClose, onSubmit, busy }: { visible: boo
 }
 
 const styles = StyleSheet.create({
-  mark: { backgroundColor: FIXA.lime, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   freeTag: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, height: 26, borderRadius: 8, alignSelf: "flex-start" },
   freeTagSm: { paddingHorizontal: 7, height: 20, borderRadius: 6 },
   price: { fontFamily: socialFont.black, fontSize: 18, lineHeight: 22, letterSpacing: -0.4 },

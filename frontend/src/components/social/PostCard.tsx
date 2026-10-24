@@ -1,5 +1,5 @@
 /**
- * Feed post card — Nextdoor-style anatomy, AMASS/FIXA styling:
+ * Feed post card — Nextdoor-style anatomy, AMASS styling (ink surfaces, brand-red accents):
  * poster row (avatar · name → Free / For sale · location · time) → bold title → clamped body →
  * photo collage → price + condition → action pills (like · reply · share · more).
  * The whole header/title/body opens the post; like/share/more never navigate.
@@ -58,8 +58,8 @@ export function PostCard({ post, onChange, onMore, categoryIcon, style, testID }
               </AppText>
               <Ionicons name="arrow-forward" size={12} color={colors.textTertiary} />
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Ionicons name={post.kind === "give" ? "gift" : "pricetag"} size={13} color={colors.fix} />
-                <AppText variant="caption" color={colors.fixText} style={{ fontFamily: socialFont.bold }}>
+                <Ionicons name={post.kind === "give" ? "gift" : "pricetag"} size={13} color={colors.brand} />
+                <AppText variant="caption" color={colors.brand} style={{ fontFamily: socialFont.bold }}>
                   {post.kind === "give" ? "Free" : "For sale"}
                 </AppText>
               </View>
@@ -70,7 +70,7 @@ export function PostCard({ post, onChange, onMore, categoryIcon, style, testID }
                 {post.edited ? " · Edited" : ""}
               </AppText>
               <Ionicons name={post.visibility === "estate" ? "home" : post.visibility === "area" ? "navigate" : "business"} size={12} color={colors.textTertiary} accessibilityLabel={`Visible to ${post.visibility}`} />
-              {post.author.same_estate && !post.is_mine ? <Badge label="Your estate" tone="fix" size="xs" /> : null}
+              {post.author.same_estate && !post.is_mine ? <Badge label="Your estate" tone="brand" size="xs" /> : null}
             </View>
           </View>
         </Pressable>
@@ -114,11 +114,11 @@ export function PostCard({ post, onChange, onMore, categoryIcon, style, testID }
 
       {post.is_mine ? (
         <Pressable onPress={() => router.push(`/social/compose?id=${post.id}` as any)} style={[styles.insights, { borderTopColor: colors.divider }]} accessibilityRole="button" accessibilityLabel="Manage your post" testID={`social-manage-${post.id}`}>
-          <Ionicons name="stats-chart-outline" size={16} color={colors.fix} />
+          <Ionicons name="stats-chart-outline" size={16} color={colors.brand} />
           <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
             {post.view_count} view{post.view_count === 1 ? "" : "s"} · {post.like_count} like{post.like_count === 1 ? "" : "s"} · {post.comment_count} repl{post.comment_count === 1 ? "y" : "ies"}
           </AppText>
-          <AppText variant="caption" color={colors.fix} style={{ fontFamily: socialFont.bold }}>
+          <AppText variant="caption" color={colors.brand} style={{ fontFamily: socialFont.bold }}>
             Manage
           </AppText>
         </Pressable>

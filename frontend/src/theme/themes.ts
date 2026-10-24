@@ -30,6 +30,8 @@ export type ThemeColors = {
   brand: string;
   brandPressed: string;
   brandSoft: string;
+  /** Brand red tuned for small text on `brandSoft` (≥ 5:1 in both themes). */
+  brandText: string;
   onBrand: string;
   // Currencies
   mass: string;
@@ -125,6 +127,7 @@ export const lightTheme: AppTheme = {
     brand: "#E11B22",
     brandPressed: "#B8151A",
     brandSoft: "#FCE8E9",
+    brandText: "#A4121A",
     onBrand: "#FFFFFF",
 
     mass: "#D4AF37",
@@ -199,6 +202,7 @@ export const darkTheme: AppTheme = {
     brand: "#E11B22",
     brandPressed: "#FA3D44",
     brandSoft: "#3D1012",
+    brandText: "#FF9A9E",
     onBrand: "#FFFFFF",
 
     mass: "#E8C95C",

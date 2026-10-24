@@ -991,3 +991,10 @@ agent_communication:
       Accounts: demo@amass.africa / amass2026 (admin + agent, 9 listings; KYC status none → good for submit + admin approve flow).
       Other agents: adaeze.okoye@amass.africa / Agent2026! etc. (see /app/memory/test_credentials.md). PhotoPager swipe on map tiles
       verified manually on web (counter 1/3 → 2/3 on horizontal scroll).
+
+  - agent: "main"
+    message: |
+      Iteration 66 — Floating pill tab bar + Updates tab (frontend only). testing_agent: all flows pass (tabs routing ×3, badges 23/32,
+      Updates header/segments/deep links, Nearby feed, AMASS branding on /social/*, nothing hidden under the pill, /notifications still OK).
+      Follow-ups fixed after the report: 320 px label shrink, aria-selected on tabs, NotificationFeed capped to the 720 px header column on tablets.
+      Theme gained `colors.brandText`. Marketplace FIXA services section intentionally untouched (separate product).

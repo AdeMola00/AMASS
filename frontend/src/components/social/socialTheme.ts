@@ -1,21 +1,7 @@
 /**
- * Social (FIXA-themed) visual accents.
- * FIXA brand surfaces are identical in light & dark (like a retailer brand colour); everything else
- * comes from the active theme — `colors.fix` (accessible green for buttons/links), `colors.fixText`
- * (green text on soft surfaces), `colors.fixSoft` (soft green wash).
- *
- * Contrast notes: lime #7ED958 is used ONLY as a large surface with ink (#111) text/icons (≈10:1).
- * It is never used for text. Primary interactive = colors.fix with white text (large/bold text).
+ * Nearby-feed helpers. All colours come from the AMASS theme (`colors.brand` red, ink surfaces,
+ * `colors.success` only for semantic "Free" states) — no third-party brand palette here.
  */
-export const FIXA = {
-  /** Brand lime from the FIXA PRO logo background — surfaces only, ink text on top. */
-  lime: "#7ED958",
-  /** Hard-hat green from the logo — tiny accents (dots, FAB sheen) only. */
-  hat: "#1FB82E",
-  ink: "#111111",
-  white: "#FFFFFF",
-} as const;
-
 export { boldFont as socialFont } from "@/src/theme/tokens";
 
 export const POST_STATUS_LABEL: Record<string, string> = {

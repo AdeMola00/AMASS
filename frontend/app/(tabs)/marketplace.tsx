@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabBarOffset } from "@/src/lib/tabBar";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -164,6 +165,7 @@ export default function Marketplace() {
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarOffset = useTabBarOffset();
   const { width: winW } = useWindowDimensions();
   // 4 tiles per row inside the horizontal padding, 8px gaps.
   const tileW = Math.floor((Math.min(winW, 720) - spacing.lg * 2 - 8 * 3) / 4);
@@ -505,7 +507,7 @@ export default function Marketplace() {
         style={bounceStyle}
         data={(fixaLocked ? [] : section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems) as any[]}
         keyExtractor={(_, i) => `row-${i}`}
-        contentContainerStyle={{ paddingTop: headerH + 8, paddingBottom: 140 }}
+        contentContainerStyle={{ paddingTop: headerH + 8, paddingBottom: tabBarOffset + 88 }}
         showsVerticalScrollIndicator={false}
         refreshControl={refreshControl}
         ListHeaderComponent={loading || fixaLocked ? null : listHeader}
@@ -717,7 +719,7 @@ export default function Marketplace() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
           router.push("/marketplace/sell" as any);
         }}
-        style={({ pressed }) => [styles.sellFab, { bottom: 92 + insets.bottom }, pressed && { transform: [{ scale: 0.95 }] }]}
+        style={({ pressed }) => [styles.sellFab, { bottom: tabBarOffset + 16 }, pressed && { transform: [{ scale: 0.95 }] }]}
         accessibilityRole="button"
         accessibilityLabel={section === "declutter" ? "Sell an item" : "Join FIXA"}
         testID="sell-fab"

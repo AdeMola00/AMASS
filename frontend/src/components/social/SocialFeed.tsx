@@ -1,7 +1,7 @@
 /**
- * Social tab — neighbourhood feed of items neighbours are giving away or selling (replaces Discover).
- * FIXA-themed: lime FIXA mark + scope picker in the header, FIXA-green chips/FAB, soft-green accents.
- * Browsing: scope (estate · area · city) → Free / For sale → category → search. Posting: green "Post" FAB.
+ * Nearby feed — items neighbours are giving away or selling (the "Nearby" segment of Updates).
+ * AMASS-branded: ink welcome card with the AMASS emblem, red Post FAB, ink/red chips.
+ * Browsing: scope (estate · area · city) → Free / For sale → category → search.
  * Nothing here contacts anyone on the user's behalf — contact lives on the post detail, viewer-initiated.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -9,33 +9,29 @@ import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, TextInput, V
 import { useFocusEffect, useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, SocialAlerts, SocialMeta, SocialPost, SocialPostKind, SocialScope } from "@/src/lib/api";
 import { track } from "@/src/lib/analytics";
-import { useAuth } from "@/src/contexts/auth";
 import { storage } from "@/src/utils/storage";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Avatar, EmptyState, IconButton, PressableScale, Screen, Skeleton, SkeletonCard, useCelebrate, useToast, type IconName } from "@/src/ui";
-import { useUnreadNotifications } from "@/src/hooks/use-unread-notifications";
-import { PostCard } from "@/src/components/social/PostCard";
-import { PostMenuSheet } from "@/src/components/social/PostMenuSheet";
-import { ActionPill, FixaLockup, FixaMark, ScopeSheet, SocialChip } from "@/src/components/social/SocialBits";
-import { socialFeedSignal } from "@/src/components/social/socialFeedSignal";
-import { FIXA, socialFont } from "@/src/components/social/socialTheme";
+import { useTabBarOffset } from "@/src/lib/tabBar";
+import { AppText, EmptyState, PressableScale, Skeleton, SkeletonCard, useCelebrate, useToast, type IconName } from "@/src/ui";
+import { AmassLogo } from "@/src/components/AmassLogo";
+import { PostCard } from "./PostCard";
+import { PostMenuSheet } from "./PostMenuSheet";
+import { ActionPill, ScopeSheet, SocialChip } from "./SocialBits";
+import { socialFeedSignal } from "./socialFeedSignal";
+import { socialFont } from "./socialTheme";
 
 const SCOPE_KEY = "amass_social_scope_v1";
 const WELCOME_KEY = "amass_social_welcome_dismissed_v1";
 const HI_KEY = "amass_social_said_hi_v1";
 
-export default function SocialTab() {
+export function SocialFeed() {
   const router = useRouter();
-  const { user } = useAuth();
   const { colors, shadows, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { unread: notifUnread } = useUnreadNotifications();
-  const [chatUnread, setChatUnread] = useState(0);
+  const tabBarOffset = useTabBarOffset();
   const [meta, setMeta] = useState<SocialMeta | null>(null);
   const [scope, setScope] = useState<SocialScope>("city");
   const [scopeReady, setScopeReady] = useState(false);
@@ -69,7 +65,6 @@ export default function SocialTab() {
       setWelcomeDismissed(!!wd);
       setSaidHi(!!hi);
       setScopeReady(true);
-      api.chatUnreadCount().then((c) => setChatUnread(c.unread_count ?? 0)).catch(() => {});
       track("social_open");
     })();
   }, []);
@@ -90,7 +85,7 @@ export default function SocialTab() {
         setItems(r.items);
         setCursor(r.next_cursor);
         setScopeLabel(r.scope_label);
-        if (meta && (r.scopes.estates.length !== meta.scopes.estates.length)) setMeta({ ...meta, scopes: r.scopes });
+        if (meta && r.scopes.estates.length !== meta.scopes.estates.length) setMeta({ ...meta, scopes: r.scopes });
       } catch {
         if (id !== reqId.current) return;
         setError(true);
@@ -128,7 +123,7 @@ export default function SocialTab() {
       setAlerts(r);
       track(r.now_following ? "social_alert_follow" : "social_alert_unfollow", { category, from: "feed" });
       if (r.now_following) {
-        if (firstEver) celebrate({ title: "You'll hear first 🎁", icon: "gift", tone: "fix" });
+        if (firstEver) celebrate({ title: "You'll hear first 🎁", icon: "gift", tone: "brand" });
         toast.show({ kind: "success", title: `Alerts on · ${label}`, body: `We'll nudge you when a neighbour gives one away in ${r.scope_label}.`, actionLabel: "Manage", onAction: () => router.push("/social/alerts" as any) });
       } else {
         toast.info(`Alerts off · ${label}`);
@@ -188,6 +183,23 @@ export default function SocialTab() {
 
   const header = (
     <View style={{ alignSelf: "center", width: maxW }}>
+      {/* Scope + my posts */}
+      <View style={[styles.toolbar, { paddingHorizontal: gutter }]}>
+        <Pressable onPress={() => setScopeOpen(true)} style={[styles.scopeBtn, { backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel={`Showing posts from ${scopeLabel}. Change area`} testID="social-scope-btn">
+          <Ionicons name="location" size={16} color={colors.brand} />
+          <AppText numberOfLines={1} style={[styles.scopeTitle, { flexShrink: 1 }]}>
+            {scopeLabel}
+          </AppText>
+          <Ionicons name="chevron-down" size={15} color={colors.textSecondary} />
+        </Pressable>
+        <Pressable onPress={() => router.push("/social/mine" as any)} style={styles.mineBtn} accessibilityRole="button" accessibilityLabel="My posts" testID="social-mine-btn" hitSlop={6}>
+          <Ionicons name="albums-outline" size={16} color={colors.text} />
+          <AppText variant="caption" style={{ fontFamily: socialFont.semibold }}>
+            My posts
+          </AppText>
+        </Pressable>
+      </View>
+
       {/* Search */}
       <View style={[styles.search, { backgroundColor: colors.surface, borderColor: isDark ? colors.border : "transparent", marginHorizontal: gutter }, !isDark && shadows.sm]}>
         <Ionicons name="search" size={18} color={colors.text} />
@@ -199,23 +211,33 @@ export default function SocialTab() {
         ) : null}
       </View>
 
-      {/* Welcome / get-started card (dismissible, lime surface with ink text) */}
+      {/* Welcome / get-started card (dismissible, ink surface with the AMASS emblem) */}
       {showWelcome ? (
-        <View style={[styles.welcome, { marginHorizontal: gutter }, shadows.sm]} testID="social-welcome">
+        <View style={[styles.welcome, { marginHorizontal: gutter, backgroundColor: colors.surfaceInverse }, shadows.sm]} testID="social-welcome">
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={styles.welcomeLogo}>
-              <FixaLockup height={46} />
+              <AmassLogo size={34} showWordmark={false} />
             </View>
             <View style={{ flex: 1 }}>
-              <AppText style={styles.welcomeTitle} color={FIXA.ink}>
-                Welcome to Social
+              <AppText style={styles.welcomeTitle} color={colors.textInverse}>
+                Give & get nearby
               </AppText>
-              <AppText variant="caption" color="rgba(17,17,17,0.78)">
+              <AppText variant="caption" color="rgba(255,255,255,0.75)">
                 Give things a second life with neighbours in {meta?.scopes.city ?? "your city"}.
               </AppText>
             </View>
-            <Pressable onPress={() => { setWelcomeDismissed(true); storage.setItem(WELCOME_KEY, true); }} hitSlop={10} style={styles.welcomeX} accessibilityRole="button" accessibilityLabel="Dismiss welcome" testID="social-welcome-dismiss">
-              <Ionicons name="close" size={16} color={FIXA.ink} />
+            <Pressable
+              onPress={() => {
+                setWelcomeDismissed(true);
+                storage.setItem(WELCOME_KEY, true);
+              }}
+              hitSlop={10}
+              style={styles.welcomeX}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss welcome"
+              testID="social-welcome-dismiss"
+            >
+              <Ionicons name="close" size={16} color={colors.textInverse} />
             </Pressable>
           </View>
           <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
@@ -224,9 +246,9 @@ export default function SocialTab() {
             <WelcomeStep done={saidHi} label="Like a post" onPress={undefined} testID="social-step-hi" />
           </View>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.max(8, (done / 3) * 100)}%` }]} />
+            <View style={[styles.progressFill, { width: `${Math.max(8, (done / 3) * 100)}%`, backgroundColor: colors.brand }]} />
           </View>
-          <AppText variant="micro" color="rgba(17,17,17,0.7)" style={{ marginTop: 6 }}>
+          <AppText variant="micro" color="rgba(255,255,255,0.7)" style={{ marginTop: 6 }}>
             {done} of 3 steps completed
           </AppText>
         </View>
@@ -272,7 +294,7 @@ export default function SocialTab() {
           </AppText>
         </View>
       ) : alerts ? (
-        <PressableScale onPress={() => router.push("/social/alerts" as any)} scaleTo={0.97} style={[styles.alertStrip, { marginHorizontal: gutter, backgroundColor: alerts.following.length ? colors.surface : colors.fixSoft, borderColor: alerts.following.length ? colors.border : "transparent" }]} accessibilityRole="button" accessibilityLabel={alerts.following.length ? `Nearby alerts on for ${alerts.following.length} categories. Manage` : "Set up nearby alerts for free items"} testID="social-alerts-strip">
+        <PressableScale onPress={() => router.push("/social/alerts" as any)} scaleTo={0.97} style={[styles.alertStrip, { marginHorizontal: gutter, backgroundColor: alerts.following.length ? colors.surface : colors.brandSoft, borderColor: alerts.following.length ? colors.border : "transparent" }]} accessibilityRole="button" accessibilityLabel={alerts.following.length ? `Nearby alerts on for ${alerts.following.length} categories. Manage` : "Set up nearby alerts for free items"} testID="social-alerts-strip">
           {alerts.following.length ? (
             <View style={{ flexDirection: "row" }}>
               {alerts.categories
@@ -285,12 +307,12 @@ export default function SocialTab() {
                 ))}
             </View>
           ) : (
-            <View style={[styles.alertDot, { backgroundColor: colors.fix, borderColor: colors.fixSoft }]}>
+            <View style={[styles.alertDot, { backgroundColor: colors.brand, borderColor: colors.brandSoft }]}>
               <Ionicons name="gift" size={15} color="#FFFFFF" />
             </View>
           )}
           <View style={{ flex: 1 }}>
-            <AppText variant="caption" style={{ fontFamily: socialFont.bold }} color={alerts.following.length ? colors.text : colors.fixText} numberOfLines={1}>
+            <AppText variant="caption" style={{ fontFamily: socialFont.bold }} color={alerts.following.length ? colors.text : colors.brand} numberOfLines={1}>
               {alerts.following.length ? `Nearby alerts on · ${alerts.following.length} ${alerts.following.length === 1 ? "category" : "categories"}` : "Hear first about free items"}
             </AppText>
             <AppText variant="micro" tone="tertiary" numberOfLines={1}>
@@ -304,39 +326,14 @@ export default function SocialTab() {
   );
 
   return (
-    <Screen testID="social-screen">
-      {/* Header */}
-      <View style={[styles.header, { alignSelf: "center", width: maxW }]}>
-        <Pressable onPress={() => setScopeOpen(true)} style={styles.scopeBtn} accessibilityRole="button" accessibilityLabel={`Showing posts from ${scopeLabel}. Change area`} testID="social-scope-btn">
-          <FixaMark size={40} testID="social-fixa-mark" />
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <AppText numberOfLines={1} style={[styles.scopeTitle, { flexShrink: 1 }]}>
-                {scopeLabel}
-              </AppText>
-              <Ionicons name="chevron-down" size={16} color={colors.text} />
-            </View>
-            <AppText variant="caption" tone="secondary" numberOfLines={1}>
-              Social · give, sell & share nearby
-            </AppText>
-          </View>
-        </Pressable>
-        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-          <IconButton icon="chatbubbles-outline" label="Messages" badge={chatUnread} onPress={() => router.push("/inbox" as any)} testID="social-inbox" />
-          <IconButton icon="notifications-outline" label="Notifications" badge={notifUnread} onPress={() => router.push("/notifications" as any)} testID="social-notifications" />
-          <Pressable onPress={() => router.push("/social/mine" as any)} accessibilityRole="button" accessibilityLabel="My posts" testID="social-mine-btn" hitSlop={6}>
-            <Avatar name={user?.full_name} uri={user?.avatar_url} size={38} tone="soft" />
-          </Pressable>
-        </View>
-      </View>
-
+    <View style={{ flex: 1 }} testID="social-feed">
       <FlatList
         data={items ?? []}
         keyExtractor={(p) => p.id}
         ListHeaderComponent={header}
-        contentContainerStyle={{ paddingBottom: 150 + insets.bottom }}
+        contentContainerStyle={{ paddingBottom: tabBarOffset + 80 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.fix} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.6}
         renderItem={({ item }) => (
@@ -374,7 +371,7 @@ export default function SocialTab() {
             </View>
           ) : items && items.length && !cursor ? (
             <View style={styles.footer}>
-              <Ionicons name="shield-checkmark" size={16} color={colors.fix} />
+              <Ionicons name="shield-checkmark" size={16} color={colors.brand} />
               <AppText variant="micro" tone="tertiary" align="center">
                 Only the neighbourhood is shown — never an address. You choose who to contact.
               </AppText>
@@ -390,29 +387,39 @@ export default function SocialTab() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
             router.push("/social/compose" as any);
           }}
-          style={[styles.fab, { bottom: 64 + Math.max(insets.bottom, 10) + 16, backgroundColor: colors.fix }, shadows.lg]}
+          style={[styles.fab, { bottom: tabBarOffset + 16, backgroundColor: colors.brand }, shadows.brand]}
           accessibilityRole="button"
           accessibilityLabel="Share an item"
           testID="social-fab"
         >
-          <Ionicons name="create" size={22} color={FIXA.white} />
-          <AppText variant="caption" color={FIXA.white} style={{ fontFamily: socialFont.bold }}>
+          <Ionicons name="create" size={22} color="#FFFFFF" />
+          <AppText variant="caption" color="#FFFFFF" style={{ fontFamily: socialFont.bold }}>
             Post
           </AppText>
         </PressableScale>
       )}
 
       {meta ? <ScopeSheet visible={scopeOpen} onClose={() => setScopeOpen(false)} value={scope} onChange={changeScope} scopes={meta.scopes} /> : null}
-      <PostMenuSheet post={menuPost} visible={!!menuPost} onClose={() => setMenuPost(null)} onUpdated={(p) => { updatePost(p); if (p.status === "gone" || p.status === "paused") removePost(p.id); }} onRemoved={(id) => removePost(id)} />
-    </Screen>
+      <PostMenuSheet
+        post={menuPost}
+        visible={!!menuPost}
+        onClose={() => setMenuPost(null)}
+        onUpdated={(p) => {
+          updatePost(p);
+          if (p.status === "gone" || p.status === "paused") removePost(p.id);
+        }}
+        onRemoved={(id) => removePost(id)}
+      />
+    </View>
   );
 }
 
 function WelcomeStep({ done, label, onPress, testID }: { done: boolean; label: string; onPress?: () => void; testID: string }) {
+  const { colors } = useTheme();
   return (
-    <Pressable onPress={onPress} disabled={!onPress || done} style={[styles.step, { backgroundColor: done ? "rgba(17,17,17,0.9)" : "rgba(255,255,255,0.75)" }]} accessibilityRole="button" accessibilityState={{ checked: done, disabled: !onPress || done }} accessibilityLabel={`${label}${done ? ", done" : ""}`} testID={testID}>
-      <Ionicons name={done ? "checkmark-circle" : "ellipse-outline"} size={16} color={done ? FIXA.lime : FIXA.ink} />
-      <AppText variant="micro" color={done ? FIXA.white : FIXA.ink} numberOfLines={2} style={{ flex: 1, fontFamily: socialFont.semibold }}>
+    <Pressable onPress={onPress} disabled={!onPress || done} style={[styles.step, { backgroundColor: done ? colors.brand : "rgba(255,255,255,0.12)" }]} accessibilityRole="button" accessibilityState={{ checked: done, disabled: !onPress || done }} accessibilityLabel={`${label}${done ? ", done" : ""}`} testID={testID}>
+      <Ionicons name={done ? "checkmark-circle" : "ellipse-outline"} size={16} color="#FFFFFF" />
+      <AppText variant="micro" color="#FFFFFF" numberOfLines={2} style={{ flex: 1, fontFamily: socialFont.semibold }}>
         {label}
       </AppText>
     </Pressable>
@@ -420,18 +427,19 @@ function WelcomeStep({ done, label, onPress, testID }: { done: boolean; label: s
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 10 },
-  scopeBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4, paddingRight: 6 },
-  scopeTitle: { fontFamily: socialFont.black, fontSize: 18, lineHeight: 22, letterSpacing: -0.4 },
+  toolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingTop: 4, paddingBottom: 12 },
+  scopeBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 40, paddingLeft: 12, paddingRight: 10, borderRadius: radii.pill, maxWidth: "70%" },
+  scopeTitle: { fontFamily: socialFont.bold, fontSize: 15, lineHeight: 19, letterSpacing: -0.2 },
+  mineBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 40, paddingHorizontal: 8 },
   search: { flexDirection: "row", alignItems: "center", gap: 10, height: 48, paddingHorizontal: 16, borderRadius: radii.pill, borderWidth: 1 },
   searchInput: { flex: 1, fontSize: 15, fontFamily: "PlusJakartaSans-500", paddingVertical: 0 },
-  welcome: { marginTop: 14, padding: 14, borderRadius: radii.xl, backgroundColor: FIXA.lime },
-  welcomeLogo: { width: 72, height: 62, borderRadius: radii.md, backgroundColor: FIXA.white, alignItems: "center", justifyContent: "center" },
+  welcome: { marginTop: 14, padding: 14, borderRadius: radii.xl },
+  welcomeLogo: { width: 56, height: 56, borderRadius: radii.md, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   welcomeTitle: { fontFamily: socialFont.black, fontSize: 18, lineHeight: 22, letterSpacing: -0.4 },
-  welcomeX: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.6)", alignItems: "center", justifyContent: "center", alignSelf: "flex-start" },
+  welcomeX: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center", alignSelf: "flex-start" },
   step: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, minHeight: 44, borderRadius: radii.md },
-  progressTrack: { height: 5, borderRadius: 3, backgroundColor: "rgba(17,17,17,0.15)", marginTop: 12, overflow: "hidden" },
-  progressFill: { height: "100%", borderRadius: 3, backgroundColor: FIXA.ink },
+  progressTrack: { height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.18)", marginTop: 12, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 3 },
   chips: { paddingHorizontal: 16, gap: 8, paddingVertical: 12 },
   feedTitleRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 2 },
   feedTitle: { fontFamily: socialFont.black, fontSize: 20, lineHeight: 24, letterSpacing: -0.5 },

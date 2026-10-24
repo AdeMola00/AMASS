@@ -19,7 +19,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Button, IconButton, Input, PressableScale, Screen, Sheet, SheetLink, Skeleton, Toggle, useCelebrate, useToast } from "@/src/ui";
 import { socialFeedSignal } from "@/src/components/social/socialFeedSignal";
-import { FIXA, photoUrl, socialFont } from "@/src/components/social/socialTheme";
+import { photoUrl, socialFont } from "@/src/components/social/socialTheme";
 
 const MAX_PHOTOS = 6;
 
@@ -169,7 +169,7 @@ export default function SocialComposeScreen() {
       track(editing ? "social_post_edited" : "social_post_created", { kind, category, photos: photos.length, visibility });
       socialFeedSignal.markDirty();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      if (!editing) celebrate({ title: kind === "give" ? "Shared 🎁" : "It's live!", icon: kind === "give" ? "gift" : "pricetag", tone: "fix" });
+      if (!editing) celebrate({ title: kind === "give" ? "Shared 🎁" : "It's live!", icon: kind === "give" ? "gift" : "pricetag", tone: "brand" });
       const alerted = !editing ? Number(("alerted" in r ? r.alerted : 0) ?? 0) : 0;
       toast.success(editing ? "Post updated" : kind === "give" ? "Shared with your neighbours 🎁" : "Your item is live", editing ? undefined : alerted > 0 ? `${alerted} neighbour${alerted === 1 ? "" : "s"} following ${meta?.categories.find((c) => c.key === category)?.label ?? "this category"} got a nudge · ${scopeLabel}` : `Visible to ${scopeLabel}`);
       // Edit: pop back to the detail screen underneath (it refetches via the signal). Create: swap the composer for the new post.
@@ -187,9 +187,9 @@ export default function SocialComposeScreen() {
   return (
     <Screen testID="social-compose-screen">
       <View style={styles.header}>
-        <IconButton icon="close" label="Cancel" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/social" as any))} testID="social-compose-cancel" />
+        <IconButton icon="close" label="Cancel" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/updates?tab=nearby" as any))} testID="social-compose-cancel" />
         <AppText style={styles.headerTitle}>{editing ? "Edit post" : "Share an item"}</AppText>
-        <Button label={editing ? "Save" : "Post"} variant="fix" size="sm" disabled={!canPost} loading={submitting} onPress={submit} testID="social-compose-submit" />
+        <Button label={editing ? "Save" : "Post"} variant="brand" size="sm" disabled={!canPost} loading={submitting} onPress={submit} testID="social-compose-submit" />
       </View>
 
       {loading ? (
@@ -212,7 +212,7 @@ export default function SocialComposeScreen() {
                   <Image source={{ uri: photoUrl(u) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
                   {i === 0 ? (
                     <View style={styles.coverTag}>
-                      <AppText variant="micro" color={FIXA.white} style={{ fontFamily: socialFont.bold }}>
+                      <AppText variant="micro" color="#FFFFFF" style={{ fontFamily: socialFont.bold }}>
                         Cover
                       </AppText>
                     </View>
@@ -220,18 +220,18 @@ export default function SocialComposeScreen() {
                 </Pressable>
               ))}
               {photos.length < MAX_PHOTOS ? (
-                <PressableScale onPress={addPhotos} disabled={!!uploading} style={[styles.photo, styles.addPhoto, { borderColor: colors.fix, backgroundColor: colors.fixSoft }]} accessibilityRole="button" accessibilityLabel="Add photos" testID="social-compose-add-photos">
+                <PressableScale onPress={addPhotos} disabled={!!uploading} style={[styles.photo, styles.addPhoto, { borderColor: colors.brand, backgroundColor: colors.brandSoft }]} accessibilityRole="button" accessibilityLabel="Add photos" testID="social-compose-add-photos">
                   {uploading ? (
                     <>
-                      <Ionicons name="cloud-upload-outline" size={26} color={colors.fix} />
-                      <AppText variant="micro" color={colors.fixText} style={{ fontFamily: socialFont.semibold }}>
+                      <Ionicons name="cloud-upload-outline" size={26} color={colors.brand} />
+                      <AppText variant="micro" color={colors.brandText} style={{ fontFamily: socialFont.semibold }}>
                         Uploading {uploading.done}/{uploading.total}
                       </AppText>
                     </>
                   ) : (
                     <>
-                      <Ionicons name="images-outline" size={26} color={colors.fix} />
-                      <AppText variant="caption" color={colors.fixText} style={{ fontFamily: socialFont.bold }}>
+                      <Ionicons name="images-outline" size={26} color={colors.brand} />
+                      <AppText variant="caption" color={colors.brandText} style={{ fontFamily: socialFont.bold }}>
                         Add photos
                       </AppText>
                     </>
@@ -259,9 +259,9 @@ export default function SocialComposeScreen() {
               {(["give", "sell"] as SocialPostKind[]).map((k) => {
                 const active = kind === k;
                 return (
-                  <Pressable key={k} onPress={() => setKind(k)} style={[styles.segmentItem, active && { backgroundColor: colors.fix }]} accessibilityRole="radio" accessibilityState={{ selected: active }} testID={`social-compose-kind-${k}`}>
-                    <Ionicons name={k === "give" ? "gift" : "pricetag"} size={16} color={active ? FIXA.white : colors.text} />
-                    <AppText variant="caption" color={active ? FIXA.white : colors.text} style={{ fontFamily: socialFont.bold }}>
+                  <Pressable key={k} onPress={() => setKind(k)} style={[styles.segmentItem, active && { backgroundColor: colors.brand }]} accessibilityRole="radio" accessibilityState={{ selected: active }} testID={`social-compose-kind-${k}`}>
+                    <Ionicons name={k === "give" ? "gift" : "pricetag"} size={16} color={active ? colors.onBrand : colors.text} />
+                    <AppText variant="caption" color={active ? colors.onBrand : colors.text} style={{ fontFamily: socialFont.bold }}>
                       {k === "give" ? "Free" : "For sale"}
                     </AppText>
                   </Pressable>
@@ -282,9 +282,9 @@ export default function SocialComposeScreen() {
                 </View>
               </View>
             ) : (
-              <View style={[styles.hint, { backgroundColor: colors.fixSoft }]}>
-                <Ionicons name="leaf" size={16} color={colors.fix} />
-                <AppText variant="caption" color={colors.fixText} style={{ flex: 1 }}>
+              <View style={[styles.hint, { backgroundColor: colors.brandSoft }]}>
+                <Ionicons name="leaf" size={16} color={colors.brand} />
+                <AppText variant="caption" color={colors.brandText} style={{ flex: 1 }}>
                   Free items get a FREE tag and reach neighbours first. Thank you for keeping it out of landfill.
                 </AppText>
               </View>
@@ -339,7 +339,7 @@ export default function SocialComposeScreen() {
             </View>
             <Input value={pickupNote} onChangeText={setPickupNote} placeholder="Pickup note (optional), e.g. weekends only, estate gate" maxLength={120} iconLeft="location-outline" containerStyle={{ marginBottom: 0 }} testID="social-compose-pickup" />
             <View style={[styles.hint, { backgroundColor: colors.surfaceAlt }]}>
-              <Ionicons name="shield-checkmark-outline" size={16} color={colors.fix} />
+              <Ionicons name="shield-checkmark-outline" size={16} color={colors.brand} />
               <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
                 Neighbours see “{scopeLabel}” — never your address. Nobody is contacted on your behalf; people reach out only if they choose to.
               </AppText>
@@ -361,7 +361,7 @@ export default function SocialComposeScreen() {
             </View>
           ) : null}
 
-          <Button label={editing ? "Save changes" : kind === "give" ? "Share for free" : "Post for sale"} variant="fix" size="lg" fullWidth iconLeft={kind === "give" ? "gift" : "pricetag"} disabled={!canPost} loading={submitting} onPress={submit} testID="social-compose-submit-bottom" />
+          <Button label={editing ? "Save changes" : kind === "give" ? "Share for free" : "Post for sale"} variant="brand" size="lg" fullWidth iconLeft={kind === "give" ? "gift" : "pricetag"} disabled={!canPost} loading={submitting} onPress={submit} testID="social-compose-submit-bottom" />
           {touched && !canPost ? (
             <AppText variant="caption" color={colors.error} align="center">
               {!titleOk ? "Add a title" : !category ? "Pick a category" : !priceOk ? "Add a price or choose Free" : uploading ? "Wait for photos to finish uploading" : ""}
@@ -376,9 +376,9 @@ export default function SocialComposeScreen() {
           {(meta?.categories ?? []).map((c) => {
             const active = category === c.key;
             return (
-              <Pressable key={c.key} onPress={() => { setCategory(c.key); setSheet(null); }} style={[styles.catChip, { backgroundColor: active ? colors.fix : colors.surfaceAlt }]} accessibilityRole="radio" accessibilityState={{ selected: active }} testID={`social-category-${c.key}`}>
-                <Ionicons name={c.icon as any} size={16} color={active ? FIXA.white : c.color} />
-                <AppText variant="caption" color={active ? FIXA.white : colors.text} style={{ fontFamily: socialFont.semibold }}>
+              <Pressable key={c.key} onPress={() => { setCategory(c.key); setSheet(null); }} style={[styles.catChip, { backgroundColor: active ? colors.brand : colors.surfaceAlt }]} accessibilityRole="radio" accessibilityState={{ selected: active }} testID={`social-category-${c.key}`}>
+                <Ionicons name={c.icon as any} size={16} color={active ? colors.onBrand : c.color} />
+                <AppText variant="caption" color={active ? colors.onBrand : colors.text} style={{ fontFamily: socialFont.semibold }}>
                   {c.label}
                 </AppText>
               </Pressable>
@@ -393,11 +393,11 @@ export default function SocialComposeScreen() {
           {(meta?.conditions ?? []).map((c) => {
             const active = condition === c.key;
             return (
-              <Pressable key={c.key} onPress={() => { setCondition(c.key); setSheet(null); }} style={[styles.optionRow, { backgroundColor: active ? colors.fixSoft : colors.surfaceAlt }]} accessibilityRole="radio" accessibilityState={{ selected: active }} testID={`social-condition-${c.key}`}>
+              <Pressable key={c.key} onPress={() => { setCondition(c.key); setSheet(null); }} style={[styles.optionRow, { backgroundColor: active ? colors.brandSoft : colors.surfaceAlt }]} accessibilityRole="radio" accessibilityState={{ selected: active }} testID={`social-condition-${c.key}`}>
                 <AppText variant="bodyMedium" style={{ flex: 1 }}>
                   {c.label}
                 </AppText>
-                <Ionicons name={active ? "checkmark-circle" : "ellipse-outline"} size={20} color={active ? colors.fix : colors.textMuted} />
+                <Ionicons name={active ? "checkmark-circle" : "ellipse-outline"} size={20} color={active ? colors.brand : colors.textMuted} />
               </Pressable>
             );
           })}
@@ -414,15 +414,15 @@ export default function SocialComposeScreen() {
           ]).map((o) => {
             const active = visibility === o.key;
             return (
-              <Pressable key={o.key} disabled={o.disabled} onPress={() => { setVisibility(o.key); setSheet(null); }} style={[styles.optionRow, { backgroundColor: active ? colors.fixSoft : colors.surfaceAlt, opacity: o.disabled ? 0.55 : 1 }]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled: o.disabled }} testID={`social-visibility-${o.key}`}>
-                <Ionicons name={o.icon as any} size={18} color={active ? colors.fix : colors.text} />
+              <Pressable key={o.key} disabled={o.disabled} onPress={() => { setVisibility(o.key); setSheet(null); }} style={[styles.optionRow, { backgroundColor: active ? colors.brandSoft : colors.surfaceAlt, opacity: o.disabled ? 0.55 : 1 }]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled: o.disabled }} testID={`social-visibility-${o.key}`}>
+                <Ionicons name={o.icon as any} size={18} color={active ? colors.brand : colors.text} />
                 <View style={{ flex: 1 }}>
                   <AppText variant="bodyMedium">{o.label}</AppText>
                   <AppText variant="caption" tone="tertiary">
                     {o.caption}
                   </AppText>
                 </View>
-                <Ionicons name={active ? "checkmark-circle" : "ellipse-outline"} size={20} color={active ? colors.fix : colors.textMuted} />
+                <Ionicons name={active ? "checkmark-circle" : "ellipse-outline"} size={20} color={active ? colors.brand : colors.textMuted} />
               </Pressable>
             );
           })}

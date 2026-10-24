@@ -1,0 +1,37 @@
+{
+  "summary": "Frontend-only test (viewport 390x844, plus 768 and 320 checks) of the floating pill tab bar, the new Updates tab (Activity + Nearby), AMASS rebranding of the social screens, the floating bar not covering content, and the standalone /notifications screen. Everything requested works. Floating pill: 358x66 at x=16, radius 33, shadow; 5 tabs (tab-index/updates/marketplace/neighbours/profile) labelled Home/Updates/Market/Neighbours/Profile; each tap target is 71x64. The active tab shows a red icon rgb(225,27,34) on a soft red capsule. I switched through all 5 tabs 3 times: the right screen rendered every time, the bar stayed on every tab, and there were no page errors. Badges show numbers: Updates 23, then 22 after reading one; Neighbours 32. Updates header: emblem, title, subtitle ('23 unread updates', 'Free & for-sale items from neighbours' on Nearby). Mark-all shows only on Activity; inbox goes to /inbox and prefs to /notification-preferences. Activity list: 12 category chips that filter (property_matches gave 7 rows), day groups, about 41 rows plus 'Load older'. Tapping a row marked it read (23 to 22, persisted) and deep-linked to /social/post/{id}. Nearby: social-feed, scope button, search, Free/For sale chips (Free filter gave 30 posts), category chips, posts, and the FAB opens /social/compose. The chosen segment persists across tab switches; /updates?tab=nearby and ?tab=activity open the right segment. Branding: /social/alerts hero is a dark ink card with a red gift disc. Nearby, /social/mine, post detail and compose have no lime (#7ED958) or FIXA green surfaces or buttons. The only #2E8B57 is the semantic FREE tag (accepted), the shared Toggle on-state in compose, and the global 'Back online' banner. Primary buttons are AMASS red. Clearance: Home sheet handle and '3 homes here' header sit above the pill (pill top 756). The last items of Activity ('Load older' and footer) and Nearby (trust footer) are fully visible above it. social-fab and Market sell-fab (Declutter and FIXA) end at 740, above the pill top at 756. /notifications works with notif-mark-all, notif-prefs and the shared feed. On tablet the pill is capped at 520 and centred. Mark-all-read was checked for presence only and not tapped, so the demo user's unread data stays intact.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "FloatingTabBar label", "issue": "At 320px width the 'Neighbours' label is cut to 'Neighbo…' (text 63px wide, tab 57px). Reduce letter-spacing or font size below 360dp, or allow a slightly smaller label.", "testID": "tab-neighbours", "priority": "low"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/social/compose", "issues": ["The 'Message in AMASS' toggle (social-compose-contact-chat) uses success green #2E8B57 when on, because the shared Toggle uses colors.success. For a strict AMASS look, use brand red for the on-state, or accept it as a semantic switch."]},
+      {"screen": "Updates (tablet 768)", "issues": ["Header and segmented control are capped at 720px, but the category chips and notification list span the full width, so they don't line up on wide screens. Cap the feed at the same width."]},
+      {"screen": "Activity feed", "issues": ["'Open →' links use the category tint (green for document/verification items, amber for warnings). This is semantic, not FIXA branding; noted only."]}
+    ],
+    "react_native_issues": [
+      {"component": "TabButton accessibilityState", "issue": "accessibilityState={{selected}} with accessibilityRole='tab' does not produce aria-selected on web (it reads null), so screen readers on web can't tell which tab is active. Use the aria-selected prop as well. Reference: /app/frontend/app/(tabs)/_layout.tsx:123-124"}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_66.json", ".screenshots/ (home, neighbours, profile, updates_activity, updates_activity_end, nearby, nearby_end, compose, alerts, mine, post, mkt_declutter, mkt_fixa, notifications, tablet, narrow)"],
+  "action_items": [
+    "LOW: Stop 'Neighbours' from truncating at 320px widths (tab-neighbours).",
+    "LOW: Add aria-selected to TabButton so the active tab is announced on web.",
+    "LOW (optional): Shared Toggle on-state is success green; switch it to brand red if no green should appear on AMASS social screens.",
+    "LOW (optional): Cap the Updates feed width to match the 720px header on tablet/web."
+  ],
+  "critical_code_review_comments": [
+    "tabBar.ts gives a single useTabBarOffset; SocialFeed, NotificationFeed, Home sheet and Market FAB all use it correctly. Neighbours (paddingBottom 130) and Profile (140) use hardcoded padding: enough today (offset is 88), but they should use useTabBarOffset for consistency on devices with a large bottom inset.",
+    "useBadges re-polls every time activeIndex changes, which re-subscribes the interval and AppState listener and fires 3 API calls on every tab switch. Acceptable, but a focus-driven refresh would be cheaper.",
+    "No deprecated Expo packages (expo-av, expo-barcode-scanner, expo-background-fetch) in the reviewed files."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% of requested flows pass (4 low-priority polish items)"},
+  "seed_data_creation": "None. One demo notification was marked read by tapping it (unread went from 23 to 22).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login demo@amass.africa / amass2026 at /(auth)/login. Floating bar testID floating-bottom-nav; its pill is the first child (top at 756 on 390x844). On Market a sponsored ad shows first; close it with ad-skip. Market sections: mkt-tab-brands / mkt-tab-fixa / mkt-tab-declutter.",
+  "rca_of_issue": ""
+}

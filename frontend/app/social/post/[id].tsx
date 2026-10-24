@@ -1,6 +1,6 @@
 /**
  * Social post detail — full-bleed photo pager with scrim, title + FREE/price + condition, poster card,
- * description, pickup note, replies (comments) and a sticky "Message {name}" CTA (FIXA green).
+ * description, pickup note, replies (comments) and a sticky "Message {name}" CTA (AMASS red).
  * Contact is only ever opened by the viewer tapping the CTA; owners get "Manage" instead.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -20,7 +20,7 @@ import { ContactSheet } from "@/src/components/social/ContactSheet";
 import { PostMenuSheet } from "@/src/components/social/PostMenuSheet";
 import { ActionPill, PriceTag, SocialHeading, StatusTag } from "@/src/components/social/SocialBits";
 import { socialFeedSignal } from "@/src/components/social/socialFeedSignal";
-import { FIXA, photoUrl, socialFont, timeAgo } from "@/src/components/social/socialTheme";
+import { photoUrl, socialFont, timeAgo } from "@/src/components/social/socialTheme";
 
 export default function SocialPostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -118,7 +118,7 @@ export default function SocialPostScreen() {
 
   const topBar = (
     <View style={[styles.topBar, { top: insets.top + 6 }]}>
-      <IconButton icon="arrow-back" label="Back" variant="glass" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/social" as any))} testID="social-post-back" />
+      <IconButton icon="arrow-back" label="Back" variant="glass" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/updates?tab=nearby" as any))} testID="social-post-back" />
       <View style={{ flex: 1 }} />
       <IconButton icon="share-outline" label="Share post" variant="glass" onPress={share} testID="social-post-share" />
       <IconButton icon="ellipsis-horizontal" label="More options" variant="glass" onPress={() => setMenuOpen(true)} testID="social-post-menu" />
@@ -130,7 +130,7 @@ export default function SocialPostScreen() {
       <Screen testID="social-post-screen">
         <View style={{ paddingTop: insets.top + 56 }}>
           {topBar}
-          <EmptyState variant="error" icon="leaf-outline" title="This post isn't available" body={error} actionLabel="Back to Social" onAction={() => router.replace("/(tabs)/social" as any)} testID="social-post-error" />
+          <EmptyState variant="error" icon="leaf-outline" title="This post isn't available" body={error} actionLabel="Back to Updates" onAction={() => router.replace("/(tabs)/updates?tab=nearby" as any)} testID="social-post-error" />
         </View>
       </Screen>
     );
@@ -154,9 +154,9 @@ export default function SocialPostScreen() {
                 ))}
               </ScrollView>
             ) : (
-              <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: colors.fixSoft }]}>
-                <Ionicons name="cube-outline" size={64} color={colors.fix} />
-                <AppText variant="caption" color={colors.fixText} style={{ marginTop: 8, fontFamily: socialFont.semibold }}>
+              <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: colors.brandSoft }]}>
+                <Ionicons name="cube-outline" size={64} color={colors.brand} />
+                <AppText variant="caption" color={colors.brandText} style={{ marginTop: 8, fontFamily: socialFont.semibold }}>
                   No photo added
                 </AppText>
               </View>
@@ -167,7 +167,7 @@ export default function SocialPostScreen() {
             {photos.length > 1 ? (
               <View style={styles.dots}>
                 {photos.map((_, i) => (
-                  <View key={i} style={[styles.dot, { backgroundColor: i === img ? FIXA.white : "rgba(255,255,255,0.45)" }, i === img && { width: 18 }]} />
+                  <View key={i} style={[styles.dot, { backgroundColor: i === img ? "#FFFFFF" : "rgba(255,255,255,0.45)" }, i === img && { width: 18 }]} />
                 ))}
               </View>
             ) : null}
@@ -184,9 +184,9 @@ export default function SocialPostScreen() {
               {/* Title + price */}
               <View style={{ gap: 8 }}>
                 <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  <View style={[styles.kindTag, { backgroundColor: colors.fixSoft }]}>
-                    <Ionicons name={post.kind === "give" ? "gift" : "pricetag"} size={13} color={colors.fix} />
-                    <AppText variant="micro" color={colors.fixText} style={{ fontFamily: socialFont.bold }}>
+                  <View style={[styles.kindTag, { backgroundColor: colors.brandSoft }]}>
+                    <Ionicons name={post.kind === "give" ? "gift" : "pricetag"} size={13} color={colors.brand} />
+                    <AppText variant="micro" color={colors.brandText} style={{ fontFamily: socialFont.bold }}>
                       {post.kind === "give" ? "Free to collect" : "For sale"}
                     </AppText>
                   </View>
@@ -207,7 +207,7 @@ export default function SocialPostScreen() {
                     <AppText numberOfLines={1} style={[styles.posterName, { flexShrink: 1 }]}>
                       {post.author.full_name}
                     </AppText>
-                    {post.author.same_estate && !post.is_mine ? <Badge label="Your estate" tone="fix" size="xs" /> : null}
+                    {post.author.same_estate && !post.is_mine ? <Badge label="Your estate" tone="brand" size="xs" /> : null}
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                     <Ionicons name={post.visibility === "estate" ? "home" : post.visibility === "area" ? "navigate" : "business"} size={13} color={colors.textTertiary} />
@@ -260,7 +260,7 @@ export default function SocialPostScreen() {
                         <AppText variant="caption" style={{ fontFamily: socialFont.bold }} numberOfLines={1}>
                           {c.author?.full_name ?? "Neighbour"}
                         </AppText>
-                        {c.is_poster ? <Badge label="Poster" tone="fix" size="xs" /> : null}
+                        {c.is_poster ? <Badge label="Poster" tone="brand" size="xs" /> : null}
                         <AppText variant="micro" tone="tertiary">
                           {timeAgo(c.created_at)}
                         </AppText>
@@ -276,8 +276,8 @@ export default function SocialPostScreen() {
                 ))}
                 <View style={[styles.replyBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <TextInput value={reply} onChangeText={setReply} placeholder={post.is_mine ? "Reply to neighbours…" : `Ask ${first} a question…`} placeholderTextColor={colors.textTertiary} multiline maxLength={500} style={[styles.replyInput, { color: colors.text }, Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null]} accessibilityLabel="Write a reply" testID="social-reply-input" />
-                  <Pressable onPress={sendReply} disabled={reply.trim().length < 1 || sending} style={[styles.replySend, { backgroundColor: reply.trim().length ? colors.fix : colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel="Send reply" testID="social-reply-send">
-                    <Ionicons name="arrow-up" size={18} color={reply.trim().length ? FIXA.white : colors.textMuted} />
+                  <Pressable onPress={sendReply} disabled={reply.trim().length < 1 || sending} style={[styles.replySend, { backgroundColor: reply.trim().length ? colors.brand : colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel="Send reply" testID="social-reply-send">
+                    <Ionicons name="arrow-up" size={18} color={reply.trim().length ? colors.onBrand : colors.textMuted} />
                   </Pressable>
                 </View>
               </View>
@@ -310,7 +310,7 @@ export default function SocialPostScreen() {
           {post.is_mine ? (
             <Button label="Manage post" variant="primary" size="lg" iconLeft="options-outline" onPress={() => setMenuOpen(true)} testID="social-post-manage" />
           ) : (
-            <Button label={`Message ${first}`} variant="fix" size="lg" iconLeft="chatbubble-ellipses" disabled={!post.can_contact} onPress={() => setContactOpen(true)} testID="social-post-contact" />
+            <Button label={`Message ${first}`} variant="brand" size="lg" iconLeft="chatbubble-ellipses" disabled={!post.can_contact} onPress={() => setContactOpen(true)} testID="social-post-contact" />
           )}
         </View>
       ) : null}
@@ -326,7 +326,7 @@ export default function SocialPostScreen() {
         }}
         onRemoved={() => {
           socialFeedSignal.markDirty();
-          router.canGoBack() ? router.back() : router.replace("/(tabs)/social" as any);
+          router.canGoBack() ? router.back() : router.replace("/(tabs)/updates?tab=nearby" as any);
         }}
       />
     </View>
@@ -338,7 +338,7 @@ function Row({ icon, title, body }: { icon: any; title: string; body: string }) 
   return (
     <View style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }}>
       <View style={[styles.rowIcon, { backgroundColor: colors.surface }]}>
-        <Ionicons name={icon} size={15} color={colors.fix} />
+        <Ionicons name={icon} size={15} color={colors.brand} />
       </View>
       <View style={{ flex: 1 }}>
         <AppText variant="caption" style={{ fontFamily: socialFont.bold }}>
@@ -357,8 +357,8 @@ function SimilarCard({ p, onPress }: { p: SocialPost; onPress: () => void }) {
   const u = photoUrl(p.cover);
   return (
     <PressableScale onPress={onPress} style={[styles.similar, { backgroundColor: colors.surface, borderColor: colors.border }, !isDark && shadows.xs]} accessibilityRole="button" accessibilityLabel={`${p.title}, ${p.kind === "give" ? "free" : "for sale"}`} testID={`social-similar-${p.id}`}>
-      <View style={[styles.similarImg, { backgroundColor: colors.fixSoft }]}>
-        {u ? <Image source={{ uri: u }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} /> : <Ionicons name="cube-outline" size={28} color={colors.fix} />}
+      <View style={[styles.similarImg, { backgroundColor: colors.brandSoft }]}>
+        {u ? <Image source={{ uri: u }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} /> : <Ionicons name="cube-outline" size={28} color={colors.brand} />}
       </View>
       <View style={{ padding: 10, gap: 4 }}>
         <PriceTag post={p} size="sm" />
