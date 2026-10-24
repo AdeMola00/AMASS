@@ -678,23 +678,31 @@ export type NotifCenterPage = {
   items: AppNotification[];
   unread: number;
   unread_by_category: Record<string, number>;
+  /** Read (not dismissed) rows in the current category — drives the "Clear read" action. */
+  read_count: number;
   categories: Record<string, NotifCategoryMeta>;
   next_before: string | null;
 };
+export type NotifChannelPref = { enabled: boolean; frequency: NotifFrequency; push: boolean; email: boolean };
+export type EmailDigestFrequency = "daily" | "weekly";
 export type NotifPrefs = {
   user_id: string;
-  categories: Record<string, { enabled: boolean; frequency: NotifFrequency }>;
+  categories: Record<string, NotifChannelPref>;
   quiet_hours: { enabled: boolean; start: string; end: string };
   push_enabled: boolean;
   push_prompt: { status: PushPromptStatus; last_prompted_at: string | null; context: string | null };
+  email_digest: { enabled: boolean; frequency: EmailDigestFrequency; hour: number };
+  /** The account email digests go to (null when the account has none). */
+  email?: string | null;
   updated_at: string;
   catalog: Record<string, NotifCategoryMeta>;
   frequencies: NotifFrequency[];
 };
 export type NotifPrefsUpdate = {
-  categories?: Record<string, { enabled?: boolean; frequency?: NotifFrequency }>;
+  categories?: Record<string, { enabled?: boolean; frequency?: NotifFrequency; push?: boolean; email?: boolean }>;
   quiet_hours?: { enabled?: boolean; start?: string; end?: string };
   push_enabled?: boolean;
+  email_digest?: { enabled?: boolean; frequency?: EmailDigestFrequency; hour?: number };
 };
 
 /* ─── Monetization types ─────────────────────────────────────────────── */
@@ -1607,11 +1615,12 @@ export const api = {
   welcomePhotos: (limit = 3) => req<{ items: { property_id: string; image: string; label: string; title: string }[]; cached: boolean }>(`/public/welcome-photos?limit=${limit}`),
 
   // ─── Notification Center (user-controlled categories / frequency / quiet hours / push) ───
-  notifCenter: (params: { category?: string; before?: string; limit?: number } = {}) => {
+  notifCenter: (params: { category?: string; before?: string; limit?: number; unreadOnly?: boolean } = {}) => {
     const q = new URLSearchParams();
     if (params.category && params.category !== "all") q.set("category", params.category);
     if (params.before) q.set("before", params.before);
     if (params.limit) q.set("limit", String(params.limit));
+    if (params.unreadOnly) q.set("unread_only", "true");
     const qs = q.toString();
     return req<NotifCenterPage>(`/notifications/center${qs ? `?${qs}` : ""}`);
   },
@@ -1625,6 +1634,12 @@ export const api = {
       body: JSON.stringify({ status, context }),
     }),
   markNotifRead: (id: string) => req<{ ok: boolean; unread: number }>(`/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
+  markNotifUnread: (id: string) => req<{ ok: boolean; unread: number }>(`/notifications/${encodeURIComponent(id)}/unread`, { method: "POST" }),
+  dismissNotif: (id: string) => req<{ ok: boolean; unread: number }>(`/notifications/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
+  restoreNotif: (id: string) => req<{ ok: boolean; notification: AppNotification; unread: number }>(`/notifications/${encodeURIComponent(id)}/restore`, { method: "POST" }),
+  dismissReadNotifs: (category?: string) =>
+    req<{ ok: boolean; marked: number; unread: number }>(`/notifications/dismiss-read${category && category !== "all" ? `?category=${encodeURIComponent(category)}` : ""}`, { method: "POST" }),
+  notifEmailTest: () => req<{ ok: boolean; sent?: boolean; to?: string; count?: number; subject?: string }>("/notifications/email/test", { method: "POST" }),
   markNotifReadByTarget: (target_type: string, target_id: string) =>
     req<{ ok: boolean; marked: number; unread: number }>("/notifications/read-by-target", {
       method: "POST",

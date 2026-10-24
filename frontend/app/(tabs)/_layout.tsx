@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { useAuth } from "@/src/contexts/auth";
 import { api } from "@/src/lib/api";
+import { subscribeBadges } from "@/src/lib/badgeSignal";
 import { useTheme } from "@/src/theme";
 import { motion, radii } from "@/src/theme/tokens";
 import { AppText } from "@/src/ui";
@@ -37,7 +38,7 @@ export default function TabsLayout() {
   );
 }
 
-/** Badge counts — Updates = unread alerts; Neighbours = unread chats + requests waiting on me. Polls every 30 s + on foreground. */
+/** Badge counts — Updates = unread alerts; Neighbours = unread chats + requests waiting on me. Polls every 30 s, on foreground, and whenever a screen signals a change. */
 function useBadges(activeIndex: number) {
   const [counts, setCounts] = useState({ updates: 0, neighbours: 0 });
   useEffect(() => {
@@ -49,10 +50,12 @@ function useBadges(activeIndex: number) {
     load();
     const id = setInterval(load, 30000);
     const sub = AppState.addEventListener("change", (s) => s === "active" && load());
+    const unsub = subscribeBadges(load);
     return () => {
       alive = false;
       clearInterval(id);
       sub.remove();
+      unsub();
     };
   }, [activeIndex]);
   return counts;

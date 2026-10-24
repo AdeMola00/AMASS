@@ -998,3 +998,11 @@ agent_communication:
       Updates header/segments/deep links, Nearby feed, AMASS branding on /social/*, nothing hidden under the pill, /notifications still OK).
       Follow-ups fixed after the report: 320 px label shrink, aria-selected on tabs, NotificationFeed capped to the 720 px header column on tablets.
       Theme gained `colors.brandText`. Marketplace FIXA services section intentionally untouched (separate product).
+
+  - agent: "main"
+    message: |
+      Iterations 67–68 — Notifications deep dive. Backend: per-category push/email channels, opt-in email digest (daily/weekly/hour,
+      hourly flush, test-send with cooldown, signed unsubscribe), soft dismiss/restore, mark-unread, dismiss-read, unread_only + read_count.
+      pytest tests/test_notification_read_state_digest.py (11) + test_notification_center.py (13) green. Frontend: Unread filter chip,
+      swipe → read/unread · ← dismiss with Undo, Clear read, email summary card + channel chips in preferences, instant badge refresh.
+      iteration_67 found slow-swipe navigation/double-count/badge lag → fixed; iteration_68 all pass. Test inbox delivered@resend.dev / Digest2026!.

@@ -1,8 +1,10 @@
 /**
  * Notification feed — the shared body of the Updates tab (Activity) and the /notifications screen.
- * Category chips → day-grouped rows → deep links. Exposes `markAllRead()` for the host header.
+ * Category chips (+ "Unread" filter, remembered) → day-grouped rows → deep links.
+ * Rows swipe: → mark read/unread · ← dismiss, both with Undo. "Clear read" tucks away everything already read.
+ * Exposes `markAllRead()` / `reload()` for the host header.
  */
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Platform, useWindowDimensions } from "react-native";
 import Animated from "react-native-reanimated";
 import { useRouter } from "expo-router";
@@ -11,9 +13,14 @@ import * as Haptics from "expo-haptics";
 import { api, type AppNotification, type NotifCategoryMeta } from "@/src/lib/api";
 import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { pushSupported } from "@/src/lib/push";
+import { storage } from "@/src/utils/storage";
+import { notifyBadges } from "@/src/lib/badgeSignal";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, BrandGradient, Button, Chip, EmptyState, SkeletonRows, useBounceRefresh, useToast, type IconName } from "@/src/ui";
+import { SwipeableNotification, swipedRecently } from "./SwipeableNotification";
+
+const UNREAD_ONLY_KEY = "amass_notif_unread_only_v1";
 
 type Tone = "default" | "brand" | "mass" | "fix" | "success" | "warning" | "info" | "premium";
 
@@ -181,6 +188,7 @@ export const NotificationFeed = forwardRef<
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const [byCat, setByCat] = useState<Record<string, number>>({});
+  const [readCount, setReadCount] = useState(0);
   const [catalog, setCatalog] = useState<Record<string, NotifCategoryMeta>>({});
   const [nextBefore, setNextBefore] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -188,31 +196,59 @@ export const NotificationFeed = forwardRef<
   const [error, setError] = useState(false);
   const [category, setCategory] = useState<string>(initialCategory || "all");
   const [pushState, setPushState] = useState<"hidden" | "offer">("hidden");
+  // "Unread only" is remembered; null = still reading the saved value (avoids a flash of the wrong list).
+  const [unreadOnly, setUnreadOnly] = useState<boolean | null>(null);
+  const [clearArmed, setClearArmed] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const reqId = useRef(0);
+  const itemsRef = useRef<AppNotification[]>([]);
+  itemsRef.current = items;
+  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStartX = useRef<number | null>(null);
+  useEffect(() => () => void (armTimer.current && clearTimeout(armTimer.current)), []);
+  /** Handlers always act on the row as it is NOW (a swipe and a tap can race on web). */
+  const latest = (n: AppNotification) => itemsRef.current.find((x) => x.id === n.id) ?? n;
+
+  useEffect(() => {
+    storage.getItem<boolean>(UNREAD_ONLY_KEY, false).then((v) => setUnreadOnly(!!v));
+  }, []);
 
   const load = useCallback(
-    async (cat = category) => {
+    async (cat = category, uo = unreadOnly ?? false) => {
+      const id = ++reqId.current;
       setError(false);
       try {
-        const r = await api.notifCenter({ category: cat, limit: 40 });
+        const r = await api.notifCenter({ category: cat, limit: 40, unreadOnly: uo });
+        if (id !== reqId.current) return;
         setItems(r.items);
         setUnread(r.unread);
         setByCat(r.unread_by_category);
+        setReadCount(r.read_count ?? 0);
         setCatalog(r.categories);
         setNextBefore(r.next_before);
       } catch {
-        setError(true);
+        if (id === reqId.current) setError(true);
       }
     },
-    [category]
+    [category, unreadOnly]
   );
 
   useEffect(() => {
+    if (unreadOnly === null) return;
     (async () => {
       setLoading(true);
-      await load(category);
+      setClearArmed(false);
+      await load(category, unreadOnly);
       setLoading(false);
     })();
-  }, [category]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [category, unreadOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleUnreadOnly = () => {
+    const next = !(unreadOnly ?? false);
+    Haptics.selectionAsync().catch(() => {});
+    setUnreadOnly(next);
+    storage.setItem(UNREAD_ONLY_KEY, next);
+  };
 
   // Offer phone alerts only here — the user is already engaging with notifications.
   useEffect(() => {
@@ -234,7 +270,7 @@ export const NotificationFeed = forwardRef<
     if (!nextBefore || loadingMore) return;
     setLoadingMore(true);
     try {
-      const r = await api.notifCenter({ category, before: nextBefore, limit: 40 });
+      const r = await api.notifCenter({ category, before: nextBefore, limit: 40, unreadOnly: unreadOnly ?? false });
       setItems((prev) => [...prev, ...r.items]);
       setNextBefore(r.next_before);
     } catch {
@@ -248,27 +284,127 @@ export const NotificationFeed = forwardRef<
     Haptics.selectionAsync().catch(() => {});
     try {
       const r = await api.markNotifReadAll(category);
-      setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+      setItems((prev) => (unreadOnly ? [] : prev.map((n) => ({ ...n, read: true }))));
+      setReadCount((c) => c + r.marked);
       setUnread(r.unread);
       setByCat((prev) => (category === "all" ? {} : { ...prev, [category]: 0 }));
+      notifyBadges();
       toast.success("All caught up", category === "all" ? "Every update is marked as read." : `${CHIP_LABEL[category] ?? category} alerts marked as read.`);
     } catch {
       toast.error("Couldn't mark as read", "Please try again.");
     }
-  }, [category, toast]);
+  }, [category, toast, unreadOnly]);
 
   useImperativeHandle(ref, () => ({ markAllRead, reload: () => load(category) }), [markAllRead, load, category]);
 
-  const openNotif = (n: AppNotification) => {
+  /** Local bookkeeping when one row flips read ↔ unread (keeps header counts honest without a refetch). */
+  const bump = (n: AppNotification, nowRead: boolean) => {
+    const delta = nowRead ? -1 : 1;
+    setUnread((u) => Math.max(0, u + delta));
+    setByCat((prev) => ({ ...prev, [n.category]: Math.max(0, (prev[n.category] ?? 0) + delta) }));
+    setReadCount((c) => Math.max(0, c - delta));
+  };
+
+  const insertBack = (n: AppNotification) =>
+    setItems((prev) => (prev.some((x) => x.id === n.id) ? prev : [...prev, n].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))));
+
+  const openNotif = (stale: AppNotification, e?: { nativeEvent?: { pageX?: number } }) => {
+    // The tap that ends a (web mouse) swipe must not navigate: gesture flag + pointer travel check.
+    const moved = pressStartX.current != null && e?.nativeEvent?.pageX != null && Math.abs(e.nativeEvent.pageX - pressStartX.current) > 8;
+    pressStartX.current = null;
+    if (swipedRecently() || moved) return;
+    const n = latest(stale);
     Haptics.selectionAsync().catch(() => {});
     if (!n.read) {
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-      setUnread((u) => Math.max(0, u - 1));
-      setByCat((prev) => ({ ...prev, [n.category]: Math.max(0, (prev[n.category] ?? 1) - 1) }));
-      api.markNotifRead(n.id).catch(() => {});
+      bump(n, true);
+      api.markNotifRead(n.id).then(notifyBadges).catch(() => {});
     }
     const route = routeFor(n);
     if (route) router.push(route as any);
+  };
+
+  /** Swipe → : flip read state. In "Unread only" a newly-read row leaves the list (Undo brings it back). */
+  const toggleRead = async (stale: AppNotification) => {
+    const n = latest(stale);
+    const nowRead = !n.read;
+    const updated = { ...n, read: nowRead };
+    setItems((prev) => (unreadOnly && nowRead ? prev.filter((x) => x.id !== n.id) : prev.map((x) => (x.id === n.id ? updated : x))));
+    bump(n, nowRead);
+    const revert = () => {
+      setItems((prev) => (prev.some((x) => x.id === n.id) ? prev.map((x) => (x.id === n.id ? n : x)) : prev));
+      if (unreadOnly && nowRead) insertBack(n);
+      bump(updated, !nowRead);
+    };
+    try {
+      await (nowRead ? api.markNotifRead(n.id) : api.markNotifUnread(n.id));
+      notifyBadges();
+      toast.show({
+        kind: "success",
+        title: nowRead ? "Marked as read" : "Marked as unread",
+        actionLabel: "Undo",
+        onAction: async () => {
+          revert();
+          await (nowRead ? api.markNotifUnread(n.id) : api.markNotifRead(n.id)).then(notifyBadges).catch(() => {});
+        },
+      });
+    } catch (e: any) {
+      revert();
+      toast.error("Couldn't update", e?.message ?? "Please try again.");
+    }
+  };
+
+  /** Swipe ← : dismiss (soft) with Undo. */
+  const dismiss = async (stale: AppNotification) => {
+    const n = latest(stale);
+    setItems((prev) => prev.filter((x) => x.id !== n.id));
+    if (!n.read) bump(n, true);
+    else setReadCount((c) => Math.max(0, c - 1));
+    const revert = () => {
+      insertBack(n);
+      if (!n.read) bump(n, false);
+      else setReadCount((c) => c + 1);
+    };
+    try {
+      await api.dismissNotif(n.id);
+      notifyBadges();
+      toast.show({
+        kind: "info",
+        title: "Update dismissed",
+        actionLabel: "Undo",
+        onAction: async () => {
+          revert();
+          await api.restoreNotif(n.id).then(notifyBadges).catch(() => {});
+        },
+      });
+    } catch (e: any) {
+      revert();
+      toast.error("Couldn't dismiss", e?.message ?? "Please try again.");
+    }
+  };
+
+  /** "Clear read" — two taps (arm → confirm); bulk, so no Undo. */
+  const clearRead = async () => {
+    if (!clearArmed) {
+      Haptics.selectionAsync().catch(() => {});
+      setClearArmed(true);
+      if (armTimer.current) clearTimeout(armTimer.current);
+      armTimer.current = setTimeout(() => setClearArmed(false), 4000);
+      return;
+    }
+    if (armTimer.current) clearTimeout(armTimer.current);
+    setClearing(true);
+    try {
+      const r = await api.dismissReadNotifs(category);
+      setItems((prev) => prev.filter((x) => !x.read));
+      setReadCount(0);
+      setClearArmed(false);
+      toast.success(`Cleared ${r.marked} read update${r.marked === 1 ? "" : "s"}`, "Unread ones are still here.");
+    } catch (e: any) {
+      toast.error("Couldn't clear", e?.message ?? "Please try again.");
+    } finally {
+      setClearing(false);
+    }
   };
 
   const chips = useMemo(() => ["all", ...Object.keys(catalog)], [catalog]);
@@ -298,6 +434,8 @@ export const NotificationFeed = forwardRef<
     <View style={{ flex: 1 }}>
       <View style={[styles.chipsWrap, column]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          <Chip label="Unread" icon={unreadOnly ? "mail-unread" : "mail-unread-outline"} selected={!!unreadOnly} tone="brand" onPress={toggleUnreadOnly} testID="notif-unread-only" />
+          <View style={[styles.chipDivider, { backgroundColor: colors.border }]} />
           {chips.map((c) => (
             <Chip
               key={c}
@@ -312,7 +450,7 @@ export const NotificationFeed = forwardRef<
         </ScrollView>
       </View>
 
-      {loading ? (
+      {loading || unreadOnly === null ? (
         <View style={[{ padding: space[4] }, column]}>
           <SkeletonRows rows={6} />
         </View>
@@ -349,14 +487,18 @@ export const NotificationFeed = forwardRef<
           ) : null}
 
           {items.length === 0 ? (
-            <EmptyState
-              icon="notifications-off-outline"
-              title={category === "all" ? "No updates yet" : `No ${(CHIP_LABEL[category] ?? category).toLowerCase()} alerts`}
-              body={category === "all" ? "Price drops, saved-search matches, messages, receipts and document reviews will land here." : catalog[category]?.caption ?? "Nothing here yet."}
-              actionLabel={category !== "all" ? "Show all" : undefined}
-              onAction={category !== "all" ? () => setCategory("all") : undefined}
-              testID="notif-empty"
-            />
+            unreadOnly ? (
+              <EmptyState icon="checkmark-done-circle-outline" title="You're all caught up" body={category === "all" ? "No unread updates. Switch off the Unread filter to see everything you've already read." : `No unread ${(CHIP_LABEL[category] ?? category).toLowerCase()} alerts.`} actionLabel="Show read updates" onAction={toggleUnreadOnly} secondaryLabel={category !== "all" ? "Show all categories" : undefined} onSecondary={category !== "all" ? () => setCategory("all") : undefined} testID="notif-empty-unread" />
+            ) : (
+              <EmptyState
+                icon="notifications-off-outline"
+                title={category === "all" ? "No updates yet" : `No ${(CHIP_LABEL[category] ?? category).toLowerCase()} alerts`}
+                body={category === "all" ? "Price drops, saved-search matches, messages, receipts and document reviews will land here." : catalog[category]?.caption ?? "Nothing here yet."}
+                actionLabel={category !== "all" ? "Show all" : undefined}
+                onAction={category !== "all" ? () => setCategory("all") : undefined}
+                testID="notif-empty"
+              />
+            )
           ) : null}
 
           {sections.map(([day, list]) => (
@@ -373,19 +515,23 @@ export const NotificationFeed = forwardRef<
                   const digest = !!n.meta?.digest;
                   const count = Number(n.meta?.count ?? 0);
                   return (
-                    <Pressable
-                      key={n.id}
-                      onPress={() => openNotif(n)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${n.read ? "" : "Unread. "}${n.title}. ${n.body}`}
-                      testID={`notif-${n.id}`}
-                      style={({ pressed }) => [
-                        styles.row,
-                        i < list.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
-                        !n.read && { backgroundColor: colors.brandSoft },
-                        pressed && { opacity: 0.85 },
-                      ]}
-                    >
+                    <SwipeableNotification key={n.id} read={n.read} onToggleRead={() => toggleRead(n)} onDismiss={() => dismiss(n)} testID={`notif-swipe-${n.id}`}>
+                      <Pressable
+                        onPressIn={(e) => {
+                          pressStartX.current = e.nativeEvent?.pageX ?? null;
+                        }}
+                        onPress={(e) => openNotif(n, e)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${n.read ? "" : "Unread. "}${n.title}. ${n.body}`}
+                        accessibilityHint="Swipe right to mark read or unread, swipe left to dismiss"
+                        testID={`notif-${n.id}`}
+                        style={({ pressed }) => [
+                          styles.row,
+                          { backgroundColor: n.read ? colors.surface : colors.brandSoft },
+                          i < list.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+                          pressed && { opacity: 0.85 },
+                        ]}
+                      >
                       <View style={[styles.icon, { backgroundColor: tone.bg }]}>
                         <Ionicons name={icon} size={18} color={tone.fg} />
                         {!n.read ? <View style={[styles.dot, { backgroundColor: colors.brand, borderColor: colors.brandSoft }]} /> : null}
@@ -417,7 +563,8 @@ export const NotificationFeed = forwardRef<
                           ) : null}
                         </View>
                       </View>
-                    </Pressable>
+                      </Pressable>
+                    </SwipeableNotification>
                   );
                 })}
               </View>
@@ -425,6 +572,25 @@ export const NotificationFeed = forwardRef<
           ))}
 
           {nextBefore ? <Button label="Load older" variant="secondary" size="sm" loading={loadingMore} onPress={loadMore} style={{ alignSelf: "center" }} testID="notif-load-more" /> : null}
+
+          {/* Clear read — tucks every read row away (two taps). Hidden in "Unread only" where read rows aren't shown anyway. */}
+          {!unreadOnly && readCount > 0 && items.length > 0 ? (
+            <Button
+              label={clearArmed ? `Tap again to clear ${readCount} read` : `Clear ${readCount} read update${readCount === 1 ? "" : "s"}`}
+              variant={clearArmed ? "destructive" : "ghost"}
+              size="sm"
+              iconLeft={clearArmed ? "trash-outline" : "checkmark-done-outline"}
+              loading={clearing}
+              onPress={clearRead}
+              style={{ alignSelf: "center" }}
+              testID="notif-clear-read"
+            />
+          ) : null}
+          {items.length > 0 ? (
+            <AppText variant="caption" tone="muted" align="center" testID="notif-swipe-hint">
+              Swipe right to mark read or unread · swipe left to dismiss
+            </AppText>
+          ) : null}
           {Platform.OS === "web" && items.length > 0 ? (
             <AppText variant="caption" tone="muted" align="center">
               Phone alerts are available in the AMASS app on iPhone and Android.
@@ -439,6 +605,7 @@ export const NotificationFeed = forwardRef<
 const styles = StyleSheet.create({
   chipsWrap: { height: 52 },
   chips: { paddingHorizontal: space[4], gap: 8, alignItems: "center" },
+  chipDivider: { width: StyleSheet.hairlineWidth, height: 22, marginHorizontal: 2 },
   group: { borderRadius: radii.lg, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 14 },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 8 },

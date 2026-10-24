@@ -28,18 +28,29 @@ notifies about ones the user (or a real counterpart) initiated.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import math
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
+from html import escape
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from auth_security import send_email
 from push_notifications import send_push
 
 logger = logging.getLogger("amass.notifications")
+
+# Public web origin used for links inside emails (G3: absolute https only).
+APP_PUBLIC_URL = os.environ.get("APP_PUBLIC_URL", "https://amass.africa").rstrip("/")
+EMAIL_DIGEST_FREQUENCIES = ("daily", "weekly")
+EMAIL_TEST_COOLDOWN_S = 300
 
 # ─── Categories ───────────────────────────────────────────────────────────
 # `digest` categories support frequency control; the rest are always immediate.
@@ -142,7 +153,7 @@ DIGEST_ROUTE = {
     "nearby_listings": "/(tabs)",
     "brand_offers": "/shop/saved",
     "marketplace": "/(tabs)/marketplace",
-    "nearby_free": "/(tabs)/social",
+    "nearby_free": "/updates?tab=nearby",
 }
 
 
@@ -161,11 +172,14 @@ def category_for(kind: str) -> str:
 def default_prefs(user_id: str) -> dict:
     return {
         "user_id": user_id,
-        "categories": {k: {"enabled": True, "frequency": v["default_frequency"]} for k, v in CATEGORIES.items()},
+        # Per category: on/off, bundling frequency, and which channels may carry it (in-app is always on).
+        "categories": {k: {"enabled": True, "frequency": v["default_frequency"], "push": True, "email": True} for k, v in CATEGORIES.items()},
         "quiet_hours": {"enabled": False, "start": "22:00", "end": "07:00"},
         "push_enabled": False,
         # undetermined | granted | denied | dismissed | blocked
         "push_prompt": {"status": "undetermined", "last_prompted_at": None, "context": None},
+        # Email digest is opt-in: one summary email per day/week at `hour` (Africa/Lagos), only categories with email on.
+        "email_digest": {"enabled": False, "frequency": "daily", "hour": 8},
         "updated_at": _iso(_now()),
     }
 
@@ -178,9 +192,21 @@ async def get_prefs(db, user_id: str) -> dict:
     cats = dict(base["categories"])
     for k, v in (doc.get("categories") or {}).items():
         if k in cats and isinstance(v, dict):
-            cats[k] = {"enabled": bool(v.get("enabled", True)), "frequency": v.get("frequency") if v.get("frequency") in FREQUENCIES else cats[k]["frequency"]}
-    base.update({k: v for k, v in doc.items() if k != "categories"})
+            cats[k] = {
+                "enabled": bool(v.get("enabled", True)),
+                "frequency": v.get("frequency") if v.get("frequency") in FREQUENCIES else cats[k]["frequency"],
+                "push": bool(v.get("push", True)),
+                "email": bool(v.get("email", True)),
+            }
+    base.update({k: v for k, v in doc.items() if k not in ("categories", "email_digest")})
     base["categories"] = cats
+    ed = dict(base["email_digest"])
+    for k, v in (doc.get("email_digest") or {}).items():
+        if k in ed:
+            ed[k] = v
+    if ed.get("frequency") not in EMAIL_DIGEST_FREQUENCIES:
+        ed["frequency"] = "daily"
+    base["email_digest"] = ed
     return base
 
 
@@ -208,9 +234,11 @@ def in_quiet_hours(prefs: dict, at: Optional[datetime] = None) -> bool:
     return cur >= start or cur < end  # overnight window
 
 
-async def _push(db, prefs: dict, user_id: str, title: str, body: str, action_url: Optional[str], idem: str) -> bool:
+async def _push(db, prefs: dict, user_id: str, title: str, body: str, action_url: Optional[str], idem: str, category: Optional[str] = None) -> bool:
     if not prefs.get("push_enabled") or prefs.get("push_prompt", {}).get("status") != "granted":
         return False
+    if category and not (prefs.get("categories", {}).get(category) or {}).get("push", True):
+        return False  # the user keeps this category in-app / email only
     if in_quiet_hours(prefs):
         return False
     try:
@@ -276,7 +304,7 @@ async def emit(
                 )
                 existing.update({"title": title[:120], "body": (body or "")[:160], "meta": merged_meta, "created_at": _iso(now), "action_url": action_url or existing.get("action_url")})
                 if push:
-                    existing["pushed"] = await _push(db, prefs, user_id, title, body, action_url, f"notif:{existing['id']}:{count}")
+                    existing["pushed"] = await _push(db, prefs, user_id, title, body, action_url, f"notif:{existing['id']}:{count}", category)
                 return existing
 
     # ── frequency → digest queue ──
@@ -310,7 +338,7 @@ async def emit(
     }
     await db.notifications.insert_one(dict(doc))
     if push:
-        doc["pushed"] = await _push(db, prefs, user_id, title, body, action_url, f"notif:{doc['id']}")
+        doc["pushed"] = await _push(db, prefs, user_id, title, body, action_url, f"notif:{doc['id']}", category)
     return doc
 
 
@@ -393,10 +421,162 @@ async def flush_digests(db) -> int:
             "created_at": _iso(now),
         }
         await db.notifications.insert_one(dict(doc))
-        await _push(db, prefs, user_id, title, body, doc["action_url"], f"digest:{doc['id']}")
+        await _push(db, prefs, user_id, title, body, doc["action_url"], f"digest:{doc['id']}", category)
         await db.notification_queue.delete_many({"id": {"$in": [i["id"] for i in items]}})
         await db.notification_digest_state.update_one({"user_id": user_id, "category": category}, {"$set": {"last_sent_at": _iso(now)}}, upsert=True)
         sent += 1
+    return sent
+
+
+# ─── Email digests (opt-in; Emergent managed Resend via auth_security.send_email) ──
+EMAIL_STATE_KEY = "__email_digest__"
+
+
+def _secret() -> str:
+    return os.environ.get("JWT_SECRET", "amass-dev-secret")
+
+
+def unsubscribe_token(user_id: str) -> str:
+    return hmac.new(_secret().encode(), f"email-digest:{user_id}".encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def _abs_link(path: Optional[str]) -> Optional[str]:
+    if not path:
+        return None
+    if path.startswith("https://"):
+        return path
+    if not path.startswith("/"):
+        return None
+    return f"{APP_PUBLIC_URL}{path.replace('/(tabs)', '') or '/'}"
+
+
+def _when(iso: str) -> str:
+    try:
+        d = datetime.fromisoformat(iso) + timedelta(hours=1)  # Africa/Lagos
+        return d.strftime("%a %d %b · %H:%M")
+    except Exception:
+        return ""
+
+
+async def email_digest_items(db, user_id: str, prefs: dict, since: Optional[str]) -> list[dict]:
+    """Notifications since the last digest in categories the user keeps on email (unread first, newest first)."""
+    cats = [k for k, v in prefs["categories"].items() if v.get("enabled", True) and v.get("email", True)]
+    q: dict = {"user_id": user_id, "dismissed": {"$ne": True}, "meta.preview": {"$ne": True}}
+    if since:
+        q["created_at"] = {"$gt": since}
+    docs = await db.notifications.find(q, {"_id": 0}).sort("created_at", -1).limit(60).to_list(60)
+    docs = [d for d in docs if category_for_doc(d) in cats]
+    # unread first; within each group newest first
+    unread = [d for d in docs if not d.get("read")]
+    read = [d for d in docs if d.get("read")]
+    unread.sort(key=lambda d: d.get("created_at", ""), reverse=True)
+    read.sort(key=lambda d: d.get("created_at", ""), reverse=True)
+    return (unread + read)[:20]
+
+
+def category_for_doc(d: dict) -> str:
+    return d.get("category") or category_for(d.get("kind", ""))
+
+
+def digest_email_html(user: dict, items: list[dict], *, frequency: str, unread_total: int) -> tuple[str, str]:
+    """Returns (subject, html). Table layout, inline styles, absolute https links only (G3), no forms (G2)."""
+    name = escape((user.get("full_name") or "there").split(" ")[0])
+    n = len(items)
+    period = "today" if frequency == "daily" else "this week"
+    subject = f"{n} new update{'s' if n != 1 else ''} on AMASS {period}" if n else "You're all caught up on AMASS"
+    prefs_link = _abs_link("/notification-preferences")
+    unsub_link = f"{APP_PUBLIC_URL}/api/notifications/email/unsubscribe?u={escape(user['id'])}&t={unsubscribe_token(user['id'])}"
+    rows = []
+    for d in items:
+        cat = CATEGORIES.get(category_for_doc(d), {})
+        link = _abs_link(d.get("action_url"))
+        dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:#E11B22;margin-right:8px;vertical-align:middle"></span>' if not d.get("read") else ""
+        open_html = f'<a href="{escape(link)}" style="color:#E11B22;font-weight:700;text-decoration:none;font-size:13px">Open →</a>' if link else ""
+        rows.append(
+            '<tr><td style="padding:14px 0;border-bottom:1px solid #EEEBE6">'
+            f'<div style="font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#8A8680;margin-bottom:4px">{escape(cat.get("label", "Update"))} · {escape(_when(d.get("created_at", "")))}</div>'
+            f'<div style="font-size:16px;font-weight:700;color:#111">{dot}{escape(d.get("title", ""))}</div>'
+            + (f'<div style="font-size:14px;color:#444;margin-top:4px;line-height:20px">{escape(d.get("body", ""))}</div>' if d.get("body") else "")
+            + (f'<div style="margin-top:6px">{open_html}</div>' if open_html else "")
+            + "</td></tr>"
+        )
+    list_html = "".join(rows) if rows else (
+        '<tr><td style="padding:20px 0;font-size:15px;color:#444">Nothing new since your last summary. '
+        "Price drops, matches, messages and receipts will show up here as they happen.</td></tr>"
+    )
+    unread_line = f"You have {unread_total} unread update{'s' if unread_total != 1 else ''} waiting in the app." if unread_total else "Your Updates tab is clear."
+    html = (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F6F4F0;padding:24px 0;font-family:Arial,Helvetica,sans-serif">'
+        '<tr><td align="center">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:16px;overflow:hidden">'
+        '<tr><td style="background:#111111;padding:20px 24px">'
+        '<div style="font-size:22px;font-weight:900;letter-spacing:-.5px;color:#FFFFFF">AMASS</div>'
+        f'<div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:2px">Your {escape(frequency)} updates</div>'
+        "</td></tr>"
+        '<tr><td style="padding:24px">'
+        f'<p style="font-size:16px;color:#111;margin:0 0 6px">Hi {name},</p>'
+        f'<p style="font-size:14px;color:#555;margin:0 0 8px">{unread_line}</p>'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{list_html}</table>'
+        f'<p style="margin:22px 0 0"><a href="{escape(_abs_link("/updates") or APP_PUBLIC_URL)}" style="display:inline-block;background:#E11B22;color:#FFFFFF;font-weight:700;font-size:14px;padding:12px 18px;border-radius:999px;text-decoration:none">Open Updates in AMASS</a></p>'
+        "</td></tr>"
+        '<tr><td style="padding:16px 24px 22px;background:#FAF8F5;font-size:12px;color:#8A8680;line-height:18px">'
+        f'You get this summary because email digests are on in your AMASS notification preferences. <a href="{escape(prefs_link)}" style="color:#555">Manage preferences</a> · <a href="{escape(unsub_link)}" style="color:#555">Turn off email digests</a>.<br>'
+        "AMASS will never ask you to share a password or code by reply."
+        "</td></tr></table></td></tr></table>"
+    )
+    return subject, html
+
+
+async def send_email_digest(db, user: dict, prefs: dict, *, force: bool = False) -> Optional[dict]:
+    """Send one digest email to `user` (skips silently when nothing new unless `force`). Updates the per-user state."""
+    if not user.get("email"):
+        return None
+    ed = prefs.get("email_digest") or {}
+    state = await db.notification_digest_state.find_one({"user_id": user["id"], "category": EMAIL_STATE_KEY}, {"_id": 0})
+    since = state.get("last_sent_at") if state else None
+    if not since:
+        since = _iso(_now() - _interval(ed.get("frequency", "daily")))
+    items = await email_digest_items(db, user["id"], prefs, since)
+    if not items and not force:
+        return None
+    if not items and force:
+        items = await email_digest_items(db, user["id"], prefs, None)  # test send: show the latest updates instead of an empty page
+    unread_total = await db.notifications.count_documents({"user_id": user["id"], "read": False, "dismissed": {"$ne": True}})
+    subject, html = digest_email_html(user, items, frequency=ed.get("frequency", "daily"), unread_total=unread_total)
+    email_id = await send_email(to=user["email"], subject=subject, html=html)
+    now = _iso(_now())
+    await db.notification_digest_state.update_one(
+        {"user_id": user["id"], "category": EMAIL_STATE_KEY},
+        {"$set": {"last_sent_at": now, "last_count": len(items), "last_email_id": email_id}},
+        upsert=True,
+    )
+    return {"sent": True, "to": user["email"], "count": len(items), "subject": subject, "email_id": email_id}
+
+
+async def flush_email_digests(db) -> int:
+    """Hourly: send due digests. Due = interval elapsed AND local (Lagos) hour reached the user's preferred hour."""
+    sent = 0
+    now = _now()
+    local_hour = (now + timedelta(hours=1)).hour
+    cursor = db.notification_prefs.find({"email_digest.enabled": True}, {"_id": 0, "user_id": 1})
+    async for p in cursor:
+        try:
+            prefs = await get_prefs(db, p["user_id"])
+            ed = prefs["email_digest"]
+            if local_hour < int(ed.get("hour", 8)):
+                continue
+            state = await db.notification_digest_state.find_one({"user_id": p["user_id"], "category": EMAIL_STATE_KEY}, {"_id": 0})
+            last = datetime.fromisoformat(state["last_sent_at"]) if state and state.get("last_sent_at") else None
+            # Subtract an hour of slack so a digest sent at 08:05 is due again the next day at 08:00.
+            if last is not None and now - last < _interval(ed["frequency"]) - timedelta(hours=1):
+                continue
+            user = await db.users.find_one({"id": p["user_id"]}, {"_id": 0, "id": 1, "email": 1, "full_name": 1})
+            if not user or not user.get("email"):
+                continue
+            if await send_email_digest(db, user, prefs):
+                sent += 1
+        except Exception as e:  # one bad mailbox must not stop the sweep
+            logger.warning("email digest failed for %s: %s", p.get("user_id"), e)
     return sent
 
 
@@ -627,6 +807,7 @@ async def ensure_notification_indexes(db) -> None:
     await db.notifications.create_index([("user_id", 1), ("dedupe_key", 1)], sparse=True)
     await db.notifications.create_index([("user_id", 1), ("read", 1)])
     await db.notifications.create_index([("user_id", 1), ("category", 1), ("created_at", -1)])
+    await db.notification_prefs.create_index("email_digest.enabled")
 
 
 async def start_notification_center(db, *, interval_s: int = 3600, first_delay_s: int = 90) -> None:
@@ -643,6 +824,7 @@ async def start_notification_center(db, *, interval_s: int = 3600, first_delay_s
         while True:
             try:
                 out = await run_matchers(db)
+                out["email_digests"] = await flush_email_digests(db)
                 logger.info("notification matchers: %s", out)
             except Exception as e:
                 logger.warning("notification matcher sweep failed: %s", e)
@@ -655,6 +837,8 @@ async def start_notification_center(db, *, interval_s: int = 3600, first_delay_s
 class CategoryPrefIn(BaseModel):
     enabled: Optional[bool] = None
     frequency: Optional[str] = Field(None, pattern="^(immediate|daily|weekly)$")
+    push: Optional[bool] = None
+    email: Optional[bool] = None
 
 
 class QuietHoursIn(BaseModel):
@@ -663,10 +847,17 @@ class QuietHoursIn(BaseModel):
     end: Optional[str] = Field(None, pattern=r"^\d{2}:\d{2}$")
 
 
+class EmailDigestIn(BaseModel):
+    enabled: Optional[bool] = None
+    frequency: Optional[str] = Field(None, pattern="^(daily|weekly)$")
+    hour: Optional[int] = Field(None, ge=0, le=23)
+
+
 class PrefsIn(BaseModel):
     categories: Optional[dict[str, CategoryPrefIn]] = None
     quiet_hours: Optional[QuietHoursIn] = None
     push_enabled: Optional[bool] = None
+    email_digest: Optional[EmailDigestIn] = None
 
 
 class PushPromptIn(BaseModel):
@@ -686,11 +877,18 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
         n.setdefault("category", category_for(n.get("kind", "")))
         return n
 
+    LIVE = {"dismissed": {"$ne": True}}  # swiped-away rows stay in the DB (undo) but leave every list and count
+
+    async def _unread(user_id: str) -> int:
+        return await db.notifications.count_documents({"user_id": user_id, "read": False, **LIVE})
+
     @router.get("/center")
-    async def center(category: Optional[str] = None, before: Optional[str] = None, limit: int = Query(40, le=100), user: dict = Depends(require_auth)):
-        q: dict = {"user_id": user["id"]}
+    async def center(category: Optional[str] = None, before: Optional[str] = None, unread_only: bool = False, limit: int = Query(40, le=100), user: dict = Depends(require_auth)):
+        q: dict = {"user_id": user["id"], **LIVE}
         if before:
             q["created_at"] = {"$lt": before}
+        if unread_only:
+            q["read"] = False
         if category and category != "all":
             if category not in CATEGORIES:
                 raise HTTPException(400, f"Unknown category {category}")
@@ -700,20 +898,21 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
             q["$or"] = [{"category": category}, legacy]
         docs = await db.notifications.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
         docs = [_annotate(d) for d in docs]
-        all_unread = [_annotate(d) async for d in db.notifications.find({"user_id": user["id"], "read": False}, {"_id": 0, "kind": 1, "category": 1})]
+        all_unread = [_annotate(d) async for d in db.notifications.find({"user_id": user["id"], "read": False, **LIVE}, {"_id": 0, "kind": 1, "category": 1})]
         by_cat: dict[str, int] = {}
         for d in all_unread:
             by_cat[d["category"]] = by_cat.get(d["category"], 0) + 1
-        return {"items": docs, "unread": len(all_unread), "unread_by_category": by_cat, "categories": CATEGORIES, "next_before": docs[-1]["created_at"] if len(docs) >= limit else None}
+        read_count = await db.notifications.count_documents({"user_id": user["id"], "read": True, **LIVE, **({"$or": q["$or"]} if "$or" in q else {})})
+        return {"items": docs, "unread": len(all_unread), "unread_by_category": by_cat, "read_count": read_count, "categories": CATEGORIES, "next_before": docs[-1]["created_at"] if len(docs) >= limit else None}
 
     @router.get("/unread-count")
     async def unread_count(user: dict = Depends(require_auth)):
-        return {"unread": await db.notifications.count_documents({"user_id": user["id"], "read": False})}
+        return {"unread": await _unread(user["id"])}
 
     @router.get("/prefs")
     async def prefs(user: dict = Depends(require_auth)):
         p = await get_prefs(db, user["id"])
-        return {**p, "catalog": CATEGORIES, "frequencies": list(FREQUENCIES)}
+        return {**p, "catalog": CATEGORIES, "frequencies": list(FREQUENCIES), "email": user.get("email")}
 
     @router.put("/prefs")
     async def update_prefs(data: PrefsIn, user: dict = Depends(require_auth)):
@@ -727,6 +926,10 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
                     cur["enabled"] = v.enabled
                 if v.frequency is not None:
                     cur["frequency"] = v.frequency if CATEGORIES[k]["digest"] else "immediate"
+                if v.push is not None:
+                    cur["push"] = v.push
+                if v.email is not None:
+                    cur["email"] = v.email
         if data.quiet_hours:
             qh = dict(p.get("quiet_hours") or {})
             for f in ("enabled", "start", "end"):
@@ -736,9 +939,41 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
             p["quiet_hours"] = qh
         if data.push_enabled is not None:
             p["push_enabled"] = data.push_enabled
+        if data.email_digest:
+            ed = dict(p.get("email_digest") or {})
+            for f in ("enabled", "frequency", "hour"):
+                val = getattr(data.email_digest, f)
+                if val is not None:
+                    ed[f] = val
+            if ed.get("enabled") and not user.get("email"):
+                raise HTTPException(400, "Add an email address to your account to receive digests")
+            p["email_digest"] = ed
         p["updated_at"] = _iso(_now())
         await db.notification_prefs.update_one({"user_id": user["id"]}, {"$set": p}, upsert=True)
-        return {**p, "catalog": CATEGORIES, "frequencies": list(FREQUENCIES)}
+        return {**p, "catalog": CATEGORIES, "frequencies": list(FREQUENCIES), "email": user.get("email")}
+
+    @router.post("/email/test")
+    async def email_test(user: dict = Depends(require_auth)):
+        """Send the digest right now (even when nothing is new) so the user can see what it looks like."""
+        if not user.get("email"):
+            raise HTTPException(400, "Add an email address to your account first")
+        state = await db.notification_digest_state.find_one({"user_id": user["id"], "category": EMAIL_STATE_KEY}, {"_id": 0, "last_test_at": 1})
+        last_test = state.get("last_test_at") if state else None
+        if last_test and (_now() - datetime.fromisoformat(last_test)).total_seconds() < EMAIL_TEST_COOLDOWN_S:
+            raise HTTPException(429, "A test email was sent a moment ago — check your inbox (and spam) before sending another")
+        p = await get_prefs(db, user["id"])
+        full = await db.users.find_one({"id": user["id"]}, {"_id": 0, "id": 1, "email": 1, "full_name": 1})
+        out = await send_email_digest(db, full or user, p, force=True)
+        await db.notification_digest_state.update_one({"user_id": user["id"], "category": EMAIL_STATE_KEY}, {"$set": {"last_test_at": _iso(_now())}}, upsert=True)
+        return {"ok": True, **(out or {})}
+
+    @router.get("/email/unsubscribe", response_class=HTMLResponse)
+    async def email_unsubscribe(u: str, t: str):
+        """One-click link from the email footer — signed, no login needed; only ever turns digests OFF."""
+        if not u or not hmac.compare_digest(t or "", unsubscribe_token(u)):
+            return HTMLResponse(_unsub_page("This link isn't valid", "The unsubscribe link has expired or was altered. Open AMASS → Profile → Notifications to change your email settings."), status_code=400)
+        await db.notification_prefs.update_one({"user_id": u}, {"$set": {"email_digest.enabled": False, "updated_at": _iso(_now())}}, upsert=True)
+        return HTMLResponse(_unsub_page("Email digests are off", "You won't get summary emails from AMASS anymore. Everything still shows in the Updates tab, and you can turn digests back on anytime in Notification preferences."))
 
     @router.post("/push-prompt")
     async def push_prompt(data: PushPromptIn, user: dict = Depends(require_auth)):
@@ -753,12 +988,48 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
         await db.notification_prefs.update_one({"user_id": user["id"]}, {"$set": p}, upsert=True)
         return {"ok": True, "push_prompt": p["push_prompt"], "push_enabled": p["push_enabled"]}
 
+    @router.post("/dismiss-read")
+    async def dismiss_read(category: Optional[str] = None, user: dict = Depends(require_auth)):
+        """'Clear read' — tuck every already-read row away (bulk; no undo, the rows stay in the DB)."""
+        q: dict = {"user_id": user["id"], "read": True, **LIVE}
+        if category and category != "all":
+            if category not in CATEGORIES:
+                raise HTTPException(400, "Unknown category")
+            q["$or"] = [{"category": category}, {"category": {"$exists": False}, "kind": {"$in": kinds_for(category)}}]
+        res = await db.notifications.update_many(q, {"$set": {"dismissed": True, "dismissed_at": _iso(_now()), "was_read": True}})
+        return {"ok": True, "marked": res.modified_count, "unread": await _unread(user["id"])}
+
     @router.post("/{notification_id}/read")
     async def mark_one_read(notification_id: str, user: dict = Depends(require_auth)):
         res = await db.notifications.update_one({"id": notification_id, "user_id": user["id"]}, {"$set": {"read": True, "read_at": _iso(_now())}})
         if res.matched_count == 0:
             raise HTTPException(404, "Notification not found")
-        return {"ok": True, "unread": await db.notifications.count_documents({"user_id": user["id"], "read": False})}
+        return {"ok": True, "unread": await _unread(user["id"])}
+
+    @router.post("/{notification_id}/unread")
+    async def mark_one_unread(notification_id: str, user: dict = Depends(require_auth)):
+        res = await db.notifications.update_one({"id": notification_id, "user_id": user["id"]}, {"$set": {"read": False}, "$unset": {"read_at": ""}})
+        if res.matched_count == 0:
+            raise HTTPException(404, "Notification not found")
+        return {"ok": True, "unread": await _unread(user["id"])}
+
+    @router.post("/{notification_id}/dismiss")
+    async def dismiss_one(notification_id: str, user: dict = Depends(require_auth)):
+        """Swipe-away. Remembers whether it was read so Undo (restore) brings it back exactly as it was."""
+        doc = await db.notifications.find_one({"id": notification_id, "user_id": user["id"]}, {"_id": 0, "read": 1})
+        if not doc:
+            raise HTTPException(404, "Notification not found")
+        await db.notifications.update_one({"id": notification_id}, {"$set": {"dismissed": True, "dismissed_at": _iso(_now()), "was_read": bool(doc.get("read"))}})
+        return {"ok": True, "unread": await _unread(user["id"])}
+
+    @router.post("/{notification_id}/restore")
+    async def restore_one(notification_id: str, user: dict = Depends(require_auth)):
+        doc = await db.notifications.find_one({"id": notification_id, "user_id": user["id"]}, {"_id": 0})
+        if not doc:
+            raise HTTPException(404, "Notification not found")
+        await db.notifications.update_one({"id": notification_id}, {"$set": {"dismissed": False, "read": bool(doc.get("was_read", doc.get("read")))}, "$unset": {"dismissed_at": "", "was_read": ""}})
+        doc = _annotate(await db.notifications.find_one({"id": notification_id}, {"_id": 0}))
+        return {"ok": True, "notification": doc, "unread": await _unread(user["id"])}
 
     @router.post("/read-by-target")
     async def read_by_target(data: ReadByTargetIn, user: dict = Depends(require_auth)):
@@ -784,7 +1055,7 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
             }.get(data.target_type, data.target_type)
             base["$or"] = [{f"meta.{key}": data.target_id}, {f"meta.{key}s": data.target_id}]
         res = await db.notifications.update_many(base, {"$set": {"read": True, "read_at": _iso(_now())}})
-        return {"ok": True, "marked": res.modified_count, "unread": await db.notifications.count_documents({"user_id": user["id"], "read": False})}
+        return {"ok": True, "marked": res.modified_count, "unread": await _unread(user["id"])}
 
     @router.post("/read-all")
     async def read_all(category: Optional[str] = None, user: dict = Depends(require_auth)):
@@ -794,7 +1065,7 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
                 raise HTTPException(400, "Unknown category")
             q["$or"] = [{"category": category}, {"category": {"$exists": False}, "kind": {"$in": kinds_for(category)}}]
         res = await db.notifications.update_many(q, {"$set": {"read": True, "read_at": _iso(_now())}})
-        return {"ok": True, "marked": res.modified_count, "unread": await db.notifications.count_documents({"user_id": user["id"], "read": False})}
+        return {"ok": True, "marked": res.modified_count, "unread": await _unread(user["id"])}
 
     @router.post("/preview")
     async def preview(user: dict = Depends(require_auth)):
@@ -812,6 +1083,22 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
 
     @router.post("/admin/run-matchers")
     async def admin_run(_: dict = Depends(require_admin)):
-        return await run_matchers(db)
+        out = await run_matchers(db)
+        out["email_digests"] = await flush_email_digests(db)
+        return out
 
     return router
+
+
+def _unsub_page(title: str, body: str) -> str:
+    return (
+        '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        f"<title>{escape(title)} · AMASS</title></head>"
+        '<body style="margin:0;background:#F6F4F0;font-family:Arial,Helvetica,sans-serif">'
+        '<div style="max-width:480px;margin:48px auto;background:#fff;border-radius:16px;overflow:hidden">'
+        '<div style="background:#111;padding:20px 24px;color:#fff;font-size:22px;font-weight:900;letter-spacing:-.5px">AMASS</div>'
+        f'<div style="padding:24px"><h1 style="font-size:20px;margin:0 0 8px;color:#111">{escape(title)}</h1>'
+        f'<p style="font-size:15px;line-height:22px;color:#444;margin:0 0 20px">{escape(body)}</p>'
+        f'<a href="{APP_PUBLIC_URL}/updates" style="display:inline-block;background:#E11B22;color:#fff;font-weight:700;padding:12px 18px;border-radius:999px;text-decoration:none">Open AMASS</a>'
+        "</div></div></body></html>"
+    )

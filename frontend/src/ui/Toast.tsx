@@ -92,6 +92,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 }}
                 hitSlop={8}
                 accessibilityRole="button"
+                testID="toast-action"
               >
                 <AppText variant="caption" weight="bold" color={colors.mass}>
                   {t.actionLabel}

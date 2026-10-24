@@ -113,6 +113,9 @@ async def send_email(*, to: str, subject: str, html: str) -> str | None:
         if code in ("insufficient_credits", "integration_disabled", "daily_limit_reached"):
             logger.warning(f"Email paused: {code} ({e.response.status_code})")
             raise HTTPException(503, "Email is temporarily unavailable")
+        if code == "undeliverable_recipient":
+            logger.warning(f"Email blocked as undeliverable: {to}")
+            raise HTTPException(400, f"{to} can't receive email right now. Check the address on your profile.")
         logger.error(f"Email send failed: {e.response.status_code} {e.response.text}")
         raise HTTPException(502, "Failed to send email")
     except HTTPException:

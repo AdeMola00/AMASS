@@ -184,8 +184,12 @@ export function Chip({
   return (
     <PressableScale
       onPress={() => onPress?.()}
+      disabled={!onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
+      aria-selected={!!selected}
+      aria-pressed={!!selected}
+      hitSlop={4}
       testID={testID}
       style={[styles.chip, { backgroundColor: selected ? selBg : colors.surfaceAlt }, style]}
     >

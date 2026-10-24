@@ -1,0 +1,40 @@
+{
+  "summary": "RETEST of iteration_67 notification fixes on the frontend only, at 390x844, as demo@amass.africa. FIX 1 PASS: slow right swipes (1.3s/15 steps, and 3s/30 steps), a slow left swipe, a left swipe held 1.5s before release, and a partial 50px swipe below the threshold all stay on /updates (or /notifications). Each shows the right 'Marked as read/unread' or 'Update dismissed' + Undo toast. Fast swipes (~250ms) still work. A plain tap on an unread row opens /agent/listing/{id}?tab=docs and drops the count by exactly 1. A tap on a read row opens its deep link. FIX 2 PASS: every action changes the count by exactly 1: read 2->1, Undo ->2, mark unread ->3, dismiss unread ->2, Undo ->3, fast read ->2, dismissing a read row leaves 2. The tab badge refreshes from the network (badgeSignal -> GET unread-count) about 1.0-1.5s after the subtitle changes, because it waits for the POST round trip. There is no 30s lag. Mark-all shows 'You're all caught up' and the badge is gone within 0.7s. FIX 3 PASS: all 11 prefs-channels-* rows are full width (x=32, w=326), on one line, with no overflow. The Instant/Daily/Weekly control is indented (x=84) only for the 5 digest categories. The hour rail shows 06:00 in full at scrollLeft 0 and 20:00 in full when scrolled to the end. Chips expose aria-selected and aria-pressed. Smoke checks PASS: the Unread chip toggles and stays on after reload; Clear read in Receipts goes 'Clear 14 read updates' -> 'Tap again to clear 14 read' -> 'Cleared 14 read updates' toast, with unread count unchanged; on /notifications a slow swipe gives the toast with no navigation, and Undo updates the badge. No deprecated Expo packages detected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "notification-preferences", "issues": [
+        "The segmented controls (prefs-email-freq-*, prefs-freq-{key}-*) render role=tab but have no aria-selected, so the selected segment is not announced. Add accessibilityState={{selected}} to the segment items.",
+        "Channel chips and hour chips are 36px tall, under 44pt. Check that hitSlop is applied.",
+        "The hint 'Phone alerts are off above — applies once turned on.' repeats under all 11 categories. Show it once, above the category list.",
+        "When the hour rail is scrolled to the end, 06:00 is clipped at the card edge. This is normal horizontal scrolling (only 46px of overflow) and is not a bug."
+      ]},
+      {"screen": "Updates / notification rows", "issues": [
+        "The badge waits for the POST and then a GET, so it lands about 1-1.5s after the optimistic subtitle change. Optional: set the badge optimistically.",
+        "Undo buttons in toasts have no testID. Add testID='toast-action' for tests."
+      ]}
+    ],
+    "react_native_issues": [
+      {"component": "Toast Animated.View", "issue": "Reanimated warning, 13 times per session: 'Property [transform] may be overwritten by a layout animation'. The entering/exiting/layout props share an Animated.View with styled shadows. Reference: /app/frontend/src/ui/Toast.tsx:66"}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_68.json"],
+  "action_items": [
+    "LOW: add accessibilityState={{selected}} to segmented-control items (prefs-email-freq-*, prefs-freq-*-*).",
+    "LOW: move the 'Phone alerts are off' hint above the category list instead of repeating it in every category.",
+    "LOW: wrap the Toast content in an inner Animated.View, so the layout animation does not overwrite transform (Reanimated warning).",
+    "LOW (optional): update the tab badge optimistically before notifyBadges refetches."
+  ],
+  "critical_code_review_comments": [
+    "The swipedRecently() flag is module-global, so a tap on any row within ~600ms after another row settles is ignored. This is acceptable but worth knowing.",
+    "clearRead does not call notifyBadges(). This is harmless, because it only removes read items and the unread count does not change."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% of requested checks"},
+  "seed_data_creation": "None created. Demo state was restored to 2 unread (dcba00f6, 0dacade1). Clear read was run on the Receipts category, which dismissed 14 read receipts notifications for demo.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login at /login (login-email/login-password/login-submit-button). Row selectors: scope under [data-testid=updates-activity-list] or [data-testid=notif-list]. Exclude testIDs ending in -pane and notif-swipe-hint. Filter chips (notif-unread-only, notif-group-*) are outside updates-activity-list; use .first. Undo: page.locator('[data-testid^=toast-]').last.get_by_text('Undo', exact=True). Demo has about 1050 read notifications, mostly admin."
+}

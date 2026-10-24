@@ -55,6 +55,7 @@ export function SegmentedControl<T extends string>({
             style={styles.seg}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
+            aria-selected={active}
             testID={`${testIDPrefix}-${o.value}`}
           >
             {o.icon ? <Ionicons name={o.icon} size={14} color={fg} /> : null}
