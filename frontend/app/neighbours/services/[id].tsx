@@ -1,6 +1,6 @@
 /**
  * Service request detail — status timeline, photos, manager updates, FIXA hand-off.
- * The "Find a FIXA pro" path uses the normal gated FIXA flow (never a free reveal).
+ * The "Find a FIXA pro" path opens the free FIXA directory (contact is always visible).
  */
 import React, { useCallback, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl, Pressable } from "react-native";
@@ -182,7 +182,7 @@ export default function ServiceRequestScreen() {
                 </View>
                 <Button label="Find a FIXA professional" variant="fix" fullWidth iconLeft="hammer-outline" onPress={() => router.push("/fixa" as any)} testID="sr-find-fixa" />
                 <AppText variant="micro" tone="tertiary">
-                  FIXA contacts are revealed through the normal FIX unlock — nothing here bypasses it.
+                  FIXA is free — every verified pro shows their phone and WhatsApp, so you can call before booking.
                 </AppText>
               </View>
             ) : null}

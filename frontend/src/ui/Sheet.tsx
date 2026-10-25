@@ -103,7 +103,7 @@ export function ChargeConfirm({
   title: string;
   description?: string;
   cost: number;
-  currency?: "MASS" | "FIX";
+  currency?: "MASS";
   balance: number;
   confirmLabel?: string;
   loading?: boolean;
@@ -116,10 +116,9 @@ export function ChargeConfirm({
   const { colors } = useTheme();
   const after = balance - cost;
   const canAfford = after >= 0;
-  const isMass = currency === "MASS";
-  const accent = isMass ? colors.mass : colors.fix;
-  const accentText = isMass ? colors.massText : colors.fixText;
-  const accentSoft = isMass ? colors.massSoft : colors.fixSoft;
+  const accent = colors.mass;
+  const accentText = colors.massText;
+  const accentSoft = colors.massSoft;
   return (
     <Sheet visible={visible} onClose={onClose} testID={testID}>
       <View style={styles.chargeHead}>

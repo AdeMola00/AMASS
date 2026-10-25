@@ -3,20 +3,13 @@ import { api, WalletDto } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 
 type WalletContextValue = {
-  /** Legacy alias — MASS wallet (kept for backward compatibility) */
+  /** Alias of `mass` — MASS is the only token in the app. */
   wallet: WalletDto | null;
-  /** MASS wallet (property utility) */
+  /** MASS wallet (property access + map time). */
   mass: WalletDto | null;
-  /** FIX wallet (FIXA service utility / reward) */
-  fix: WalletDto | null;
   loading: boolean;
   refresh: () => Promise<void>;
   purchase: (bundleId: string) => Promise<{ credited: number; balance: number }>;
-  purchaseFix: (bundleId: string) => Promise<{ credited: number; balance: number }>;
-  spendFix: (
-    action: string,
-    meta?: Record<string, any>
-  ) => Promise<{ spent: number; balance: number }>;
   subscribe: (planId: string) => Promise<{ credited: number; balance: number }>;
   claimDailyLogin: () => Promise<{ credited?: number; already_claimed?: boolean }>;
 };
@@ -26,26 +19,18 @@ const WalletContext = createContext<WalletContextValue | null>(null);
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [mass, setMass] = useState<WalletDto | null>(null);
-  const [fix, setFix] = useState<WalletDto | null>(null);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!user) {
       setMass(null);
-      setFix(null);
       return;
     }
     setLoading(true);
     try {
-      const dual = await api.walletDual();
-      setMass(dual.mass);
-      setFix(dual.fix);
+      setMass(await api.wallet());
     } catch {
-      // Fallback to legacy endpoint if dual fails
-      try {
-        const w = await api.wallet();
-        setMass(w);
-      } catch {}
+      // keep the last known balance — the next refresh (focus / purchase) retries
     } finally {
       setLoading(false);
     }
@@ -60,24 +45,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const res = await api.purchaseTokens(bundleId);
       await refresh();
       return { credited: res.credited, balance: res.balance };
-    },
-    [refresh]
-  );
-
-  const purchaseFix = useCallback(
-    async (bundleId: string) => {
-      const res = await api.purchaseFix(bundleId);
-      await refresh();
-      return { credited: res.credited, balance: res.balance };
-    },
-    [refresh]
-  );
-
-  const spendFix = useCallback(
-    async (action: string, meta?: Record<string, any>) => {
-      const res = await api.spendFix(action, meta);
-      await refresh();
-      return { spent: res.spent, balance: res.balance };
     },
     [refresh]
   );
@@ -102,24 +69,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refresh]);
 
-  return (
-    <WalletContext.Provider
-      value={{
-        wallet: mass,
-        mass,
-        fix,
-        loading,
-        refresh,
-        purchase,
-        purchaseFix,
-        spendFix,
-        subscribe,
-        claimDailyLogin,
-      }}
-    >
-      {children}
-    </WalletContext.Provider>
-  );
+  return <WalletContext.Provider value={{ wallet: mass, mass, loading, refresh, purchase, subscribe, claimDailyLogin }}>{children}</WalletContext.Provider>;
 }
 
 export function useWallet() {

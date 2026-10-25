@@ -322,7 +322,7 @@ def register_property_access_routes(
         target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1})
         if not target:
             raise HTTPException(404, "User not found")
-        currency = "FIX" if (data.currency or "MASS").upper() == "FIX" else "MASS"
+        currency = "MASS"
         reason = (data.reason or "Admin adjustment").strip()[:200]
         meta = {"admin_id": admin["id"], "reason": reason, "manual": True}
         if data.amount > 0:

@@ -1,14 +1,10 @@
 """
-AMASS Dual-Token Economy — MASS (property utility) + FIX (FIXA service utility/reward).
+AMASS token economy — MASS only.
 
-  • MASS — spent by users to unlock premium property details, view premium
-    listings, buy subscriptions, etc. Purchasable via Paystack/Flutterwave/etc.
-  • FIX  — earned by verified FIXA service providers (job completions, ratings,
-    referrals, milestones) and also purchasable by customers for premium FIXA
-    features (provider profile boost, priority listing, etc.).
-
-Wallets, transactions and subscriptions all carry a `currency` field so a
-single WalletService supports both tokens without duplicated code.
+  • MASS — spent by users to unlock property details, browse the map (1 MASS / hour) and buy subscriptions.
+    Purchasable via Paystack/Flutterwave. ₦100 = 1 MASS.
+  • FIX was retired in Jun 2026: FIXA (home-service providers) is free to browse, contact and book. The
+    `currency` field stays on wallets/transactions so the historical ledger still reads correctly.
 
 MOCKED payment gateway: purchases succeed instantly. Real Paystack/Flutterwave
 wiring will plug into the /confirm handlers when API keys are available.
@@ -103,37 +99,6 @@ TOKEN_BUNDLES = [
     {"id": "professional", "name": "Professional", "tokens": 100, "bonus": 15, "price_ngn": 10_000},
 ]
 
-# ─── FIX bundles (customers can also purchase FIX for premium FIXA features) ─
-FIX_BUNDLES = [
-    {"id": "fix_starter", "name": "FIX Starter", "tokens": 50, "bonus": 0, "price_ngn": 500},
-    {"id": "fix_pro", "name": "FIX Pro", "tokens": 200, "bonus": 20, "price_ngn": 2_000},
-    {"id": "fix_team", "name": "FIX Team", "tokens": 500, "bonus": 100, "price_ngn": 5_000},
-    {"id": "fix_enterprise", "name": "FIX Enterprise", "tokens": 1_500, "bonus": 300, "price_ngn": 12_500},
-]
-
-# ─── FIX earning rules ────────────────────────────────────────
-# Server-side events award FIX to verified FIXA service providers.
-FIX_EARN_RULES: dict = {
-    "job_completed":         {"amount": 10,  "description": "Completed a verified job"},
-    "positive_rating":       {"amount": 5,   "description": "Received a 5-star customer rating"},
-    "referral_signup":       {"amount": 20,  "description": "Referral signup bonus"},
-    "active_profile_weekly": {"amount": 3,   "description": "Weekly active profile bonus"},
-    "milestone_50":          {"amount": 50,  "description": "50 jobs milestone"},
-    "milestone_100":         {"amount": 100, "description": "100 jobs milestone"},
-    "milestone_500":         {"amount": 500, "description": "500 jobs milestone"},
-    "promotion":             {"amount": 25,  "description": "AMASS/FIXA promotion reward"},
-    "onboarding_bonus":      {"amount": 15,  "description": "FIXA provider onboarding bonus"},
-}
-
-# ─── FIX spend rules ─────────────────────────────────────────
-# What customers or providers can do with FIX.
-FIX_SPEND_RULES: dict = {
-    "profile_boost_7d":  {"amount": 40,  "description": "Provider profile boost for 7 days"},
-    "priority_listing":  {"amount": 80,  "description": "Priority listing in FIXA search (30 days)"},
-    "featured_pro_30d":  {"amount": 150, "description": "Featured Pro badge for 30 days"},
-    "customer_discount": {"amount": 20,  "description": "10% off next FIXA booking"},
-}
-
 SUBSCRIPTION_PLANS = [
     {
         "id": "starter",
@@ -166,7 +131,7 @@ SUBSCRIPTION_PLANS = [
 ]
 
 WELCOME_TOKENS = 30   # Default welcome MASS = ₦3,000 at ₦100/MASS (admin-editable: app_settings.monetization.welcome_bonus)
-WELCOME_FIX = 100     # Default welcome FIX (admin-editable)
+WELCOME_FIX = 0       # FIX retired (Jun 2026) — legacy wallets only
 DEFAULT_UNLOCK_PERMANENCE_DAYS = 0  # 0 = forever
 
 
@@ -187,7 +152,9 @@ async def bundles_with_bonus(db: AsyncIOMotorDatabase, currency: str) -> list[di
     so the app must never offer them."""
     mcfg = ((await db.app_settings.find_one({"key": "monetization"}, {"_id": 0, "value": 1})) or {}).get("value") or {}
     min_ngn = int(mcfg.get("topup_min_ngn", 1000) or 1000)
-    src = FIX_BUNDLES if currency.upper() == "FIX" else TOKEN_BUNDLES
+    if currency.upper() != "MASS":
+        return []
+    src = TOKEN_BUNDLES
     out = []
     for b in src:
         if int(b["price_ngn"]) < min_ngn:
@@ -288,17 +255,6 @@ class SubscribeIn(BaseModel):
 
 class UnlockIn(BaseModel):
     property_id: str
-
-
-class FixEarnIn(BaseModel):
-    event: str  # key from FIX_EARN_RULES
-    provider_user_id: Optional[str] = None  # if None → current user
-    meta: dict = Field(default_factory=dict)
-
-
-class FixSpendIn(BaseModel):
-    action: str  # key from FIX_SPEND_RULES
-    meta: dict = Field(default_factory=dict)
 
 
 # ─── Auth guard (dup to avoid circular imports) ─────────────────
@@ -533,29 +489,6 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
         sub = await _current_sub(user_id)
         return _wallet_out(w, "MASS", sub)
 
-    # ─── FIX wallet endpoint
-    @router.get("/wallet/fix", response_model=WalletOut)
-    async def wallet_fix(
-        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
-    ):
-        user_id = await _current_user_id(creds)
-        w = await svc.get_or_create(user_id, "FIX")
-        return _wallet_out(w, "FIX")
-
-    # ─── Unified dual-wallet endpoint (single roundtrip for FE Wallet screen)
-    @router.get("/wallet/dual", response_model=DualWalletOut)
-    async def wallet_dual(
-        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
-    ):
-        user_id = await _current_user_id(creds)
-        mass = await svc.get_or_create(user_id, "MASS")
-        fix = await svc.get_or_create(user_id, "FIX")
-        sub = await _current_sub(user_id)
-        return DualWalletOut(
-            mass=_wallet_out(mass, "MASS", sub),
-            fix=_wallet_out(fix, "FIX"),
-        )
-
     @router.get("/wallet/transactions")
     async def wallet_transactions(
         limit: int = 40,
@@ -582,27 +515,8 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
     @router.get("/tokens/bundles")
     async def list_bundles(currency: str = "MASS"):
         """Bundle catalog with the FULL credit the buyer will receive (incl. the admin top-up tier
-        bonus) so the app can disclose the exact total before any payment."""
-        return await bundles_with_bonus(db, "FIX" if currency.upper() == "FIX" else "MASS")
-
-    @router.get("/wallet/fix/bundles")
-    async def list_fix_bundles():
-        return await bundles_with_bonus(db, "FIX")
-
-    @router.get("/wallet/fix/earn-rules")
-    async def list_fix_earn_rules():
-        """Public catalog of how FIX is earned (for provider dashboard)."""
-        return [
-            {"event": k, "amount": v["amount"], "description": v["description"]}
-            for k, v in FIX_EARN_RULES.items()
-        ]
-
-    @router.get("/wallet/fix/spend-rules")
-    async def list_fix_spend_rules():
-        return [
-            {"action": k, "amount": v["amount"], "description": v["description"]}
-            for k, v in FIX_SPEND_RULES.items()
-        ]
+        bonus) so the app can disclose the exact total before any payment. MASS only."""
+        return await bundles_with_bonus(db, "MASS")
 
     @router.post("/tokens/purchase")
     async def purchase_tokens(
@@ -784,105 +698,6 @@ def register_token_routes(db: AsyncIOMotorDatabase) -> APIRouter:
             meta={"task_id": "daily_login", "date": today},
         )
         return {"ok": True, "credited": 2}
-
-    # ─── FIX purchase (customer buys FIX for premium FIXA features) ─────
-    @router.post("/wallet/fix/purchase")
-    async def purchase_fix(
-        data: PurchaseIn,
-        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
-    ):
-        """DEPRECATED: This mock endpoint has been removed. FIX purchases now
-        go through /api/payments/init (currency='FIX') and are credited via
-        the provider webhook, ensuring no wallet credit occurs without a
-        real (or explicitly mocked via MOCK_PAYMENT env) transaction.
-        """
-        raise HTTPException(
-            410,
-            {
-                "error": "endpoint_removed",
-                "message": "Use POST /api/payments/initialize with currency='FIX' to purchase FIX tokens.",
-                "redirect": "/api/payments/initialize",
-            },
-        )
-
-    # ─── FIX earn (server-triggered event: job_completed, positive_rating…) ─
-    @router.post("/wallet/fix/earn")
-    async def earn_fix(
-        data: FixEarnIn,
-        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
-    ):
-        """Awards FIX to a service provider based on a whitelisted event.
-
-        For MVP the caller is authenticated as either the provider (self-report
-        via a booking flow) or an admin/system. Idempotency keys can be added
-        via meta (e.g., booking_id) to prevent double-credits.
-        """
-        rule = FIX_EARN_RULES.get(data.event)
-        if not rule:
-            raise HTTPException(400, f"Unknown FIX earn event '{data.event}'")
-        target_user = data.provider_user_id or await _current_user_id(creds)
-        # Idempotency: if meta carries an idempotency_key, skip on duplicate.
-        idem = data.meta.get("idempotency_key") if data.meta else None
-        if idem:
-            dup = await db.token_transactions.find_one(
-                {"user_id": target_user, "currency": "FIX", "meta.idempotency_key": idem}
-            )
-            if dup:
-                return {"ok": True, "duplicate": True, "credited": 0}
-        await svc.credit(
-            target_user,
-            rule["amount"],
-            "earn_reward",
-            rule["description"],
-            currency="FIX",
-            meta={"event": data.event, **(data.meta or {})},
-        )
-        w = await svc.get_or_create(target_user, "FIX")
-        return {
-            "ok": True,
-            "credited": rule["amount"],
-            "event": data.event,
-            "balance": w["balance"] + w["bonus_balance"],
-        }
-
-    # ─── FIX spend (premium FIXA feature: profile boost, priority listing…) ─
-    @router.post("/wallet/fix/spend")
-    async def spend_fix(
-        data: FixSpendIn,
-        creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
-    ):
-        rule = FIX_SPEND_RULES.get(data.action)
-        if not rule:
-            raise HTTPException(400, f"Unknown FIX spend action '{data.action}'")
-        user_id = await _current_user_id(creds)
-        try:
-            w = await svc.debit(
-                user_id,
-                rule["amount"],
-                "spend_feature",
-                rule["description"],
-                currency="FIX",
-                meta={"action": data.action, **(data.meta or {})},
-            )
-        except HTTPException as e:
-            if e.status_code == 402:
-                wallet = await svc.get_or_create(user_id, "FIX")
-                raise HTTPException(
-                    402,
-                    {
-                        "error": "insufficient_fix",
-                        "required": rule["amount"],
-                        "balance": wallet["balance"] + wallet["bonus_balance"],
-                        "shortfall": rule["amount"] - (wallet["balance"] + wallet["bonus_balance"]),
-                    },
-                )
-            raise
-        return {
-            "ok": True,
-            "action": data.action,
-            "spent": rule["amount"],
-            "balance": w["balance"] + w["bonus_balance"],
-        }
 
     return router
 

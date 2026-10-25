@@ -39,10 +39,8 @@ import { useBounceRefresh } from "@/src/ui/Refresh";
 import { ScreenLift } from "@/src/ui/Layout";
 import { useAdTrigger } from "@/src/hooks/useAdTrigger";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
-import { FixaGate } from "@/src/components/fixa/FixaGate";
 import { ShopHome } from "@/src/components/shop/ShopHome";
 import { useShopBasket } from "@/src/contexts/shopBasket";
-import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { gradients } from "@/src/theme/tokens";
 import { LinearGradient } from "expo-linear-gradient";
@@ -193,14 +191,12 @@ export default function Marketplace() {
   const [sortKey, setSortKey] = useState<SortKey>("nearby");
   const [sortOpen, setSortOpen] = useState(false);
   const { count: basketCount } = useShopBasket();
-  // FIXA gate — FIX balance must be > 0 to browse providers (read live, never cached).
-  const [fixAccess, setFixAccess] = useState<{ allowed: boolean; balance: number } | null>(null);
-  const { fix: fixWallet } = useWallet();
+  // FIXA is free — no token gate. The FAB routes a pro to Join FIXA (or their dashboard once they have a profile).
+  const [myFixaStatus, setMyFixaStatus] = useState<string | null>(null);
   useEffect(() => {
     if (section !== "fixa") return;
-    api.fixaAccess().then((r) => setFixAccess({ allowed: r.allowed, balance: r.balance })).catch(() => setFixAccess(null));
-  }, [section, fixWallet?.spendable]);
-  const fixaLocked = section === "fixa" && fixAccess !== null && !fixAccess.allowed;
+    api.fixaMe().then((m) => setMyFixaStatus(m.status)).catch(() => setMyFixaStatus(null));
+  }, [section]);
 
   // Restore prefs
   useEffect(() => {
@@ -312,7 +308,7 @@ export default function Marketplace() {
 
   const openItem = (it: MarketplaceItem) => {
     noteInteraction();
-    // FIXA providers live behind the FIX gate — their profile + contact unlock is /fixa/[id].
+    // FIXA providers open their free profile (contact + booking) at /fixa/[id].
     if (it.category === "services") {
       router.push(`/fixa/${it.id}` as any);
       return;
@@ -411,6 +407,7 @@ export default function Marketplace() {
             <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
               <View style={styles.fixaPill}><Ionicons name="shield-checkmark" size={12} color="#1C5E39" /><Text style={styles.fixaPillText}>Vetted</Text></View>
               <View style={styles.fixaPill}><Ionicons name="star" size={12} color="#1C5E39" /><Text style={styles.fixaPillText}>Rated</Text></View>
+              <View style={styles.fixaPill}><Ionicons name="call" size={12} color="#1C5E39" /><Text style={styles.fixaPillText}>Free to contact</Text></View>
             </View>
           </View>
           <View style={styles.fixaShield}>
@@ -505,20 +502,18 @@ export default function Marketplace() {
       ) : (
       <Animated.FlatList
         style={bounceStyle}
-        data={(fixaLocked ? [] : section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems) as any[]}
+        data={(section === "fixa" ? sortedItems : viewMode === "grid" ? gridRows : sortedItems) as any[]}
         keyExtractor={(_, i) => `row-${i}`}
         contentContainerStyle={{ paddingTop: headerH + 8, paddingBottom: tabBarOffset + 88 }}
         showsVerticalScrollIndicator={false}
         refreshControl={refreshControl}
-        ListHeaderComponent={loading || fixaLocked ? undefined : listHeader}
+        ListHeaderComponent={loading ? undefined : listHeader}
         removeClippedSubviews={Platform.OS !== "web"}
         initialNumToRender={8}
         windowSize={7}
         maxToRenderPerBatch={8}
         ListEmptyComponent={
-          fixaLocked ? (
-            <FixaGate balance={fixAccess?.balance ?? 0} compact testID="market-fixa-gate" />
-          ) : loading ? (
+          loading ? (
             <View style={{ paddingHorizontal: spacing.lg, gap: 12 }} testID="market-loading">
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <Skeleton height={36} width={110} radius={18} />
@@ -719,18 +714,19 @@ export default function Marketplace() {
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-          router.push("/marketplace/sell" as any);
+          if (section === "declutter") router.push("/marketplace/sell" as any);
+          else router.push((myFixaStatus && myFixaStatus !== "none" ? "/fixa/provider" : "/fixa/join") as any);
         }}
         style={({ pressed }) => [styles.sellFab, { bottom: tabBarOffset + 16 }, pressed && { transform: [{ scale: 0.95 }] }]}
         accessibilityRole="button"
-        accessibilityLabel={section === "declutter" ? "Sell an item" : "Join FIXA"}
+        accessibilityLabel={section === "declutter" ? "Sell an item" : myFixaStatus && myFixaStatus !== "none" ? "My FIXA profile" : "Join FIXA"}
         testID="sell-fab"
       >
         <LinearGradient colors={[...(section === "declutter" ? gradients.declutter : gradients.fix)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         <Shimmer intensity={0.7} delay={1200} />
         <Ionicons name={section === "declutter" ? "pricetag" : "hammer"} size={20} color="#fff" />
         <Text style={styles.sellFabText}>
-          {section === "declutter" ? "Sell" : "Join FIXA"}
+          {section === "declutter" ? "Sell" : myFixaStatus && myFixaStatus !== "none" ? "My FIXA" : "Join FIXA"}
         </Text>
       </Pressable>
       )}

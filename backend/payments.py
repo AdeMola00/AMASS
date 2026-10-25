@@ -24,7 +24,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from tokens import WalletService, TOKEN_BUNDLES, FIX_BUNDLES, Currency, tier_bonus_for
+from tokens import WalletService, TOKEN_BUNDLES, Currency, tier_bonus_for
 
 
 PROVIDER = Literal["paystack", "flutterwave"]
@@ -72,7 +72,9 @@ def _api_base(request: Optional[Request] = None) -> str:
 
 
 def _lookup_bundle(currency: Currency, bundle_id: str) -> Optional[dict]:
-    src = FIX_BUNDLES if currency == "FIX" else TOKEN_BUNDLES
+    if currency != "MASS":
+        raise HTTPException(422, "Only MASS can be purchased — FIXA is free")
+    src = TOKEN_BUNDLES
     return next((b for b in src if b["id"] == bundle_id), None)
 
 

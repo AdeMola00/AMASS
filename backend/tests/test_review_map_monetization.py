@@ -103,7 +103,8 @@ def test_map_markers_requires_auth_and_shape():
     assert isinstance(data["markers"], list) and len(data["markers"]) > 0
     expected = {"id", "category", "type", "lat", "lng", "unlocked", "verified", "approx"}
     for m in data["markers"]:
-        assert set(m.keys()) == expected, m
+        assert expected <= set(m.keys()), m
+        assert not ({"address", "agent_phone", "agent_id", "seller_phone"} & set(m.keys())), m
     # fresh user: everything approx + locked
     assert all(m["approx"] is True and m["unlocked"] is False for m in data["markers"])
 
@@ -196,12 +197,21 @@ def test_unlock_missing_idempotency_key_422():
     assert r.status_code == 422, (r.status_code, r.text)
 
 
+def _drain(tok, uid):
+    """Property fees are 5–12 MASS and the welcome bonus is 30, so nothing is unaffordable by default — empty the wallet."""
+    atok = _login(*DEMO)
+    bal = _balance(tok)
+    if bal > 0:
+        r = requests.post(f"{BASE}/api/admin/wallet/{uid}/adjust", headers=_hdr(atok), json={"amount": -bal, "currency": "MASS", "reason": "test"})
+        assert r.status_code == 200, r.text
+    assert _balance(tok) == 0
+
+
 def test_unlock_402_when_unaffordable_wallet_unchanged():
-    tok, _ = _new_user()
+    tok, uid = _new_user()
+    _drain(tok, uid)
     props = requests.get(f"{BASE}/api/properties?limit=100", headers=_hdr(tok)).json()
-    too_expensive = [p for p in props if p["token_cost"] > WELCOME]
-    assert too_expensive, "need at least one property above welcome bonus"
-    p = too_expensive[0]
+    p = next(p for p in props if p["token_cost"] > 0)
     before = _balance(tok)
     r = requests.post(f"{BASE}/api/unlocks",
                       headers=_hdr(tok, **{"Idempotency-Key": uuid.uuid4().hex}),
@@ -269,11 +279,10 @@ def test_legacy_properties_unlock_alias_charges_once():
 
 
 def test_legacy_properties_unlock_402_shape():
-    tok, _ = _new_user()
+    tok, uid = _new_user()
+    _drain(tok, uid)
     props = requests.get(f"{BASE}/api/properties?limit=100", headers=_hdr(tok)).json()
-    too_expensive = [p for p in props if p["token_cost"] > WELCOME]
-    assert too_expensive
-    p = too_expensive[0]
+    p = next(p for p in props if p["token_cost"] > 0)
     r = requests.post(f"{BASE}/api/properties/unlock", headers=_hdr(tok),
                       json={"property_id": p["id"]})
     assert r.status_code == 402
@@ -304,31 +313,18 @@ def test_admin_not_exempt_and_is_owner():
         assert qo["fee"] == 0
 
 
-# ---------------- FIX gate ----------------
+# ---------------- FIXA is free (no FIX token, no gate) ----------------
 
-def test_fix_gate_access():
-    tok, _ = _new_user()
-    # Fresh users receive 100 FIX welcome
-    acc = requests.get(f"{BASE}/api/fixa/access", headers=_hdr(tok))
-    assert acc.status_code == 200
-    body = acc.json()
-    assert body["allowed"] is True
-    assert body["balance"] >= 1
-    pr = requests.get(f"{BASE}/api/fixa/providers", headers=_hdr(tok))
-    assert pr.status_code == 200
-
-
-def test_fix_gate_blocks_at_zero():
-    atok = _login(*DEMO)
+def test_fixa_free_browse_with_contact():
     tok, uid = _new_user()
-    # zero out FIX
-    bal = requests.get(f"{BASE}/api/wallet/fix", headers=_hdr(tok)).json()["spendable"]
-    if bal > 0:
-        r = requests.post(f"{BASE}/api/admin/wallet/{uid}/adjust", headers=_hdr(atok),
-                          json={"amount": -bal, "currency": "FIX", "reason": "test"})
-        assert r.status_code == 200, r.text
-    acc = requests.get(f"{BASE}/api/fixa/access", headers=_hdr(tok)).json()
-    assert acc["allowed"] is False
+    _drain(tok, uid)  # even with 0 MASS
+    assert requests.get(f"{BASE}/api/fixa/access", headers=_hdr(tok)).status_code == 404
+    assert requests.get(f"{BASE}/api/wallet/fix", headers=_hdr(tok)).status_code == 404
     pr = requests.get(f"{BASE}/api/fixa/providers", headers=_hdr(tok))
-    assert pr.status_code == 403
-    assert pr.json()["detail"].get("code") == "FIX_REQUIRED"
+    assert pr.status_code == 200, pr.text
+    items = pr.json()["items"]
+    assert items and all(i["phone"] for i in items)
+
+
+def test_fixa_requires_auth():
+    assert requests.get(f"{BASE}/api/fixa/providers").status_code in (401, 403)

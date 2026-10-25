@@ -13,13 +13,17 @@ import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
-import { api, MarketplaceItem } from "@/src/lib/api";
+import { api, FixaBooking, MarketplaceItem } from "@/src/lib/api";
 import { radius, spacing, formatNaira, shadows } from "@/src/constants/theme";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 import { Illustration, useCelebrate, useMoneyRain } from "@/src/ui";
 
+/** What the sheet needs to know about a FIXA pro — a MarketplaceItem or a ProviderFull mapped into this shape. */
+export type BookingTarget = Pick<MarketplaceItem, "id"> &
+  Partial<Pick<MarketplaceItem, "seller_name" | "vendor" | "seller_avatar" | "is_fixa_verified" | "subcategory" | "seller_rating" | "rating" | "seller_reviews" | "reviews" | "price">>;
+
 export type BookingSheetRef = {
-  open: (item: MarketplaceItem) => void;
+  open: (item: BookingTarget, onBooked?: (booking: FixaBooking) => void) => void;
   close: () => void;
 };
 
@@ -47,7 +51,8 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const sheetRef = useRef<BottomSheetModal>(null);
-  const [item, setItem] = useState<MarketplaceItem | null>(null);
+  const [item, setItem] = useState<BookingTarget | null>(null);
+  const onBookedRef = useRef<((booking: FixaBooking) => void) | undefined>(undefined);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -58,7 +63,8 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
   const [confirmed, setConfirmed] = useState(false);
 
   useImperativeHandle(ref, () => ({
-    open: (it) => {
+    open: (it, onBooked) => {
+      onBookedRef.current = onBooked;
       setItem(it);
       setName("");
       setPhone("");
@@ -95,7 +101,7 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
     }
     setSending(true);
     try {
-      await api.fixaBook({
+      const res = await api.fixaBook({
         item_id: item.id,
         customer_name: name.trim(),
         customer_phone: phone.trim(),
@@ -104,6 +110,7 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
         scheduled_time: timeSlot,
         notes: notes.trim() || undefined,
       });
+      onBookedRef.current?.(res.booking);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setConfirmed(true);
       rain({ variant: "subtle", key: `booking:${item.id}:${dateKey}:${timeSlot}` });
@@ -134,7 +141,7 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
             <Illustration name="success" size={150} />
             <Text style={styles.confirmedTitle}>Booking sent!</Text>
             <Text style={styles.confirmedBody}>
-              {item.seller_name} will reach out shortly to confirm.
+              {item.seller_name || item.vendor || "The pro"} will confirm from their FIXA dashboard — you can also call them now. No payment needed.
             </Text>
           </View>
         ) : (
@@ -142,7 +149,7 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
             {/* Provider header */}
             <View style={styles.hdr}>
               <Image
-                source={{ uri: item.seller_avatar }}
+                source={{ uri: item.seller_avatar ?? undefined }}
                 style={styles.hdrAvatar}
                 contentFit="cover"
               />
@@ -160,10 +167,10 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
                   <Text style={styles.trade}>{item.subcategory}</Text>
                   <View style={styles.dot} />
                   <Ionicons name="star" size={11} color="#F5B301" />
-                  <Text style={styles.metaStrong}>{(item.seller_rating ?? item.rating).toFixed(1)}</Text>
-                  <Text style={styles.meta}>({item.seller_reviews ?? item.reviews})</Text>
+                  <Text style={styles.metaStrong}>{(item.seller_rating ?? item.rating ?? 0).toFixed(1)}</Text>
+                  <Text style={styles.meta}>({item.seller_reviews ?? item.reviews ?? 0})</Text>
                 </View>
-                <Text style={styles.priceLine}>From <Text style={styles.priceBold}>{formatNaira(item.price)}</Text></Text>
+                {item.price ? <Text style={styles.priceLine}>From <Text style={styles.priceBold}>{formatNaira(item.price)}</Text></Text> : null}
               </View>
             </View>
 
@@ -250,7 +257,7 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
             <View style={styles.trustRow}>
               <Ionicons name="shield-checkmark" size={14} color="#22C55E" />
               <Text style={styles.trustText}>
-                FIXA-verified pro — background-checked, rated, insured.
+                Free booking — no tokens, no fees. The pro confirms and you rate the job afterwards.
               </Text>
             </View>
 

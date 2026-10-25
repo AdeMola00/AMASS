@@ -245,8 +245,6 @@ def register_chat_routes(db, get_current_user, require_admin):
         )
         if not item:
             raise HTTPException(404, "Listing not found")
-        if item.get("category") == "services":
-            raise HTTPException(400, "FIXA providers are contacted after unlocking with FIX")
         seller_id = item.get("seller_id")
         if not seller_id:
             raise HTTPException(400, "This listing has no seller to contact")

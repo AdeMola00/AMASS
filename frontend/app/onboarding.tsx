@@ -89,7 +89,7 @@ const SLIDES: Slide[] = [
     kind: "fixa",
     image: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1400&q=80",
     headline: "fix anything",
-    subtitle: "Vetted pros. Pay with FIX. Track every job.",
+    subtitle: "Vetted pros. Free to contact. Track every job.",
     cta: "fix",
     ctaIcon: "construct",
     chips: [
@@ -111,7 +111,7 @@ const SLIDES: Slide[] = [
     ctaIcon: "rocket",
     bullets: [
       { icon: "home", label: "MASS unlocks homes", tone: "mass" },
-      { icon: "construct", label: "FIX pays pros", tone: "fix" },
+      { icon: "call", label: "Call or WhatsApp free", tone: "fix" },
       { icon: "gift", label: "Earn daily", tone: "ink" },
     ],
   },

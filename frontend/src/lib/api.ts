@@ -88,7 +88,7 @@ export type Property = {
   agent_identity_verified?: boolean;
 };
 
-export type Currency = "MASS" | "FIX";
+export type Currency = "MASS";
 
 export type WalletDto = {
   currency?: Currency;  // undefined = legacy MASS wallet
@@ -101,11 +101,6 @@ export type WalletDto = {
   subscription?: any | null;
 };
 
-export type DualWalletDto = {
-  mass: WalletDto;
-  fix: WalletDto;
-};
-
 export type TokenBundle = {
   id: string;
   name: string;
@@ -116,18 +111,6 @@ export type TokenBundle = {
   tier_bonus?: number;
   /** tokens + bonus + tier_bonus — exactly what gets credited. */
   total?: number;
-};
-
-export type FixEarnRule = {
-  event: string;
-  amount: number;
-  description: string;
-};
-
-export type FixSpendRule = {
-  action: string;
-  amount: number;
-  description: string;
 };
 
 export type SubscriptionPlan = {
@@ -148,7 +131,7 @@ export type WalletTransaction = {
   meta: Record<string, any>;
   created_at: string;
   // Monetization ledger extras (unlock charges / credits)
-  feature_key?: "property" | "fixa_provider";
+  feature_key?: "property";
   category?: string | null;
   zone_tier?: string | null;
   price_snapshot?: { amount: number; currency: string; token_ngn: number; ngn: number } | null;
@@ -472,8 +455,6 @@ export type MarketplaceItem = {
   provider_service_areas?: string[];
   is_fixa_verified?: boolean;
   fixa_badges?: string[];
-  /** FIXA: contact is hidden until the provider is unlocked with FIX (set by the backend on list payloads). */
-  contact_locked?: boolean;
   /** Listing lifecycle (missing = active). */
   status?: ListingStatus;
   /** Only on /marketplace/my-listings — offers awaiting the seller. */
@@ -729,14 +710,14 @@ export type NotifPrefsUpdate = {
 };
 
 /* ─── Monetization types ─────────────────────────────────────────────── */
-export type FeatureKey = "property" | "fixa_provider";
+export type FeatureKey = "property";
 export type UnlockQuote = {
   feature_key: FeatureKey;
   target_id: string;
   label: string;
   category: string;
   zone_tier: "A" | "B" | "C" | "D";
-  currency: "MASS" | "FIX";
+  currency: "MASS";
   fee: number;
   fee_ngn: number;
   token_ngn: number;
@@ -785,7 +766,7 @@ export type UnlockResult = {
   feature_key: FeatureKey;
   target_id: string;
   charged: number;
-  currency: "MASS" | "FIX";
+  currency: "MASS";
   balance_after: number;
   free_reason?: string | null;
   entitlement?: { id: string; status: string; amount_paid: number; created_at: string; receipt_no?: string | null } | null;
@@ -849,30 +830,130 @@ export type MapTime = {
   hours_charged: number;
   heartbeat_seconds?: number;
 };
+/** FIXA provider card — FIXA is free, so phone/WhatsApp are always present. */
 export type ProviderPreview = {
   id: string;
   display_name: string;
   initials: string;
   category: string;
-  rating?: number;
+  categories: string[];
+  rating?: number | null;
   reviews?: number;
-  area?: string;
+  area?: string | null;
+  city?: string | null;
   verified: boolean;
   badges: string[];
-  years_experience?: number;
+  years_experience?: number | null;
   jobs_completed?: number;
   image?: string | null;
   is_boosted: boolean;
-  tier?: number;
-  unlocked?: boolean;
-  bio?: string;
-  zone_tier?: string;
+  phone?: string | null;
+  whatsapp?: string | null;
+  seller_id?: string | null;
+  status: FixaStatus | "listed";
+};
+
+export type FixaStatus = "pending" | "verified" | "rejected" | "suspended" | "hidden";
+
+export type FixaReview = { rating: number; review?: string | null; by: string; at?: string | null; trade?: string | null };
+
+export type FixaBooking = {
+  id: string;
+  user_id: string;
+  item_id: string;
+  provider_id?: string | null;
+  provider_name?: string | null;
+  provider_avatar?: string | null;
+  provider_phone?: string | null;
+  provider_whatsapp?: string | null;
+  trade?: string | null;
+  customer_name: string;
+  customer_phone: string;
+  address: string;
+  scheduled_date: string;
+  scheduled_time: string;
+  notes?: string;
+  status: "pending" | "confirmed" | "completed" | "cancelled" | "declined";
+  created_at: string;
+  confirmed_at?: string | null;
+  completed_at?: string | null;
+  rating?: number | null;
+  review?: string | null;
+  provider_note?: string | null;
+  cancel_note?: string | null;
+};
+
+export type ProviderFull = ProviderPreview & {
+  bio: string;
+  specializations: string[];
+  service_areas: string[];
+  call_out_from?: number | null;
+  images: string[];
+  posted_at?: string | null;
+  reviews_list: FixaReview[];
+  is_owner: boolean;
+  my_open_booking: FixaBooking | null;
+  my_report: { id: string; reason: string; created_at: string } | null;
+};
+
+export type FixaBadgeRule = { name: string; icon: string; how: string; auto: boolean; min_jobs?: number; min_rating?: number };
+
+export type FixaApplyIn = {
+  business_name: string;
+  categories: string[];
+  city: string;
+  service_areas: string[];
+  phone: string;
+  whatsapp?: string;
+  years_experience: number;
+  bio: string;
+  image?: string | null;
+};
+
+export type FixaMe = {
+  status: FixaStatus | "none";
+  profile: ProviderFull | null;
+  stats: { jobs_completed: number; pending_requests: number; upcoming: number; open_reports: number } | null;
+  rejection_reason?: string | null;
+  hidden_reason?: string | null;
+  applied_at?: string | null;
+  verified_at?: string | null;
+  badge_rules?: FixaBadgeRule[];
+};
+
+export type FixaReportReason = "no_show" | "poor_work" | "overcharging" | "unsafe" | "fraud" | "other";
+
+export type FixaReport = {
+  id: string;
+  provider_item_id: string;
+  provider_user_id?: string | null;
+  provider_name?: string | null;
+  reporter_id: string;
+  reporter_name?: string | null;
+  reason: FixaReportReason;
+  reason_label: string;
+  details?: string | null;
+  booking_id?: string | null;
+  status: "open" | "resolved" | "dismissed";
+  created_at: string;
+  resolved_at?: string | null;
+  resolution?: string | null;
+  provider_status?: string;
+};
+
+export type FixaApplication = ProviderFull & {
+  applied_at?: string | null;
+  verified_at?: string | null;
+  rejection_reason?: string | null;
+  hidden_reason?: string | null;
+  user?: { id: string; full_name?: string; email?: string; phone?: string; identity_verified?: boolean } | null;
+  stats: { jobs_completed: number; pending_requests: number; upcoming: number; open_reports: number };
 };
 
 export const api = {
   // ─── Monetization (shared unlock service) ───
   monetizationConfig: () =>
-    req<{ conversion: { MASS_ngn: number; FIX_ngn: number }; welcome_bonus: { MASS: number; FIX: number }; topup_min_ngn: number; topup_bonus_tiers: { min_ngn: number; bonus_pct: number }[] }>("/monetization/config"),
+    req<{ conversion: { MASS_ngn: number }; welcome_bonus: { MASS: number }; topup_min_ngn: number; topup_bonus_tiers: { min_ngn: number; bonus_pct: number }[] }>("/monetization/config"),
   unlockQuote: (featureKey: FeatureKey, targetId: string) =>
     req<UnlockQuote>(`/unlocks/quote?featureKey=${featureKey}&targetId=${encodeURIComponent(targetId)}`),
   unlock: (featureKey: FeatureKey, targetId: string, idempotencyKey: string) =>
@@ -902,8 +983,8 @@ export const api = {
   /** Map time — 1 MASS buys 60 min on the Find Home map. Heartbeat once a minute while the tab is in front. */
   mapTimeTick: () => req<MapTime>("/map/time/tick", { method: "POST" }),
   mapTimeStatus: () => req<MapTime>("/map/time"),
-  // FIXA (gated — FIX > 0)
-  fixaAccess: () => req<{ allowed: boolean; balance: number; currency: "FIX" }>("/fixa/access"),
+  // FIXA — free: browse, contact and book without tokens. New pros join via /fixa/apply and wait for AMASS Admin.
+  fixaCategories: () => req<{ categories: string[]; report_reasons: Record<FixaReportReason, string>; badge_rules: FixaBadgeRule[] }>("/fixa/categories"),
   fixaProviders: (params?: Record<string, string | number | boolean | undefined>) => {
     const qs = params
       ? "?" +
@@ -912,10 +993,28 @@ export const api = {
           .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
           .join("&")
       : "";
-    return req<{ items: ProviderPreview[]; count: number; subcategories: string[]; fix_balance: number }>(`/fixa/providers${qs}`);
+    return req<{ items: ProviderPreview[]; count: number; subcategories: string[]; my_status: FixaStatus | null }>(`/fixa/providers${qs}`);
   },
-  fixaProvider: (id: string) => req<ProviderPreview>(`/fixa/providers/${id}`),
-  fixaProviderDetails: (id: string) => req<any>(`/fixa/providers/${id}/details`),
+  fixaProvider: (id: string) => req<ProviderFull>(`/fixa/providers/${id}`),
+  fixaApply: (body: FixaApplyIn) => req<ProviderFull & { status: FixaStatus }>("/fixa/apply", { method: "POST", body: JSON.stringify(body) }),
+  fixaMe: () => req<FixaMe>("/fixa/me"),
+  fixaUpdateMe: (body: FixaApplyIn) => req<{ status: FixaStatus; profile: ProviderFull }>("/fixa/me", { method: "PUT", body: JSON.stringify(body) }),
+  fixaJobs: () => req<{ items: FixaBooking[]; stats: FixaMe["stats"] }>("/fixa/jobs"),
+  fixaJobConfirm: (jobId: string, note?: string) => req<{ ok: boolean; status: string }>(`/fixa/jobs/${jobId}/confirm`, { method: "POST", body: JSON.stringify({ note }) }),
+  fixaJobDecline: (jobId: string, note?: string) => req<{ ok: boolean; status: string }>(`/fixa/jobs/${jobId}/decline`, { method: "POST", body: JSON.stringify({ note }) }),
+  fixaReport: (providerId: string, body: { reason: FixaReportReason; details?: string; booking_id?: string }) =>
+    req<{ ok: boolean; report: FixaReport; auto_hidden: boolean; open_reports: number }>(`/fixa/providers/${providerId}/report`, { method: "POST", body: JSON.stringify(body) }),
+  fixaCancelBooking: (bookingId: string, note?: string) => req<{ ok: boolean; status: string }>(`/marketplace/fixa/bookings/${bookingId}/cancel`, { method: "POST", body: JSON.stringify({ note }) }),
+  // Admin — FIXA verification & reports
+  adminFixaOverview: () => req<{ pending: number; verified: number; hidden: number; open_reports: number }>("/admin/fixa/overview"),
+  adminFixaApplications: (status: "pending" | "verified" | "rejected" | "hidden" | "suspended" | "all" = "pending") => req<{ items: FixaApplication[]; count: number }>(`/admin/fixa/applications?status=${status}`),
+  adminFixaApprove: (id: string, note?: string) => req<{ ok: boolean }>(`/admin/fixa/applications/${id}/approve`, { method: "POST", body: JSON.stringify({ note }) }),
+  adminFixaReject: (id: string, note?: string) => req<{ ok: boolean }>(`/admin/fixa/applications/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) }),
+  adminFixaSuspend: (id: string, note?: string) => req<{ ok: boolean }>(`/admin/fixa/providers/${id}/suspend`, { method: "POST", body: JSON.stringify({ note }) }),
+  adminFixaReinstate: (id: string) => req<{ ok: boolean }>(`/admin/fixa/providers/${id}/reinstate`, { method: "POST" }),
+  adminFixaReports: (status: "open" | "resolved" | "dismissed" | "all" = "open") => req<{ items: FixaReport[]; count: number }>(`/admin/fixa/reports?status=${status}`),
+  adminFixaResolveReport: (id: string, body: { outcome: "resolved" | "dismissed"; note?: string; reinstate?: boolean }) =>
+    req<{ ok: boolean; status: string }>(`/admin/fixa/reports/${id}/resolve`, { method: "POST", body: JSON.stringify(body) }),
   // Admin — pricing & monetization
   adminPricing: () => req<{ prices: any[]; conversion: any; zone_multipliers: any; bases: any }>("/admin/pricing"),
   adminSetPrice: (data: { featureKey: FeatureKey; category: string; zoneTier: string; amount: number; note?: string }) =>
@@ -1274,11 +1373,11 @@ export const api = {
     scheduled_time: string;
     notes?: string;
   }) =>
-    req<{ ok: boolean; booking: any }>("/marketplace/fixa/book", {
+    req<{ ok: boolean; booking: FixaBooking }>("/marketplace/fixa/book", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  fixaMyBookings: () => req<any[]>("/marketplace/fixa/bookings"),
+  fixaMyBookings: () => req<FixaBooking[]>("/marketplace/fixa/bookings"),
 
   // Cart
   getCart: () => req<Cart>("/cart"),
@@ -1423,7 +1522,6 @@ export const api = {
 
   // ─── Token economy (MASS = property utility) ─────────
   wallet: () => req<WalletDto>("/wallet/me"),
-  walletDual: () => req<DualWalletDto>("/wallet/dual"),
   walletMass: () => req<WalletDto>("/wallet/mass"),
   walletTransactions: (limit = 40, currency?: Currency) =>
     req<WalletTransaction[]>(
@@ -1531,28 +1629,9 @@ export const api = {
       { method: "POST" }
     ),
 
-  // ─── FIX token (FIXA service utility & reward) ────────
-  walletFix: () => req<WalletDto>("/wallet/fix"),
-  listFixBundles: () => req<TokenBundle[]>("/wallet/fix/bundles"),
-  fixEarnRules: () => req<FixEarnRule[]>("/wallet/fix/earn-rules"),
-  fixSpendRules: () => req<FixSpendRule[]>("/wallet/fix/spend-rules"),
-  purchaseFix: (bundle_id: string, provider: "paystack" | "flutterwave" | "bank_transfer" | "card" | "mock" = "mock") =>
-    req<{ ok: boolean; credited: number; balance: number }>("/wallet/fix/purchase", {
-      method: "POST",
-      body: JSON.stringify({ bundle_id, provider }),
-    }),
-  spendFix: (action: string, meta?: Record<string, any>) =>
-    req<{ ok: boolean; action: string; spent: number; balance: number }>(
-      "/wallet/fix/spend",
-      { method: "POST", body: JSON.stringify({ action, meta: meta || {} }) }
-    ),
-  earnFix: (event: string, meta?: Record<string, any>) =>
-    req<{ ok: boolean; credited?: number; balance?: number; duplicate?: boolean }>(
-      "/wallet/fix/earn",
-      { method: "POST", body: JSON.stringify({ event, meta: meta || {} }) }
-    ),
+  // ─── FIXA booking completion (reputation only — nothing is earned or spent) ────────
   fixaCompleteBooking: (booking_id: string, rating?: number, review?: string) =>
-    req<{ ok: boolean; already_completed?: boolean; awards?: { event: string; amount: number }[] }>(
+    req<{ ok: boolean; already_completed?: boolean; rating?: number | null }>(
       `/marketplace/fixa/bookings/${booking_id}/complete`,
       { method: "POST", body: JSON.stringify({ rating, review }) }
     ),

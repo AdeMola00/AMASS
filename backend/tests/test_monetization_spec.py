@@ -89,22 +89,26 @@ def _find_prop(props, pred):
 def test_welcome_bonus_from_config():
     tok, _ = _new_user()
     assert _balance(tok, "MASS") == 30  # ₦3,000 at ₦100/MASS
-    assert _balance(tok, "FIX") == 100
     cfg = requests.get(f"{BASE}/api/monetization/config").json()
-    assert cfg["conversion"]["MASS_ngn"] == 100 and cfg["conversion"]["FIX_ngn"] == 10
+    assert cfg["conversion"] == {"MASS_ngn": 100}  # MASS is the only token — no FIX anywhere
+    assert "FIX" not in cfg["welcome_bonus"]
     assert cfg["topup_min_ngn"] == 1000
+    assert requests.get(f"{BASE}/api/wallet/fix", headers=_hdr(tok)).status_code == 404
+    assert requests.get(f"{BASE}/api/wallet/dual", headers=_hdr(tok)).status_code == 404
 
 
 # ─── Zone fees ──────────────────────────────────────────────────────────
-def test_fees_per_zone_and_sale_ge_rent(admin_tok):
+def test_fees_per_zone_and_rent_above_sale(admin_tok):
+    """Location sets the fee (5 → 12 MASS); rent/lease is always dearer than sale; no FIXA fee rows remain."""
     r = requests.get(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok))
     assert r.status_code == 200
     prices = {(p["feature_key"], p["category"], p["zone_tier"]): p["amount"] for p in r.json()["prices"]}
-    assert prices[("property", "rent", "A")] == 80 and prices[("property", "sale", "A")] == 120
-    assert prices[("property", "rent", "D")] == 10 and prices[("property", "sale", "D")] == 15
+    assert prices[("property", "rent", "A")] == 12 and prices[("property", "sale", "A")] == 10
+    assert prices[("property", "rent", "D")] == 6 and prices[("property", "sale", "D")] == 5
     for z in "ABCD":
-        assert prices[("property", "sale", z)] >= prices[("property", "rent", z)]
-    assert prices[("fixa_provider", "1", "A")] == 80 and prices[("fixa_provider", "4", "D")] == 400
+        assert prices[("property", "rent", z)] > prices[("property", "sale", z)]
+        assert 5 <= prices[("property", "sale", z)] <= 12 and 5 <= prices[("property", "rent", z)] <= 12
+    assert not [k for k in prices if k[0] == "fixa_provider"]
 
 
 def test_quote_zone_resolution(admin_tok, props):
@@ -112,7 +116,7 @@ def test_quote_zone_resolution(admin_tok, props):
     ikoyi = _find_prop(props, lambda p: "ikoyi" in (p.get("city", "") + p.get("location", "")).lower())
     q = requests.get(f"{BASE}/api/unlocks/quote", headers=_hdr(tok), params={"featureKey": "property", "targetId": ikoyi["id"]}).json()
     assert q["zone_tier"] == "A"
-    assert q["fee"] in (80, 120)
+    assert q["fee"] in (10, 12)
     assert q["fee_ngn"] == q["fee"] * 100
     assert q["currency"] == "MASS"
 
@@ -211,75 +215,39 @@ def test_concurrent_property_unlock_single_charge(admin_tok, props):
     assert len([t for t in tx if t.get("kind") == "spend_unlock"]) == 1
 
 
-# ─── FIXA gate & provider unlock ────────────────────────────────────────
-def test_zero_fix_blocks_fixa_routes(admin_tok, providers):
+# ─── FIXA is free — no gate, no unlock, contact always visible ───────────
+def test_fixa_free_for_zero_mass_user(admin_tok, providers):
     tok, uid = _new_user()
-    _set_balance(admin_tok, uid, tok, "FIX", 0)
-    _set_balance(admin_tok, uid, tok, "MASS", 10000)  # MASS never pays for FIX features
+    _set_balance(admin_tok, uid, tok, "MASS", 0)
     pid = providers[0]["id"]
-    assert requests.get(f"{BASE}/api/fixa/providers", headers=_hdr(tok)).status_code == 403
-    assert requests.get(f"{BASE}/api/fixa/providers/{pid}/details", headers=_hdr(tok)).status_code == 403
-    assert requests.get(f"{BASE}/api/fixa/access", headers=_hdr(tok)).json()["allowed"] is False
-    b = requests.post(f"{BASE}/api/marketplace/fixa/book", headers=_hdr(tok), json={"item_id": pid, "customer_name": "T", "customer_phone": "080", "address": "x", "scheduled_date": "2026-07-01", "scheduled_time": "Morning"})
-    assert b.status_code == 403
-    assert _unlock(tok, "fixa_provider", pid).status_code == 403
-    assert _balance(tok, "MASS") == 10000 and _balance(tok, "FIX") == 0
-
-
-def test_fixa_entry_free_and_previews_hide_contact(admin_tok, providers):
-    tok, uid = _new_user()
-    _set_balance(admin_tok, uid, tok, "FIX", 100)
     r = requests.get(f"{BASE}/api/fixa/providers", headers=_hdr(tok))
-    assert r.status_code == 200
-    item = r.json()["items"][0]
-    assert "phone" not in item and "seller_phone" not in item and "whatsapp" not in item
-    assert _balance(tok, "FIX") == 100  # entry deducts nothing
-    # legacy marketplace list never leaks provider contact
-    mk = requests.get(f"{BASE}/api/marketplace", params={"category": "services"}).json()
-    assert all("seller_phone" not in d and "seller_whatsapp" not in d for d in mk)
-    it = requests.get(f"{BASE}/api/marketplace/items/{item['id']}").json()["item"]
-    assert "seller_phone" not in it
-
-
-def test_provider_unlock_once_insufficient_repeat_concurrent(admin_tok, providers):
-    tok, uid = _new_user()
-    pid = providers[0]["id"]
-    _set_balance(admin_tok, uid, tok, "FIX", 10)
-    q = requests.get(f"{BASE}/api/unlocks/quote", headers=_hdr(tok), params={"featureKey": "fixa_provider", "targetId": pid}).json()
-    fee = q["fee"]
-    assert q["currency"] == "FIX" and fee >= 50
-    # insufficient FIX (0 < FIX < fee) → no charge
-    r = _unlock(tok, "fixa_provider", pid)
-    assert r.status_code == 402 and _balance(tok, "FIX") == 10
-    # MASS can't substitute
-    _set_balance(admin_tok, uid, tok, "MASS", 5000)
-    assert _unlock(tok, "fixa_provider", pid).status_code == 402
-    # fund FIX and unlock concurrently → single charge
-    _set_balance(admin_tok, uid, tok, "FIX", fee * 2 + 5)
-    with ThreadPoolExecutor(max_workers=5) as ex:
-        results = list(ex.map(lambda _: _unlock(tok, "fixa_provider", pid), range(5)))
-    charged = [r.json()["charged"] for r in results if r.status_code == 200]
-    assert sum(1 for c in charged if c > 0) == 1
-    assert _balance(tok, "FIX") == fee + 5
-    assert _balance(tok, "MASS") == 5000
-    d = requests.get(f"{BASE}/api/fixa/providers/{pid}/details", headers=_hdr(tok))
-    assert d.status_code == 200 and d.json().get("seller_phone")
-    # reopen is free
-    r3 = _unlock(tok, "fixa_provider", pid)
-    assert r3.status_code == 200 and r3.json()["charged"] == 0
-    assert _balance(tok, "FIX") == fee + 5
-    # booking now allowed
+    assert r.status_code == 200, r.text
+    item = next(i for i in r.json()["items"] if i["id"] == pid)
+    assert item["phone"] and item["whatsapp"]  # contact is public — no booking or payment needed
+    d = requests.get(f"{BASE}/api/fixa/providers/{pid}", headers=_hdr(tok))
+    assert d.status_code == 200 and d.json()["phone"] and "reviews_list" in d.json()
+    assert requests.get(f"{BASE}/api/fixa/access", headers=_hdr(tok)).status_code == 404
+    assert requests.get(f"{BASE}/api/fixa/providers/{pid}/details", headers=_hdr(tok)).status_code == 404
+    # fixa_provider is no longer a paid feature
+    assert requests.get(f"{BASE}/api/unlocks/quote", headers=_hdr(tok), params={"featureKey": "fixa_provider", "targetId": pid}).status_code == 422
+    assert _unlock(tok, "fixa_provider", pid).status_code == 422
+    # booking is free and never touches the wallet
     b = requests.post(f"{BASE}/api/marketplace/fixa/book", headers=_hdr(tok), json={"item_id": pid, "customer_name": "T", "customer_phone": "080", "address": "x", "scheduled_date": "2026-07-01", "scheduled_time": "Morning"})
     assert b.status_code == 200, b.text
-    mine = requests.get(f"{BASE}/api/unlocks/mine", headers=_hdr(tok), params={"featureKey": "fixa_provider"}).json()
-    assert mine["count"] == 1 and mine["items"][0]["provider"]["phone"]
+    assert b.json()["booking"]["status"] == "pending" and b.json()["booking"]["provider_phone"]
+    assert _balance(tok, "MASS") == 0
+    # one open booking per provider
+    b2 = requests.post(f"{BASE}/api/marketplace/fixa/book", headers=_hdr(tok), json={"item_id": pid, "customer_name": "T", "customer_phone": "080", "address": "x", "scheduled_date": "2026-07-02", "scheduled_time": "Morning"})
+    assert b2.status_code == 409
+    c = requests.post(f"{BASE}/api/marketplace/fixa/bookings/{b.json()['booking']['id']}/cancel", headers=_hdr(tok), json={"note": "changed plans"})
+    assert c.status_code == 200 and c.json()["status"] == "cancelled"
 
 
-def test_provider_details_403_without_entitlement(admin_tok, providers):
-    tok, uid = _new_user()
-    _set_balance(admin_tok, uid, tok, "FIX", 100)
-    d = requests.get(f"{BASE}/api/fixa/providers/{providers[1]['id']}/details", headers=_hdr(tok))
-    assert d.status_code == 403 and d.json()["detail"]["code"] == "UNLOCK_REQUIRED"
+def test_marketplace_services_expose_contact(providers):
+    mk = requests.get(f"{BASE}/api/marketplace", params={"category": "services"}).json()
+    assert mk and all("contact_locked" not in d for d in mk)
+    it = requests.get(f"{BASE}/api/marketplace/items/{providers[0]['id']}").json()["item"]
+    assert it.get("seller_phone")
 
 
 # ─── Pricing admin ───────────────────────────────────────────────────────
@@ -295,11 +263,22 @@ def test_price_change_future_only_and_validation(admin_tok, props):
     assert requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": cat, "zoneTier": zone, "amount": 0}).status_code == 422
     sale = requests.get(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok)).json()["prices"]
     sale_amt = next(x["amount"] for x in sale if x["feature_key"] == "property" and x["category"] == "sale" and x["zone_tier"] == zone)
-    assert requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": "rent", "zoneTier": zone, "amount": sale_amt + 1}).status_code == 422
+    rent_amt = next(x["amount"] for x in sale if x["feature_key"] == "property" and x["category"] == "rent" and x["zone_tier"] == zone)
+    # rent/lease must stay above sale, and every fee stays within 5–12 MASS
+    assert requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": "rent", "zoneTier": zone, "amount": sale_amt - 1}).status_code == 422
+    assert requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": "sale", "zoneTier": zone, "amount": rent_amt + 1}).status_code == 422
+    assert requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": "sale", "zoneTier": zone, "amount": 4}).status_code == 422
+    assert requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": "rent", "zoneTier": zone, "amount": 13}).status_code == 422
     # valid change → future quotes only; past entitlement untouched
-    new_fee = fee + 10 if cat == "rent" and fee + 10 <= sale_amt else fee + 1
-    if cat == "sale":
-        new_fee = fee + 10
+    restore_rent = None
+    if cat == "rent":
+        new_fee = fee - 1 if fee - 1 > sale_amt else fee + 1
+    else:
+        new_fee = next((x for x in (fee - 1, fee + 1) if 5 <= x < rent_amt), None)
+        if new_fee is None:  # e.g. zone D sale 5 / rent 6 — lift rent first so sale has room
+            restore_rent = rent_amt
+            assert requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": "rent", "zoneTier": zone, "amount": rent_amt + 1, "note": "test"}).status_code == 200
+            new_fee = fee + 1
     r2 = requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": cat, "zoneTier": zone, "amount": new_fee, "note": "test"})
     assert r2.status_code == 200, r2.text
     try:
@@ -312,6 +291,8 @@ def test_price_change_future_only_and_validation(admin_tok, props):
         assert mine["items"][0]["entitlement"]["amount_paid"] == fee
     finally:
         requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": cat, "zoneTier": zone, "amount": fee, "note": "restore"})
+        if restore_rent is not None:
+            requests.post(f"{BASE}/api/admin/pricing", headers=_hdr(admin_tok), json={"featureKey": "property", "category": "rent", "zoneTier": zone, "amount": restore_rent, "note": "restore"})
 
 
 # ─── Auto-credit ─────────────────────────────────────────────────────────

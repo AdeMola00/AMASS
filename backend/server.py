@@ -27,7 +27,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, Strea
 from marketplace_seed import VENDORS, COLLECTIONS, MARKET_ITEMS
 from marketplace_c2c_seed import C2C_ITEMS as C2C_MARKET_ITEMS
 from fixa_seed import FIXA_PROVIDERS
-from tokens import register_token_routes, compute_token_cost, has_unlocked, is_free_amass_sale, WalletService, FIX_EARN_RULES
+from tokens import register_token_routes, compute_token_cost, has_unlocked, is_free_amass_sale, WalletService
 from earn_and_tools import register_earn_routes, register_agent_tool_routes
 from promotions import register_promotion_routes, find_promoted_first, annotate_promotion
 from ads import register_ads_routes
@@ -341,7 +341,7 @@ from monetization import (
     UnlockService as _UnlockService,
     _jitter as approx_location,
 )
-_mon_router, _mon_admin, _unlock_svc, require_fix_access = register_monetization_routes(db, get_current_user, require_admin)
+_mon_router, _mon_admin, _unlock_svc = register_monetization_routes(db, get_current_user, require_admin)
 app.include_router(_mon_router)
 app.include_router(_mon_admin)
 
@@ -1245,18 +1245,8 @@ async def marketplace(
     return [_strip_fixa_contact(d) for d in docs]
 
 
-FIXA_SENSITIVE_FIELDS = ("seller_phone", "seller_whatsapp", "contact_prefs")
-
-
 def _strip_fixa_contact(doc: dict) -> dict:
-    """FIXA providers (category=services) never expose contact details in
-    list/preview payloads — only `/api/fixa/providers/{id}/details` (entitled) does."""
-    if doc.get("category") == "services":
-        d = dict(doc)
-        for f in FIXA_SENSITIVE_FIELDS:
-            d.pop(f, None)
-        d["contact_locked"] = True
-        return d
+    """FIXA is free: provider contact details are public. Kept as a pass-through so call sites read the same."""
     return doc
 
 
@@ -1295,22 +1285,6 @@ async def marketplace_item(
         {"subcategory": it["subcategory"], "id": {"$ne": it["id"]}, "status": {"$nin": ["paused", "sold", "removed"]}},
         {"_id": 0},
     ).limit(6).to_list(6)
-    if it.get("category") == "services":
-        # FIXA provider: contact only for entitled viewers / owner / admin.
-        entitled = False
-        if creds:
-            try:
-                payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
-                uid = payload.get("sub")
-                u = await db.users.find_one({"id": uid}, {"_id": 0, "id": 1, "is_admin": 1, "email": 1})
-                if u:
-                    u["is_admin"] = bool(u.get("is_admin")) or (u.get("email") or "").lower() in ADMIN_EMAILS
-                    entitled = await _unlock_svc.has_access(u, "fixa_provider", item_id, await _unlock_svc.resolve_target("fixa_provider", item_id))
-            except Exception:
-                entitled = False
-        if not entitled:
-            it = _strip_fixa_contact(it)
-        related = [_strip_fixa_contact(r) for r in related]
     return {"item": it, "related": related}
 
 
@@ -1369,24 +1343,29 @@ class FixaBookingIn(BaseModel):
 
 
 @api.post("/marketplace/fixa/book")
-async def fixa_book(data: FixaBookingIn, user: dict = Depends(require_fix_access)):
+async def fixa_book(data: FixaBookingIn, user: dict = Depends(get_current_user)):
+    """Free booking — FIXA has no tokens. The provider (when registered) is notified and confirms from /fixa/provider."""
+    from fixa import HIDDEN_STATUSES as _FIXA_HIDDEN
+    from notification_center import emit as _emit
+
     it = await db.marketplace.find_one({"id": data.item_id}, {"_id": 0})
     if not it:
         raise HTTPException(404, "Provider not found")
     if it.get("category") != "services":
         raise HTTPException(400, "This item is not a FIXA service listing")
-    # Booking is a protected FIXA action — requires the provider entitlement (or owner/admin).
-    _t = await _unlock_svc.resolve_target("fixa_provider", data.item_id)
-    if not await _unlock_svc.has_access(user, "fixa_provider", data.item_id, _t):
-        _q = await _unlock_svc.quote(user, "fixa_provider", data.item_id, log_attempt=False)
-        raise HTTPException(403, {"code": "UNLOCK_REQUIRED", "fee": _q["fee"], "fee_ngn": _q["fee_ngn"], "currency": "FIX", "balance": _q["balance"]})
+    if it.get("fixa_status") in _FIXA_HIDDEN or it.get("status") in ("removed", "paused"):
+        raise HTTPException(409, "This provider isn't taking bookings right now")
+    if it.get("seller_id") == user["id"]:
+        raise HTTPException(400, "You can't book your own profile")
+    if await db.fixa_bookings.find_one({"item_id": data.item_id, "user_id": user["id"], "status": {"$in": ["pending", "confirmed"]}}, {"_id": 0, "id": 1}):
+        raise HTTPException(409, "You already have an open booking with this provider")
     doc = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
         "item_id": data.item_id,
         "provider_id": it.get("seller_id"),
         "provider_name": it.get("seller_name") or it.get("vendor"),
-        "provider_avatar": it.get("seller_avatar"),
+        "provider_avatar": it.get("seller_avatar") or it.get("image"),
         "provider_phone": it.get("seller_phone"),
         "provider_whatsapp": it.get("seller_whatsapp"),
         "trade": it.get("subcategory"),
@@ -1396,12 +1375,38 @@ async def fixa_book(data: FixaBookingIn, user: dict = Depends(require_fix_access
         "scheduled_date": data.scheduled_date,
         "scheduled_time": data.scheduled_time,
         "notes": data.notes or "",
-        "status": "pending",  # pending | confirmed | completed | cancelled
+        "status": "pending",  # pending | confirmed | completed | cancelled | declined
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.fixa_bookings.insert_one(doc.copy())
     doc.pop("_id", None)
+    if it.get("seller_id") and not str(it["seller_id"]).startswith("fixa_"):
+        try:
+            await _emit(db, it["seller_id"], "FIXA_BOOKING_REQUESTED", "New booking request", f"{data.customer_name} wants {it.get('subcategory') or 'a job'} on {data.scheduled_date} · {data.scheduled_time}.", {"booking_id": doc["id"], "provider_item_id": it["id"]}, action_url="/fixa/provider")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("fixa booking notification failed: %s", e)
     return {"ok": True, "booking": doc}
+
+
+class FixaBookingCancelIn(BaseModel):
+    note: Optional[str] = None
+
+
+@api.post("/marketplace/fixa/bookings/{booking_id}/cancel")
+async def fixa_booking_cancel(booking_id: str, data: FixaBookingCancelIn | None = None, user: dict = Depends(get_current_user)):
+    b = await db.fixa_bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not b or b["user_id"] != user["id"]:
+        raise HTTPException(404, "Booking not found")
+    if b.get("status") not in ("pending", "confirmed"):
+        raise HTTPException(409, "This booking is already closed")
+    await db.fixa_bookings.update_one({"id": booking_id}, {"$set": {"status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat(), "cancel_note": ((data.note if data else None) or "").strip() or None}})
+    if b.get("provider_id") and not str(b["provider_id"]).startswith("fixa_"):
+        from notification_center import emit as _emit
+        try:
+            await _emit(db, b["provider_id"], "FIXA_BOOKING_CANCELLED", "Booking cancelled", f"{b.get('customer_name')} cancelled {b.get('scheduled_date')} · {b.get('scheduled_time')}.", {"booking_id": booking_id}, action_url="/fixa/provider")
+        except Exception:  # noqa: BLE001
+            pass
+    return {"ok": True, "status": "cancelled"}
 
 
 @api.get("/marketplace/fixa/bookings")
@@ -1413,7 +1418,7 @@ async def fixa_my_bookings(user: dict = Depends(get_current_user)):
 
 
 class FixaBookingCompleteIn(BaseModel):
-    rating: Optional[int] = None  # 1-5 stars; 5 unlocks the "positive_rating" bonus
+    rating: Optional[int] = Field(default=None, ge=1, le=5)  # 1-5 stars — reputation only
     review: Optional[str] = None
 
 
@@ -1423,12 +1428,10 @@ async def fixa_booking_complete(
     data: FixaBookingCompleteIn,
     user: dict = Depends(get_current_user),
 ):
-    """Customer marks a booking complete. Auto-awards FIX to the provider:
-       – job_completed (base) always
-       – positive_rating bonus when rating >= 5
-       – milestone bonuses when the provider crosses 50/100/500 lifetime jobs
-    Idempotent by booking_id.
-    """
+    """Customer marks a booking complete and (optionally) rates it. Reputation only — jobs done + rating are
+    recomputed on the provider's profile; nothing is earned or spent. Idempotent by booking_id."""
+    from fixa import recompute_provider_rating
+
     booking = await db.fixa_bookings.find_one({"id": booking_id}, {"_id": 0})
     if not booking:
         raise HTTPException(404, "Booking not found")
@@ -1436,6 +1439,8 @@ async def fixa_booking_complete(
         raise HTTPException(403, "Only the booking owner can complete this booking")
     if booking.get("status") == "completed":
         return {"ok": True, "already_completed": True}
+    if booking.get("status") in ("cancelled", "declined"):
+        raise HTTPException(409, "This booking was closed before it happened")
 
     now = datetime.now(timezone.utc).isoformat()
     update: dict = {"status": "completed", "completed_at": now}
@@ -1444,62 +1449,16 @@ async def fixa_booking_complete(
     if data.review:
         update["review"] = data.review[:500]
     await db.fixa_bookings.update_one({"id": booking_id}, {"$set": update})
-
-    # ─── Auto-award FIX to the provider ───────────────────────
-    svc = WalletService(db)
-    awards: list[dict] = []
-    provider_id = booking.get("provider_id")
-    # Provider FIX wallet is keyed by seller_id (fixa_*). In this MVP seed
-    # providers are external tradespeople not real users — we track FIX on
-    # them anyway so their virtual wallets accrue balance.
-    if provider_id:
-        # 1. Base job completion
-        base = FIX_EARN_RULES["job_completed"]
-        idem = f"job_completed:{booking_id}"
-        dup = await db.token_transactions.find_one(
-            {"user_id": provider_id, "currency": "FIX", "meta.idempotency_key": idem}
-        )
-        if not dup:
-            await svc.credit(
-                provider_id, base["amount"], "earn_reward", base["description"],
-                currency="FIX",
-                meta={"event": "job_completed", "booking_id": booking_id, "idempotency_key": idem},
-            )
-            awards.append({"event": "job_completed", "amount": base["amount"]})
-        # 2. Positive rating bonus
-        if update.get("rating") == 5:
-            pos = FIX_EARN_RULES["positive_rating"]
-            idem2 = f"positive_rating:{booking_id}"
-            dup2 = await db.token_transactions.find_one(
-                {"user_id": provider_id, "currency": "FIX", "meta.idempotency_key": idem2}
-            )
-            if not dup2:
-                await svc.credit(
-                    provider_id, pos["amount"], "earn_reward", pos["description"],
-                    currency="FIX",
-                    meta={"event": "positive_rating", "booking_id": booking_id, "idempotency_key": idem2},
-                )
-                awards.append({"event": "positive_rating", "amount": pos["amount"]})
-        # 3. Milestone check
-        completed_count = await db.fixa_bookings.count_documents(
-            {"provider_id": provider_id, "status": "completed"}
-        )
-        for milestone in (50, 100, 500):
-            if completed_count == milestone:
-                m_rule = FIX_EARN_RULES[f"milestone_{milestone}"]
-                idem3 = f"milestone_{milestone}:{provider_id}"
-                dup3 = await db.token_transactions.find_one(
-                    {"user_id": provider_id, "currency": "FIX", "meta.idempotency_key": idem3}
-                )
-                if not dup3:
-                    await svc.credit(
-                        provider_id, m_rule["amount"], "earn_reward", m_rule["description"],
-                        currency="FIX",
-                        meta={"event": f"milestone_{milestone}", "idempotency_key": idem3},
-                    )
-                    awards.append({"event": f"milestone_{milestone}", "amount": m_rule["amount"]})
-
-    return {"ok": True, "booking_id": booking_id, "awards": awards}
+    if booking.get("item_id"):
+        await recompute_provider_rating(db, booking["item_id"])
+    if booking.get("provider_id") and not str(booking["provider_id"]).startswith("fixa_"):
+        from notification_center import emit as _emit
+        try:
+            stars = f" · {update['rating']}★" if update.get("rating") else ""
+            await _emit(db, booking["provider_id"], "FIXA_JOB_COMPLETED", "Job marked done" + stars, f"{booking.get('customer_name')} marked the {booking.get('trade') or 'job'} complete.", {"booking_id": booking_id}, action_url="/fixa/provider")
+        except Exception:  # noqa: BLE001
+            pass
+    return {"ok": True, "booking_id": booking_id, "rating": update.get("rating")}
 
 
 # ─── Cart ─────────────────────────────────────────────────
@@ -2114,6 +2073,12 @@ app.include_router(register_property_improvement_routes(db, get_current_user))
 from viewings import register_viewing_routes, start_viewings
 app.include_router(register_viewing_routes(db, get_current_user))
 
+# ─── FIXA (free): providers, Join FIXA applications, provider jobs, reports, admin verification
+from fixa import ensure_fixa_indexes, register_fixa_routes
+_fixa_router, _fixa_admin = register_fixa_routes(db, get_current_user, require_admin, ADMIN_EMAILS)
+app.include_router(_fixa_router)
+app.include_router(_fixa_admin)
+
 # ─── Map time (1 MASS per hour on the Find Home map; 0 MASS → no markers). /map/markers runs the same meter.
 from map_time import ensure_map_time_indexes, register_map_time_routes
 _map_time_router, _map_time_meter = register_map_time_routes(db, get_current_user)
@@ -2348,6 +2313,7 @@ async def on_startup():
     await start_notification_center(db)  # indexes + hourly matcher/digest sweep
     await start_viewings(db)  # indexes + 24h reminder sweep
     await ensure_map_time_indexes(db)
+    await ensure_fixa_indexes(db)
     # ─── DB Indexes (idempotent) ─────────────────────────────
     try:
         await db.properties.create_index("id", unique=True)

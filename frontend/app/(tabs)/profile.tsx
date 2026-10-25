@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Alert, Platform } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -6,7 +6,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "@/src/contexts/auth";
 import { useWallet } from "@/src/contexts/wallet";
-import { api } from "@/src/lib/api";
+import { api, type FixaStatus } from "@/src/lib/api";
 import { useTheme, useThemeMode } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AnimatedNumber, AppText, Avatar, Badge, Button, ListRow, ProgressBar, RowGroup, Screen, Shimmer, StatTile, type IconName, Gloss } from "@/src/ui";
@@ -41,7 +41,8 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     title: "Services",
     rows: [
       { icon: "storefront-outline", label: "My Market Listings", route: "/marketplace/my-listings", tone: "brand" },
-      { icon: "hammer-outline", label: "Provider Dashboard", route: "/provider-dashboard", tone: "fix" },
+      { icon: "search-outline", label: "Find a Pro (FIXA)", route: "/fixa", tone: "fix" },
+      { icon: "calendar-outline", label: "My FIXA Bookings", route: "/fixa/bookings" },
       { icon: "construct-outline", label: "Improve My Property", route: "/improve", tone: "info" },
       { icon: "megaphone-outline", label: "My Ad Campaigns", route: "/ads" },
     ],
@@ -72,12 +73,13 @@ function greeting() {
 export default function Profile() {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { mass, fix } = useWallet();
+  const { mass } = useWallet();
   const { colors, isDark, shadows } = useTheme();
   const { setMode } = useThemeMode();
 
   const [saved, setSaved] = useState<number | null>(null);
   const [unlocked, setUnlocked] = useState<number | null>(null);
+  const [fixaStatus, setFixaStatus] = useState<FixaStatus | "none" | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -85,8 +87,18 @@ export default function Profile() {
       api.listFavorites().then((r) => setSaved(r.length)).catch(() => setSaved(0));
       // myUnlocks is the same source the Unlocks screen renders, so the tile and the list always agree.
       api.myUnlocks("property").then((r) => setUnlocked(r.count)).catch(() => setUnlocked(0));
+      // FIXA: providers (pending or verified) get their dashboard; everyone else is invited to join.
+      api.fixaMe().then((m) => setFixaStatus(m.status)).catch(() => setFixaStatus("none"));
     }, [])
   );
+
+  const isProvider = !!fixaStatus && fixaStatus !== "none";
+  const groups = useMemo(() => {
+    const fixaRow: Row = isProvider
+      ? { icon: "hammer-outline", label: fixaStatus === "pending" ? "My FIXA Profile · Pending" : "My FIXA Dashboard", route: "/fixa/provider", tone: "fix" }
+      : { icon: "hammer-outline", label: "Join FIXA", route: "/fixa/join", tone: "fix" };
+    return GROUPS.map((g) => (g.title === "Services" ? { ...g, rows: [g.rows[0], fixaRow, ...g.rows.slice(1)] } : g));
+  }, [isProvider, fixaStatus]);
 
   const memberYear = user?.created_at ? new Date(user.created_at).getFullYear() : new Date().getFullYear();
   const firstName = (user?.full_name || "").trim().split(" ")[0] || "there";
@@ -199,7 +211,7 @@ export default function Profile() {
                 router.push("/wallet");
               }}
               accessibilityRole="button"
-              accessibilityLabel={`Wallet. ${mass?.spendable ?? 0} MASS and ${fix?.spendable ?? 0} FIX. Open wallet`}
+              accessibilityLabel={`Wallet. ${mass?.spendable ?? 0} MASS. Open wallet`}
               testID="wallet-card"
               style={({ pressed }) => [{ gap: 18 }, pressed && { opacity: 0.9 }]}
             >
@@ -219,9 +231,9 @@ export default function Profile() {
               </View>
               <View style={styles.walletFooter}>
                 <View style={[styles.fixPill, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
-                  <View style={[styles.coinDot, { backgroundColor: colors.fix }]} />
+                  <View style={[styles.coinDot, { backgroundColor: colors.mass }]} />
                   <AppText variant="caption" color="#fff" tabular>
-                    {(fix?.spendable ?? 0).toLocaleString()} FIX
+                    1 MASS = ₦100
                   </AppText>
                 </View>
                 {mass?.subscription?.plan_id ? (
@@ -260,7 +272,7 @@ export default function Profile() {
 
         {/* Menu groups */}
         <View style={{ paddingHorizontal: space[4], gap: space[5] }}>
-          {GROUPS.map((g) => (
+          {groups.map((g) => (
             <RowGroup key={g.title} title={g.title}>
               {g.rows.map((m, i) => {
                 const locked = m.requires === "agent" && !user?.is_agent;

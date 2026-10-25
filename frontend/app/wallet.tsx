@@ -6,20 +6,19 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { api, Currency, WalletTransaction } from "@/src/lib/api";
+import { api, WalletTransaction } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { gradients, radii, space } from "@/src/theme/tokens";
-import { AnimatedNumber, AppText, Badge, Button, Card, Chip, EmptyState, Gloss, IconButton, ListRow, PressableScale, RowGroup, Screen, ScreenHeader, Section, Sheet, SheetLink, Shimmer, SkeletonRows, useBounceRefresh, useCelebrate, useToast, type IconName } from "@/src/ui";
+import { AnimatedNumber, AppText, Badge, Button, Card, EmptyState, Gloss, IconButton, ListRow, PressableScale, RowGroup, Screen, ScreenHeader, Section, Sheet, SheetLink, Shimmer, SkeletonRows, useBounceRefresh, useCelebrate, useToast, type IconName } from "@/src/ui";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Wallet — two glossy token cards (gold MASS, forest FIX), one clear list of
+   Wallet — one glossy MASS card (the only token in the app), one clear list of
    ways to earn, and every charge/credit as a tappable receipt.
    ────────────────────────────────────────────────────────────────────────── */
 
-type TxFilter = "all" | "MASS" | "FIX";
-type Tone = "default" | "brand" | "mass" | "fix" | "success" | "premium" | "warning" | "info";
+type Tone = "default" | "brand" | "mass" | "success" | "premium" | "warning" | "info";
 type TxMeta = { icon: IconName; tone: Tone; label: string };
 
 const TX_META: Record<string, TxMeta> = {
@@ -52,7 +51,6 @@ type EarnInfo = {
   openTasks: number;
   openTokens: number;
   referralTokens: number | null;
-  fixRules: { event: string; amount: number; description: string }[];
 };
 
 export default function WalletScreen() {
@@ -61,37 +59,36 @@ export default function WalletScreen() {
   const { colors } = useTheme();
   const toast = useToast();
   const celebrate = useCelebrate();
-  const { mass, fix, refresh, loading, claimDailyLogin } = useWallet();
+  const { mass, refresh, loading, claimDailyLogin } = useWallet();
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  const [txFilter, setTxFilter] = useState<TxFilter>("all");
-  const [conversion, setConversion] = useState<{ MASS_ngn: number; FIX_ngn: number }>({ MASS_ngn: 100, FIX_ngn: 10 });
+  const [conversion, setConversion] = useState<{ MASS_ngn: number }>({ MASS_ngn: 100 });
   const [earn, setEarn] = useState<EarnInfo | null>(null);
   const [receipt, setReceipt] = useState<WalletTransaction | null>(null);
 
   useEffect(() => {
     api.monetizationConfig().then((c) => setConversion(c.conversion)).catch(() => {});
   }, []);
-  const ngn = (n: number, ccy: "MASS" | "FIX") => `≈ ₦${(n * (ccy === "FIX" ? conversion.FIX_ngn : conversion.MASS_ngn)).toLocaleString()}`;
+  const ngn = (n: number) => `≈ ₦${(n * conversion.MASS_ngn).toLocaleString()}`;
 
   const loadTx = useCallback(async () => {
     setTxLoading(true);
     setTxError(false);
     try {
-      const list = await api.walletTransactions(60, txFilter === "all" ? undefined : (txFilter as Currency));
+      const list = await api.walletTransactions(60, "MASS");
       setTransactions(list);
     } catch {
       setTxError(true);
     } finally {
       setTxLoading(false);
     }
-  }, [txFilter]);
+  }, []);
 
   /** Earning paths — each source is best-effort so one failure never hides the others. */
   const loadEarn = useCallback(async () => {
-    const [tasks, ref, rules] = await Promise.all([api.earnTasks().catch(() => null), api.myReferral().catch(() => null), api.fixEarnRules().catch(() => [])]);
+    const [tasks, ref] = await Promise.all([api.earnTasks().catch(() => null), api.myReferral().catch(() => null)]);
     const daily = tasks?.tasks.find((t) => t.id === "daily_login");
     const open = (tasks?.tasks ?? []).filter((t) => !t.completed && t.id !== "daily_login");
     setEarn({
@@ -100,7 +97,6 @@ export default function WalletScreen() {
       openTasks: open.length,
       openTokens: open.reduce((s, t) => s + (t.tokens || 0), 0),
       referralTokens: ref?.tokens_per_referral ?? null,
-      fixRules: (rules ?? []).slice(0, 3),
     });
   }, []);
 
@@ -143,9 +139,6 @@ export default function WalletScreen() {
   const massUsed = mass?.lifetime_used ?? 0;
   const massEarned = mass?.lifetime_earned ?? 0;
   const subscription = mass?.subscription;
-  const fixBalance = fix?.spendable ?? 0;
-  const fixEarned = fix?.lifetime_earned ?? 0;
-  const fixUsed = fix?.lifetime_used ?? 0;
 
   const grouped = useMemo(() => {
     const map = new Map<string, WalletTransaction[]>();
@@ -164,7 +157,7 @@ export default function WalletScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScreenHeader
         title="Wallet"
-        subtitle="MASS · FIX · Receipts"
+        subtitle="MASS · Receipts"
         right={
           <>
             <IconButton icon="receipt-outline" label="Receipt alerts" onPress={() => router.push("/notifications?category=receipts" as any)} testID="wallet-receipts" />
@@ -188,7 +181,7 @@ export default function WalletScreen() {
             caption="Property tokens"
             balance={massBalance}
             ccy="MASS"
-            sub={`${ngn(massBalance, "MASS")} · 1 MASS = ₦${conversion.MASS_ngn}`}
+            sub={`${ngn(massBalance)} · 1 MASS = ₦${conversion.MASS_ngn}`}
             balanceTestID="mass-balance"
             subTestID="mass-balance-ngn"
             stats={[
@@ -202,37 +195,6 @@ export default function WalletScreen() {
             <QuickAction icon="add" label="Buy MASS" tone="brand" onPress={() => router.push("/buy-tokens")} />
             <QuickAction icon="star" label="Subscribe" onPress={() => router.push("/subscribe")} />
             <QuickAction icon="gift" label="Earn" onPress={() => router.push("/earn")} />
-          </View>
-        </View>
-
-        {/* ── FIX card ── */}
-        <View style={{ paddingHorizontal: space[4], gap: space[3] }}>
-          <TokenCard
-            testID="fix-card"
-            gradient={[...gradients.fixCard]}
-            ink="#FFFFFF"
-            muted="rgba(255,255,255,0.72)"
-            divider="rgba(255,255,255,0.18)"
-            tag="FIX"
-            tagBg="rgba(255,255,255,0.92)"
-            tagFg="#1C5E39"
-            tagIcon="shield-checkmark"
-            caption="FIXA service tokens"
-            balance={fixBalance}
-            ccy="FIX"
-            sub={`${ngn(fixBalance, "FIX")} · 1 FIX = ₦${conversion.FIX_ngn}`}
-            balanceTestID="fix-balance"
-            subTestID="fix-balance-ngn"
-            stats={[
-              { label: "Earned", value: fixEarned },
-              { label: "Spent", value: fixUsed },
-            ]}
-            art={<Ionicons name="construct" size={150} color="#FFFFFF" />}
-          />
-          <View style={styles.actions}>
-            <QuickAction icon="add" label="Buy FIX" tone="fix" onPress={() => router.push("/buy-fix" as any)} />
-            <QuickAction icon="trending-up" label="Earn FIX" onPress={() => router.push("/earn-fix" as any)} />
-            <QuickAction icon="construct" label="Browse FIXA" onPress={() => router.push("/fixa" as any)} />
           </View>
         </View>
 
@@ -265,7 +227,6 @@ export default function WalletScreen() {
               testID="wallet-earn-referral"
               trailing={earn?.referralTokens ? <Badge label={`+${earn.referralTokens}`} tone="mass" size="sm" /> : undefined}
             />
-            <ListRow icon="construct" iconTone="fix" label="Earn FIX" onPress={() => router.push("/earn-fix" as any)} testID="wallet-earn-fix" />
             {subscription && subscription.plan_id ? (
               <ListRow
                 icon="star"
@@ -285,12 +246,6 @@ export default function WalletScreen() {
 
         {/* ── Receipts ── */}
         <Section title="Receipts" caption="Tap a row for details">
-          <View style={styles.filters}>
-            {(["all", "MASS", "FIX"] as TxFilter[]).map((f) => (
-              <Chip key={f} label={f === "all" ? "All" : f} selected={txFilter === f} onPress={() => setTxFilter(f)} tone={f === "FIX" ? "fix" : f === "MASS" ? "mass" : "default"} testID={`wallet-filter-${f}`} />
-            ))}
-          </View>
-
           {txLoading ? (
             <Card>
               <SkeletonRows rows={5} />
@@ -310,7 +265,6 @@ export default function WalletScreen() {
                   {items.map((tx, i) => {
                     const meta = TX_META[tx.kind] || { icon: "cash" as IconName, tone: "default" as const, label: "Activity" };
                     const positive = tx.amount > 0;
-                    const ccy = (tx.currency ?? "MASS") as "MASS" | "FIX";
                     const time = new Date(tx.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
                     return (
                       <ListRow
@@ -332,9 +286,9 @@ export default function WalletScreen() {
                               {tx.amount.toLocaleString()}
                             </AppText>
                             <AppText variant="micro" tone="tertiary" tabular>
-                              {ngn(Math.abs(tx.amount), ccy)}
+                              {ngn(Math.abs(tx.amount))}
                             </AppText>
-                            <Badge label={ccy} tone={ccy === "FIX" ? "fix" : "mass"} size="xs" />
+                            <Badge label="MASS" tone="mass" size="xs" />
                           </View>
                         }
                       />
@@ -388,7 +342,7 @@ function TokenCard({
   tagIcon?: IconName;
   caption: string;
   balance: number;
-  ccy: "MASS" | "FIX";
+  ccy: "MASS";
   sub: string;
   stats: { label: string; value: number }[];
   art: React.ReactNode;
@@ -400,7 +354,7 @@ function TokenCard({
   return (
     <LinearGradient colors={gradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, shadows.md]} testID={testID}>
       <Gloss height="52%" opacity={0.9} />
-      <Shimmer intensity={0.45} delay={ccy === "FIX" ? 1600 : 500} />
+      <Shimmer intensity={0.45} delay={500} />
       {/* soft lower-right glow for depth */}
       <LinearGradient colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.10)"]} start={{ x: 0.2, y: 0.3 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <View style={styles.heroArt} pointerEvents="none">
@@ -446,18 +400,18 @@ function TokenCard({
 }
 
 /* ─── Receipt detail sheet ─── */
-function ReceiptSheet({ tx, onClose, ngn }: { tx: WalletTransaction | null; onClose: () => void; ngn: (n: number, c: "MASS" | "FIX") => string }) {
+function ReceiptSheet({ tx, onClose, ngn }: { tx: WalletTransaction | null; onClose: () => void; ngn: (n: number) => string }) {
   const { colors } = useTheme();
   const toast = useToast();
   if (!tx) return null;
   const meta = TX_META[tx.kind] || { icon: "cash" as IconName, tone: "default" as const, label: "Activity" };
-  const ccy = (tx.currency ?? "MASS") as "MASS" | "FIX";
+  const ccy = "MASS";
   const positive = tx.amount > 0;
   const when = new Date(tx.created_at);
   const ref = tx.meta?.reference || tx.meta?.transaction_id || tx.id;
-  const context = tx.feature_key ? [tx.feature_key === "property" ? (tx.category === "sale" ? "Sale listing" : "Rental listing") : `Provider tier ${tx.category}`, tx.zone_tier ? `Zone ${tx.zone_tier}` : null, tx.auto_credit ? "Auto-credit" : null].filter(Boolean).join(" · ") : null;
+  const context = tx.feature_key ? [tx.category === "sale" ? "Sale listing" : "Rental listing", tx.zone_tier ? `Zone ${tx.zone_tier}` : null, tx.auto_credit ? "Auto-credit" : null].filter(Boolean).join(" · ") : null;
   const share = () =>
-    Share.share({ message: `AMASS receipt${tx.receipt_no ? ` ${tx.receipt_no}` : ""} · ${tx.description}\n${positive ? "+" : ""}${tx.amount.toLocaleString()} ${ccy} (${ngn(Math.abs(tx.amount), ccy)})\n${when.toLocaleString()}\nRef ${ref}` }).catch(() => {});
+    Share.share({ message: `AMASS receipt${tx.receipt_no ? ` ${tx.receipt_no}` : ""} · ${tx.description}\n${positive ? "+" : ""}${tx.amount.toLocaleString()} ${ccy} (${ngn(Math.abs(tx.amount))})\n${when.toLocaleString()}\nRef ${ref}` }).catch(() => {});
   const emailCopy = async () => {
     if (!tx.receipt_no) return;
     try {
@@ -481,16 +435,16 @@ function ReceiptSheet({ tx, onClose, ngn }: { tx: WalletTransaction | null; onCl
   return (
     <Sheet visible onClose={onClose} title="Receipt" testID="receipt-sheet">
       <View style={{ gap: space[4] }}>
-        <View style={[styles.receiptHero, { backgroundColor: ccy === "FIX" ? colors.fixSoft : colors.massSoft }]}>
+        <View style={[styles.receiptHero, { backgroundColor: colors.massSoft }]}>
           <View style={[styles.roundIcon, { backgroundColor: colors.surface }]}>
-            <Ionicons name={meta.icon} size={20} color={ccy === "FIX" ? colors.fixText : colors.massText} />
+            <Ionicons name={meta.icon} size={20} color={colors.massText} />
           </View>
           <View style={{ flex: 1, gap: 2 }}>
             <AppText variant="bodyMedium" numberOfLines={2}>
               {tx.description}
             </AppText>
             <AppText variant="caption" tone="tertiary">
-              {ngn(Math.abs(tx.amount), ccy)}
+              {ngn(Math.abs(tx.amount))}
             </AppText>
           </View>
           <AppText variant="h3" tabular color={positive ? colors.success : colors.text} testID="receipt-amount">
@@ -527,10 +481,10 @@ function ReceiptSheet({ tx, onClose, ngn }: { tx: WalletTransaction | null; onCl
   );
 }
 
-function QuickAction({ icon, label, onPress, tone = "default" }: { icon: IconName; label: string; onPress: () => void; tone?: "default" | "brand" | "fix" }) {
+function QuickAction({ icon, label, onPress, tone = "default" }: { icon: IconName; label: string; onPress: () => void; tone?: "default" | "brand" }) {
   const { colors } = useTheme();
   const filled = tone !== "default";
-  const grad = tone === "brand" ? gradients.brand : gradients.fix;
+  const grad = gradients.brand;
   return (
     <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={label} testID={`wallet-action-${label.toLowerCase().replace(/\s+/g, "-")}`} style={[styles.quick, { backgroundColor: filled ? "transparent" : colors.surfaceAlt }]}>
       {filled ? (
@@ -560,7 +514,6 @@ const styles = StyleSheet.create({
   quick: { flex: 1, alignItems: "center", gap: 8, paddingVertical: 14, borderRadius: radii.lg, overflow: "hidden" },
   quickIcon: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   roundIcon: { width: 44, height: 44, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  filters: { flexDirection: "row", gap: 8 },
   receiptHero: { flexDirection: "row", alignItems: "center", gap: 12, padding: space[4], borderRadius: radii.lg },
   receiptRows: { borderRadius: radii.lg, paddingHorizontal: space[4] },
   receiptRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },

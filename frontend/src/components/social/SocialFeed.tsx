@@ -17,6 +17,7 @@ import { radii, space } from "@/src/theme/tokens";
 import { useTabBarOffset } from "@/src/lib/tabBar";
 import { AppText, EmptyState, PressableScale, Skeleton, SkeletonCard, useCelebrate, useToast, type IconName } from "@/src/ui";
 import { AmassLogo } from "@/src/components/AmassLogo";
+import { ProsNearYouRail } from "@/src/components/fixa/ProsNearYouRail";
 import { PostCard } from "./PostCard";
 import { PostMenuSheet } from "./PostMenuSheet";
 import { ActionPill, ScopeSheet, SocialChip } from "./SocialBits";
@@ -44,6 +45,7 @@ export function SocialFeed() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [railKey, setRailKey] = useState(0);
   const [error, setError] = useState(false);
   const [scopeLabel, setScopeLabel] = useState("Nearby");
   const [menuPost, setMenuPost] = useState<SocialPost | null>(null);
@@ -150,6 +152,7 @@ export function SocialFeed() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    setRailKey((k) => k + 1);
     await Promise.all([load(true), api.socialMeta().then(setMeta).catch(() => {})]);
     setRefreshing(false);
   };
@@ -180,6 +183,14 @@ export function SocialFeed() {
   const showWelcome = !welcomeDismissed && meta && done < 3;
   const maxW = Math.min(width, 720);
   const gutter = space[4];
+  // FIXA "Pros near you" rail sits after the first few posts so it never pushes the newest items off-screen.
+  const PROS_ROW = "__fixa_pros";
+  const rows = useMemo<(SocialPost | { id: typeof PROS_ROW })[]>(() => {
+    if (!items?.length) return [];
+    const at = Math.min(3, items.length);
+    return [...items.slice(0, at), { id: PROS_ROW }, ...items.slice(at)];
+  }, [items]);
+  const prosRail = <ProsNearYouRail city={meta?.scopes.city} gutter={gutter} refreshKey={railKey} />;
 
   const header = (
     <View style={{ alignSelf: "center", width: maxW }}>
@@ -328,7 +339,7 @@ export function SocialFeed() {
   return (
     <View style={{ flex: 1 }} testID="social-feed">
       <FlatList
-        data={items ?? []}
+        data={rows}
         keyExtractor={(p) => p.id}
         ListHeaderComponent={header}
         contentContainerStyle={{ paddingBottom: tabBarOffset + 80 }}
@@ -336,31 +347,42 @@ export function SocialFeed() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.6}
-        renderItem={({ item }) => (
-          <View style={{ alignSelf: "center", width: maxW, paddingHorizontal: gutter, marginTop: 12 }}>
-            <PostCard post={item} onChange={updatePost} onMore={setMenuPost} categoryIcon={categoryIcon[item.category]} />
-          </View>
-        )}
+        renderItem={({ item }) =>
+          item.id === PROS_ROW ? (
+            <View style={{ alignSelf: "center", width: maxW, marginTop: 16 }}>{prosRail}</View>
+          ) : (
+            <View style={{ alignSelf: "center", width: maxW, paddingHorizontal: gutter, marginTop: 12 }}>
+              <PostCard post={item as SocialPost} onChange={updatePost} onMore={setMenuPost} categoryIcon={categoryIcon[(item as SocialPost).category]} />
+            </View>
+          )
+        }
         ListEmptyComponent={
-          <View style={{ alignSelf: "center", width: maxW, paddingHorizontal: gutter, paddingTop: 8 }}>
+          <View style={{ alignSelf: "center", width: maxW, paddingTop: 8 }}>
             {!items ? (
-              <View style={{ gap: 12 }} testID="social-loading">
+              <View style={{ gap: 12, paddingHorizontal: gutter }} testID="social-loading">
                 <SkeletonCard imageHeight={220} />
                 <SkeletonCard imageHeight={220} />
               </View>
             ) : error ? (
-              <EmptyState variant="error" title="Couldn't load the feed" body="Check your connection and try again." actionLabel="Retry" onAction={() => load()} testID="social-error" />
+              <View style={{ paddingHorizontal: gutter }}>
+                <EmptyState variant="error" title="Couldn't load the feed" body="Check your connection and try again." actionLabel="Retry" onAction={() => load()} testID="social-error" />
+              </View>
             ) : (
-              <EmptyState
-                icon="leaf-outline"
-                title={debouncedQ ? "No matches nearby" : scope === "city" ? "Nothing here yet" : `Quiet in ${scopeLabel}`}
-                body={debouncedQ ? "Try a different word, or widen the area." : category && !followingCategory ? `No free ${selectedCategoryLabel.toLowerCase()} right now — want a nudge when a neighbour posts one?` : scope === "city" ? "Be the first to share something — a chair, books, a fridge you no longer need." : "Widen to your area or city, or be the first to post here."}
-                actionLabel={category && !followingCategory && alerts ? "Alert me when one's posted" : "Share an item"}
-                onAction={category && !followingCategory && alerts ? toggleAlert : () => router.push("/social/compose" as any)}
-                secondaryLabel={category && !followingCategory && alerts ? "Share an item" : scope !== "city" ? `Show all of ${meta?.scopes.city ?? "the city"}` : undefined}
-                onSecondary={category && !followingCategory && alerts ? () => router.push("/social/compose" as any) : scope !== "city" ? () => changeScope("city") : undefined}
-                testID="social-empty"
-              />
+              <View style={{ gap: 8 }}>
+                {prosRail}
+                <View style={{ paddingHorizontal: gutter }}>
+                  <EmptyState
+                    icon="leaf-outline"
+                    title={debouncedQ ? "No matches nearby" : scope === "city" ? "Nothing here yet" : `Quiet in ${scopeLabel}`}
+                    body={debouncedQ ? "Try a different word, or widen the area." : category && !followingCategory ? `No free ${selectedCategoryLabel.toLowerCase()} right now — want a nudge when a neighbour posts one?` : scope === "city" ? "Be the first to share something — a chair, books, a fridge you no longer need." : "Widen to your area or city, or be the first to post here."}
+                    actionLabel={category && !followingCategory && alerts ? "Alert me when one's posted" : "Share an item"}
+                    onAction={category && !followingCategory && alerts ? toggleAlert : () => router.push("/social/compose" as any)}
+                    secondaryLabel={category && !followingCategory && alerts ? "Share an item" : scope !== "city" ? `Show all of ${meta?.scopes.city ?? "the city"}` : undefined}
+                    onSecondary={category && !followingCategory && alerts ? () => router.push("/social/compose" as any) : scope !== "city" ? () => changeScope("city") : undefined}
+                    testID="social-empty"
+                  />
+                </View>
+              </View>
             )}
           </View>
         }

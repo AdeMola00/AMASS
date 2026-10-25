@@ -40,7 +40,7 @@ const PROVIDER_META: Record<PaymentProviderId, ProviderMeta> = {
 };
 
 export type TokenPurchaseConfig = {
-  currency: "MASS" | "FIX";
+  currency: "MASS";
   title: string;
   heroTitle: string;
   heroBody: string;
@@ -59,13 +59,11 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
   const { colors, shadows } = useTheme();
   const toast = useToast();
   const { rainOncePersisted } = useMoneyRain();
-  const { mass, fix, refresh } = useWallet();
-  const isMass = config.currency === "MASS";
-  const balance = (isMass ? mass : fix)?.spendable ?? 0;
+  const { mass, refresh } = useWallet();
+  const balance = mass?.spendable ?? 0;
 
-  const accent = isMass ? colors.mass : colors.fix;
-  const accentText = isMass ? colors.massText : colors.fixText;
-  const accentSoft = isMass ? colors.massSoft : colors.fixSoft;
+  const accent = colors.mass;
+  const accentSoft = colors.massSoft;
 
   const [bundles, setBundles] = useState<TokenBundle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,7 +150,7 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
         // Show exactly what the server credited (bundle + bonus + tier bonus) and the receipt number.
         setCredited({ tokens: (paidStatus.credits ?? 0) + (paidStatus.bonus ?? 0), receiptNo: paidStatus.receipt_no ?? null, amountNgn: paidStatus.amount_ngn });
         // Server-confirmed MASS purchase → celebration, once per reference on this device (the callback route shares the key).
-        if (config.currency === "MASS") rainOncePersisted("celebrate", `pay:${init.reference}`);
+        rainOncePersisted("celebrate", `pay:${init.reference}`);
       } else if (result.type === "cancel" || result.type === "dismiss") {
         toast.info("Checkout closed", "No payment was made.");
       } else {
@@ -217,7 +215,7 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
                   </View>
                 </View>
                 <View style={[styles.heroCoin, { backgroundColor: accent }]}>
-                  {isMass ? <TokenIcon size={30} /> : <Ionicons name="construct" size={24} color="#052E1F" />}
+                  <TokenIcon size={30} />
                 </View>
               </View>
               <AppText variant="h3" color={colors.textInverse} style={{ marginTop: 14 }}>
@@ -278,19 +276,15 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
                   >
                     {isBest ? (
                       <View style={[styles.bestBadge, { backgroundColor: accent }]}>
-                        <Ionicons name="flame" size={10} color={isMass ? "#1A1200" : "#052E1F"} />
-                        <AppText variant="micro" color={isMass ? "#1A1200" : "#052E1F"}>
+                        <Ionicons name="flame" size={10} color="#1A1200" />
+                        <AppText variant="micro" color="#1A1200">
                           BEST VALUE
                         </AppText>
                       </View>
                     ) : null}
                     <View style={styles.bundleTop}>
                       <View style={[styles.bundleCoin, { backgroundColor: isSelected ? accent : accentSoft }]}>
-                        {isMass ? (
-                          <TokenIcon size={26} animated={isSelected} />
-                        ) : (
-                          <Ionicons name="construct" size={18} color={isSelected ? "#052E1F" : accentText} />
-                        )}
+                        <TokenIcon size={26} animated={isSelected} />
                       </View>
                       <View
                         style={[
@@ -298,7 +292,7 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
                           { borderColor: isSelected ? accent : colors.borderStrong, backgroundColor: isSelected ? accent : "transparent" },
                         ]}
                       >
-                        {isSelected ? <Ionicons name="checkmark" size={13} color={isMass ? "#1A1200" : "#052E1F"} /> : null}
+                        {isSelected ? <Ionicons name="checkmark" size={13} color="#1A1200" /> : null}
                       </View>
                     </View>
                     <AppText variant="caption" tone="secondary" weight="semibold" numberOfLines={1}>
@@ -313,7 +307,7 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
                       </AppText>
                     </View>
                     {bonusTotal > 0 ? (
-                      <Badge label={`+${bonusTotal} bonus`} tone={isMass ? "mass" : "fix"} icon="gift" size="xs" />
+                      <Badge label={`+${bonusTotal} bonus`} tone="mass" icon="gift" size="xs" />
                     ) : (
                       <View style={{ height: 18 }} />
                     )}

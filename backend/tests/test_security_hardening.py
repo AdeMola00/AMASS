@@ -109,21 +109,18 @@ class TestPurchaseEndpointsGone:
         assert isinstance(detail, dict), detail
         assert detail.get("redirect", "").startswith("/api/payments/")
 
-    def test_fix_purchase_returns_410(self, client, demo_headers):
+    def test_fix_purchase_route_is_gone(self, client, demo_headers):
+        """FIX was removed entirely (Jun 2026) — the route no longer exists."""
         r = client.post(
             f"{BASE_URL}/api/wallet/fix/purchase",
             json=self.payload,
             headers=demo_headers,
         )
-        assert r.status_code == 410, r.text
-        body = r.json()
-        detail = body.get("detail", body)
-        assert isinstance(detail, dict), detail
-        assert detail.get("redirect", "").startswith("/api/payments/")
+        assert r.status_code == 404, r.text
 
     def test_purchase_gone_endpoints_dont_credit_wallet(self, client, demo_headers):
         """Even in the (broken) case where 410 flow leaks state, wallet must NOT change."""
-        before = client.get(f"{BASE_URL}/api/wallet/dual", headers=demo_headers).json()
+        before = client.get(f"{BASE_URL}/api/wallet/me", headers=demo_headers).json()
         client.post(
             f"{BASE_URL}/api/tokens/purchase",
             json=self.payload,
@@ -134,70 +131,22 @@ class TestPurchaseEndpointsGone:
             json=self.payload,
             headers=demo_headers,
         )
-        after = client.get(f"{BASE_URL}/api/wallet/dual", headers=demo_headers).json()
-        assert before["mass"]["balance"] == after["mass"]["balance"]
-        assert before["mass"]["bonus_balance"] == after["mass"]["bonus_balance"]
-        assert before["fix"]["balance"] == after["fix"]["balance"]
-        assert before["fix"]["bonus_balance"] == after["fix"]["bonus_balance"]
+        after = client.get(f"{BASE_URL}/api/wallet/me", headers=demo_headers).json()
+        assert before["balance"] == after["balance"]
+        assert before["bonus_balance"] == after["bonus_balance"]
 
 
-# ─── 3. Wallet atomic credit + idempotency ───────────────────────
+# ─── 3. Wallet — MASS only ───────────────────────────────────────
 class TestWalletAtomicity:
-    def test_dual_wallet_reachable(self, client, demo_headers):
-        r = client.get(f"{BASE_URL}/api/wallet/dual", headers=demo_headers)
+    def test_single_mass_wallet(self, client, demo_headers):
+        r = client.get(f"{BASE_URL}/api/wallet/me", headers=demo_headers)
         assert r.status_code == 200, r.text
         body = r.json()
-        assert "mass" in body and "fix" in body
-        assert isinstance(body["mass"]["balance"], int)
-        assert isinstance(body["fix"]["balance"], int)
-
-    def test_fix_earn_idempotency(self, client, demo_headers):
-        idem = f"test-{uuid.uuid4().hex[:12]}"
-        before = client.get(f"{BASE_URL}/api/wallet/dual", headers=demo_headers).json()
-        first = client.post(
-            f"{BASE_URL}/api/wallet/fix/earn",
-            json={"event": "job_completed", "meta": {"idempotency_key": idem}},
-            headers=demo_headers,
-        )
-        assert first.status_code == 200, first.text
-        f1 = first.json()
-        assert f1.get("ok") is True
-        assert f1.get("credited", 0) > 0, f1
-        credited = f1["credited"]
-
-        # Second call with same key → duplicate no-op
-        second = client.post(
-            f"{BASE_URL}/api/wallet/fix/earn",
-            json={"event": "job_completed", "meta": {"idempotency_key": idem}},
-            headers=demo_headers,
-        )
-        assert second.status_code == 200, second.text
-        f2 = second.json()
-        assert f2.get("duplicate") is True, f2
-        assert f2.get("credited", 0) == 0, f2
-
-        after = client.get(f"{BASE_URL}/api/wallet/dual", headers=demo_headers).json()
-        # Exactly one credit applied
-        delta = (
-            after["fix"]["balance"]
-            + after["fix"]["bonus_balance"]
-            - before["fix"]["balance"]
-            - before["fix"]["bonus_balance"]
-        )
-        assert delta == credited, {
-            "before": before["fix"],
-            "after": after["fix"],
-            "credited": credited,
-        }
-        # lifetime_earned should also go up by exactly `credited`
-        lt_delta = after["fix"].get("lifetime_earned", 0) - before["fix"].get(
-            "lifetime_earned", 0
-        )
-        assert lt_delta == credited, {
-            "before_lt": before["fix"].get("lifetime_earned"),
-            "after_lt": after["fix"].get("lifetime_earned"),
-            "credited": credited,
-        }
+        assert body.get("currency", "MASS") == "MASS"
+        assert isinstance(body["balance"], int)
+        assert client.get(f"{BASE_URL}/api/wallet/dual", headers=demo_headers).status_code == 404
+        assert client.get(f"{BASE_URL}/api/wallet/fix", headers=demo_headers).status_code == 404
+        assert client.post(f"{BASE_URL}/api/wallet/fix/earn", json={"event": "job_completed"}, headers=demo_headers).status_code == 404
 
     def test_daily_login_claim_once(self, client, demo_headers):
         # Ensure a clean run: if today already claimed we assert 'already_claimed'
@@ -330,9 +279,9 @@ class TestRegressionSurface:
         assert r.status_code == 200, r.text
         assert "balance" in r.json()
 
-    def test_wallet_dual(self, client, demo_headers):
+    def test_wallet_dual_is_gone(self, client, demo_headers):
         r = client.get(f"{BASE_URL}/api/wallet/dual", headers=demo_headers)
-        assert r.status_code == 200, r.text
+        assert r.status_code == 404, r.text
 
     def test_wallet_transactions_mass(self, client, demo_headers):
         # Prefer the documented /wallet/transactions?currency=MASS shape

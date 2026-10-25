@@ -13,8 +13,8 @@ const SUPPORT_EMAIL = "hello@amass.africa";
 
 const FAQS: { q: string; a: string; tags: string[] }[] = [
   {
-    q: "What are MASS and FIX tokens?",
-    a: "MASS is your in-app balance used to unlock property details and contact agents. FIX is earned by FIXA service providers for completed jobs. You can top up MASS or earn both through tasks, referrals and daily bonuses.",
+    q: "What is MASS, and is FIXA free?",
+    a: "MASS is your in-app balance (1 MASS = ₦100) used to see homes on the map and unlock property details and agent contact. FIXA is completely free: browse verified service providers, call or WhatsApp them directly and book a visit without spending anything. Pros build their reputation through completed jobs and ratings.",
     tags: ["wallet", "tokens", "mass", "fix"],
   },
   {

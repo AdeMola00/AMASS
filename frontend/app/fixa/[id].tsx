@@ -1,58 +1,43 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Linking } from "react-native";
+import { View, StyleSheet, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, ApiError, MarketplaceItem, ProviderPreview, UnlockResult } from "@/src/lib/api";
+import * as Haptics from "expo-haptics";
+import { api, ApiError, FixaBooking, FixaReportReason, ProviderFull } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
-import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
-import { LinearGradient } from "expo-linear-gradient";
-import { gradients, radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, Card, EmptyState, PressableScale, Screen, ScreenHeader, Skeleton, UnlockDialog, useToast } from "@/src/ui";
+import { radii, space } from "@/src/theme/tokens";
+import { AppText, Badge, Button, Card, EmptyState, IconButton, PressableScale, Screen, ScreenHeader, Skeleton, useCelebrate, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
-import { FixaGate } from "@/src/components/fixa/FixaGate";
+import { BadgeStrip, BOOKING_META, callProvider, formatSlot, ProviderAvatar, RateSheet, ReportSheet, tradeIcon, whatsappProvider } from "@/src/components/fixa/FixaBits";
 import { BookingSheet, BookingSheetRef } from "@/src/components/marketplace/BookingSheet";
 
-type Details = MarketplaceItem & { unlocked: boolean };
-
+/**
+ * FIXA provider profile — everything is free: phone + WhatsApp are always visible, booking costs nothing,
+ * the customer marks the job done and rates it, and anyone can report a provider to AMASS Admin.
+ */
 export default function FixaProviderScreen() {
-  const { id, unlock } = useLocalSearchParams<{ id: string; unlock?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const toast = useToast();
-  const { fix } = useWallet();
+  const celebrate = useCelebrate();
   const bookingRef = useRef<BookingSheetRef>(null);
-  const autoOpened = useRef(false);
-  const [preview, setPreview] = useState<ProviderPreview | null>(null);
-  const [details, setDetails] = useState<Details | null>(null);
-  const [gated, setGated] = useState(false);
-  const [fee, setFee] = useState<number | null>(null);
+  const [p, setP] = useState<ProviderFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [unlockOpen, setUnlockOpen] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
-    setGated(false);
     try {
-      const p = await api.fixaProvider(id);
-      setPreview(p);
-      if (p.unlocked) {
-        setDetails(await api.fixaProviderDetails(id));
-      } else {
-        setDetails(null);
-        try {
-          await api.fixaProviderDetails(id);
-        } catch (e: any) {
-          if (e instanceof ApiError && e.status === 403 && e.detail?.code === "UNLOCK_REQUIRED") setFee(Number(e.detail.fee));
-        }
-      }
+      setP(await api.fixaProvider(id));
     } catch (e: any) {
-      if (e instanceof ApiError && e.status === 403) setGated(true);
-      else if (e instanceof ApiError && e.status === 404) setNotFound(true);
+      if (e instanceof ApiError && e.status === 404) setNotFound(true);
       else toast.error("Couldn't load this provider", e?.message ?? "Please try again.");
     } finally {
       setLoading(false);
@@ -63,32 +48,60 @@ export default function FixaProviderScreen() {
     load();
   }, [load]);
 
-  // Back from a FIX top-up → re-open the confirmation.
-  useEffect(() => {
-    if (!unlock || !preview || preview.unlocked || autoOpened.current) return;
-    autoOpened.current = true;
-    const t = setTimeout(() => setUnlockOpen(true), 600);
-    return () => clearTimeout(t);
-  }, [unlock, preview]);
-
-  const onUnlocked = (res: UnlockResult) => {
-    setUnlockOpen(false);
-    if (res.charged > 0) toast.success("Contact unlocked", `${res.charged} FIX deducted · yours forever.`);
-    setDetails({ ...(res.details as MarketplaceItem), unlocked: true });
-    setPreview((p) => (p ? { ...p, unlocked: true } : p));
-  };
-
-  const digits = (raw?: string) => (raw ?? "").replace(/[^\d+]/g, "");
   const call = () => {
-    const n = digits(details?.seller_phone);
-    if (!n) return toast.info("No phone number", "This provider hasn't added a number. Book a visit instead.");
-    Linking.openURL(`tel:${n}`).catch(() => {});
+    if (!callProvider(p?.phone)) toast.info("No phone number", "This provider hasn't added a number. Book a visit instead.");
   };
   const whatsapp = () => {
-    const n = digits(details?.seller_whatsapp || details?.seller_phone).replace(/^\+/, "");
-    if (!n) return toast.info("No WhatsApp number", "This provider hasn't added WhatsApp yet.");
-    const msg = encodeURIComponent(`Hi ${details?.seller_name ?? ""}, I found you on AMASS FIXA and would like to book a ${(details?.subcategory ?? "service").toLowerCase()} job.`);
-    Linking.openURL(`https://wa.me/${n}?text=${msg}`).catch(() => {});
+    if (!p || !whatsappProvider(p)) toast.info("No WhatsApp number", "This provider hasn't added WhatsApp yet.");
+  };
+  const book = () => {
+    if (!p) return;
+    bookingRef.current?.open(
+      { id: p.id, seller_name: p.display_name, seller_avatar: p.image ?? undefined, is_fixa_verified: p.verified, subcategory: p.category, rating: p.rating ?? undefined, reviews: p.reviews, price: p.call_out_from ?? undefined },
+      (b: FixaBooking) => setP((cur) => (cur ? { ...cur, my_open_booking: b } : cur))
+    );
+  };
+  const cancelBooking = async () => {
+    if (!p?.my_open_booking) return;
+    setBusy(true);
+    try {
+      await api.fixaCancelBooking(p.my_open_booking.id);
+      toast.info("Booking cancelled", `${p.display_name} has been told.`);
+      setP({ ...p, my_open_booking: null });
+    } catch (e: any) {
+      toast.error("Couldn't cancel", e?.message ?? "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const complete = async (rating: number, review: string) => {
+    if (!p?.my_open_booking) return;
+    setBusy(true);
+    try {
+      await api.fixaCompleteBooking(p.my_open_booking.id, rating, review || undefined);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setRateOpen(false);
+      celebrate({ title: `${rating}★ for ${p.display_name}`, icon: "star", tone: "fix" });
+      await load();
+    } catch (e: any) {
+      toast.error("Couldn't save your rating", e?.message ?? "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const report = async (reason: FixaReportReason, details: string) => {
+    if (!p) return;
+    setBusy(true);
+    try {
+      const r = await api.fixaReport(p.id, { reason, details: details || undefined, booking_id: p.my_open_booking?.id });
+      setReportOpen(false);
+      toast.success("Report sent to AMASS Admin", r.auto_hidden ? "This provider is now hidden while the team reviews the reports." : "Thanks — the team will look into it.");
+      setP({ ...p, my_report: { id: r.report.id, reason, created_at: r.report.created_at } });
+    } catch (e: any) {
+      toast.error("Couldn't send the report", e instanceof ApiError && typeof e.detail === "string" ? e.detail : e?.message ?? "Please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (loading) {
@@ -110,79 +123,67 @@ export default function FixaProviderScreen() {
       </Screen>
     );
   }
-  if (gated) {
-    return (
-      <Screen testID="fixa-provider-gated">
-        <Stack.Screen options={{ headerShown: false }} />
-        <ScreenHeader title="FIXA" />
-        <FixaGate balance={fix?.spendable ?? 0} />
-      </Screen>
-    );
-  }
-  if (notFound || !preview) {
+  if (notFound || !p) {
     return (
       <Screen testID="fixa-provider-notfound">
         <Stack.Screen options={{ headerShown: false }} />
         <ScreenHeader title="Provider" />
-        <EmptyState variant="error" title="Provider not found" body="This FIXA profile may have been removed." actionLabel="Browse FIXA" onAction={() => router.replace("/fixa" as any)} />
+        <EmptyState variant="error" title="Provider not found" body="This FIXA profile may be awaiting verification or was removed." actionLabel="Browse FIXA" onAction={() => router.replace("/fixa" as any)} />
       </Screen>
     );
   }
 
-  const unlocked = !!preview.unlocked && !!details;
-  const specs = details?.provider_specializations ?? [];
-  const areas = details?.provider_service_areas ?? [];
-  const bio = details?.seller_bio || details?.description || preview.bio;
+  const open = p.my_open_booking;
+  const statusNote = p.status === "pending" ? "Awaiting AMASS verification — only you can see this profile." : p.status === "hidden" || p.status === "suspended" ? "Hidden from customers while AMASS Admin reviews it." : null;
 
   return (
     <Screen testID="fixa-provider-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title={preview.category} subtitle={preview.verified ? "FIXA verified provider" : "FIXA provider"} />
+      <ScreenHeader title={p.category} subtitle={p.verified ? "FIXA verified provider" : "FIXA provider"} />
       <ScrollView contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: 120 + insets.bottom }} showsVerticalScrollIndicator={false}>
+        {statusNote ? (
+          <Card tone="soft" style={{ flexDirection: "row", alignItems: "center", gap: 10 }} testID="fixa-owner-note">
+            <Ionicons name="information-circle" size={18} color={colors.warning} />
+            <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
+              {statusNote}
+            </AppText>
+          </Card>
+        ) : null}
+
         {/* Identity */}
         <View style={styles.identity}>
-          <View>
-            {preview.image ? (
-              <Image source={{ uri: preview.image }} style={[styles.avatar, { backgroundColor: colors.skeleton }]} contentFit="cover" transition={250} />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: colors.surfaceInverse, alignItems: "center", justifyContent: "center" }]}>
-                <AppText variant="h2" color={colors.textInverse}>
-                  {preview.initials}
-                </AppText>
-              </View>
-            )}
-            {preview.verified ? (
-              <View style={[styles.verifyDot, { backgroundColor: colors.fix, borderColor: colors.bg }]}>
-                <Ionicons name="shield-checkmark" size={14} color="#fff" />
-              </View>
-            ) : null}
-          </View>
+          <ProviderAvatar provider={p} size={84} />
           <View style={{ flex: 1, gap: 4 }}>
             <AppText variant="h2" testID="fixa-provider-name">
-              {preview.display_name}
+              {p.display_name}
             </AppText>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <Badge label={preview.category} tone="fix" size="xs" />
-              {preview.is_boosted ? <Badge label="Boosted" tone="premium" icon="rocket" size="xs" /> : null}
-              <Badge label={`Tier ${preview.tier ?? 1} · Zone ${preview.zone_tier ?? "D"}`} tone="neutral" size="xs" />
+              {(p.categories.length ? p.categories : [p.category]).map((c) => (
+                <Badge key={c} label={c} tone="fix" size="xs" icon={tradeIcon(c)} />
+              ))}
+              {p.is_boosted ? <Badge label="Boosted" tone="premium" icon="rocket" size="xs" /> : null}
             </View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              {preview.rating ? (
+              {p.rating ? (
                 <>
                   <Ionicons name="star" size={13} color={colors.mass} />
                   <AppText variant="bodySm" weight="bold" tabular>
-                    {preview.rating.toFixed(1)}
+                    {Number(p.rating).toFixed(1)}
                   </AppText>
                   <AppText variant="bodySm" tone="tertiary" tabular>
-                    ({preview.reviews ?? 0} reviews)
+                    ({p.reviews ?? 0} reviews)
                   </AppText>
                 </>
-              ) : null}
-              {preview.area ? (
+              ) : (
+                <AppText variant="bodySm" tone="tertiary">
+                  New on FIXA · no ratings yet
+                </AppText>
+              )}
+              {p.area ? (
                 <>
                   <Ionicons name="location" size={12} color={colors.textTertiary} />
                   <AppText variant="bodySm" tone="tertiary" numberOfLines={1} style={{ flexShrink: 1 }}>
-                    {preview.area}
+                    {p.area}
                   </AppText>
                 </>
               ) : null}
@@ -190,133 +191,163 @@ export default function FixaProviderScreen() {
           </View>
         </View>
 
-        {/* Trust stats */}
+        {/* Reputation */}
         <View style={styles.stats}>
-          <Stat icon="briefcase-outline" value={preview.jobs_completed != null ? `${preview.jobs_completed}+` : "—"} label="Jobs done" />
-          <Stat icon="time-outline" value={preview.years_experience != null ? `${preview.years_experience} yrs` : "—"} label="Experience" />
-          <Stat icon="shield-checkmark-outline" value={preview.verified ? "Yes" : "Pending"} label="Vetted" />
+          <Stat icon="briefcase-outline" value={`${p.jobs_completed ?? 0}`} label="Jobs done" testID="fixa-stat-jobs" />
+          <Stat icon="time-outline" value={p.years_experience != null ? `${p.years_experience} yrs` : "—"} label="Experience" />
+          <Stat icon="shield-checkmark-outline" value={p.verified ? "Yes" : "Pending"} label="Verified" />
         </View>
+        <BadgeStrip badges={p.badges} max={6} size="sm" />
 
-        {preview.badges.length > 0 ? (
-          <View style={styles.badges}>
-            {preview.badges.map((b) => (
-              <View key={b} style={[styles.badge, { backgroundColor: colors.fixSoft }]}>
-                <Ionicons name="checkmark-circle" size={12} color={colors.fixText} />
-                <AppText variant="caption" weight="semibold" color={colors.fixText}>
-                  {b}
-                </AppText>
-              </View>
-            ))}
+        {/* Contact — always free */}
+        <Card testID="fixa-contact" style={{ gap: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="call" size={16} color={colors.fixText} />
+            <AppText variant="title" style={{ flex: 1 }}>
+              Direct contact
+            </AppText>
+            <Badge label="Free" tone="fix" size="xs" />
           </View>
+          {p.phone ? <ContactLine icon="call" value={p.phone} onPress={call} testID="fixa-call" /> : null}
+          {p.whatsapp || p.phone ? <ContactLine icon="logo-whatsapp" value={p.whatsapp || p.phone || ""} onPress={whatsapp} testID="fixa-whatsapp" brand /> : null}
+          {!p.phone && !p.whatsapp ? (
+            <AppText variant="caption" tone="tertiary" testID="fixa-contact-unavailable">
+              No direct number on file yet — book a visit below and the pro will call you back.
+            </AppText>
+          ) : null}
+          {p.call_out_from ? (
+            <AppText variant="caption" tone="secondary" tabular>
+              Call-out from {formatNaira(p.call_out_from)} · agree the price directly with the pro
+            </AppText>
+          ) : null}
+        </Card>
+
+        {/* My booking */}
+        {open ? (
+          <Card tone="soft" style={{ gap: 10 }} testID="fixa-my-booking">
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="calendar" size={16} color={colors.text} />
+              <AppText variant="title" style={{ flex: 1 }}>
+                Your booking
+              </AppText>
+              <Badge label={BOOKING_META[open.status].label} tone={BOOKING_META[open.status].tone} icon={BOOKING_META[open.status].icon} size="xs" />
+            </View>
+            <AppText variant="bodySm" tone="secondary">
+              {formatSlot(open)} · {open.address}
+            </AppText>
+            {open.provider_note ? (
+              <AppText variant="caption" tone="tertiary">
+                Note from {p.display_name}: {open.provider_note}
+              </AppText>
+            ) : null}
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <Button label="Mark done & rate" variant="primary" size="sm" iconLeft="star" onPress={() => setRateOpen(true)} style={{ flex: 1.3 }} testID="fixa-complete-btn" />
+              <Button label="Cancel" variant="secondary" size="sm" onPress={cancelBooking} loading={busy} style={{ flex: 1 }} testID="fixa-cancel-booking" />
+            </View>
+          </Card>
         ) : null}
 
-        {bio ? (
+        {p.bio ? (
           <View style={{ gap: 6 }}>
             <AppText variant="h3">About</AppText>
             <AppText variant="body" tone="secondary">
-              {bio}
+              {p.bio}
             </AppText>
           </View>
         ) : null}
-
-        {/* Contact — the paid part */}
-        {unlocked ? (
-          <Card testID="fixa-contact-revealed" style={{ gap: 12 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Ionicons name="lock-open" size={16} color={colors.success} />
-              <AppText variant="title">Direct contact · unlocked</AppText>
-            </View>
-            {details?.seller_phone ? <ContactLine icon="call" value={details.seller_phone} onPress={call} testID="fixa-call" /> : null}
-            {details?.seller_whatsapp || details?.seller_phone ? <ContactLine icon="logo-whatsapp" value={details.seller_whatsapp || details.seller_phone || ""} onPress={whatsapp} testID="fixa-whatsapp" brand /> : null}
-            {!details?.seller_phone && !details?.seller_whatsapp ? (
-              <AppText variant="caption" tone="tertiary" testID="fixa-contact-unavailable">
-                No direct number on file — book a visit below and FIXA will coordinate. Unreachable within 24h? Request a credit from My Unlocks.
-              </AppText>
-            ) : null}
-            {details?.price ? (
-              <AppText variant="caption" tone="secondary" tabular>
-                Call-out from {formatNaira(details.price)}
-              </AppText>
-            ) : null}
-          </Card>
-        ) : (
-          <Card tone="ink" style={styles.lockedCard} testID="fixa-contact-locked">
-            <View style={[styles.lockIcon, { backgroundColor: colors.fix }]}>
-              <Ionicons name="lock-closed" size={18} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <AppText variant="title" color={colors.textInverse}>
-                Direct contact is locked
-              </AppText>
-              <AppText variant="caption" color={colors.textInverse} style={{ opacity: 0.75, marginTop: 2 }}>
-                Unlock once with FIX to get the phone and WhatsApp number — forever. If the pro is unreachable within 24h, you are credited back.
-              </AppText>
-            </View>
-          </Card>
-        )}
-
-        {unlocked && specs.length > 0 ? (
+        {p.specializations.length > 0 ? (
           <View style={{ gap: 8 }}>
             <AppText variant="h3">Specialisations</AppText>
             <View style={styles.badges}>
-              {specs.map((s) => (
+              {p.specializations.map((s) => (
                 <Badge key={s} label={s} tone="neutral" />
               ))}
             </View>
           </View>
         ) : null}
-        {unlocked && areas.length > 0 ? (
+        {p.service_areas.length > 0 ? (
           <View style={{ gap: 6 }}>
             <AppText variant="h3">Service areas</AppText>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Ionicons name="navigate" size={13} color={colors.textTertiary} />
               <AppText variant="bodySm" tone="secondary" style={{ flex: 1 }}>
-                {areas.join(" · ")}
+                {p.service_areas.join(" · ")}
               </AppText>
             </View>
           </View>
         ) : null}
+
+        {/* Reviews */}
+        <View style={{ gap: 8 }}>
+          <AppText variant="h3">Reviews</AppText>
+          {p.reviews_list.length === 0 ? (
+            <AppText variant="bodySm" tone="tertiary" testID="fixa-no-reviews">
+              {p.reviews ? `${p.reviews} ratings so far — written reviews from AMASS customers will show here.` : "No reviews yet. Book a job and be the first to rate."}
+            </AppText>
+          ) : (
+            p.reviews_list.map((r, i) => (
+              <Card key={`${r.at}-${i}`} elevation="none" style={{ gap: 4, backgroundColor: colors.surfaceAlt }} testID={`fixa-review-${i}`}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View style={{ flexDirection: "row" }}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Ionicons key={n} name={n <= r.rating ? "star" : "star-outline"} size={12} color={colors.mass} />
+                    ))}
+                  </View>
+                  <AppText variant="caption" weight="semibold" style={{ flex: 1 }}>
+                    {r.by}
+                  </AppText>
+                  <AppText variant="micro" tone="tertiary">
+                    {r.at ? new Date(r.at).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : ""}
+                  </AppText>
+                </View>
+                {r.review ? (
+                  <AppText variant="bodySm" tone="secondary">
+                    {r.review}
+                  </AppText>
+                ) : null}
+              </Card>
+            ))
+          )}
+        </View>
+
+        {/* Report */}
+        {!p.is_owner ? (
+          p.my_report ? (
+            <AppText variant="caption" tone="tertiary" align="center" testID="fixa-reported">
+              You reported this provider — AMASS Admin is reviewing it.
+            </AppText>
+          ) : (
+            <Button label="Report this provider" variant="ghost" size="sm" iconLeft="flag-outline" onPress={() => setReportOpen(true)} testID="fixa-report-btn" />
+          )
+        ) : (
+          <Button label="Manage my FIXA profile" variant="secondary" iconLeft="create-outline" onPress={() => router.push("/fixa/provider" as any)} testID="fixa-manage-btn" />
+        )}
       </ScrollView>
 
       {/* Sticky CTA */}
-      <View style={[styles.sticky, shadows.lg, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: colors.bgElevated }]}>
-        {unlocked ? (
-          <>
-            <Button label="Call" variant="secondary" size="lg" iconLeft="call" onPress={call} style={{ flex: 1 }} testID="fixa-cta-call" />
-            <Button label="Book a visit" variant="primary" size="lg" iconLeft="calendar" onPress={() => details && bookingRef.current?.open(details)} style={{ flex: 1.4 }} testID="fixa-cta-book" />
-          </>
-        ) : (
-          <PressableScale
-            style={[styles.unlockCta, shadows.md]}
-            onPress={() => setUnlockOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel={`Unlock contact${fee ? ` for ${fee} FIX` : ""}. You have ${fix?.spendable ?? 0} FIX`}
-            testID="fixa-unlock-cta"
-          >
-            <LinearGradient colors={[...gradients.premium]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
-            <Ionicons name="lock-open" size={18} color="#fff" />
-            <View>
-              <AppText variant="title" color="#fff">
-                {fee != null ? `Unlock contact · ${fee.toLocaleString()} FIX` : "Unlock contact"}
-              </AppText>
-              <AppText variant="micro" color="rgba(255,255,255,0.8)" style={{ marginTop: 1 }} tabular testID="fixa-unlock-balance">
-                You have {(fix?.spendable ?? 0).toLocaleString()} FIX · confirm before paying
-              </AppText>
-            </View>
-          </PressableScale>
-        )}
-      </View>
+      {!p.is_owner ? (
+        <View style={[styles.sticky, shadows.lg, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: colors.bgElevated }]}>
+          <IconButton icon="call" label="Call provider" size={52} iconSize={22} onPress={call} testID="fixa-cta-call" />
+          <IconButton icon="logo-whatsapp" label="WhatsApp provider" size={52} iconSize={22} color={colors.success} onPress={whatsapp} testID="fixa-cta-whatsapp" />
+          {open ? (
+            <Button label="Booked · view" variant="fix" size="lg" iconLeft="checkmark-circle" onPress={() => router.push("/fixa/bookings" as any)} style={{ flex: 1 }} testID="fixa-cta-booked" />
+          ) : (
+            <Button label="Book a visit · free" variant="fix" size="lg" iconLeft="calendar" onPress={book} style={{ flex: 1 }} testID="fixa-cta-book" />
+          )}
+        </View>
+      ) : null}
 
-      <UnlockDialog visible={unlockOpen} featureKey="fixa_provider" targetId={id ?? null} onClose={() => setUnlockOpen(false)} onUnlocked={onUnlocked} />
       <BookingSheet ref={bookingRef} />
+      <RateSheet visible={rateOpen} booking={open} onClose={() => setRateOpen(false)} onSubmit={complete} busy={busy} />
+      <ReportSheet visible={reportOpen} providerName={p.display_name} onClose={() => setReportOpen(false)} onSubmit={report} busy={busy} />
     </Screen>
   );
 }
 
-function Stat({ icon, value, label }: { icon: IconName; value: string; label: string }) {
+function Stat({ icon, value, label, testID }: { icon: IconName; value: string; label: string; testID?: string }) {
   const { colors } = useTheme();
   return (
-    <View style={[styles.stat, { backgroundColor: colors.surfaceAlt }]} accessibilityLabel={`${label}: ${value}`}>
+    <View style={[styles.stat, { backgroundColor: colors.surfaceAlt }]} accessibilityLabel={`${label}: ${value}`} testID={testID}>
       <Ionicons name={icon} size={18} color={colors.text} />
       <AppText variant="title" tabular>
         {value}
@@ -343,15 +374,9 @@ function ContactLine({ icon, value, onPress, testID, brand }: { icon: IconName; 
 
 const styles = StyleSheet.create({
   identity: { flexDirection: "row", gap: 14, alignItems: "center" },
-  avatar: { width: 84, height: 84, borderRadius: 42 },
-  verifyDot: { position: "absolute", bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   stats: { flexDirection: "row", gap: 10 },
   stat: { flex: 1, alignItems: "center", gap: 4, paddingVertical: 12, borderRadius: radii.md },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  badge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, height: 28, borderRadius: radii.pill },
-  lockedCard: { flexDirection: "row", alignItems: "center", gap: 12 },
-  lockIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   contact: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md },
-  sticky: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: space[4], paddingTop: 12, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl },
-  unlockCta: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12, height: 60, paddingHorizontal: 18, borderRadius: radii.pill, overflow: "hidden" },
+  sticky: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space[4], paddingTop: 12, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl },
 });

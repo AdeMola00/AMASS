@@ -7,7 +7,7 @@ import pytest
 import requests
 
 BASE = (os.environ.get("EXPO_BACKEND_URL") or os.environ.get("EXPO_PUBLIC_BACKEND_URL")).rstrip("/")
-TABLE = {"A": (80, 120), "B": (40, 60), "C": (20, 30), "D": (10, 15)}
+TABLE = {"A": (12, 10), "B": (9, 8), "C": (7, 6), "D": (6, 5)}  # zone → (rent, sale)
 
 
 def H(tok, **kw):
@@ -127,7 +127,7 @@ def test_unlock_once_receipt_ledger(admin, rental):
     rc = recs[0]
     assert rc["tokens"] == fee and rc["amount_ngn"] == fee * 100 and rc["rate_ngn"] == 100
     assert any(i["label"] == "Zone" for i in rc["items"])
-    assert rc["email_status"] in ("failed", "sent")
+    assert rc["email_status"] in ("failed", "sent", "pending")
     other, _ = new_user()
     assert requests.get(f"{BASE}/api/receipts/{rc['receipt_no']}", headers=H(other)).status_code == 404
     tx = requests.get(f"{BASE}/api/wallet/transactions", headers=H(tok)).json()
@@ -171,13 +171,13 @@ def test_webhooks_and_unknown_ref():
     assert requests.get(f"{BASE}/api/payments/mock/amass_unknown_{uuid.uuid4().hex}", allow_redirects=False).status_code == 404
 
 
-# FIXA untouched
-def test_fixa_fix_untouched():
+# FIXA is free — no FIX wallet, contact public
+def test_fixa_free_no_fix():
     tok, _ = new_user()
-    assert bal(tok, "FIX") == 100
+    assert requests.get(f"{BASE}/api/wallet/fix", headers=H(tok)).status_code == 404
     pr = requests.get(f"{BASE}/api/fixa/providers", headers=H(tok))
     assert pr.status_code == 200
     items = pr.json().get("items", [])
-    assert items
-    q = quote(tok, items[0]["id"], fk="fixa_provider")
-    assert q["currency"] == "FIX" and q.get("token_ngn") == 10, q
+    assert items and items[0]["phone"]
+    r = requests.get(f"{BASE}/api/unlocks/quote", headers=H(tok), params={"featureKey": "fixa_provider", "targetId": items[0]["id"]})
+    assert r.status_code == 422

@@ -1,5 +1,5 @@
 """AMASS monetization core — shared unlock service, entitlements, zone/tier
-pricing, FIX gate, lean map markers, admin pricing + reporting.
+pricing, lean map markers, admin pricing + reporting.
 
 Design (MongoDB standalone → no multi-document transactions):
   • The ENTITLEMENT row is the lock. `POST /unlocks` inserts a *pending*
@@ -36,19 +36,19 @@ from app_settings import get_setting
 from social_common import marker_social_context
 from tokens import WalletService
 
-FeatureKey = Literal["property", "fixa_provider"]
-FEATURE_CURRENCY: dict[str, str] = {"property": "MASS", "fixa_provider": "FIX"}
+FeatureKey = Literal["property"]
+FEATURE_CURRENCY: dict[str, str] = {"property": "MASS"}
 
-# ─── MASS — the sole property-access currency ────────────────────────────
-# ₦100 = 1 MASS. Property fees are quoted, disclosed and charged in MASS only;
-# FIX is the FIXA services currency and is never accepted for property access.
+# ─── MASS — the only token in the app ────────────────────────────────────
+# ₦100 = 1 MASS. Property fees are quoted, disclosed and charged in MASS only.
+# (FIX and paid FIXA unlocks were removed in Jun 2026 — FIXA is free.)
 PROPERTY_CURRENCY = "MASS"
 MASS_NGN = 100
 
 # ─── Defaults (admin-editable; persisted in app_settings) ───────────────
 DEFAULT_MONETIZATION = {
-    "conversion": {"MASS_ngn": MASS_NGN, "FIX_ngn": 10},
-    "welcome_bonus": {"MASS": 30, "FIX": 100},
+    "conversion": {"MASS_ngn": MASS_NGN},
+    "welcome_bonus": {"MASS": 30},
     "topup_min_ngn": 1000,
     "topup_bonus_tiers": [
         {"min_ngn": 5000, "bonus_pct": 5},
@@ -60,13 +60,18 @@ DEFAULT_MONETIZATION = {
     "map_hour_mass": 1,  # MASS per hour spent on the Find Home map (0 = free map)
     "free_amass_sale": False,
 }
-# Approved Lagos price table (MASS). Base × zone multiplier:
-#   Zone A (prime)    rent 80 · sale 120   = ₦8,000 / ₦12,000
-#   Zone B (high)     rent 40 · sale 60    = ₦4,000 / ₦6,000
-#   Zone C (mid)      rent 20 · sale 30    = ₦2,000 / ₦3,000
-#   Zone D (standard) rent 10 · sale 15    = ₦1,000 / ₦1,500
-PROPERTY_BASE = {"rent": 10, "sale": 15}
-PROPERTY_ZONE_MULT = {"A": 8, "B": 4, "C": 2, "D": 1}
+# Approved price table (MASS, ₦100 = 1 MASS) — the LOCATION sets the fee, 5 → 12 MASS; rent/lease sits above sale.
+#   Zone A (prime)    sale 10 · rent 12   = ₦1,000 / ₦1,200
+#   Zone B (high)     sale  8 · rent  9   = ₦800 / ₦900
+#   Zone C (mid)      sale  6 · rent  7   = ₦600 / ₦700
+#   Zone D (standard) sale  5 · rent  6   = ₦500 / ₦600
+PROPERTY_FEES: dict[str, dict[str, int]] = {
+    "A": {"sale": 10, "rent": 12},
+    "B": {"sale": 8, "rent": 9},
+    "C": {"sale": 6, "rent": 7},
+    "D": {"sale": 5, "rent": 6},
+}
+PROPERTY_FEE_MIN, PROPERTY_FEE_MAX = 5, 12
 ZONE_LABELS = {"A": "Prime", "B": "High", "C": "Mid", "D": "Standard"}
 # Lagos areas per zone — the human-readable face of the approved table (zone lookup is admin-editable).
 LAGOS_ZONE_AREAS: dict[str, list[str]] = {
@@ -75,12 +80,12 @@ LAGOS_ZONE_AREAS: dict[str, list[str]] = {
     "C": ["Yaba", "Surulere", "Ikeja", "Festac"],
     "D": ["Everywhere else in Lagos"],
 }
-# Pre-June-2026 scale (₦10 = 1 MASS, base 100/150) — used once by the startup migration.
+# Pre-June-2026 scales — used once by the startup migrations.
 _LEGACY_PROPERTY_BASE = {"rent": 100, "sale": 150}
 _LEGACY_MASS_NGN = 10
 _LEGACY_WELCOME_MASS = 300
-PROVIDER_TIER_BASE = {"1": 50, "2": 100, "3": 200, "4": 400}
-PROVIDER_ZONE_MULT = {"A": 1.5, "B": 1.25, "C": 1.0, "D": 1.0}
+_V2_PROPERTY_BASE = {"rent": 10, "sale": 15}
+_V2_ZONE_MULT = {"A": 8, "B": 4, "C": 2, "D": 1}
 DEFAULT_ZONE_LOOKUP: dict[str, str] = {
     # Zone A — prime
     "ikoyi": "A", "victoria island": "A", "banana island": "A", "lekki phase 1": "A", "maitama": "A", "asokoro": "A",
@@ -168,7 +173,7 @@ class PricingEngine:
 
     async def token_ngn(self, currency: str) -> int:
         cfg = await self.config()
-        return int(cfg["conversion"].get(f"{currency}_ngn", MASS_NGN if currency == PROPERTY_CURRENCY else 10))
+        return int(cfg["conversion"].get(f"{currency}_ngn", MASS_NGN))
 
     async def lagos_price_table(self) -> dict:
         """The approved Lagos property-access table: live MASS fees per zone with their exact naira value."""
@@ -208,9 +213,8 @@ class PricingEngine:
         return 1
 
     def default_amount(self, feature_key: str, category: str, zone: str) -> int:
-        if feature_key == "property":
-            return int(PROPERTY_BASE.get(category, PROPERTY_BASE["rent"]) * PROPERTY_ZONE_MULT.get(zone, 1))
-        return round_to_10(PROVIDER_TIER_BASE.get(str(category), 50) * PROVIDER_ZONE_MULT.get(zone, 1.0))
+        fees = PROPERTY_FEES.get(zone, PROPERTY_FEES["D"])
+        return int(fees.get(category, fees["rent"]))
 
     async def active_price(self, feature_key: str, category: str, zone: str) -> dict:
         row = await self.db.fee_prices.find_one(
@@ -234,8 +238,6 @@ class PricingEngine:
         for zone in ZONE_ORDER:
             for cat in ("rent", "sale"):
                 created += await self._ensure_row("property", cat, zone)
-            for tier in ("1", "2", "3", "4"):
-                created += await self._ensure_row("fixa_provider", tier, zone)
         return created
 
     async def _ensure_row(self, fk: str, cat: str, zone: str) -> int:
@@ -278,12 +280,14 @@ class PricingEngine:
         if amount <= 0:
             raise HTTPException(422, "Price must be greater than zero")
         if feature_key == "property":
+            if amount < PROPERTY_FEE_MIN or amount > PROPERTY_FEE_MAX:
+                raise HTTPException(422, f"Property fees stay between {PROPERTY_FEE_MIN} and {PROPERTY_FEE_MAX} MASS (₦{PROPERTY_FEE_MIN * MASS_NGN:,}–₦{PROPERTY_FEE_MAX * MASS_NGN:,})")
             other_cat = "rent" if category == "sale" else "sale"
             other = await self.active_price("property", other_cat, zone)
-            if category == "sale" and amount < int(other["amount"]):
-                raise HTTPException(422, f"Sale price ({amount}) must be ≥ rent price ({other['amount']}) in zone {zone}")
-            if category == "rent" and amount > int(other["amount"]):
-                raise HTTPException(422, f"Rent price ({amount}) must be ≤ sale price ({other['amount']}) in zone {zone}")
+            if category == "rent" and amount <= int(other["amount"]):
+                raise HTTPException(422, f"Rent/lease price ({amount}) must be higher than the sale price ({other['amount']}) in zone {zone}")
+            if category == "sale" and amount >= int(other["amount"]):
+                raise HTTPException(422, f"Sale price ({amount}) must be lower than the rent/lease price ({other['amount']}) in zone {zone}")
             med = await self.zone_medians(zone)
             token_ngn = await self.token_ngn("MASS")
             if category == "sale" and med["median_sale"]:
@@ -362,19 +366,6 @@ class UnlockService:
                 feature_key=feature_key, target_id=target_id,
                 label=f"{cat.title()} · {(doc.get('property_type') or 'property').replace('_', ' ').title()} · {ref}",
                 category=cat, zone_tier=zone, owner_id=doc.get("agent_id"), available=available, doc=doc,
-            )
-        if feature_key == "fixa_provider":
-            doc = await self.db.marketplace.find_one({"id": target_id, "category": "services"}, {"_id": 0})
-            if not doc:
-                raise HTTPException(404, "Provider not found")
-            tier = await self.pricing.tier_for(doc.get("subcategory"), doc.get("category"))
-            zone = await self.pricing.zone_for(doc.get("location"), doc.get("city"))
-            available = (doc.get("status") or "active") not in ("inactive", "suspended", "removed")
-            return Target(
-                feature_key=feature_key, target_id=target_id,
-                label=doc.get("seller_name") or doc.get("name") or "FIXA provider",
-                category=str(tier), zone_tier=zone, owner_id=doc.get("seller_id") or doc.get("vendor_id"),
-                available=available, doc=doc,
             )
         raise HTTPException(422, "Unknown featureKey")
 
@@ -757,8 +748,8 @@ async def migrate_mass_ngn_100(db: AsyncIOMotorDatabase) -> Optional[dict]:
     # Property fee rows: legacy default → new default; admin overrides scale ÷10 (min 1 MASS).
     async for row in db.fee_prices.find({"feature_key": "property", "active": True}):
         cat, zone, amount = row.get("category"), row.get("zone_tier"), int(row.get("amount", 0))
-        legacy_default = _LEGACY_PROPERTY_BASE.get(cat, _LEGACY_PROPERTY_BASE["rent"]) * PROPERTY_ZONE_MULT.get(zone, 1)
-        new_default = PROPERTY_BASE.get(cat, PROPERTY_BASE["rent"]) * PROPERTY_ZONE_MULT.get(zone, 1)
+        legacy_default = _LEGACY_PROPERTY_BASE.get(cat, _LEGACY_PROPERTY_BASE["rent"]) * _V2_ZONE_MULT.get(zone, 1)
+        new_default = _V2_PROPERTY_BASE.get(cat, _V2_PROPERTY_BASE["rent"]) * _V2_ZONE_MULT.get(zone, 1)
         if amount == new_default or amount < legacy_default / 2:
             continue  # already on the new scale
         new_amount = new_default if amount == legacy_default else max(1, int(round(amount / 10)))
@@ -771,9 +762,40 @@ async def migrate_mass_ngn_100(db: AsyncIOMotorDatabase) -> Optional[dict]:
     return report
 
 
+async def migrate_property_fees_v3(db: AsyncIOMotorDatabase) -> Optional[dict]:
+    """One-off (Jun 2026): the 5–12 MASS location table replaces every active property fee row (admin overrides
+    included — the owner approved the new range), FIXA provider fee rows are retired (FIXA is free) and the FIX
+    conversion / welcome values leave the config. Guarded by a `migrations` row."""
+    key = "property_fees_v3_5_12"
+    if await db.migrations.find_one({"key": key}):
+        return None
+    now = _now()
+    report = {"key": key, "applied_at": now, "property_rows": 0, "fixa_rows": 0}
+    res = await db.fee_prices.update_many({"feature_key": "property", "active": True}, {"$set": {"active": False, "effective_to": now}})
+    report["property_rows"] = res.modified_count
+    for zone in ZONE_ORDER:
+        for cat in ("rent", "sale"):
+            await db.fee_prices.insert_one({
+                "id": str(uuid.uuid4()), "feature_key": "property", "category": cat, "zone_tier": zone, "currency": "MASS",
+                "amount": PROPERTY_FEES[zone][cat], "active": True, "effective_from": now, "effective_to": None,
+                "created_by": "system", "note": "5–12 MASS location table (Jun 2026)", "created_at": now,
+            })
+    res2 = await db.fee_prices.update_many({"feature_key": "fixa_provider", "active": True}, {"$set": {"active": False, "effective_to": now, "note": "FIXA is free — retired"}})
+    report["fixa_rows"] = res2.modified_count
+    cfg = await db.app_settings.find_one({"key": "monetization"}, {"_id": 0, "value": 1})
+    if cfg:
+        value = dict(cfg.get("value") or {})
+        conv = {k: v for k, v in (value.get("conversion") or {}).items() if not k.startswith("FIX")}
+        wb = {k: v for k, v in (value.get("welcome_bonus") or {}).items() if k != "FIX"}
+        await db.app_settings.update_one({"key": "monetization"}, {"$set": {"value": {**value, "conversion": conv, "welcome_bonus": wb}, "updated_at": now}})
+    await db.migrations.insert_one(dict(report))
+    return report
+
+
 async def ensure_monetization_indexes(db: AsyncIOMotorDatabase) -> None:
     await ensure_monetization_defaults(db)
     await migrate_mass_ngn_100(db)
+    await migrate_property_fees_v3(db)
     await db.entitlements.create_index([("user_id", ASCENDING), ("feature_key", ASCENDING), ("target_id", ASCENDING)], unique=True, name="entitlement_uniq")
     await db.entitlements.create_index([("target_id", ASCENDING), ("status", ASCENDING)], name="entitlement_target")
     await db.unlock_requests.create_index([("key", ASCENDING)], unique=True, name="unlock_request_key_uniq")
@@ -846,16 +868,6 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
     router = APIRouter(prefix="/api", tags=["monetization"])
     admin = APIRouter(prefix="/api/admin", tags=["monetization-admin"])
 
-    async def require_fix_access(user: dict = Depends(get_current_user)) -> dict:
-        """FIXA gate: FIX > 0, read live from the wallet (never cached). Entry never deducts."""
-        w = await svc.wallet.get_or_create(user["id"], "FIX")
-        bal = int(w["balance"] + w["bonus_balance"])
-        if bal <= 0:
-            raise HTTPException(403, {"code": "FIX_REQUIRED", "message": "FIXA access requires FIX tokens", "balance": bal})
-        user["_fix_balance"] = bal
-        return user
-
-    # ── public config (naira equivalence shown everywhere) ──
     @router.get("/monetization/config")
     async def public_config():
         cfg = await pricing.config()
@@ -869,15 +881,11 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
     # ── quotes & unlocks ──
     @router.get("/unlocks/quote")
     async def get_quote(featureKey: FeatureKey, targetId: str, user: dict = Depends(get_current_user)):
-        if featureKey == "fixa_provider":
-            await require_fix_access(user)
         return await svc.quote(user, featureKey, targetId)
 
     @router.post("/unlocks")
     async def post_unlock(data: UnlockIn, request: Request, user: dict = Depends(get_current_user)):
         key = request.headers.get("Idempotency-Key") or request.headers.get("idempotency-key") or ""
-        if data.featureKey == "fixa_provider":
-            await require_fix_access(user)
         return await svc.unlock(user, data.featureKey, data.targetId, key)
 
     @router.get("/unlocks/status/{key}")
@@ -1047,58 +1055,12 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
             })
         return {"markers": out, "count": len(out), "approx_radius_m": 150, "access": True, "map_time": map_time}
 
-    # ── FIXA (gated) ──
-    @router.get("/fixa/access")
-    async def fixa_access(user: dict = Depends(get_current_user)):
-        w = await svc.wallet.get_or_create(user["id"], "FIX")
-        bal = int(w["balance"] + w["bonus_balance"])
-        return {"allowed": bal > 0, "balance": bal, "currency": "FIX"}
-
-    @router.get("/fixa/providers")
-    async def fixa_providers(
-        q: Optional[str] = None, subcategory: Optional[str] = None, city: Optional[str] = None, verified: Optional[bool] = None,
-        sort: Optional[str] = None, limit: int = 60, user: dict = Depends(require_fix_access),
-    ):
-        query: dict = {"category": "services"}
-        if subcategory:
-            query["subcategory"] = {"$regex": f"^{re.escape(subcategory)}$", "$options": "i"}
-        if city:
-            query["$or"] = [{"city": {"$regex": re.escape(city), "$options": "i"}}, {"location": {"$regex": re.escape(city), "$options": "i"}}]
-        if verified is not None:
-            query["is_fixa_verified"] = verified
-        if q:
-            rx = {"$regex": re.escape(q), "$options": "i"}
-            query["$and"] = [{"$or": [{"name": rx}, {"seller_name": rx}, {"subcategory": rx}, {"tags": rx}, {"provider_specializations": rx}]}]
-        sort_spec = [("is_boosted", -1), ("rating", -1)] if sort != "newest" else [("posted_at", -1)]
-        docs = await db.marketplace.find(query, {"_id": 0}).sort(sort_spec).limit(min(limit, 200)).to_list(200)
-        ents = {e["target_id"] for e in await db.entitlements.find({"user_id": user["id"], "feature_key": "fixa_provider", "status": "active"}, {"_id": 0, "target_id": 1}).to_list(2000)}
-        items = []
-        for d in docs:
-            tier = await pricing.tier_for(d.get("subcategory"), d.get("category"))
-            items.append({**UnlockService.provider_preview(d), "tier": tier, "unlocked": d["id"] in ents or d.get("seller_id") == user["id"]})
-        subs = await db.marketplace.distinct("subcategory", {"category": "services"})
-        return {"items": items, "count": len(items), "subcategories": sorted(s for s in subs if s), "fix_balance": user.get("_fix_balance")}
-
-    @router.get("/fixa/providers/{provider_id}")
-    async def fixa_provider_preview(provider_id: str, user: dict = Depends(require_fix_access)):
-        t = await svc.resolve_target("fixa_provider", provider_id)
-        unlocked = await svc.has_access(user, "fixa_provider", provider_id, t)
-        return {**UnlockService.provider_preview(t.doc), "tier": int(t.category), "zone_tier": t.zone_tier, "unlocked": unlocked, "bio": (t.doc.get("seller_bio") or t.doc.get("description") or "")[:160]}
-
-    @router.get("/fixa/providers/{provider_id}/details")
-    async def fixa_provider_details(provider_id: str, user: dict = Depends(require_fix_access)):
-        t = await svc.resolve_target("fixa_provider", provider_id)
-        if not await svc.has_access(user, "fixa_provider", provider_id, t):
-            q = await svc.quote(user, "fixa_provider", provider_id, log_attempt=False)
-            raise HTTPException(403, {"code": "UNLOCK_REQUIRED", "fee": q["fee"], "fee_ngn": q["fee_ngn"], "currency": "FIX", "balance": q["balance"]})
-        return await svc.details(user, t)
-
     # ── admin: pricing ──
     @admin.get("/pricing")
     async def admin_pricing(_admin=Depends(require_admin)):
         rows = await db.fee_prices.find({"active": True}, {"_id": 0}).sort([("feature_key", 1), ("zone_tier", 1), ("category", 1)]).to_list(200)
         cfg = await pricing.config()
-        return {"prices": rows, "conversion": cfg["conversion"], "zone_multipliers": {"property": PROPERTY_ZONE_MULT, "fixa_provider": PROVIDER_ZONE_MULT}, "bases": {"property": PROPERTY_BASE, "fixa_provider": PROVIDER_TIER_BASE}}
+        return {"prices": rows, "conversion": cfg["conversion"], "table": PROPERTY_FEES, "range": {"min": PROPERTY_FEE_MIN, "max": PROPERTY_FEE_MAX}, "zone_labels": ZONE_LABELS}
 
     @admin.post("/pricing")
     async def admin_set_price(data: PriceIn, admin_user: dict = Depends(require_admin)):
@@ -1131,7 +1093,7 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
 
     @admin.get("/pricing/tiers")
     async def admin_tiers(_admin=Depends(require_admin)):
-        return {"tiers": await pricing.category_tiers(), "bases": PROVIDER_TIER_BASE}
+        return {"tiers": await pricing.category_tiers()}
 
     @admin.put("/pricing/tiers")
     async def admin_set_tiers(data: TiersIn, admin_user: dict = Depends(require_admin)):
@@ -1185,7 +1147,7 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
         by_cat: dict[str, dict] = {}
         by_date: dict[str, dict] = {}
         payers: set[str] = set()
-        tokens_by_cur = {"MASS": 0, "FIX": 0}
+        tokens_by_cur = {"MASS": 0}
         sale = rent = provider = 0
         for t in txs:
             amt = abs(int(t["amount"]))
@@ -1207,7 +1169,7 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
             else:
                 provider += 1
             day = t["created_at"].strftime("%Y-%m-%d") if isinstance(t.get("created_at"), datetime) else str(t.get("created_at"))[:10]
-            dd = by_date.setdefault(day, {"date": day, "unlocks": 0, "MASS": 0, "FIX": 0, "ngn": 0})
+            dd = by_date.setdefault(day, {"date": day, "unlocks": 0, "MASS": 0, "ngn": 0})
             dd["unlocks"] += 1
             dd[cur] = dd.get(cur, 0) + amt
             dd["ngn"] += amt * int(conv.get(f"{cur}_ngn", 10))
@@ -1290,7 +1252,7 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
     async def admin_reconcile(_admin=Depends(require_admin)):
         return await svc.reconcile()
 
-    return router, admin, svc, require_fix_access
+    return router, admin, svc
 
 
 def _parse_date(s: Optional[str], end_of_day: bool = False) -> Optional[datetime]:

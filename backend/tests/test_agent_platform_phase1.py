@@ -450,11 +450,12 @@ class TestRegression:
         r = session.get(f"{BASE_URL}/api/marketplace")
         assert r.status_code == 200
 
-    def test_wallet_dual(self, session, demo_headers):
-        r = session.get(f"{BASE_URL}/api/wallet/dual", headers=demo_headers)
+    def test_wallet_me_is_mass_only(self, session, demo_headers):
+        r = session.get(f"{BASE_URL}/api/wallet/me", headers=demo_headers)
         assert r.status_code == 200
         w = r.json()
-        assert "mass" in w and "fix" in w
+        assert "balance" in w and w.get("currency", "MASS") == "MASS"
+        assert session.get(f"{BASE_URL}/api/wallet/dual", headers=demo_headers).status_code == 404
 
     def test_earn_tasks(self, session, demo_headers):
         r = session.get(f"{BASE_URL}/api/earn/tasks", headers=demo_headers)

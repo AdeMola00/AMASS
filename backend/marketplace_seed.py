@@ -437,7 +437,8 @@ MARKET_ITEMS = [
         "image": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=1200",
         "images": ["https://images.unsplash.com/photo-1560250097-0b93528c311a?w=1200"],
         "vendor": "AKD Studio", "vendor_id": "vendor-akd",
-        "rating": 4.9, "reviews": 54, "location": "Ikoyi, Lagos",
+        "rating": 4.9, "reviews": 54,
+        "seller_name": "Adewale Kayode", "seller_phone": "+2348012345101", "seller_whatsapp": "+2348012345101", "location": "Ikoyi, Lagos",
         "verified": True, "delivery": False, "delivery_days": 30, "popular": True,
     },
     {
@@ -447,7 +448,8 @@ MARKET_ITEMS = [
         "image": "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1200",
         "images": ["https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1200"],
         "vendor": "StructPro", "vendor_id": None,
-        "rating": 4.6, "reviews": 89, "location": "Lagos",
+        "rating": 4.6, "reviews": 89,
+        "seller_name": "StructPro Engineering", "seller_phone": "+2348012345102", "seller_whatsapp": "+2348012345102", "location": "Lagos",
         "verified": True, "delivery": False, "delivery_days": 30,
     },
     {
@@ -457,7 +459,8 @@ MARKET_ITEMS = [
         "image": "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=1200",
         "images": ["https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=1200"],
         "vendor": "AKD Studio", "vendor_id": "vendor-akd",
-        "rating": 4.8, "reviews": 41, "location": "Ikoyi, Lagos",
+        "rating": 4.8, "reviews": 41,
+        "seller_name": "AKD Studio Interiors", "seller_phone": "+2348012345103", "seller_whatsapp": "+2348012345103", "location": "Ikoyi, Lagos",
         "verified": True, "delivery": False, "delivery_days": 21,
     },
     {
@@ -467,7 +470,8 @@ MARKET_ITEMS = [
         "image": "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1200",
         "images": ["https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=1200"],
         "vendor": "AKD Studio", "vendor_id": "vendor-akd",
-        "rating": 4.9, "reviews": 22, "location": "Ikoyi, Lagos",
+        "rating": 4.9, "reviews": 22,
+        "seller_name": "AKD Project Management", "seller_phone": "+2348012345104", "seller_whatsapp": "+2348012345104", "location": "Ikoyi, Lagos",
         "verified": True, "delivery": False, "delivery_days": 90,
     },
     {
@@ -477,7 +481,8 @@ MARKET_ITEMS = [
         "image": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200",
         "images": ["https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200"],
         "vendor": "SurveyPros NG", "vendor_id": None,
-        "rating": 4.7, "reviews": 118, "location": "Lagos",
+        "rating": 4.7, "reviews": 118,
+        "seller_name": "SurveyPros NG", "seller_phone": "+2348012345105", "seller_whatsapp": "+2348012345105", "location": "Lagos",
         "verified": True, "delivery": False, "delivery_days": 10,
     },
 ]

@@ -15,7 +15,7 @@ import { useMoneyRain } from "./MoneyRain";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 /**
- * The ONE paid-action confirmation for MASS (properties) and FIX (FIXA providers).
+ * The ONE paid-action confirmation — MASS for property access (FIXA is free and never comes through here).
  *
  * Rules enforced here (the backend enforces them again):
  *  • Live values only — a fresh quote is fetched every time the sheet opens.
@@ -53,10 +53,8 @@ export function UnlockDialog({
   const keyRef = useRef<string | null>(null);
   const settledRef = useRef(false);
 
-  const isMass = featureKey === "property";
-  const currency = isMass ? "MASS" : "FIX";
-  const accentText = isMass ? colors.massText : colors.fixText;
-  const accentSoft = isMass ? colors.massSoft : colors.fixSoft;
+  const currency = "MASS";
+  const accentSoft = colors.massSoft;
 
   const loadQuote = useCallback(async () => {
     if (!targetId) return;
@@ -147,7 +145,7 @@ export function UnlockDialog({
 
   const fund = () => {
     onClose();
-    setTimeout(() => router.push({ pathname: "/buy-tokens", params: { currency, returnTo: isMass ? `/property/${targetId}` : `/fixa/${targetId}`, unlock: "1" } } as any), 150);
+    setTimeout(() => router.push({ pathname: "/buy-tokens", params: { currency, returnTo: `/property/${targetId}`, unlock: "1" } } as any), 150);
   };
 
   const canAfford = !!quote && quote.can_afford;
@@ -157,10 +155,10 @@ export function UnlockDialog({
     <Sheet visible={visible} onClose={cancel} testID={testID}>
       <View style={styles.head}>
         <View style={[styles.icon, { backgroundColor: accentSoft }]}>
-          {isMass ? <TokenIcon size={30} /> : <Ionicons name="construct" size={24} color={accentText} />}
+          <TokenIcon size={30} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <AppText variant="heroSm">{isMass ? "Unlock this home" : "Unlock this provider"}</AppText>
+          <AppText variant="heroSm">Unlock this home</AppText>
           <AppText variant="bodySm" tone="secondary" numberOfLines={2} testID="unlock-item-label">
             {loading || !quote ? "Checking the live price…" : quote.label}
           </AppText>
@@ -184,7 +182,7 @@ export function UnlockDialog({
                 Fee
               </AppText>
               <View style={styles.feeAmounts}>
-                <AppText variant="h2" color={accentText} tabular testID="unlock-fee">
+                <AppText variant="h2" color={colors.massText} tabular testID="unlock-fee">
                   {fmt(quote.fee)} {currency}
                 </AppText>
                 <AppText variant="h3" tabular testID="unlock-fee-ngn">
@@ -193,7 +191,7 @@ export function UnlockDialog({
               </View>
               <AppText variant="micro" tone="tertiary" tabular testID="unlock-rate">
                 ₦{fmt(quote.token_ngn)} = 1 {currency}
-                {isMass ? ` · Zone ${quote.zone_tier} · ${quote.category === "sale" ? "Sale" : "Rent"}` : ""}
+                {` · Zone ${quote.zone_tier} · ${quote.category === "sale" ? "Sale" : "Rent"}`}
               </AppText>
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -216,7 +214,7 @@ export function UnlockDialog({
             <View style={styles.noteRow}>
               <Ionicons name="information-circle-outline" size={15} color={colors.textTertiary} />
               <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
-                Confirming deducts {fmt(quote.fee)} {currency} (₦{fmt(quote.fee_ngn)}) from your wallet. One-time — this {isMass ? "property" : "provider"} stays unlocked forever. Cancel costs nothing.
+                Confirming deducts {fmt(quote.fee)} {currency} (₦{fmt(quote.fee_ngn)}) from your wallet. One-time — this property stays unlocked forever. Cancel costs nothing.
               </AppText>
             </View>
           ) : (

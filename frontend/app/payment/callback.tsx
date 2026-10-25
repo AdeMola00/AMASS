@@ -46,11 +46,10 @@ export default function PaymentCallback() {
           setDetails(s);
           if (s.status === "paid") {
             setState("success");
-            // Confirmed by the server (status "paid") — only now may anything celebrate. MASS top-ups get the money
-            // rain once per reference on this device (the purchase screen shares the key); FIX keeps confetti.
-            const isMass = s.currency !== "FIX";
-            if (isMass) rainOncePersisted("celebrate", `pay:${ref}`);
-            celebrate({ title: s.credits ? `+${(s.credits + (s.bonus ?? 0)).toLocaleString()} ${s.currency ?? ""}`.trim() : "Paid!", icon: "wallet", tone: isMass ? "mass" : "fix", confetti: !isMass });
+            // Confirmed by the server (status "paid") — only now may anything celebrate: money rain once per
+            // reference on this device (the purchase screen shares the key).
+            rainOncePersisted("celebrate", `pay:${ref}`);
+            celebrate({ title: s.credits ? `+${(s.credits + (s.bonus ?? 0)).toLocaleString()} MASS` : "Paid!", icon: "wallet", tone: "mass", confetti: false });
             await refresh();
             return;
           }

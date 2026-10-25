@@ -1,5 +1,5 @@
 /**
- * Admin · Monetization — zone/tier pricing (MASS & FIX), zone lookup, category tiers,
+ * Admin · Monetization — zone pricing (MASS only; FIXA is free), zone lookup, category tiers,
  * conversion/welcome/top-up config and the unlock revenue report.
  * Every write goes through the audited admin endpoints; the backend validates
  * (sale ≥ rent per zone, ceilings vs. zone medians) and returns 422 with a reason.
@@ -17,18 +17,12 @@ import { radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, BarChart, Button, Card, Chip, EmptyState, Input, Screen, ScreenHeader, Section, Sheet, SkeletonRows, StatTile, Tabs, Toggle, useToast } from "@/src/ui";
 
 type Tab = "prices" | "zones" | "config" | "report";
-type Price = { id: string | null; feature_key: FeatureKey; category: string; zone_tier: string; currency: "MASS" | "FIX"; amount: number; effective_from?: string; created_by?: string; note?: string };
+type Price = { id: string | null; feature_key: FeatureKey; category: string; zone_tier: string; currency: "MASS"; amount: number; effective_from?: string; created_by?: string; note?: string };
 const ZONES = ["A", "B", "C", "D"] as const;
 const ZONE_LABEL: Record<string, string> = { A: "Prime", B: "High", C: "Mid", D: "Standard" };
 const PROP_CATS = [
   { key: "rent", label: "Rent" },
   { key: "sale", label: "Sale" },
-];
-const TIER_CATS = [
-  { key: "1", label: "T1 Everyday" },
-  { key: "2", label: "T2 Skilled" },
-  { key: "3", label: "T3 Project" },
-  { key: "4", label: "T4 Pro" },
 ];
 
 export default function AdminPricing() {
@@ -72,7 +66,7 @@ function PricesTab() {
   const { colors } = useTheme();
   const toast = useToast();
   const [prices, setPrices] = useState<Price[]>([]);
-  const [conversion, setConversion] = useState<{ MASS_ngn: number; FIX_ngn: number }>({ MASS_ngn: 100, FIX_ngn: 10 });
+  const [conversion, setConversion] = useState<{ MASS_ngn: number }>({ MASS_ngn: 100 });
   const [history, setHistory] = useState<Price[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,7 +95,7 @@ function PricesTab() {
   }, [load]);
 
   const find = (fk: FeatureKey, cat: string, zone: string) => prices.find((p) => p.feature_key === fk && p.category === cat && p.zone_tier === zone);
-  const ngn = (p: Price) => p.amount * (p.currency === "FIX" ? conversion.FIX_ngn : conversion.MASS_ngn);
+  const ngn = (p: Price) => p.amount * conversion.MASS_ngn;
 
   const openEdit = (p: Price) => {
     Haptics.selectionAsync().catch(() => {});
@@ -120,7 +114,7 @@ function PricesTab() {
     try {
       await api.adminSetPrice({ featureKey: editing.feature_key, category: editing.category, zoneTier: editing.zone_tier, amount: Math.round(n), note });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      toast.success("Price updated", `${editing.feature_key === "property" ? editing.category : `Tier ${editing.category}`} · Zone ${editing.zone_tier} → ${Math.round(n)} ${editing.currency}`);
+      toast.success("Price updated", `${editing.category} · Zone ${editing.zone_tier} → ${Math.round(n)} MASS`);
       setEditing(null);
       load();
     } catch (e: any) {
@@ -152,11 +146,8 @@ function PricesTab() {
         />
       }
     >
-      <Section title="Property unlocks · MASS" caption={`Zone × category. 1 MASS = ₦${conversion.MASS_ngn}. Sale must be ≥ rent in the same zone.`}>
+      <Section title="Property unlocks · MASS" caption={`Zone × category · 5–12 MASS. 1 MASS = ₦${conversion.MASS_ngn}. Rent/lease must be higher than sale in the same zone. FIXA is free — no provider fees.`}>
         <Grid cats={PROP_CATS} render={(cat, zone) => find("property", cat, zone)} onEdit={openEdit} ngn={ngn} testID="grid-property" />
-      </Section>
-      <Section title="FIXA provider unlocks · FIX" caption={`Zone × provider tier. 1 FIX = ₦${conversion.FIX_ngn}.`}>
-        <Grid cats={TIER_CATS} render={(cat, zone) => find("fixa_provider", cat, zone)} onEdit={openEdit} ngn={ngn} testID="grid-provider" />
       </Section>
       <Section title="Recent changes" caption="Admin edits only — seeds hidden. Full history is kept server-side.">
         {history.length === 0 ? (
@@ -193,7 +184,7 @@ function PricesTab() {
             <AppText variant="bodySm" tone="secondary">
               Current: {editing.amount.toLocaleString()} {editing.currency} (≈ ₦{ngn(editing).toLocaleString()}). New price applies to future unlocks only; past charges are never edited.
             </AppText>
-            <Input label={`New price (${editing.currency})`} value={amount} onChangeText={setAmount} keyboardType="number-pad" helper={amount && Number(amount) > 0 ? `≈ ₦${(Number(amount) * (editing.currency === "FIX" ? conversion.FIX_ngn : conversion.MASS_ngn)).toLocaleString()}` : undefined} error={error} testID="price-amount" />
+            <Input label="New price (MASS)" value={amount} onChangeText={setAmount} keyboardType="number-pad" helper={amount && Number(amount) > 0 ? `≈ ₦${(Number(amount) * (editing.currency === "FIX" ? conversion.FIX_ngn : conversion.MASS_ngn)).toLocaleString()}` : undefined} error={error} testID="price-amount" />
             <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Why is this changing?" testID="price-note" />
             <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
               <Button label="Cancel" variant="secondary" size="lg" onPress={() => setEditing(null)} disabled={saving} style={{ flex: 1 }} testID="price-cancel" />
@@ -241,7 +232,7 @@ function Grid({ cats, render, onEdit, ngn, testID }: { cats: { key: string; labe
             }
             return (
               <Pressable key={c.key} onPress={() => onEdit(p)} style={({ pressed }) => [styles.cell, { backgroundColor: pressed ? colors.surfaceAlt : "transparent" }]} accessibilityRole="button" accessibilityLabel={`Edit ${c.label} zone ${z}: ${p.amount} ${p.currency}`} testID={`price-${p.feature_key}-${p.category}-${z}`}>
-                <AppText variant="title" tabular color={p.currency === "FIX" ? colors.fixText : colors.massText}>
+                <AppText variant="title" tabular color={colors.massText}>
                   {p.amount.toLocaleString()}
                 </AppText>
                 <AppText variant="micro" tone="tertiary" tabular>
@@ -463,9 +454,7 @@ function ConfigTab() {
         setFreeSale(!!c.free_amass_sale);
         setForm({
           MASS_ngn: String(c.conversion?.MASS_ngn ?? 100),
-          FIX_ngn: String(c.conversion?.FIX_ngn ?? 10),
           welcome_MASS: String(c.welcome_bonus?.MASS ?? 0),
-          welcome_FIX: String(c.welcome_bonus?.FIX ?? 0),
           topup_min_ngn: String(c.topup_min_ngn ?? 1000),
           auto_credit_window_hours: String(c.auto_credit_window_hours ?? 24),
           map_markers_per_minute: String(c.map_markers_per_minute ?? 90),
@@ -478,13 +467,13 @@ function ConfigTab() {
   const num = (k: string) => Number(form[k]);
 
   const save = async () => {
-    const vals = ["MASS_ngn", "FIX_ngn", "welcome_MASS", "welcome_FIX", "topup_min_ngn", "auto_credit_window_hours", "map_markers_per_minute"].map(num);
+    const vals = ["MASS_ngn", "welcome_MASS", "topup_min_ngn", "auto_credit_window_hours", "map_markers_per_minute"].map(num);
     if (vals.some((v) => !Number.isFinite(v) || v < 0)) return toast.error("Check the numbers", "All values must be non-negative numbers.");
     setSaving(true);
     try {
       const r = await api.adminSetMonetizationConfig({
-        conversion: { MASS_ngn: num("MASS_ngn"), FIX_ngn: num("FIX_ngn") },
-        welcome_bonus: { MASS: num("welcome_MASS"), FIX: num("welcome_FIX") },
+        conversion: { MASS_ngn: num("MASS_ngn") },
+        welcome_bonus: { MASS: num("welcome_MASS") },
         topup_min_ngn: num("topup_min_ngn"),
         auto_credit_window_hours: num("auto_credit_window_hours"),
         map_markers_per_minute: num("map_markers_per_minute"),
@@ -514,7 +503,6 @@ function ConfigTab() {
         <Card style={{ gap: 12 }}>
           <View style={styles.twoCol}>
             <Input label="1 MASS = ₦" value={form.MASS_ngn} onChangeText={set("MASS_ngn")} keyboardType="number-pad" containerStyle={{ flex: 1 }} testID="cfg-mass-ngn" />
-            <Input label="1 FIX = ₦" value={form.FIX_ngn} onChangeText={set("FIX_ngn")} keyboardType="number-pad" containerStyle={{ flex: 1 }} testID="cfg-fix-ngn" />
           </View>
         </Card>
       </Section>
@@ -522,7 +510,6 @@ function ConfigTab() {
         <Card style={{ gap: 12 }}>
           <View style={styles.twoCol}>
             <Input label="MASS" value={form.welcome_MASS} onChangeText={set("welcome_MASS")} keyboardType="number-pad" containerStyle={{ flex: 1 }} testID="cfg-welcome-mass" />
-            <Input label="FIX" value={form.welcome_FIX} onChangeText={set("welcome_FIX")} keyboardType="number-pad" containerStyle={{ flex: 1 }} testID="cfg-welcome-fix" />
           </View>
         </Card>
       </Section>
@@ -661,7 +648,6 @@ function ReportTab() {
         <View style={{ flexDirection: "row", gap: 8 }}>
           <Chip label="All" selected={fk === ""} onPress={() => setFk("")} testID="report-fk-all" />
           <Chip label="Properties · MASS" selected={fk === "property"} onPress={() => setFk("property")} tone="mass" testID="report-fk-property" />
-          <Chip label="FIXA · FIX" selected={fk === "fixa_provider"} onPress={() => setFk("fixa_provider")} tone="fix" testID="report-fk-fixa" />
         </View>
       </View>
 
@@ -672,7 +658,7 @@ function ReportTab() {
       ) : (
         <>
           <View style={styles.stats}>
-            <StatTile icon="cash-outline" tone="success" value={compact((rep.naira_value?.MASS ?? 0) + (rep.naira_value?.FIX ?? 0))} label="Revenue (₦)" testID="report-revenue" />
+            <StatTile icon="cash-outline" tone="success" value={compact(rep.naira_value?.MASS ?? 0)} label="Revenue (₦)" testID="report-revenue" />
             <StatTile icon="lock-open-outline" tone="brand" value={rep.paid_unlocks} label="Paid unlocks" testID="report-paid" />
             <StatTile icon="people-outline" tone="info" value={rep.unique_payers} label="Unique payers" />
           </View>
@@ -712,9 +698,9 @@ function ReportTab() {
 
           <Section title="Tokens collected">
             <Card padded={false}>
-              {(["MASS", "FIX"] as const).map((c, i) => (
-                <View key={c} style={[styles.kvRow, i === 0 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
-                  <Badge label={c} tone={c === "FIX" ? "fix" : "mass"} size="xs" />
+              {(["MASS"] as const).map((c) => (
+                <View key={c} style={styles.kvRow}>
+                  <Badge label={c} tone="mass" size="xs" />
                   <AppText variant="bodySm" tone="secondary" style={{ flex: 1, marginLeft: 8 }}>
                     avg {Number(rep.average_per_unlock?.[c] ?? 0).toFixed(0)} / unlock
                   </AppText>

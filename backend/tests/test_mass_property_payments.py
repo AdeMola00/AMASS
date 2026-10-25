@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASE = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 ADMIN = ("demo@amass.africa", "amass2026")
 MASS_NGN = 100
-TABLE = {"A": (80, 120), "B": (40, 60), "C": (20, 30), "D": (10, 15)}  # zone → (rent, sale) in MASS
+TABLE = {"A": (12, 10), "B": (9, 8), "C": (7, 6), "D": (6, 5)}  # zone → (rent, sale) in MASS — 5 → 12, rent above sale
 
 
 def _login(email, password):
