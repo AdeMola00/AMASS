@@ -107,7 +107,17 @@ export default function HomeMap() {
   const lastRegionSaveRef = useRef(0);
   /** Set when a listing is opened from here — on return we refresh pins so an unlock shows immediately. */
   const openedRef = useRef<string | null>(null);
+  /** Last marker tap. On iOS (Apple Maps in Expo Go) the map's own tap recogniser fires for the SAME touch as a
+   *  marker tap — without this guard that map press would close the card the instant it opened. */
+  const markerPressAtRef = useRef(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  /** Map backdrop tap → deselect. Ignored when it's the echo of a marker tap (iOS) or flagged as one (Android). */
+  const onMapPress = (e?: any) => {
+    if (e?.nativeEvent?.action === "marker-press") return;
+    if (Date.now() - markerPressAtRef.current < 500) return;
+    setActiveId(null);
+  };
 
   const performIntroAnimation = useCallback(
     (target: Region) => {
@@ -421,6 +431,7 @@ export default function HomeMap() {
 
   /** Tap a price → select it and, when its label would sit under the preview card or the top chrome, glide it into the clear area. */
   const onMarkerPress = (p: Pin) => {
+    markerPressAtRef.current = Date.now();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     // Money rain exactly once per selection — re-tapping the open pin, panning or zooming never replays it.
     if (activeId !== p.id) rain({ variant: "brief", key: `pin:${p.id}` });
@@ -607,8 +618,9 @@ export default function HomeMap() {
         pitchEnabled
         rotateEnabled
         toolbarEnabled={false}
+        moveOnMarkerPress={false}
         onRegionChangeComplete={onRegionChangeComplete}
-        onPress={() => setActiveId(null)}
+        onPress={onMapPress}
       >
         {clusters.map((c: any) => {
           if (c.properties?.cluster) {
