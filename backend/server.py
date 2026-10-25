@@ -2110,6 +2110,15 @@ app.include_router(register_receipt_routes(db, get_current_user))
 from property_improvement import register_property_improvement_routes
 app.include_router(register_property_improvement_routes(db, get_current_user))
 
+# ─── Property viewings (buyer books a slot with the listing agent after unlocking)
+from viewings import register_viewing_routes, start_viewings
+app.include_router(register_viewing_routes(db, get_current_user))
+
+# ─── Map time (1 MASS per hour on the Find Home map; 0 MASS → no markers). /map/markers runs the same meter.
+from map_time import ensure_map_time_indexes, register_map_time_routes
+_map_time_router, _map_time_meter = register_map_time_routes(db, get_current_user)
+app.include_router(_map_time_router)
+
 # ─── Agent Platform (Phase 1: onboarding, plans, quotas, founding, admin)
 from agent_platform import (
     register_agent_platform_routes,
@@ -2337,6 +2346,8 @@ async def _monetization_startup():
 async def on_startup():
     await _monetization_startup()
     await start_notification_center(db)  # indexes + hourly matcher/digest sweep
+    await start_viewings(db)  # indexes + 24h reminder sweep
+    await ensure_map_time_indexes(db)
     # ─── DB Indexes (idempotent) ─────────────────────────────
     try:
         await db.properties.create_index("id", unique=True)

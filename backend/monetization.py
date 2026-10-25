@@ -57,6 +57,7 @@ DEFAULT_MONETIZATION = {
     ],
     "auto_credit_window_hours": 24,
     "map_markers_per_minute": 90,
+    "map_hour_mass": 1,  # MASS per hour spent on the Find Home map (0 = free map)
     "free_amass_sale": False,
 }
 # Approved Lagos price table (MASS). Base × zone multiplier:
@@ -830,6 +831,7 @@ class ConfigIn(BaseModel):
     topup_bonus_tiers: Optional[list] = None
     auto_credit_window_hours: Optional[int] = None
     map_markers_per_minute: Optional[int] = None
+    map_hour_mass: Optional[int] = Field(default=None, ge=0, le=100)
     free_amass_sale: Optional[bool] = None
 
 
@@ -956,6 +958,11 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
         cfg = await pricing.config()
         if not _marker_bucket.allow(user["id"], int(cfg.get("map_markers_per_minute", 90))):
             raise HTTPException(429, "Too many map requests — slow down a little")
+        # Map time: 0 MASS → no markers; otherwise this call is a heartbeat on the metered hour (1 MASS / hour).
+        from map_time import MapTimeMeter
+        map_time = await MapTimeMeter(db).tick(user, heartbeat=True)
+        if not map_time["access"]:
+            return {"markers": [], "count": 0, "approx_radius_m": 150, "access": False, "map_time": map_time}
         query: dict = {"status": {"$nin": ["sold", "removed", "withdrawn", "unavailable"]}}
         if listing_type:
             query["listing_type"] = {"$in": ["sale", "buy"]} if listing_type in ("sale", "buy") else listing_type
@@ -1038,7 +1045,7 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
                 "views_count": max(int(d.get("views_count") or 0), views.get(d["id"], 0)),
                 "agent_identity_verified": d.get("agent_id") in kyc_agents,
             })
-        return {"markers": out, "count": len(out), "approx_radius_m": 150}
+        return {"markers": out, "count": len(out), "approx_radius_m": 150, "access": True, "map_time": map_time}
 
     # ── FIXA (gated) ──
     @router.get("/fixa/access")

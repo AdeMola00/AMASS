@@ -13,6 +13,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import {
   AppText,
+  Badge,
   Button,
   Card,
   Chip,
@@ -88,6 +89,7 @@ export default function AgentDashboard() {
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [promos, setPromos] = useState<Awaited<ReturnType<typeof api.myPromotions>> | null>(null);
+  const [viewings, setViewings] = useState<{ pending: number; upcoming: number } | null>(null);
   const [quota, setQuota] = useState<{
     plan_id: string;
     plan_name: string;
@@ -100,12 +102,13 @@ export default function AgentDashboard() {
   const load = useCallback(async () => {
     setError(false);
     try {
-      const [d, m, ld, q, pr] = await Promise.all([
+      const [d, m, ld, q, pr, vw] = await Promise.all([
         api.agentDashboard(),
         api.agentManager(),
         api.agentLeads().catch(() => [] as Lead[]),
         api.myQuota().catch(() => null),
         api.myPromotions().catch(() => null),
+        api.myViewings("agent").catch(() => null),
       ]);
       setDashboard(d);
       setSummary(m.summary);
@@ -113,6 +116,7 @@ export default function AgentDashboard() {
       setLeads(ld);
       setQuota(q);
       setPromos(pr);
+      setViewings(vw ? { pending: vw.pending_for_me, upcoming: vw.upcoming.length } : null);
     } catch {
       setError(true);
     }
@@ -224,6 +228,23 @@ export default function AgentDashboard() {
             setFilter("boosted");
             setTab("listings");
           }} />
+
+          {/* Viewing requests from buyers who unlocked a listing */}
+          <Card onPress={() => router.push("/viewings?role=agent" as any)} testID="agent-viewings-entry" tone="soft" style={(viewings?.pending ?? 0) > 0 ? { backgroundColor: colors.warningSoft } : undefined}>
+            <View style={styles.rowCenter}>
+              <View style={[styles.roundIcon, { backgroundColor: colors.surface }]}>
+                <Ionicons name="calendar" size={18} color={(viewings?.pending ?? 0) > 0 ? colors.warning : colors.text} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="title">Viewing requests</AppText>
+                <AppText variant="caption" tone="secondary">
+                  {(viewings?.pending ?? 0) > 0 ? `${viewings!.pending} waiting for your reply · ${viewings!.upcoming} upcoming` : viewings?.upcoming ? `${viewings.upcoming} upcoming · set your viewing hours` : "Buyers book slots after unlocking · set your viewing hours"}
+                </AppText>
+              </View>
+              {(viewings?.pending ?? 0) > 0 ? <Badge label={String(viewings!.pending)} tone="warning" size="xs" /> : null}
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </View>
+          </Card>
 
           {/* Phase D-5: Verification Task Queue entry */}
           <Card onPress={() => router.push("/agent/tasks" as any)} testID="agent-tasks-entry" tone="soft">

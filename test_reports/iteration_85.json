@@ -1,0 +1,32 @@
+{
+  "summary": "Focused retest of the iter84 race fixes plus the Find Home layout. RACE FIX 1 (map time) is verified: 6 parallel GET /map/markers and POST /map/time/tick calls on a fresh 5-MASS user gave exactly 1 charged_now=true, hours_charged=1 in every response and a balance of 4. After rewinding Mongo to used 3590 s with the last tick 60 s ago, 6 parallel calls gave exactly 1 charged_now, hours_charged=2 everywhere and a balance of 3, with exactly 2 map_time debits in the ledger. This held in 5 out of 5 repeated runs, and the sequential flow charges only once. RACE FIX 2 (viewings) is verified: 6 parallel POST /viewings gave exactly one 201 and five 409s in 5 out of 5 runs. The uniq_open_viewing_per_home partial unique index exists. A sequential 201 → 409 → cancel → 201 behaves correctly and all test viewings were cancelled. The requested command (test_map_time + test_viewings + test_viewings_race_iter83) passed 11/11. Adding test_iter84_map_time_public.py gives 17/17 when run serially (-n 0). Run under the default xdist -n 2, test_map_time.py::test_zero_mass_hides_every_marker fails every time. This is a test-isolation problem, not a product bug: the iter84 admin-config test sets the global map_hour_mass to 0 on the other worker, so map time is free while the zero-MASS check runs. Frontend at 390x844, zeromass user: map-gate sits in the bottom band at y 511-758 above the tab bar (top at 770). It does not overlap the locate/zoom buttons (y 196-360). There are no pins, no count pill and no time chip, and Get MASS goes to /buy-tokens?currency=MASS. Demo user: map-time-chip is 44px tall and shows '55 min'. Pins, clusters and the results pill render, and tapping a pin opens the preview card with Unlock · 120 MASS.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "tests (suite isolation)", "issue": "tests/test_iter84_map_time_public.py::admin config test PUTs the global map_hour_mass=0. Under the pytest.ini default (-n 2 --dist loadscope) it runs at the same time as tests/test_map_time.py on the other worker, so test_zero_mass_hides_every_marker sees a free map and fails (3 out of 3 runs). It passes alone and when run serially."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Find Home (demo, preview card open)", "issues": ["The tall preview card (top y=351) runs about 9px under the bottom of fab-zoom-out (y 312-360) and sits just above the card's close button. This is pre-existing and not caused by the gate change."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter85_race_retest.py", "/app/test_reports/pytest/iter85.xml", "/app/test_reports/iter85_gate.png", "/app/test_reports/iter85_demo_map.png", "/app/test_reports/iter85_demo_preview.png"],
+  "action_items": [
+    "Optional: stop the map_hour_mass global-config tests in test_map_time.py and test_iter84_map_time_public.py from running in parallel. Options: put them in a single file, mark them to run serially, or make the zero-MASS test retry or assert hourly_cost==1 first. Otherwise test_zero_mass_hides_every_marker fails under the default -n 2.",
+    "Optional polish: add a little space between the right-side FAB stack and a tall preview card (for example, cap the card's height or hide or shift the zoom buttons while a card is open)."
+  ],
+  "critical_code_review_comments": [
+    "map_time._buy_hour: the claim is a conditional update_one keyed on hours_charged, and only the winner debits. Losing requests re-read the doc and report charged_now=false. If the debit fails, the claim is rolled back. This is correct.",
+    "map_time.tick: concurrent requests each write the same used_seconds and last_tick_at (last write wins, values are about the same). Accepted; it can only under-count a few seconds."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter85_race_retest.py (new)"],
+  "success_rate": {"backend": "100% product (22/22 incl. new iter85 suite; 1 xdist-only test-isolation failure)", "frontend": "100%"},
+  "seed_data_creation": "Created throwaway users test_it85_*@amass-qa.africa (5 MASS and 3 MASS balances, partly spent). Created and cancelled viewings on the demo account. map_hour_mass is still 1 and zeromass is still at 0 MASS. No agent hours were changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the map-time suites with -n 0, or isolate the global-config toggling tests, because pytest.ini forces -n 2. On web, onboarding renders a few seconds after load, so wait for [data-testid=onboarding-signin] before tapping. Pins use testID pin-<id>; the preview card uses preview-card-<id>."
+}

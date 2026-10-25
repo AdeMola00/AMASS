@@ -118,14 +118,18 @@ def test_quote_zone_resolution(admin_tok, props):
 
 
 # ─── Zero / insufficient MASS ───────────────────────────────────────────
-def test_zero_mass_blocked_but_map_usable(admin_tok, props):
+def test_zero_mass_blocked_and_map_markers_hidden(admin_tok, props):
     tok, uid = _new_user()
     _set_balance(admin_tok, uid, tok, "MASS", 0)
+    # 0 MASS → the map shows no homes at all (map time costs 1 MASS / hour).
     m = requests.get(f"{BASE}/api/map/markers", headers=_hdr(tok), params={"limit": 50})
     assert m.status_code == 200
-    mk = m.json()["markers"]
+    assert m.json()["markers"] == [] and m.json()["access"] is False
+    # With MASS the teaser tier comes back: never the street address, gallery or agent.
+    _set_balance(admin_tok, uid, tok, "MASS", 1)
+    mk = requests.get(f"{BASE}/api/map/markers", headers=_hdr(tok), params={"limit": 50}).json()["markers"]
     assert len(mk) > 0
-    # Teaser tier only: never the street address, gallery or agent.
+    assert _balance(tok) == 0  # the hour on the map took the single MASS
     assert {"id", "category", "type", "lat", "lng", "unlocked", "verified", "approx"} <= set(mk[0].keys())
     assert not ({"location", "agent_phone", "agent_email", "agent_name"} & set(mk[0].keys()))
     assert all(x["images"] is None for x in mk if not x["unlocked"])

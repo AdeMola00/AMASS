@@ -20,7 +20,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from "react-native-reanimated";
 import { MapView, Marker, Circle, PROVIDER_DEFAULT } from "@/src/lib/map";
-import { api, Property } from "@/src/lib/api";
+import { api, Property, type Viewing } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { useTheme } from "@/src/theme";
@@ -40,6 +40,8 @@ import { useAuth } from "@/src/contexts/auth";
 import { recordRecentlyViewed } from "@/src/lib/recently-viewed";
 import { track, viaFrom } from "@/src/lib/analytics";
 import { AddToCollectionSheet } from "@/src/components/neighbours/AddToCollectionSheet";
+import { ViewingSheet } from "@/src/components/viewings/ViewingSheet";
+import { fmtDay, fmtTime, statusBadge } from "@/src/lib/viewingTime";
 import type { PropertySocialContext } from "@/src/lib/api";
 
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
@@ -47,7 +49,7 @@ const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 const galleryHeight = (h: number) => Math.min(Math.max(Math.round(h * 0.58), 420), 560);
 
 export default function PropertyDetails() {
-  const { id, unlock, via, rained } = useLocalSearchParams<{ id: string; unlock?: string; via?: string; rained?: string }>();
+  const { id, unlock, via, rained, book } = useLocalSearchParams<{ id: string; unlock?: string; via?: string; rained?: string; book?: string }>();
   const arrivedVia = viaFrom(via);
   const router = useRouter();
   const { rain } = useMoneyRain();
@@ -70,6 +72,9 @@ export default function PropertyDetails() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
+  /** Open viewing (requested / confirmed / rescheduled) for this home — `undefined` until loaded, `null` when none. */
+  const [viewing, setViewing] = useState<Viewing | null | undefined>(undefined);
+  const [bookOpen, setBookOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [social, setSocial] = useState<PropertySocialContext[string] | null>(null);
   const heart = useSharedValue(1);
@@ -123,6 +128,18 @@ export default function PropertyDetails() {
     const t = setTimeout(() => setUnlockOpen(true), 600);
     return () => clearTimeout(t);
   }, [property, unlock]);
+
+  // Viewings: once the home is unlocked (and it isn't mine), load the open viewing for this home, if any.
+  const canBook = !!(property && (property.unlocked || property.is_free_amass_sale) && property.agent_id && user?.id !== property.agent_id);
+  useEffect(() => {
+    if (!canBook || !property) return;
+    api.viewingAvailability(property.agent_id!, property.id)
+      .then((a) => setViewing(a.existing))
+      .catch(() => {});
+  }, [canBook, property?.id, property?.unlocked]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (book && canBook && viewing === null && !bookOpen) setBookOpen(true);
+  }, [book, canBook, viewing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isHot = useMemo(
     () => (property ? (property.views_recent ?? 0) >= 5 || (property.favorites_recent ?? 0) >= 3 : false),
@@ -658,6 +675,26 @@ export default function PropertyDetails() {
                     style={{ marginTop: space[3] }}
                     testID="btn-contact-agent"
                   />
+
+                  {/* Book a viewing — a real slot with the agent, confirmed in-app */}
+                  {canBook ? (
+                    viewing ? (
+                      <Pressable onPress={() => router.push(`/viewings/${viewing.id}` as any)} accessibilityRole="button" style={[styles.viewingRow, { backgroundColor: viewing.status === "confirmed" ? colors.successSoft : colors.warningSoft }]} testID="viewing-status-row">
+                        <Ionicons name="calendar" size={18} color={viewing.status === "confirmed" ? colors.success : colors.warning} />
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <AppText variant="bodyMedium">
+                            Viewing · {fmtDay(viewing.start, { relative: true })}, {fmtTime(viewing.start)}
+                          </AppText>
+                          <AppText variant="caption" tone="secondary">
+                            {statusBadge(viewing.status, viewing.awaiting, "buyer").label} · tap for details
+                          </AppText>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                      </Pressable>
+                    ) : (
+                      <Button label="Book a viewing" variant="secondary" iconLeft="calendar-outline" fullWidth onPress={() => setBookOpen(true)} style={{ marginTop: space[2] }} testID="btn-book-viewing" />
+                    )
+                  ) : null}
                 </>
               )}
             </View>
@@ -746,6 +783,23 @@ export default function PropertyDetails() {
                   testID="book-tour-btn"
                 />
               </>
+            ) : canBook ? (
+              <>
+                <IconButton icon="chatbubbles-outline" label="Chat with agent · free" variant="secondary" size={ctaIcon} iconSize={22} onPress={startChat} testID="cta-chat-icon" />
+                {viewing ? (
+                  <Button
+                    label={`${fmtDay(viewing.start, { relative: true })} · ${fmtTime(viewing.start)}`}
+                    variant="secondary"
+                    size={tight ? "md" : "lg"}
+                    onPress={() => router.push(`/viewings/${viewing.id}` as any)}
+                    style={{ flex: 1 }}
+                    accessibilityLabel={`Your viewing, ${fmtDay(viewing.start, { relative: true })} at ${fmtTime(viewing.start)}. ${statusBadge(viewing.status, viewing.awaiting, "buyer").label}`}
+                    testID="book-tour-btn"
+                  />
+                ) : (
+                  <Button label="Book viewing" variant="primary" size={tight ? "md" : "lg"} iconLeft={tight ? undefined : "calendar"} onPress={() => setBookOpen(true)} style={{ flex: 1 }} testID="book-tour-btn" />
+                )}
+              </>
             ) : (
               <Button
                 label="Chat · Free"
@@ -781,6 +835,20 @@ export default function PropertyDetails() {
         )}
       </View>
       <UnlockDialog visible={unlockOpen} featureKey="property" targetId={property.id} onClose={() => setUnlockOpen(false)} onUnlocked={onUnlocked} />
+      {canBook && property.agent_id ? (
+        <ViewingSheet
+          visible={bookOpen}
+          onClose={() => setBookOpen(false)}
+          mode="request"
+          propertyId={property.id}
+          agentId={property.agent_id}
+          onDone={(v) => {
+            setBookOpen(false);
+            setViewing(v);
+            toast.show({ kind: "success", title: "Viewing requested", body: `${property.agent_name ?? "The agent"} will confirm ${fmtDay(v.start, { relative: true })}, ${fmtTime(v.start)} in the app.`, actionLabel: "View", onAction: () => router.push(`/viewings/${v.id}` as any) });
+          }}
+        />
+      ) : null}
       <AddToCollectionSheet visible={listOpen} onClose={() => setListOpen(false)} targetId={property.id} kind="property" onAdded={() => api.socialContext([property.id]).then((r) => setSocial(r[property.id] ?? null)).catch(() => {})} />
 
       {/* Fullscreen gallery modal */}
@@ -1045,6 +1113,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
   },
   contactRevealed: { marginTop: space[3], gap: 8 },
+  viewingRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.lg, marginTop: space[2] },
   contactLine: {
     flexDirection: "row",
     alignItems: "center",

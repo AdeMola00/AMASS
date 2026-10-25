@@ -65,7 +65,7 @@ CATEGORIES: dict[str, dict[str, Any]] = {
     "receipts": {"label": "Receipts", "caption": "Top-ups, unlocks and payouts", "icon": "receipt", "digest": False, "default_frequency": "immediate"},
     "admin": {"label": "Admin decisions", "caption": "Approvals, rejections and moderation", "icon": "shield-checkmark", "digest": False, "default_frequency": "immediate"},
     "messages": {"label": "Messages", "caption": "Chats with agents, buyers and neighbours", "icon": "chatbubble", "digest": False, "default_frequency": "immediate"},
-    "services": {"label": "Services & projects", "caption": "Inspections, FIXA bookings, renovations", "icon": "construct", "digest": False, "default_frequency": "immediate"},
+    "services": {"label": "Services & projects", "caption": "Viewings, inspections, FIXA bookings, renovations", "icon": "construct", "digest": False, "default_frequency": "immediate"},
 }
 FREQUENCIES = ("immediate", "daily", "weekly")
 
@@ -112,6 +112,12 @@ KIND_CATEGORY: dict[str, str] = {
     "SERVICE_REQUEST_UPDATE": "services",
     "inspection_requested": "services",
     "inspection_scheduled": "services",
+    "VIEWING_REQUESTED": "services",
+    "VIEWING_CONFIRMED": "services",
+    "VIEWING_RESCHEDULED": "services",
+    "VIEWING_DECLINED": "services",
+    "VIEWING_CANCELLED": "services",
+    "VIEWING_REMINDER": "services",
     "report_ready": "services",
     "loan_submitted": "receipts",
     "loan_status_change": "admin",
@@ -344,7 +350,7 @@ async def emit(
 
 def _target_of(meta: dict) -> Optional[tuple[str, Any]]:
     # Most specific first — a chat about a property must collapse per conversation, not per property.
-    for k in ("conversation_id", "offer_id", "connection_id", "collection_id", "post_id", "event_id", "service_request_id", "representation_id", "reference", "ad_id", "saved_search_id", "review_id", "retailer_id", "estate_id", "item_id", "property_id"):
+    for k in ("conversation_id", "viewing_id", "offer_id", "connection_id", "collection_id", "post_id", "event_id", "service_request_id", "representation_id", "reference", "ad_id", "saved_search_id", "review_id", "retailer_id", "estate_id", "item_id", "property_id"):
         if meta.get(k):
             return k, meta[k]
     return None

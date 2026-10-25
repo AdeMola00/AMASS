@@ -3,8 +3,9 @@
  * Front photo (16:9, consistent crop, blurhash placeholder, logo fallback) · price · beds/baths/size ·
  * type + approximate area · trust tags · one clear action.
  *
- * Free tier only: cover photo, price, specs, listing type, general area. "+N photos", the exact
- * address and the agent stay behind the existing MASS unlock flow — this card only calls back.
+ * This card is ALL a user sees before paying: cover photo, price, specs, listing type, general area.
+ * Every tap on a locked card (photo, details or the button) goes to the MASS unlock flow — the listing
+ * page itself opens only once the home is unlocked. The card only calls back; the map decides.
  */
 import React, { useState } from "react";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
@@ -17,7 +18,7 @@ import { radii, space } from "@/src/theme/tokens";
 import { AppText, Button, PressableScale } from "@/src/ui";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { TokenIcon } from "@/src/components/TokenIcon";
-import { compactPrice, fullPrice, hasNudge, kindLabel, listingKind, nudgeText, priceSuffix, specLine, typeLabel, type Pin } from "./pins";
+import { compactPrice, fullPrice, hasNudge, kindColor, kindLabel, listingKind, nudgeText, priceSuffix, specLine, typeLabel, type Pin } from "./pins";
 
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 /** Photo height cap — keeps the card to ≈ 45 % of a 390 × 844 screen so pins stay visible above it. */
@@ -52,7 +53,7 @@ export function PreviewCard({
   const specs = specLine(pin);
   const suffix = priceSuffix(pin.listing_type);
   const kind = listingKind(pin);
-  const kindBg = kind === "sale" ? colors.brand : kind === "rent" ? colors.info : kind === "lease" ? colors.declutter : colors.mass;
+  const kindBg = kindColor(pin); // same Sale green · Rent red · Lease blue as the map pins
   const kindFg = kind === "shortlet" ? "#1A1200" : "#FFFFFF";
   const photoH = Math.min(Math.round((width - space[3] * 2) * 9 / 16), PHOTO_MAX_H);
   const extraPhotos = Math.max((pin.image_count ?? 0) - 1, 0);
@@ -74,7 +75,7 @@ export function PreviewCard({
       testID={`preview-card-${pin.id}`}
     >
       {/* Front photo */}
-      <Pressable onPress={onOpen} accessibilityRole="imagebutton" accessibilityLabel={`${pin.title ?? "Home"} photo. Open listing`} testID={`preview-photo-${pin.id}`}>
+      <Pressable onPress={onOpen} accessibilityRole="imagebutton" accessibilityLabel={`${pin.title ?? "Home"} photo. ${locked ? "Unlock with MASS to open the listing" : "Open listing"}`} testID={`preview-photo-${pin.id}`}>
         <View style={[styles.photo, { height: photoH, backgroundColor: colors.surfaceAlt }]}>
           {pin.cover && imgState !== "failed" ? (
             <Image
@@ -155,7 +156,7 @@ export function PreviewCard({
       </View>
 
       {/* Details */}
-      <Pressable onPress={onOpen} style={styles.body} accessibilityRole="button" accessibilityLabel={`${fullPrice(pin.price)}${suffix}. ${specs.map((s) => s.text).join(", ")}. Open listing`} testID={`preview-open-${pin.id}`}>
+      <Pressable onPress={onOpen} style={styles.body} accessibilityRole="button" accessibilityLabel={`${fullPrice(pin.price)}${suffix}. ${specs.map((s) => s.text).join(", ")}. ${locked ? "Unlock with MASS to open the listing" : "Open listing"}`} testID={`preview-open-${pin.id}`}>
         <View style={styles.priceRow}>
           <AppText tabular style={[styles.price, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
             {fullPrice(pin.price)}

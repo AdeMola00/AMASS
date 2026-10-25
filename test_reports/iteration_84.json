@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 84 tested map time (backend and frontend), the tile-only gate and the viewing hardening. Backend: test_map_time.py and test_viewings.py pass 9/9. The new suite against the public URL (tests/test_iter84_map_time_public.py) passes 5/6. These all work: the 0-MASS gate, the first hour charged once, the ledger row (spend_feature -1, feature_key map_time), GET /map/time being read-only, the hour rolling over, the empty-wallet gate, a top-up buying the next hour, gaps over 150 s accruing nothing, map_hour_mass=0 making the map free (and -1 returning 422), and the availability checks (99:99 → 400, overlap → 400, end before start → 400, adjacent windows → 200). The one failure is a HIGH race: parallel markers/tick calls each charge an hour (6 parallel calls → 5 MASS charged instead of 1). This can happen in the real app: coming back from an unlocked listing fires tick() and load() at the same moment. Regression: test_viewings_race_iter83 now fails every time (6 parallel POST /viewings → six 201s, so six duplicate open requests). Frontend at 390x844: everything requested works. That covers the zero-MASS gate (no pins, gate card, Get MASS → /buy-tokens, no count pill, no empty card, no chip), top-up → back → markers reload, the demo chip (60 min plus info toast), the locked pin's photo, body and primary taps each opening UnlockDialog while the URL stays '/', the unlocked pin's photo opening /property/{id}, the segments, the filter sheet, preview close, and the wallet row 'Map time · 60 min on Find Home · Feature -1'. No deprecated Expo packages detected.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/map/markers + POST /api/map/time/tick (map_time.py MapTimeMeter.tick)", "issue": "Race causes double charging. tick() reads the map_time doc, checks used>=paid, debits, then upserts, with no atomic guard. Concurrent calls each see the hour as used up and each debit 1 MASS. Reproduced: a fresh user with 5 MASS and 6 parallel calls ended at 0 MASS, with charged_now=true on 5 of them. Real-app trigger: index.tsx useFocusEffect fires tick() (line ~405) and the openedRef effect fires load() → /map/markers (line ~442) at the same moment when returning from a listing. If the hour has run out, the user is charged 2 MASS.", "priority": "HIGH"},
+      {"endpoint": "POST /api/viewings", "issue": "Duplicate open requests on concurrent POST. request_viewing does find_one(existing open) and then inserts, with no unique index or lock. 6 parallel identical POSTs → six 201s (tests/test_viewings_race_iter83.py fails 2/2 runs). The viewings collection has no partial unique index on (buyer_id, property_id) for open statuses.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "PUT /api/viewings/availability/me", "issue": "'24:00' is rejected (h>23), so an agent can't set a window that ends at midnight. Acceptable but worth noting."},
+      {"endpoint": "tests (stale)", "issue": "3 tests in test_map_passport_redesign.py fail on data-dependent assertions unrelated to this iteration: demo unlocked ratio >0.5 (now 14/143); the FIXA user has 3 unlocked markers; KeyError 'approx' on the /property detail payload. test_review_map_monetization::test_map_markers_requires_auth_and_shape is the known stale failure."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Return from listing → map (focus)", "issue": "tick() and load() fire concurrently on focus. Together with the backend race above, this can charge 2 MASS for one hour. Fix it on the backend (atomic). Optionally also skip the focus tick when a silent load is about to run.", "affected_testIDs": ["map-time-chip"]}
+    ],
+    "design_issues": [
+      {"screen": "Find Home (0 MASS)", "issues": ["The map-gate card (x 35–355, y ≈278–578) partly covers the fab-zoom-out button (x 330–378, y 312–360)."]},
+      {"screen": "Find Home (with MASS)", "issues": ["map-time-chip is 82x36, below the 44pt minimum touch target, and has no hitSlop.", "On first load the ₦285M price pin sits on top of the fab-zoom-out button."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter84_map_time_public.py", "/app/backend/tests/test_map_time.py", "/app/backend/tests/test_viewings.py", "/app/backend/tests/test_viewings_race_iter83.py", "/app/test_reports/pytest/iter84.xml"],
+  "action_items": [
+    "HIGH: Make MapTimeMeter.tick atomic. Use an optimistic CAS, e.g. find_one_and_update({user_id, hours_charged: hours, paid_seconds: paid}, {$set: {...new values}}), and debit ONLY if the CAS matched. Alternatively, debit with an idempotency reference such as f'map_time:{uid}:{hours+1}' using a unique index on wallet transactions, so concurrent charges for the same hour collapse into one. Re-run tests/test_iter84_map_time_public.py::test_concurrent_first_load_charges_once.",
+    "HIGH: Prevent duplicate open viewing requests. Add a partial unique index on viewings (buyer_id, property_id) with partialFilterExpression status in OPEN_STATUSES and catch DuplicateKeyError → 409. Re-run tests/test_viewings_race_iter83.py.",
+    "LOW: Keep the map-gate card from covering fab-zoom-out (narrower card or more top margin). Add hitSlop or a 44pt min height to map-time-chip.",
+    "LOW: Update the stale assertions in test_map_passport_redesign.py and test_review_map_monetization.py."
+  ],
+  "critical_code_review_comments": [
+    "map_time.py: the check-then-debit-then-upsert pattern is not concurrency-safe (see critical). The unique index on map_time.user_id stops duplicate docs but not double debits.",
+    "map_time.py: a paid hour stays 'unused' forever while the user is away. So a user who bought an hour and then spent the rest of their MASS still sees markers with 0 MASS until the hour is used. This matches rule B, but it means rule A ('0 MASS → no markers') isn't strictly true. Make sure this is the intended product behaviour.",
+    "viewings.py request_viewing: the existing-open check and the agent-slot conflict (confirmed only) are both non-atomic.",
+    "PreviewCard / index.tsx onOpen routing is correct: locked → primaryAction → UnlockDialog, unlocked → openPin."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter84_map_time_public.py (new)"],
+  "success_rate": {"backend": "83% of the new suite (5/6); 9/9 in the E1 suites; 52/57 in the related regression suites (1 real regression, 4 stale)", "frontend": "100% of the requested flows"},
+  "seed_data_creation": "Created test users test_mt84_*@amass-qa.africa with MASS set via admin adjust. zeromass@amass-qa.africa was topped up +1 during the UI test and the hour was auto-charged, so its balance is 0 again. I then set its map_time used_seconds = paid_seconds, so the gate is back (access false). map_hour_mass is confirmed back at 1. Adaeze's hours are restored to Mon–Sun 09:00–17:00 with 60-min slots. The demo user was charged 1 MASS of map time (balance 15509).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the backend suites with '-n 0' or '-n 4' (pytest.ini adds xdist). The web stand-in map Markers do NOT render aria-labels. Find locked/unlocked pin ids from /api/map/markers ('unlocked' field) and tap [data-testid=pin-{id}]. Search 'Palatial' to bring up the unlocked demo pin 7d769d80. The 'All' segment tab isn't found by role name 'All'. After cancelling UnlockDialog, wait about 2.5 s before the next card tap (sheet close animation).",
+  "rca_of_issue": "Map-time double charge: tick() is a read-modify-write with no atomicity. Two requests in flight both read used>=paid and both call wallet.debit. Reproduce: fresh user with 5 MASS, then 6 parallel GET /map/markers + POST /map/time/tick → balance 0. Fix: CAS on the map_time doc (or an idempotent debit keyed by hour number) before or with the debit. Viewing duplicates: same pattern in request_viewing (find_one existing → insert). Fix with a partial unique index."
+}

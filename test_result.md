@@ -1039,3 +1039,26 @@ agent_communication:
       (→ Reanimated sync hook) and Reanimated skipping the fade under reduce-motion (→ ReduceMotion.Never), rain on
       not-found property (→ rain after load + catch), callback repeat (→ rainOncePersisted) — all fixed. Demo account has
       test offers/orders/finance/inspection docs prefixed "TEST" from the agent runs.
+
+  - agent: "main"
+    message: |
+      Iteration 84 (to run) — (1) Viewing hardening after iteration_83: /viewings/{id}/complete → 409 while the slot is in the future;
+      _transition precondition {status, awaiting} → 409 on races; availability hours validated 00:00–23:59 + no same-day overlaps.
+      tests/test_viewings.py 6/6. (2) NEW map time + tile-only gate (user rule): 0 MASS → GET /api/map/markers returns markers:[] +
+      access:false + map_time; with MASS the first markers call / heartbeat buys 60 min of map time for 1 MASS (wallet ledger
+      spend_feature feature_key=map_time), later hours charged automatically while heartbeats keep coming (≤150 s apart);
+      POST /api/map/time/tick (heartbeat, 60 s from the Find Home tab), GET /api/map/time (read-only). Admin config
+      map_hour_mass (0 = free map). Frontend: map-gate card + Get MASS, map-time-chip "N min", toasts + subtle rain on charge,
+      locked PreviewCard photo/details taps open the UnlockDialog instead of /property/[id]. Test users: zeromass@amass-qa.africa /
+      Zero2026!x (0 MASS), demo@amass.africa / amass2026 (15k MASS). tests/test_map_time.py 3/3. Stale pre-existing failure:
+      tests/test_review_map_monetization.py::test_map_markers_requires_auth_and_shape (asserts the old 8-key marker shape).
+
+  - agent: "main"
+    message: |
+      Iteration 84 results → fixes: (1) map-time double charge under parallel heartbeats → MapTimeMeter now CLAIMS the hour with a
+      conditional update keyed on hours_charged before debiting (loser reports the winner's state, charged_now false); the final write
+      only touches used_seconds/last_tick_at. tests/test_map_time.py::test_parallel_heartbeats_buy_the_hour_once (6 parallel → 1 charge,
+      twice). (2) duplicate viewing requests under parallel POST /viewings → partial unique index uniq_open_viewing_per_home
+      (buyer_id, property_id, status in open) + DuplicateKeyError → 409; pre-existing duplicates auto-cancelled at boot.
+      tests/test_viewings_race_iter83.py passes again. (3) Gate card moved into the bottom band (no overlap with the FAB column);
+      map-time-chip 44 pt tall. Request: retest races + gate layout only.

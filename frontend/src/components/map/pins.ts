@@ -59,6 +59,10 @@ export const listingKind = (p: Pick<Pin, "category" | "listing_type">): ListingK
   if (t === "lease") return "lease";
   return p.category === "sale" || t === "buy" || t === "sale" ? "sale" : "rent";
 };
+/** Marker colour per listing kind — fixed so pins read the same on satellite tiles in light and dark mode:
+ *  Sale = green · Rent = red · Lease = blue · Shortlet = gold. */
+export const KIND_COLORS: Record<ListingKind, string> = { sale: "#1F9D55", rent: "#E11B22", lease: "#2563EB", shortlet: "#D4AF37" };
+export const kindColor = (p: Pick<Pin, "category" | "listing_type">) => KIND_COLORS[listingKind(p)];
 
 /** Marker state — exactly one wins: selected › unlocked › saved › viewed › default. */
 export type PinState = "selected" | "unlocked" | "saved" | "viewed" | "default";

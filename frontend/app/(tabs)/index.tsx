@@ -3,12 +3,13 @@
  * satellite map, clusters when zoomed out, and ONE preview card for the home you tap.
  * No list view, no feed — you explore by moving the map.
  *
- * Money rules are unchanged: the map + teaser tier (front photo, price, specs, general area,
- * listing type) are free; "+N photos", the exact address and the agent unlock through
- * `UnlockDialog` (MASS). Locked pins sit at an approximate, server-jittered spot.
+ * Money rules: homes only show on the map while the wallet has MASS — 1 MASS buys 60 minutes on the map
+ * (metered on the server; 0 MASS → no markers). The tapped home's preview card is all a user sees for free;
+ * the listing itself ("+N photos", exact address, agent, description…) opens only after the MASS unlock
+ * through `UnlockDialog`. Locked pins sit at an approximate, server-jittered spot.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, StyleSheet, Pressable, TextInput, Platform, Linking, Animated, ActivityIndicator, Image, useWindowDimensions } from "react-native";
+import { View, StyleSheet, Pressable, TextInput, Platform, Linking, Animated, ActivityIndicator, AppState, Image, useWindowDimensions } from "react-native";
 import Reanimated, { FadeIn, FadeInDown, FadeOut, FadeOutUp } from "react-native-reanimated";
 import { MapView, Marker, PROVIDER_DEFAULT, Region, IS_MAP_LIMITED_IN_EXPO_GO } from "@/src/lib/map";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
@@ -16,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { api, UnlockResult } from "@/src/lib/api";
+import { api, MapTime, UnlockResult } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
 import { useAuth } from "@/src/contexts/auth";
 import { useWallet } from "@/src/contexts/wallet";
@@ -28,10 +29,11 @@ import type { IconName } from "@/src/ui";
 import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
 import { AmassLogo } from "@/src/components/AmassLogo";
+import { TokenIcon } from "@/src/components/TokenIcon";
 import { ClusterPin, PIN_H, PIN_HALF_W, PricePin, clusterSize, pinHalfWidth } from "@/src/components/map/PricePin";
 import { PREVIEW_CARD_H, PreviewCard } from "@/src/components/map/PreviewCard";
 import { INTENTS, IntentSheet, type Intent } from "@/src/components/map/IntentSheet";
-import { hasNudge, nudgeText, pinState, pinVia, toPin, type Pin } from "@/src/components/map/pins";
+import { KIND_COLORS, hasNudge, nudgeText, pinState, pinVia, toPin, type Pin } from "@/src/components/map/pins";
 import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 import { track, trackMarkerImpressions } from "@/src/lib/analytics";
 import { useTabBarOffset } from "@/src/lib/tabBar";
@@ -74,9 +76,14 @@ export default function HomeMap() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ ai_filters?: string }>();
-  const { mass, loading: walletLoading } = useWallet();
+  const { mass, loading: walletLoading, refresh: refreshWallet } = useWallet();
   const massBalance = mass?.spendable ?? 0;
   const noMass = !walletLoading && massBalance <= 0;
+  /** Map time (server-metered): 1 MASS per hour on the map; `access` false → no homes until a top-up. */
+  const [mapTime, setMapTime] = useState<MapTime | null>(null);
+  const mapTimeRef = useRef<MapTime | null>(null);
+  mapTimeRef.current = mapTime;
+  const gated = !!mapTime && !mapTime.access;
 
   const mapRef = useRef<MapView>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
@@ -285,7 +292,36 @@ export default function HomeMap() {
     [reduce, bandFracs, regionFor]
   );
 
+  /** Apply a meter reading: announce a charge (toast + subtle rain), and when the hour ran out on an empty wallet
+   *  clear the homes and point to Get MASS. The wallet badge refreshes after every charge. */
+  const applyMapTime = useCallback(
+    (mt: MapTime) => {
+      const prev = mapTimeRef.current;
+      setMapTime(mt);
+      if (mt.charged_now) {
+        refreshWallet().catch(() => {});
+        track("map_time_charged", { hour: mt.hours_charged, cost: mt.hourly_cost });
+        rain({ variant: "subtle", key: `maptime:${mt.hours_charged}` });
+        toast.show({
+          kind: "success",
+          title: mt.hours_charged <= 1 ? `Map time started · ${mt.hourly_cost} MASS` : `Another hour on the map · ${mt.hourly_cost} MASS`,
+          body: mt.hours_charged <= 1 ? "Homes show for 60 minutes on the map. The next hour is only charged while you're still browsing." : `${mt.balance} MASS left in your wallet.`,
+        });
+      }
+      if (!mt.access) {
+        setPins([]);
+        setActiveId(null);
+        if (prev?.access) {
+          track("map_time_exhausted", { hours: mt.hours_charged });
+          toast.show({ kind: "info", title: "Out of MASS — homes hidden", body: "Top up to keep browsing the map.", actionLabel: "Get MASS", onAction: () => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any) });
+        }
+      }
+    },
+    [refreshWallet, rain, toast, router]
+  );
+
   // Markers: authenticated, lean teaser tier (cover · price · specs · city). Address + agent stay gated.
+  // The same call is a heartbeat on the metered map hour; `access:false` → the wallet is empty, no homes.
   const load = useCallback(
     async (opts?: { fit?: boolean; area?: boolean; silent?: boolean }) => {
       if (!opts?.silent) setLoading(true);
@@ -311,6 +347,12 @@ export default function HomeMap() {
           params.max_lng = r.longitude + r.longitudeDelta * 0.8;
         }
         const res = await api.mapMarkers(params);
+        if (res.map_time) applyMapTime(res.map_time);
+        if (res.access === false) {
+          setPins([]);
+          setShowSearchArea(false);
+          return;
+        }
         const mapped = res.markers.map(toPin);
         setPins(mapped);
         setShowSearchArea(false);
@@ -329,7 +371,51 @@ export default function HomeMap() {
         setLoading(false);
       }
     },
-    [filters, searchTerm, fitToPins, reduce]
+    [filters, searchTerm, fitToPins, reduce, applyMapTime]
+  );
+
+  // Map-time heartbeat: once a minute while this tab is in front AND the app is active. Leaving the tab or
+  // backgrounding the app stops the clock (the server never counts a gap). Coming back with a topped-up wallet
+  // after the homes were hidden → the first heartbeat buys the next hour and the homes reload.
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useFocusEffect(
+    useCallback(() => {
+      let timer: ReturnType<typeof setInterval> | null = null;
+      let stopped = false;
+      const tick = async () => {
+        if (stopped || AppState.currentState !== "active") return;
+        try {
+          const before = mapTimeRef.current;
+          const mt = await api.mapTimeTick();
+          if (stopped) return;
+          applyMapTime(mt);
+          if (mt.access && before && !before.access) loadRef.current({ silent: true });
+        } catch {}
+      };
+      const start = () => {
+        if (timer) return;
+        timer = setInterval(tick, 60_000);
+      };
+      const stop = () => {
+        if (timer) clearInterval(timer);
+        timer = null;
+      };
+      // Only heartbeat on our own once the first markers load has reported the meter (it already ticked).
+      if (mapTimeRef.current) tick();
+      start();
+      const sub = AppState.addEventListener("change", (s) => {
+        if (s === "active") {
+          tick();
+          start();
+        } else stop();
+      });
+      return () => {
+        stopped = true;
+        stop();
+        sub.remove();
+      };
+    }, [applyMapTime])
   );
 
   // First load stays nearby-first; later filter / search changes also fly to the results.
@@ -734,29 +820,51 @@ export default function HomeMap() {
                 accessibilityLabel={it.label}
                 testID={`intent-seg-${it.key}`}
               >
-                <AppText color={active ? colors.onPrimary : colors.textSecondary} numberOfLines={1} style={[styles.segText, active && styles.segTextActive]}>
-                  {it.short}
-                </AppText>
+                <View style={styles.segInner}>
+                  {it.key !== "all" ? <View style={[styles.segDot, { backgroundColor: KIND_COLORS[it.key === "buy" ? "sale" : it.key] }]} /> : null}
+                  <AppText color={active ? colors.onPrimary : colors.textSecondary} numberOfLines={1} style={[styles.segText, active && styles.segTextActive]}>
+                    {it.short}
+                  </AppText>
+                </View>
               </Pressable>
             );
           })}
         </View>
 
-        {greet && user ? (
-          <Reanimated.View entering={reduce ? FadeIn.duration(150) : FadeInDown.delay(400).duration(300)} exiting={reduce ? FadeOut.duration(120) : FadeOutUp.duration(250)} style={styles.greetRow} pointerEvents="none" testID="home-greeting">
-            <View style={[styles.greetPill, shadows.md, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.94)" }]}>
-              <Image source={ILLUSTRATIONS["mascot-wave"]} style={{ width: 30, height: 30 }} resizeMode="contain" />
-              <View>
-                <AppText variant="caption" style={{ fontFamily: "PlusJakartaSans-700" }}>
-                  {greeting()}, {firstName} 👋
-                </AppText>
-                <AppText variant="micro" tone="tertiary">
-                  {locationPermission === "granted" ? "Showing homes around you" : "Showing the busiest market near you"}
-                </AppText>
+        <View style={styles.greetRow} pointerEvents="box-none">
+          {mapTime?.access && mapTime.metered && mapTime.remaining_seconds != null ? (
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                toast.info("Map time", `${mapTime.hourly_cost} MASS buys 60 minutes on the map — the clock only runs while you're here. ${mapTime.balance} MASS in your wallet.`);
+              }}
+              style={[styles.timeChip, shadows.md, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.94)" }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Map time: ${Math.max(1, Math.ceil(mapTime.remaining_seconds / 60))} minutes left this hour. ${mapTime.hourly_cost} MASS per hour.`}
+              testID="map-time-chip"
+            >
+              <Ionicons name="time-outline" size={14} color={colors.massText} />
+              <AppText variant="micro" color={colors.massText} tabular style={{ fontFamily: "PlusJakartaSans-700" }}>
+                {Math.max(1, Math.ceil(mapTime.remaining_seconds / 60))} min
+              </AppText>
+            </Pressable>
+          ) : null}
+          {greet && user ? (
+            <Reanimated.View entering={reduce ? FadeIn.duration(150) : FadeInDown.delay(400).duration(300)} exiting={reduce ? FadeOut.duration(120) : FadeOutUp.duration(250)} pointerEvents="none" testID="home-greeting">
+              <View style={[styles.greetPill, shadows.md, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.94)" }]}>
+                <Image source={ILLUSTRATIONS["mascot-wave"]} style={{ width: 30, height: 30 }} resizeMode="contain" />
+                <View>
+                  <AppText variant="caption" style={{ fontFamily: "PlusJakartaSans-700" }}>
+                    {greeting()}, {firstName} 👋
+                  </AppText>
+                  <AppText variant="micro" tone="tertiary">
+                    {locationPermission === "granted" ? "Showing homes around you" : "Showing the busiest market near you"}
+                  </AppText>
+                </View>
               </View>
-            </View>
-          </Reanimated.View>
-        ) : null}
+            </Reanimated.View>
+          ) : null}
+        </View>
       </View>
 
       {Math.abs(heading) > 2 ? (
@@ -771,8 +879,8 @@ export default function HomeMap() {
         <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" label="Zoom out" />
       </View>
 
-      {/* Centered status: error / empty */}
-      {!loading && (loadError || visiblePins.length === 0) ? (
+      {/* Centered status: error / empty (the 0-MASS gate lives in the bottom band, where the homes would be) */}
+      {gated ? null : !loading && (loadError || visiblePins.length === 0) ? (
         <View style={[styles.mapStatusWrap, { paddingBottom: tabBarH + 40, paddingTop: chromeBottom }]} pointerEvents="box-none">
           {loadError ? (
             <View style={[styles.statusCard, shadows.md, { backgroundColor: colors.bgElevated }]} testID="map-status-error">
@@ -860,7 +968,7 @@ export default function HomeMap() {
             saved={savedIds.has(activePin.id)}
             noMass={noMass}
             reduceMotion={reduce}
-            onOpen={() => openPin(activePin)}
+            onOpen={() => (activePin.unlocked ? openPin(activePin) : primaryAction(activePin))}
             onPrimary={() => primaryAction(activePin)}
             onSave={() => toggleSave(activePin)}
             onClose={() => setActiveId(null)}
@@ -872,6 +980,21 @@ export default function HomeMap() {
               Finding homes…
             </AppText>
           </View>
+        ) : gated ? (
+          <Reanimated.View entering={reduce ? FadeIn.duration(120) : FadeInDown.duration(260)} style={[styles.gateCard, shadows.lg, { backgroundColor: colors.bgElevated, borderColor: isDark ? colors.border : "transparent" }]} testID="map-gate">
+            <View style={styles.gateHead}>
+              <View style={[styles.gateIcon, { backgroundColor: colors.massSoft }]}>
+                <TokenIcon size={24} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="title">Add MASS to see homes on the map</AppText>
+                <AppText variant="caption" tone="secondary">
+                  {`${mapTime?.hours_charged ? "Your map time has run out and your wallet is empty." : "Your wallet is empty."} Homes show for ${mapTime?.hourly_cost ?? 1} MASS per hour — only while you're browsing. Unlocking a home's address, photos and agent is separate.`}
+                </AppText>
+              </View>
+            </View>
+            <Button label="Get MASS" variant="premium" size="md" fullWidth iconLeft="add" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="map-gate-get-mass" />
+          </Reanimated.View>
         ) : !loadError && visiblePins.length > 0 ? (
           <Pressable
             onPress={showExploreWider ? exploreWider : undefined}
@@ -927,10 +1050,16 @@ const styles = StyleSheet.create({
   filterDot: { position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   segment: { flexDirection: "row", height: 50, padding: 4, borderRadius: radii.lg, gap: 4 },
   segItem: { flex: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
+  segInner: { flexDirection: "row", alignItems: "center", gap: 6 },
+  segDot: { width: 8, height: 8, borderRadius: 4 },
   segText: { fontSize: 15.5, lineHeight: 20, letterSpacing: -0.2, fontFamily: "PlusJakartaSans-700" },
   segTextActive: { fontFamily: "PlusJakartaSans-800" },
-  greetRow: { flexDirection: "row", justifyContent: "flex-start" },
+  greetRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   greetPill: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 14, height: 48, borderRadius: radii.pill },
+  timeChip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, height: 44, borderRadius: radii.pill },
+  gateCard: { alignSelf: "stretch", padding: space[4], gap: 14, borderRadius: radii.xl, borderWidth: StyleSheet.hairlineWidth },
+  gateHead: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  gateIcon: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
   compassWrap: { position: "absolute", right: space[3], zIndex: 3 },
   rightActions: { position: "absolute", right: space[3], gap: 10, zIndex: 3 },
   actionBtn: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },

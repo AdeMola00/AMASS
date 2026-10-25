@@ -747,6 +747,39 @@ export type UnlockQuote = {
   is_owner: boolean;
   available: boolean;
 };
+// ─── Property viewings ───
+export type ViewingStatus = "requested" | "confirmed" | "rescheduled" | "declined" | "cancelled" | "completed";
+export type ViewingWindow = { weekday: number; start: string; end: string }; // weekday 0 = Monday · Lagos time "HH:MM"
+export type ViewingHours = { hours: ViewingWindow[]; slot_minutes: number; has_hours: boolean };
+export type ViewingPerson = { id: string; full_name?: string; avatar_url?: string | null; verified?: boolean; is_agent?: boolean } | null;
+export type Viewing = {
+  id: string;
+  property_id: string;
+  property_title?: string | null;
+  property_city?: string | null;
+  property_image?: string | null;
+  agent_id: string;
+  buyer_id: string;
+  start: string;
+  end: string;
+  slot_minutes: number;
+  status: ViewingStatus;
+  awaiting: "agent" | "buyer" | null;
+  note?: string | null;
+  history: { at: string; by: "buyer" | "agent"; action: string; start?: string | null; note?: string | null }[];
+  created_at: string;
+  updated_at: string;
+  buyer: ViewingPerson;
+  agent: ViewingPerson;
+  role: "buyer" | "agent";
+  can_confirm: boolean;
+  can_propose: boolean;
+  can_cancel: boolean;
+  can_decline: boolean;
+  can_complete: boolean;
+};
+export type ViewingAvailability = ViewingHours & { taken: { start: string; end: string }[]; max_days_ahead: number; existing: Viewing | null };
+
 export type UnlockResult = {
   ok: boolean;
   feature_key: FeatureKey;
@@ -803,6 +836,19 @@ export type MapMarker = {
   views_count?: number;
   agent_identity_verified?: boolean;
 };
+export type MapTime = {
+  /** False → the wallet is empty and the paid hour is used up: no markers until the user tops up. */
+  access: boolean;
+  /** False when the admin set the hourly price to 0 (free map). */
+  metered: boolean;
+  remaining_seconds: number | null;
+  hourly_cost: number;
+  balance: number;
+  /** True on the response that just bought the next hour. */
+  charged_now: boolean;
+  hours_charged: number;
+  heartbeat_seconds?: number;
+};
 export type ProviderPreview = {
   id: string;
   display_name: string;
@@ -851,8 +897,11 @@ export const api = {
           .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
           .join("&")
       : "";
-    return req<{ markers: MapMarker[]; count: number; approx_radius_m: number }>(`/map/markers${qs}`);
+    return req<{ markers: MapMarker[]; count: number; approx_radius_m: number; access: boolean; map_time: MapTime }>(`/map/markers${qs}`);
   },
+  /** Map time — 1 MASS buys 60 min on the Find Home map. Heartbeat once a minute while the tab is in front. */
+  mapTimeTick: () => req<MapTime>("/map/time/tick", { method: "POST" }),
+  mapTimeStatus: () => req<MapTime>("/map/time"),
   // FIXA (gated — FIX > 0)
   fixaAccess: () => req<{ allowed: boolean; balance: number; currency: "FIX" }>("/fixa/access"),
   fixaProviders: (params?: Record<string, string | number | boolean | undefined>) => {
@@ -1631,6 +1680,18 @@ export const api = {
   }) =>
     req<any>("/finance/applications", { method: "POST", body: JSON.stringify(data) }),
   getFinanceApplication: (id: string) => req<any>(`/finance/applications/${id}`),
+  // ─── Property viewings (buyer ↔ listing agent) ───
+  viewingAvailability: (agentId: string, propertyId: string) => req<ViewingAvailability>(`/viewings/availability/${agentId}?property_id=${encodeURIComponent(propertyId)}`),
+  myViewingHours: () => req<ViewingHours>("/viewings/availability/me"),
+  setViewingHours: (hours: ViewingWindow[], slotMinutes = 60) => req<ViewingHours>("/viewings/availability/me", { method: "PUT", body: JSON.stringify({ hours, slot_minutes: slotMinutes }) }),
+  requestViewing: (propertyId: string, start: string, note?: string) => req<Viewing>("/viewings", { method: "POST", body: JSON.stringify({ property_id: propertyId, start, note }) }),
+  myViewings: (role: "buyer" | "agent" | "all" = "all") => req<{ upcoming: Viewing[]; past: Viewing[]; pending_for_me: number }>(`/viewings/mine?role=${role}`),
+  getViewing: (id: string) => req<Viewing>(`/viewings/${id}`),
+  confirmViewing: (id: string, note?: string) => req<Viewing>(`/viewings/${id}/confirm`, { method: "POST", body: JSON.stringify({ note }) }),
+  proposeViewingTime: (id: string, start: string, note?: string) => req<Viewing>(`/viewings/${id}/propose`, { method: "POST", body: JSON.stringify({ start, note }) }),
+  declineViewing: (id: string, note?: string) => req<Viewing>(`/viewings/${id}/decline`, { method: "POST", body: JSON.stringify({ note }) }),
+  cancelViewing: (id: string, note?: string) => req<Viewing>(`/viewings/${id}/cancel`, { method: "POST", body: JSON.stringify({ note }) }),
+  completeViewing: (id: string) => req<Viewing>(`/viewings/${id}/complete`, { method: "POST" }),
   createProject: (data: {
     property_id: string;
     inspection_id?: string;
