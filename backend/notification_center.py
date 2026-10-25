@@ -602,6 +602,8 @@ def _criteria_query(c: dict) -> dict:
         query["bedrooms"] = {"$gte": int(c["min_beds"])}
     if c.get("min_baths") is not None:
         query["bathrooms"] = {"$gte": int(c["min_baths"])}
+    if c.get("verified"):
+        query["verified"] = True
     b = c.get("bbox")
     if b and len(b) == 4:
         query["longitude"] = {"$gte": b[0], "$lte": b[2]}

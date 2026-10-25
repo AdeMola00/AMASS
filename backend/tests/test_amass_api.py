@@ -103,9 +103,12 @@ class TestProperties:
         assert r.status_code == 200
         data = r.json()
         assert len(data) >= 1
+        # Anonymous callers get the teaser tier (street address gated → city only), so a hit may have
+        # matched on the hidden street. At least one result must still be explainable from public fields.
+        hays = [f"{p.get('title','')} {p.get('location','')} {p.get('city','')} {p.get('description','')}".lower() for p in data]
+        assert any("lekki" in h for h in hays)
         for p in data:
-            hay = f"{p.get('title','')} {p.get('location','')} {p.get('city','')} {p.get('description','')}".lower()
-            assert "lekki" in hay
+            assert p.get("approx") is True and not p.get("agent_phone")
 
     def test_get_single_property(self, base_url, api_client):
         lst = api_client.get(f"{base_url}/api/properties").json()

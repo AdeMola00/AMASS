@@ -1,20 +1,22 @@
 import React, { useCallback, useMemo, useRef, useState, forwardRef, useImperativeHandle } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, useWindowDimensions } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import type { IconName } from "../ui/icons";
-import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
+import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
 import { radius, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 
 export type FilterState = {
-  listingType?: "buy" | "rent" | "shortlet" | "land" | "commercial";
+  listingType?: "buy" | "rent" | "lease" | "shortlet" | "land" | "commercial";
   minPrice?: number;
   maxPrice?: number;
   bedrooms?: number;
   bathrooms?: number;
   propertyType?: string;
   verifiedOnly?: boolean;
+  /** Only homes friends saved or that sit in one of my shared lists (client-side). */
+  friendsOnly?: boolean;
   tokenFilter?: "free" | "token" | "amass_exclusive";
   recentOnly?: boolean;
   openHouse?: boolean;
@@ -28,6 +30,7 @@ export type FilterSheetRef = {
 const LISTING_TYPES: { key: NonNullable<FilterState["listingType"]>; label: string; icon: IconName }[] = [
   { key: "buy", label: "Buy", icon: "key-outline" },
   { key: "rent", label: "Rent", icon: "home-outline" },
+  { key: "lease", label: "Lease", icon: "business-outline" },
   { key: "shortlet", label: "Short Let", icon: "bed-outline" },
   { key: "land", label: "Land", icon: "map-outline" },
   { key: "commercial", label: "Commercial", icon: "business-outline" },
@@ -69,6 +72,9 @@ export const FilterSheet = forwardRef<
   }));
 
   const snapPoints = useMemo(() => ["85%"], []);
+  // Explicit height so the scroll area is bounded and the Apply footer stays on screen (BottomSheetView alone grows with content on web).
+  const { height: winH } = useWindowDimensions();
+  const sheetBodyH = Math.round(winH * 0.85) - 28;
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -101,15 +107,15 @@ export const FilterSheet = forwardRef<
       handleIndicatorStyle={styles.handle}
       enableDynamicSizing={false}
     >
-      <BottomSheetView style={styles.container}>
+      <BottomSheetView style={[styles.container, { height: sheetBodyH }]}>
         <View style={styles.header}>
           <Text style={styles.title}>Filters</Text>
-          <Pressable onPress={reset} hitSlop={10}>
+          <Pressable onPress={reset} hitSlop={10} testID="reset-filters-btn" accessibilityRole="button">
             <Text style={styles.resetText}>Reset</Text>
           </Pressable>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+        <BottomSheetScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
           {/* Listing type */}
           <Section title="Listing type">
             <View style={styles.chipsGrid}>
@@ -255,21 +261,34 @@ export const FilterSheet = forwardRef<
           </Section>
 
           <Section title="Trust">
-            <Pressable
-              onPress={() => setDraft((d) => ({ ...d, verifiedOnly: !d.verifiedOnly }))}
-              style={[styles.chip, draft.verifiedOnly && styles.chipActive, { alignSelf: "flex-start" }]}
-            >
-              <Ionicons
-                name="shield-checkmark"
-                size={16}
-                color={draft.verifiedOnly ? "#fff" : colors.textSecondary}
-              />
-              <Text style={[styles.chipText, draft.verifiedOnly && styles.chipTextActive]}>
-                Verified only
-              </Text>
-            </Pressable>
+            <View style={styles.chipsGrid}>
+              <Pressable
+                onPress={() => setDraft((d) => ({ ...d, verifiedOnly: !d.verifiedOnly }))}
+                style={[styles.chip, draft.verifiedOnly && styles.chipActive]}
+                testID="filter-verified-only"
+              >
+                <Ionicons
+                  name="shield-checkmark"
+                  size={16}
+                  color={draft.verifiedOnly ? "#fff" : colors.textSecondary}
+                />
+                <Text style={[styles.chipText, draft.verifiedOnly && styles.chipTextActive]}>
+                  Verified only
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setDraft((d) => ({ ...d, friendsOnly: !d.friendsOnly }))}
+                style={[styles.chip, draft.friendsOnly && styles.chipActive]}
+                testID="filter-friends-only"
+              >
+                <Ionicons name="people" size={16} color={draft.friendsOnly ? "#fff" : colors.textSecondary} />
+                <Text style={[styles.chipText, draft.friendsOnly && styles.chipTextActive]}>
+                  Friends&apos; picks
+                </Text>
+              </Pressable>
+            </View>
           </Section>
-        </ScrollView>
+        </BottomSheetScrollView>
 
         <View style={styles.footer}>
           <Pressable style={styles.applyBtn} onPress={apply} testID="apply-filters-btn">

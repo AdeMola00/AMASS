@@ -1330,8 +1330,18 @@ async def annotate_properties(db: AsyncIOMotorDatabase, docs: list[dict], user_i
         p["zone_tier"] = zone
         p["unlocked"] = is_free or p["id"] in ent_ids or (user_id is not None and p.get("agent_id") == user_id)
         if not p["unlocked"]:
-            p.pop("agent_phone", None)
-            p.pop("agent_email", None)
+            # Teaser tier only — same gate as GET /properties/{id} and /map/markers: the front photo,
+            # city-level place and an approximate pin. Gallery, street address and the agent stay paid.
+            gallery = [u for u in (p.get("images") or []) if u]
+            first_image = p.get("image") or (gallery[0] if gallery else None)
+            p["image_count"] = max(len(gallery), 1 if first_image else 0)
+            p["images"] = [first_image] if first_image else []
+            p["location"] = p.get("city") or ""
+            if p.get("latitude") is not None and p.get("longitude") is not None:
+                p["latitude"], p["longitude"] = _jitter(p["id"], p["latitude"], p["longitude"])
+            p["approx"] = True
+            for k in ("agent_phone", "agent_email", "agent_name", "agent_avatar", "street", "address", "directions", "plus_code"):
+                p.pop(k, None)
 
 
 async def property_fee(db: AsyncIOMotorDatabase, prop: dict) -> tuple[int, bool]:

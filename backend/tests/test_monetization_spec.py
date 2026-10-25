@@ -125,7 +125,10 @@ def test_zero_mass_blocked_but_map_usable(admin_tok, props):
     assert m.status_code == 200
     mk = m.json()["markers"]
     assert len(mk) > 0
-    assert set(mk[0].keys()) == {"id", "category", "type", "lat", "lng", "unlocked", "verified", "approx"}
+    # Teaser tier only: never the street address, gallery or agent.
+    assert {"id", "category", "type", "lat", "lng", "unlocked", "verified", "approx"} <= set(mk[0].keys())
+    assert not ({"location", "agent_phone", "agent_email", "agent_name"} & set(mk[0].keys()))
+    assert all(x["images"] is None for x in mk if not x["unlocked"])
     assert all(x["approx"] for x in mk)  # jittered until unlocked
     r = _unlock(tok, "property", props[0]["id"])
     assert r.status_code == 402

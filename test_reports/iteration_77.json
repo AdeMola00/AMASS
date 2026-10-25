@@ -1,0 +1,52 @@
+{
+  "summary": "Frontend-only test of the new map-first Find Home (390x844 web preview) + tab bar rename + property page/buy-tokens regressions. 11 of 12 areas mostly pass. Working: intent sheet (shows on first visit, persists, Buy filters listing_type=sale, All restores), price pins (₦420M, ₦14M/yr; selected = brand red; one preview card, swaps on next pin, closes via preview-close and backdrop), clusters + tap to zoom in, preview card contents, save/unsave (toast with View, saved pin ring+heart, shows in /saved-properties), viewed grey pin, gold unlocked pins, MASS unlock from the card (Cancel charged 0; Confirm charged exactly 80 MASS, 280→200, property opened unlocked with address, pin gold, CTA 'View home'), Search this area (bbox params sent, pill hides), filters (Lease chip, Verified only, Friends' picks, badge count, bookmark button), empty state buttons, tab bar (solid full-width, 5 correct labels, active red, last row visible on Feeds/Market/My Home/My Amass), property page (hero '+3 photos · unlock', red price pill on mini-map, '/year' for lease, unlock dialog), reduced motion (no crash, card shows), /buy-tokens success sheet, /wallet. Bugs found: 1 HIGH data leak, 2 HIGH map bugs where you land on an empty map, and 4 MEDIUM/LOW bugs (list below).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/favorites (server.py:1118-1123)", "issue": "Returns raw property docs with no access gating: street/location, exact latitude/longitude, every image and agent fields for homes the user has NOT unlocked. /saved-properties showed 'Omorinre Johnson Street, Lekki Phase 1' for the locked ₦285M home (c716dc5a), while its property page says 'Lekki · exact address unlocks with MASS'. Anyone can get around the MASS paywall just by saving a home.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "fitToPins (app/(tabs)/index.tsx:213-229)", "issue": "When results are spread across cities, latitudeDelta/longitudeDelta are capped at 1.2, so the map flies to the midpoint between the cities and NONE of the pins are in view. Steps: fresh storage → intent-lease (lease homes are in VI, Abuja and Port Harcourt) → no pins, no clusters, the pill says 'Move the map to find homes' and map-status-empty does not show. Tapping intent-seg-all then leaves the map empty too: fit runs again over all 53 homes across Nigeria and hits the same cap. Same result for Lease + Verified only, and for map-clear-filters-btn after an empty search. The user has to tap fab-locate to get back. Fix: fit to the nearest group of pins (or the densest cluster), or don't cap the delta.", "testID": "intent-lease / intent-seg-all / map-clear-filters-btn", "priority": "HIGH"},
+      {"component": "Empty state (app/(tabs)/index.tsx:698)", "issue": "The condition is `pins.length === 0` but the screen draws visiblePins (friendsOnly filters on the client). Turning on Friends' picks with no matches gives a blank map with no map-status-empty, Clear filters or Search wider. Use visiblePins.length.", "testID": "map-status-empty", "priority": "MEDIUM"},
+      {"component": "saveCurrentSearch (app/(tabs)/index.tsx:491-500)", "issue": "verifiedOnly and friendsOnly are never put into criteria. With only 'Verified only' on, the bookmark (save-search-btn) is shown but tapping it gives the toast 'Nothing to save yet – Add filters or a search term first'.", "testID": "save-search-btn", "priority": "MEDIUM"},
+      {"component": "PreviewCard price (src/components/map/pins.ts:75-78)", "issue": "fullPrice() calls the compact formatNaira, so the card shows '₦420M' instead of the full naira amount '₦420,000,000' that the spec asks for.", "testID": "preview-open-{id}", "priority": "LOW"},
+      {"component": "recenter fallback (app/(tabs)/index.tsx:462)", "issue": "On the web / no-location fallback, animateToRegion(DEFAULT_MARKET_REGION) runs without setting programmaticUntilRef or setShowSearchArea(false), so 'Search this area' appears right after tapping fab-locate.", "testID": "fab-locate / search-this-area", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Save → /saved-properties", "issue": "The saved list shows the exact address of locked homes (see backend critical). This is a paywall leak.", "affected_testIDs": ["preview-save-{id}"]}
+    ],
+    "design_issues": [
+      {"screen": "Find Home map", "issues": [
+        "Pins draw on top of the right-hand FAB column. The ₦285M pin covers the edge of fab-zoom-out (the FAB centre still gets the tap). Put the FAB column above the marker layer or keep markers clear of it.",
+        "inView / 'N homes in view' counts pins under the tab bar and under the open preview card (a pin at y=789 sat behind bottom-nav). Count only the area you can actually see.",
+        "The preview card is about 414px tall (~half of an 844 screen) and hides most pins. Consider a more compact card.",
+        "Cluster testIDs are cluster-{count}, so two clusters of 2 both get 'cluster-2'. Use the cluster id so testIDs are unique.",
+        "explore-wider-pill with none in view zooms out to all of Nigeria (lat 2–11.8). That is a very big jump."
+      ]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_77.json", ".screenshots/i77_*.jpg"],
+  "action_items": [
+    "HIGH: Gate GET /api/favorites (server.py:1118). For homes the user hasn't unlocked, return only the teaser fields (no street/location, no exact lat/lng, only the cover image, no agent fields). This matches /property and /map/markers.",
+    "HIGH: Fix fitToPins (index.tsx:213-229). Results spread across several cities currently land the map on an empty spot (Lease intent, All after a filter, Clear filters). Fit to the nearest group of pins or don't cap the delta.",
+    "MEDIUM: Empty-state condition at index.tsx:698 should use visiblePins.length so Friends' picks with no matches shows map-status-empty.",
+    "MEDIUM: saveCurrentSearch should include verified / friends_only in criteria.",
+    "LOW: fullPrice() on PreviewCard should show the full amount (₦420,000,000), e.g. with toLocaleString.",
+    "LOW: In the recenter() web/no-GPS fallback, set programmaticUntilRef and hide search-this-area.",
+    "LOW: Keep the FAB column above the pins; leave the tab bar and preview card out of the inView count; give clusters unique testIDs."
+  ],
+  "critical_code_review_comments": [
+    "app/(tabs)/index.tsx is 868 lines (>700). Split it into hooks (useMapPins, useIntent, useRegionPersistence) and sub-components (MapChrome, StatusOverlay).",
+    "load() catches every error and only switches on 429. Other failures all say 'Couldn't load the map.', which is OK, but silent reloads swallow errors with nothing logged."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only; 1 backend leak found incidentally)", "frontend": "~85% (12 areas tested; 2 HIGH, 2 MEDIUM, 3 LOW issues)"},
+  "seed_data_creation": "FIXA tester spent ONE unlock: 80 MASS on 29740569-42d4-4b05-b741-4d99f46525de (₦14M/yr Lekki rent), balance 280→200. Demo bought one mock Explorer bundle (+10 MASS). The demo's saved home c716dc5a was saved and then un-saved (net zero).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Intent is stored per browser, so every fresh Playwright context shows intent-sheet ~1.4s after the map loads; dismiss it (intent-all) before tapping tabs or it blocks clicks. Use normal (non-force) clicks on pins and pick ones inside the visible area (y 180–650). Off-screen pins are still in the DOM and a force click lands on whatever sits on top (for example tab-updates). The Market tab shows a sponsored interstitial first; the Skip button becomes active after about 3s. The FIXA tester now has 200 MASS and 29740569 unlocked. Demo (admin) has f2342766 saved.",
+  "rca_of_issue": "Empty map after Lease / Clear filters: load({fit:true}) → fitToPins(list). If no pin is in the current region it computes the bounding box, then clamps the delta to at most 1.2°. Lease homes span lat 4.8 (PH) to 9.06 (Abuja), so the centre ~(6.9, 5.2) with a 1.2° window contains none of them. Repro: fresh storage, log in as demo, tap intent-lease → 0 pins and 'Move the map to find homes'."
+}

@@ -1,17 +1,17 @@
 /**
- * Tabs shell + AMASS floating tab bar.
- * A softly elevated pill (not edge-to-edge) that floats above content: five evenly spaced
- * tabs, the active one marked by an AMASS-red icon on a soft red capsule that slides between
- * tabs, ink label in bold; inactive tabs stay legible in secondary ink. Badges: Updates (unread
- * alerts) and Neighbours (unread chats + requests). Full-height press targets (66pt).
+ * Tabs shell + AMASS bottom navigation.
+ * A solid, full-width bar (never floating over content): five big, evenly spaced tabs —
+ * Find Home · Feeds · Market · My Home · My Amass. The active tab is AMASS-red (filled icon,
+ * bold label) on a soft red capsule that slides between tabs; inactive tabs stay legible in
+ * secondary ink. Badges: Feeds (unread alerts) and My Home (unread chats + requests).
+ * Every tab is a full-height 66 pt press target.
  */
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Pressable, Platform, AppState } from "react-native";
+import { View, StyleSheet, Pressable, AppState, useWindowDimensions } from "react-native";
 import { Tabs, Redirect } from "expo-router";
 import type { BottomTabBarProps } from "expo-router/js-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { useAuth } from "@/src/contexts/auth";
@@ -19,8 +19,8 @@ import { api } from "@/src/lib/api";
 import { subscribeBadges } from "@/src/lib/badgeSignal";
 import { useTheme } from "@/src/theme";
 import { motion, radii } from "@/src/theme/tokens";
-import { AppText } from "@/src/ui";
-import { TAB_BAR_GAP, TAB_BAR_HEIGHT, useTabBarWidth } from "@/src/lib/tabBar";
+import { AppText, useReducedMotion } from "@/src/ui";
+import { TAB_BAR_HEIGHT } from "@/src/lib/tabBar";
 import type { IconName } from "@/src/ui/icons";
 
 export default function TabsLayout() {
@@ -29,17 +29,17 @@ export default function TabsLayout() {
   if (!user) return <Redirect href="/(auth)/login" />;
 
   return (
-    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <FloatingTabBar {...props} />}>
-      <Tabs.Screen name="index" options={{ title: "Home" }} />
-      <Tabs.Screen name="updates" options={{ title: "Updates" }} />
+    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <BottomNav {...props} />}>
+      <Tabs.Screen name="index" options={{ title: "Find Home" }} />
+      <Tabs.Screen name="updates" options={{ title: "Feeds" }} />
       <Tabs.Screen name="marketplace" options={{ title: "Market" }} />
-      <Tabs.Screen name="neighbours" options={{ title: "Neighbours" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
+      <Tabs.Screen name="neighbours" options={{ title: "My Home" }} />
+      <Tabs.Screen name="profile" options={{ title: "My Amass" }} />
     </Tabs>
   );
 }
 
-/** Badge counts — Updates = unread alerts; Neighbours = unread chats + requests waiting on me. Polls every 30 s, on foreground, and whenever a screen signals a change. */
+/** Badge counts — Feeds = unread alerts; My Home = unread chats + requests waiting on me. Polls every 30 s, on foreground, and whenever a screen signals a change. */
 function useBadges(activeIndex: number) {
   const [counts, setCounts] = useState({ updates: 0, neighbours: 0 });
   useEffect(() => {
@@ -62,69 +62,73 @@ function useBadges(activeIndex: number) {
   return counts;
 }
 
-const INDICATOR_W = 56;
-const INDICATOR_H = 34;
+const CAPSULE_W = 60;
+const CAPSULE_H = 32;
+/** Wide screens: the row of tabs stops stretching so icons and labels stay close together. */
+const MAX_ROW_W = 640;
 
 // expo-router 58: custom tabBar receives { state, descriptors, emitter, navigateToTab, insets } (no `navigation`).
-function FloatingTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
+function BottomNav({ state, emitter, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { colors, shadows, isDark } = useTheme();
-  const barW = useTabBarWidth();
+  const { colors, isDark } = useTheme();
+  const { width } = useWindowDimensions();
+  const reduce = useReducedMotion();
+  const rowW = Math.min(width, MAX_ROW_W);
   const count = state.routes.length;
-  const tabW = barW / count;
+  const tabW = rowW / count;
   const x = useSharedValue(0);
   const badges = useBadges(state.index);
 
   useEffect(() => {
-    x.value = withSpring(state.index * tabW + (tabW - INDICATOR_W) / 2, motion.spring);
-  }, [state.index, tabW, x]);
-  const indicator = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+    const target = state.index * tabW + (tabW - CAPSULE_W) / 2;
+    x.value = reduce ? target : withSpring(target, motion.spring);
+  }, [state.index, tabW, x, reduce]);
+  const capsule = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) + TAB_BAR_GAP }]} pointerEvents="box-none" testID="floating-bottom-nav">
-      <View style={[styles.pill, shadows.lg, { width: barW, backgroundColor: isDark ? colors.tabBar : "rgba(255,255,255,0.92)", borderColor: isDark ? colors.border : "rgba(17,17,17,0.06)" }]}>
-        {Platform.OS !== "web" ? <BlurView intensity={isDark ? 50 : 70} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} /> : null}
-        <View style={styles.row} accessibilityRole="tablist">
-          <Animated.View pointerEvents="none" style={[styles.indicator, { backgroundColor: colors.brandSoft }, indicator]} />
-          {state.routes.map((r: any, i: number) => (
-            <TabButton
-              key={r.key}
-              route={r}
-              active={state.index === i}
-              compact={tabW < 66}
-              badge={r.name === "updates" ? badges.updates : r.name === "neighbours" ? badges.neighbours : 0}
-              onPress={() => {
-                const event = emitter.emit({ type: "tabPress", target: r.key, canPreventDefault: true });
-                if (state.index !== i && !event.defaultPrevented) navigateToTab(r.key);
-              }}
-            />
-          ))}
-        </View>
+    <View
+      style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8), backgroundColor: isDark ? colors.bgElevated : "#FFFFFF", borderTopColor: colors.border }, !isDark && styles.barShadow]}
+      testID="bottom-nav"
+    >
+      <View style={[styles.row, { width: rowW }]} accessibilityRole="tablist">
+        <Animated.View pointerEvents="none" style={[styles.capsule, { backgroundColor: colors.brandSoft }, capsule]} />
+        {state.routes.map((r: any, i: number) => (
+          <TabButton
+            key={r.key}
+            route={r}
+            active={state.index === i}
+            compact={tabW < 72}
+            reduce={reduce}
+            badge={r.name === "updates" ? badges.updates : r.name === "neighbours" ? badges.neighbours : 0}
+            onPress={() => {
+              const event = emitter.emit({ type: "tabPress", target: r.key, canPreventDefault: true });
+              if (state.index !== i && !event.defaultPrevented) navigateToTab(r.key);
+            }}
+          />
+        ))}
       </View>
     </View>
   );
 }
 
-function TabButton({ route, active, onPress, badge, compact }: any) {
+function TabButton({ route, active, onPress, badge, compact, reduce }: any) {
   const { colors } = useTheme();
   const cfg = tabConfig(route.name);
   const scale = useSharedValue(1);
   const lift = useSharedValue(active ? -1 : 0);
   useEffect(() => {
-    lift.value = withTiming(active ? -1 : 0, { duration: motion.base });
-  }, [active, lift]);
+    lift.value = reduce ? (active ? -1 : 0) : withTiming(active ? -1 : 0, { duration: motion.base });
+  }, [active, lift, reduce]);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }, { translateY: lift.value }] }));
-  const iconTint = active ? colors.brand : colors.textSecondary;
-  const labelTint = active ? colors.text : colors.textSecondary;
+  const tint = active ? colors.brand : colors.textSecondary;
   return (
     <Pressable
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});
-        scale.value = withSequence(withSpring(0.86, motion.spring), withSpring(1.14, motion.springBounce), withSpring(1, motion.spring));
+        if (!reduce) scale.value = withSequence(withSpring(0.88, motion.spring), withSpring(1.1, motion.springBounce), withSpring(1, motion.spring));
         onPress();
       }}
       style={styles.tab}
-      hitSlop={{ top: 6, bottom: 6 }}
       testID={`tab-${route.name}`}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
@@ -132,16 +136,16 @@ function TabButton({ route, active, onPress, badge, compact }: any) {
       accessibilityLabel={`${cfg.label} tab${badge ? `, ${badge} unread` : ""}`}
     >
       <Animated.View style={[styles.iconWrap, anim]}>
-        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={24} color={iconTint} />
+        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={27} color={tint} />
         {badge > 0 ? (
-          <View style={[styles.badge, { backgroundColor: colors.brand, borderColor: active ? colors.brandSoft : colors.surface }]} testID={`tab-badge-${route.name}`}>
+          <View style={[styles.badge, { backgroundColor: colors.brand, borderColor: active ? colors.brandSoft : colors.bgElevated }]} testID={`tab-badge-${route.name}`}>
             <AppText variant="micro" color="#fff" tabular style={styles.badgeText}>
               {badge > 99 ? "99+" : badge}
             </AppText>
           </View>
         ) : null}
       </Animated.View>
-      <AppText variant="micro" color={labelTint} numberOfLines={1} style={[styles.tabLabel, compact && styles.tabLabelCompact, active && styles.tabLabelActive]}>
+      <AppText color={tint} numberOfLines={1} style={[styles.label, compact && styles.labelCompact, active && styles.labelActive]}>
         {cfg.label}
       </AppText>
     </Pressable>
@@ -151,37 +155,37 @@ function TabButton({ route, active, onPress, badge, compact }: any) {
 function tabConfig(routeName: string): { label: string; icon: IconName; iconActive: IconName } {
   switch (routeName) {
     case "index":
-      return { label: "Home", icon: "home-outline", iconActive: "home" };
+      return { label: "Find Home", icon: "search-outline", iconActive: "search" };
     case "updates":
-      return { label: "Updates", icon: "notifications-outline", iconActive: "notifications" };
+      return { label: "Feeds", icon: "newspaper-outline", iconActive: "newspaper" };
     case "marketplace":
       return { label: "Market", icon: "storefront-outline", iconActive: "storefront" };
     case "neighbours":
-      return { label: "Neighbours", icon: "people-outline", iconActive: "people" };
+      return { label: "My Home", icon: "home-outline", iconActive: "home" };
     case "profile":
-      return { label: "Profile", icon: "person-circle-outline", iconActive: "person-circle" };
+      return { label: "My Amass", icon: "person-circle-outline", iconActive: "person-circle" };
     default:
       return { label: "", icon: "ellipse-outline", iconActive: "ellipse" };
   }
 }
 
 const styles = StyleSheet.create({
-  container: { position: "absolute", left: 0, right: 0, bottom: 0, alignItems: "center" },
-  pill: { height: TAB_BAR_HEIGHT, borderRadius: TAB_BAR_HEIGHT / 2, borderWidth: 1, overflow: "hidden" },
-  row: { flexDirection: "row", flex: 1, alignItems: "center", position: "relative" },
-  indicator: { position: "absolute", left: 0, top: 8, width: INDICATOR_W, height: INDICATOR_H, borderRadius: radii.pill },
-  tab: { flex: 1, height: "100%", alignItems: "center", justifyContent: "center", paddingTop: 2, gap: 3 },
-  iconWrap: { width: INDICATOR_W, height: INDICATOR_H, alignItems: "center", justifyContent: "center" },
-  tabLabel: { fontSize: 12.5, lineHeight: 16, letterSpacing: -0.2, fontFamily: "PlusJakartaSans-600" },
-  tabLabelCompact: { fontSize: 10.5, letterSpacing: -0.45 },
-  tabLabelActive: { fontFamily: "PlusJakartaSans-700" },
+  bar: { position: "absolute", left: 0, right: 0, bottom: 0, alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth },
+  barShadow: { shadowColor: "#111111", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 12 },
+  row: { flexDirection: "row", height: TAB_BAR_HEIGHT, alignItems: "stretch", position: "relative" },
+  capsule: { position: "absolute", left: 0, top: 7, width: CAPSULE_W, height: CAPSULE_H, borderRadius: radii.pill },
+  tab: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 4, gap: 4 },
+  iconWrap: { width: CAPSULE_W, height: CAPSULE_H, alignItems: "center", justifyContent: "center" },
+  label: { fontSize: 13, lineHeight: 17, letterSpacing: -0.2, fontFamily: "PlusJakartaSans-700" },
+  labelCompact: { fontSize: 11.5, letterSpacing: -0.4 },
+  labelActive: { fontFamily: "PlusJakartaSans-800" },
   badge: {
     position: "absolute",
-    top: -3,
-    right: 4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    top: -4,
+    right: 6,
+    minWidth: 19,
+    height: 19,
+    borderRadius: 10,
     paddingHorizontal: 4,
     borderWidth: 2,
     alignItems: "center",

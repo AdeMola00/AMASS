@@ -76,7 +76,7 @@ export default function UpdatesTab() {
         ) : null}
         <View style={{ flex: 1, gap: 1, minWidth: 0 }}>
           <AppText variant="h2" numberOfLines={1} testID="updates-title">
-            Updates
+            Feeds
           </AppText>
           <AppText variant="caption" tone="secondary" numberOfLines={1} testID="updates-subtitle">
             {subtitle}

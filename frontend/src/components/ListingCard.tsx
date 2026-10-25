@@ -115,7 +115,8 @@ export function ListingCard({
             <Ionicons name="location-outline" size={13} color={colors.textTertiary} />
             <AppText variant="caption" tone="tertiary" numberOfLines={1} style={{ flex: 1 }}>
               {property.location}
-              {property.city ? `, ${property.city}` : ""}
+              {property.city && property.city !== property.location ? `, ${property.city}` : ""}
+              {property.unlocked === false ? " · approx." : ""}
             </AppText>
           </View>
           {specs.length ? (

@@ -247,6 +247,8 @@ def register_agent_platform_v2_routes(
     require_auth,
     require_admin,
     finalize_subscription_hook,   # callable(pending_dict) → coroutine
+    optional_viewer,              # FastAPI dependency → viewer user id or None
+    gate_listings,                # async (db, docs, viewer_id) → applies the MASS teaser gate
 ):
     """v2 adds: public profile by slug, badge progress, Apple deletion.
     Also exposes the subscription finalize hook so payments.py webhook can
@@ -306,7 +308,7 @@ def register_agent_platform_v2_routes(
         return await _public_agent(agent)
 
     @router.get("/public/{slug}/listings")
-    async def public_agent_listings(slug: str, limit: int = 30):
+    async def public_agent_listings(slug: str, limit: int = 30, viewer: Optional[str] = Depends(optional_viewer)):
         agent = await db.agent_applications.find_one({"slug": slug}, {"_id": 0}) or (
             await db.agent_applications.find_one({"user_id": slug}, {"_id": 0})
         )
@@ -316,6 +318,8 @@ def register_agent_platform_v2_routes(
             {"agent_id": agent["user_id"], "status": {"$nin": ["archived"]}},
             {"_id": 0},
         ).sort("created_at", -1).to_list(limit)
+        # Public profile — teaser tier unless the viewer has unlocked (or owns) the listing.
+        await gate_listings(db, docs, viewer)
         return docs
 
     @router.get("/badge/progress", response_model=BadgeProgressOut)

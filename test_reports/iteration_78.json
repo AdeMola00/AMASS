@@ -1,0 +1,46 @@
+{
+  "summary": "I retested the iteration_77 fixes at 390x844 on the public URL (demo + FIXA tester) and ran the backend checks. FIX-1 passes: /favorites and /agents/{id}/listings now return the teaser tier for locked homes, for logged-in and anonymous callers, and /saved-properties shows 'Ajah, Ajah' for the locked home and the street only for the unlocked one. FIX-2 passes: Lease intent shows 2 pins, All shows 6, 'Search wider' from an empty area shows 127 homes in view and the cluster sum matches, and 'Clear filters' brings pins back. FIX-4 passes: Verified-only shows the bookmark, the toast says 'Search saved', and the API stores criteria.verified=true. FIX-5 passes (₦285,000,000). FIX-6 passes: search-this-area does not show after fab-locate. FIX-7c passes (cluster-16, cluster-154 and so on are unique). FIX-7d passes (card is 367px tall). FIX-7a passes for the fab buttons and the bottom pill; the greeting chip could not be checked this way because it has pointerEvents=none. FIX-3 could not be checked: the demo user's friend-saved homes are off screen, so the pill shows 'None in view · Explore wider' and the empty card does not appear; tapping it shows the friends' homes. The regression smoke passes (selected red pin, single card, save ring toggles, viewed grey after coming back, tab labels, '+3 photos · unlock', red mini-map price pill). The gold unlocked pin was not re-checked because it never appeared on screen. NEW HIGH: POST /api/saved-searches/{id}/run is not teaser-gated. It returns the street address, every image and agent_name for locked homes.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/saved-searches/{id}/run", "issue": "This endpoint does not go through the paywall gate. Its matches have no 'unlocked' key, and locked homes come back with the street location (e.g. 'Thomas Estate, Ajah' for 397ae03a), all 4 images, agent_name 'Adaeze Okoye' and presumably exact lat/lng. The frontend calls it from src/lib/api.ts:1526, so the leak reaches users. Fix: call `await annotate_properties(db, docs, user['id'])` before `return {\"count\": len(docs), \"matches\": docs}` at saved_searches.py:178.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/favorites (UI)", "issue": "A locked home has location == city, so the saved-properties card reads 'Ajah, Ajah'. The UI should drop the duplicate city when approx=true."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Friends' picks filter (FIX-3)", "issue": "Demo has friend-saved homes that are loaded but off screen, so visiblePins > 0 and map-status-empty plus the 'None of your friends…' copy never show. The pill reads 'None in view · Explore wider', and tapping it shows 3 friend-saved homes. This works, but the friends copy is only reachable when no friend pins are loaded at all.", "affected_testIDs": ["map-status-empty", "explore-wider-pill"]}
+    ],
+    "design_issues": [
+      {"screen": "Find Home map", "issues": [
+        "The fit (Rent intent and explore-wider) can leave a cluster half under the bottom results pill (cluster-57 '2' at y≈680-720 against the pill at 714). The tap at y=694 did nothing. The fit padding should reserve the pill or card height.",
+        "FIX-7b, partly met: in Rent view the pill says '8 homes in view', but only 7 are readable. One pin's anchor is just inside the band while its body is hidden behind the Buy/Rent segment (top-left, y≈100-130). Count by the pin body rather than the anchor, or add the pin height to the top margin.",
+        "In All view, 3-4 pins at the city centre overlap (₦520M / ₦25xM / ₦480M) without clustering, so one price is unreadable. Consider a larger cluster radius at this zoom.",
+        "After explore-wider with Friends on, a pin sits flush against the left edge (x=0, '₦65k/night', partly clipped)."
+      ]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter78_teaser_gate_retest.py", "/app/backend/tests/test_map_first_gating.py", "/app/test_reports/pytest/pytest_iter78.xml"],
+  "action_items": [
+    "HIGH: in saved_searches.py run_saved_search, call annotate_properties(db, docs, user['id']) before returning matches so locked homes get the teaser tier (city location, front photo only, jittered lat/lng, no agent fields). test_iter78_teaser_gate_retest.py::test_saved_search_run_is_teaser_gated currently fails and should pass after the fix.",
+    "MEDIUM: fitToPins and explore-wider padding should reserve the bottom pill and the top chrome plus greeting, so no cluster or pin lands under them; the inView count should leave out pins whose body is hidden under the chrome.",
+    "LOW: on saved-properties and other list cards, do not render 'City, City' when location == city (approx teaser).",
+    "LOW: test_map_first_gating.py::test_public_agent_listings_are_teaser_tier skips because the first locked marker has no agent. Use adaeze.okoye's id so it really runs (my new test does)."
+  ],
+  "critical_code_review_comments": [
+    "saved_searches.py:178 returns raw property docs: this is the last list endpoint that skips the teaser gate.",
+    "index.tsx is 892 lines, over the 700-line guideline. Split the overlays, empty state and pill into components.",
+    "index.tsx:607: marker zIndex values (selected 20, boosted 6, unlocked 4) are higher than overlay zIndex 3/4. On web, hit-testing showed the buttons on top, but native stacking should be checked on a device.",
+    "Saving a search with Friends' picks on drops friendsOnly (criteria only kept verified=true). That is acceptable if intended, but the toast does not say so."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter78_teaser_gate_retest.py (new)"],
+  "success_rate": {"backend": "88% (7/8 incl. existing suite; 1 skip; new saved-search run gate fails)", "frontend": "90% (FIX-1,2,4,5,6,7a,7c,7d + regression pass; FIX-3 not reachable for demo; 7b partial)"},
+  "seed_data_creation": "None kept. I added and removed FIXA favorites (397ae03a, 29740569) and deleted the demo 'verified' saved search afterwards. No unlocks spent.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use EXPO_PUBLIC_BACKEND_URL. Run pytest with -n0 because pytest.ini adds xdist. The saved-search run response key is 'matches'. A fresh context shows intent-sheet; tap intent-all or intent-rent. home-greeting has pointerEvents=none, so elementFromPoint looks through it. Demo's friend-saved homes are off screen in the initial view. FIXA's unlocked 29740569 (₦14M/yr Lekki Ph1) is not in the initial Rent viewport.",
+  "rca_of_issue": "When the teaser gate was added to /favorites and /agents/{id}/listings, saved_searches.run_saved_search was missed. It builds its own Mongo query and returns docs directly. Reproduce: log in as fixa.tester, POST /api/saved-searches {criteria:{verified:true}}, then POST /run. matches[0].location is 'Thomas Estate, Ajah', there are 4 images and agent_name is present. Fix: annotate_properties before returning."
+}

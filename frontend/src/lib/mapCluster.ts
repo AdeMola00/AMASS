@@ -14,8 +14,9 @@ export type PointFeature = Supercluster.PointFeature<{ property: Property }>;
  */
 export function buildIndex(properties: Property[]) {
   const cluster = new Supercluster<{ property: Property }>({
-    radius: 60,
-    maxZoom: 14,
+    // Price pills are ~110–125 px wide — cluster anything closer than that so no label hides another.
+    radius: 112,
+    maxZoom: 16,
     minZoom: 0,
     minPoints: 2,
   });
@@ -30,23 +31,25 @@ export function buildIndex(properties: Property[]) {
   return cluster;
 }
 
-/** Convert a react-native-maps Region → [west, south, east, north] + zoom. */
-export function regionToBBoxZoom(region: Region): { bbox: [number, number, number, number]; zoom: number } {
+/** Convert a react-native-maps Region → [west, south, east, north] + zoom.
+ *  `viewWidth` (px) makes the zoom match what's actually on screen — supercluster's pixel radius
+ *  assumes a 256 px world tile, so we scale by how many pixels the region's longitude span covers. */
+export function regionToBBoxZoom(region: Region, viewWidth = 390): { bbox: [number, number, number, number]; zoom: number } {
   const west = region.longitude - region.longitudeDelta / 2;
   const east = region.longitude + region.longitudeDelta / 2;
   const south = region.latitude - region.latitudeDelta / 2;
   const north = region.latitude + region.latitudeDelta / 2;
-  // Approx zoom from latitudeDelta.
-  const zoom = Math.max(0, Math.min(20, Math.round(Math.log2(360 / Math.max(region.latitudeDelta, 0.0002)))));
+  const zoom = Math.max(0, Math.min(20, Math.round(Math.log2((viewWidth / 256) * (360 / Math.max(region.longitudeDelta, 0.0002))))));
   return { bbox: [west, south, east, north], zoom };
 }
 
 export function getClusters(
   index: Supercluster<{ property: Property }> | null,
-  region: Region
+  region: Region,
+  viewWidth?: number
 ) {
   if (!index) return [];
-  const { bbox, zoom } = regionToBBoxZoom(region);
+  const { bbox, zoom } = regionToBBoxZoom(region, viewWidth);
   try {
     return index.getClusters(bbox, zoom);
   } catch {

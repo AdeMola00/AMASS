@@ -4,7 +4,6 @@
  * or unlock logic; it only formats what the public teaser tier already exposes.
  */
 import type { MapMarker } from "@/src/lib/api";
-import { formatNaira } from "@/src/constants/theme";
 
 export type Pin = MapMarker & {
   friendsSaved: number;
@@ -41,7 +40,7 @@ export function compactPrice(price?: number | null): string {
 }
 const trim = (n: number) => (n >= 100 ? Math.round(n).toString() : n >= 10 ? n.toFixed(n % 1 === 0 ? 0 : 1) : n.toFixed(n % 1 === 0 ? 0 : 2).replace(/\.?0+$/, ""));
 
-/** Suffix for the listing type — "/yr" for rentals, "/night" for shortlets. */
+/** Suffix for the listing type — "/yr" for rentals and leases, "/night" for shortlets. */
 export function priceSuffix(listingType?: string | null): string {
   const t = (listingType ?? "").toLowerCase();
   if (t === "rent" || t === "lease") return "/yr";
@@ -49,10 +48,32 @@ export function priceSuffix(listingType?: string | null): string {
   return "";
 }
 
-/** Full price for tiles — "₦145,000,000" or "Price on request". */
+/** "₦2.5M/yr" — the rounded price label a map marker shows. */
+export const markerPrice = (p: Pick<Pin, "price" | "listing_type">) => `${compactPrice(p.price)}${priceSuffix(p.listing_type)}`;
+
+/** Buy · Rent · Lease · Short let — the four ways to take a home. */
+export type ListingKind = "sale" | "rent" | "lease" | "shortlet";
+export const listingKind = (p: Pick<Pin, "category" | "listing_type">): ListingKind => {
+  const t = (p.listing_type ?? "").toLowerCase();
+  if (t === "shortlet") return "shortlet";
+  if (t === "lease") return "lease";
+  return p.category === "sale" || t === "buy" || t === "sale" ? "sale" : "rent";
+};
+
+/** Marker state — exactly one wins: selected › unlocked › saved › viewed › default. */
+export type PinState = "selected" | "unlocked" | "saved" | "viewed" | "default";
+export function pinState(p: Pin, ctx: { active: boolean; saved: boolean; viewed: boolean }): PinState {
+  if (ctx.active) return "selected";
+  if (p.unlocked) return "unlocked";
+  if (ctx.saved) return "saved";
+  if (ctx.viewed) return "viewed";
+  return "default";
+}
+
+/** Full price for cards — "₦145,000,000" or "Price on request". */
 export function fullPrice(price?: number | null): string {
   if (price == null || !Number.isFinite(price) || price <= 0) return "Price on request";
-  return formatNaira(price);
+  return `₦${Math.round(price).toLocaleString()}`;
 }
 
 /** "4 bd · 5 ba · 480 m²" */
@@ -64,6 +85,9 @@ export function specLine(p: Pick<Pin, "bedrooms" | "bathrooms" | "size_sqm">): {
   return out;
 }
 
-export const kindLabel = (p: Pick<Pin, "category" | "listing_type">) => ((p.listing_type ?? "").toLowerCase() === "shortlet" ? "Short let" : p.category === "sale" ? "For sale" : "To rent");
+export const kindLabel = (p: Pick<Pin, "category" | "listing_type">) => {
+  const k = listingKind(p);
+  return k === "shortlet" ? "Short let" : k === "lease" ? "To lease" : k === "sale" ? "For sale" : "To rent";
+};
 
 export const typeLabel = (t?: string | null) => (t ? t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, " ") : "Home");

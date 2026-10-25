@@ -1,54 +1,50 @@
 {
   "app_name": "Amass",
-  "personality": "3 Editorial structure with 6 Glass / Luxe surfaces",
-  "personality_one_liner": "A premium, photo-first real estate map that combines crisp editorial typography with cinematic glassmorphism floating above satellite imagery.",
+  "personality": "1 iOS-Native Clean with 3 Editorial typography",
+  "personality_one_liner": "A premium, map-first real estate discovery experience where properties feel tactile, prices are crystal clear, and the interface recedes to let the homes shine.",
   "color": {
-    "surface": "#F7F6F3",
+    "surface": "#FFFFFF",
     "onSurface": "#111111",
-    "surfaceSecondary": "#EAE8E3",
+    "surfaceSecondary": "#F7F6F3",
     "onSurfaceSecondary": "#111111",
-    "surfaceTertiary": "#DFDDD8",
+    "surfaceTertiary": "#EAE8E3",
     "onSurfaceTertiary": "#111111",
     "surfaceInverse": "#111111",
     "onSurfaceInverse": "#FFFFFF",
     "brand": "#E11B22",
     "brandPrimary": "#E11B22",
     "onBrandPrimary": "#FFFFFF",
-    "brandSecondary": "#C2151D",
-    "onBrandSecondary": "#FFFFFF",
-    "brandTertiary": "#FAD4D5",
-    "onBrandTertiary": "#E11B22",
+    "brandSecondary": "#FCE8E9",
+    "onBrandSecondary": "#E11B22",
+    "brandTertiary": "#FAF5E5",
+    "onBrandTertiary": "#8A6D14",
     "success": "#2E8B57",
     "onSuccess": "#FFFFFF",
     "warning": "#D4AF37",
-    "onWarning": "#111111",
+    "onWarning": "#FFFFFF",
     "error": "#E11B22",
     "onError": "#FFFFFF",
-    "info": "#2B547E",
+    "info": "#4F46E5",
     "onInfo": "#FFFFFF",
     "border": "#EAE8E3",
     "borderStrong": "#111111",
-    "divider": "#DFDDD8",
-    "muted": "#757575",
-    "onBrand": "#FFFFFF",
-    "massGold": "#D4AF37",
-    "fixGreen": "#2E8B57"
+    "divider": "#EAE8E3",
+    "muted": "#5C5C59",
+    "onBrand": "#FFFFFF"
   },
   "typography": {
-    "displayFontFamily": "DM Serif Display",
-    "textFontFamily": "Plus Jakarta Sans",
+    "displayFontFamily": "DMSerifDisplay",
+    "textFontFamily": "PlusJakartaSans",
     "scale": {
       "sm": 12,
       "base": 14,
       "lg": 16,
       "xl": 20,
-      "2xl": 24,
-      "3xl": 32,
-      "4xl": 48
+      "2xl": 24
     }
   },
   "spacing": {
-    "rule": "Handle spacing correctly dont have extra spaces where its not required, handle padding and margin corectly and subtle for buttons and components",
+    "rule": "Generous touch targets and layout padding. Apply safe area correctly so map elements aren't obscured.",
     "xs": 4,
     "sm": 8,
     "md": 12,
@@ -58,32 +54,31 @@
     "3xl": 48
   },
   "radius_tokens": {
-    "sm": 6,
-    "md": 12,
-    "lg": 20,
+    "sm": 10,
+    "md": 14,
+    "lg": 18,
     "xl": 24,
     "pill": 999
   },
-  "shadow_tier": 3,
+  "shadow_tier": "2",
   "navigation": "bottom_tabs",
-  "icon_set": "Ionicons",
+  "icon_set": "Phosphor",
   "glassmorphism": {
     "enabled": "true",
     "do's": [
-      "Use heavily tinted glass (min 70% opacity white/surface) for floating search bars, filter rails, map FABs, and the compact preview tile to maintain high contrast over satellite imagery.",
-      "Apply frosted glass to the bottom sheet handle/header area when over scrolling map.",
-      "Use subtle blur backdrops on the property detail hero buttons (back, heart, share)."
+      "Use glass for floating map controls like 'Search this area' or location buttons to keep the map visible",
+      "Use glass on property page back buttons over the hero image"
     ],
     "dont's": [
-      "Don't use low-opacity blurs over the satellite map; text will become unreadable.",
-      "Don't use glassmorphism on the main content area of the Property Detail screen or dense lists."
+      "Do not blur the property preview card (it should be solid surface)",
+      "Do not blur the bottom tab bar (must be solid per brief)"
     ]
   },
   "platform_libraries": {
     "glass": {
       "ios": "expo-blur",
       "android": "expo-blur",
-      "low_end_android_fallback": "solid surface with Shadow Tier 3"
+      "low_end_android_fallback": "solid surface"
     },
     "image": "expo-image",
     "blur": "expo-blur",
@@ -93,79 +88,47 @@
   },
   "screens": [
     {
-      "name": "Home Map",
-      "purpose": "A highly polished, satellite-only discovery surface focused on proximity, letting users browse distinct picture-rich property markers and quick compact previews without navigating away.",
+      "name": "MapHome",
+      "purpose": "Map-only property discovery home page where users scan prices, explore neighborhoods, and preview listings without switching to a list view.",
       "states": {
-        "loading": "Skeletal layout of floating glass search bar and map FABs over an initial loading map state.",
-        "empty": "No homes in the immediate area: 'Search this area' pill or 'Explore wider' action appears to zoom out.",
-        "error": "Toast overlay with a retry option to fetch map bounds."
+        "loading": "Display a generic map grid placeholder and skeleton top chrome.",
+        "empty": "If no properties exist in the current bounds, display 'No properties found here' floating pill and a 'Clear filters' CTA.",
+        "error": "Failed to load map data. Show 'Retry' floating pill."
       },
-      "layout": "Map background: flex: 1, react-native-maps (satellite provider). Top absolute: Glassmorphic Search Bar (incorporating AI search icon, no balance chips) followed by a horizontal glassmorphic FilterChip rail. Right absolute (centered vertically): Stacked glass FABs (Locate, Compass, Layers). Bottom absolute: 'Explore wider' pill floating above the bottom sheet. Z-index order is critical to keep overlays above the map. Bottom Sheet: @gorhom/bottom-sheet snaps at 15% (header only), 50% (half map visible), 90% (browsing mode). Bottom sheet lists full-width photo-led ListingCards."
+      "layout": "Absolute full-screen map. Top Chrome overlays top safe area. Map Controls sit right and top-center. Preview Card anchors to the bottom above the tab bar. Tab Bar anchors to root bottom."
     },
     {
-      "name": "Property Detail",
-      "purpose": "A deep dive into a selected listing featuring a full-bleed photo gallery, bold pricing, clear spec hierarchy, and distinct transaction CTAs.",
+      "name": "PropertyDetails",
+      "purpose": "Full detail view accessed via the preview card or directly. Contains the MASS unlock flow for additional content.",
       "states": {
-        "loading": "Skeleton UI matching the hero image and typographic structure.",
+        "loading": "Hero image shimmer, skeleton text blocks for specs.",
         "empty": "N/A",
-        "error": "Error fetching property details, with a full-screen retry state."
+        "error": "Error loading property details."
       },
-      "layout": "Top: Full-bleed expo-image carousel with floating glass frosted circular buttons (back, heart, share). Overlapping white 'Sheet' container pulling up from the bottom over the image. Huge bold Price (h1/display size) and inline specs row (Beds, Baths, Sqft). Sticky bottom container: CTA row with Contact (outline) and Tour (filled brandPrimary) or Unlock (MASS gold)."
+      "layout": "Full-bleed hero image gallery at top with transparent header. Sticky primary CTA at the bottom ('Unlock' or 'Contact Agent'). Scrollable body."
     }
   ],
-  "components": {
-    "map_markers": {
-      "base": "Composite layout. Left: 36x36pt circular photo (`expo-image`) with 1pt `surface` border. Right: Overlapping pill (radius `pill`) containing Price text (12pt, weight 700). High contrast drop shadow `Shadow Tier 3` required to separate from satellite background.",
-      "states": {
-        "unlocked": "Photo is clear. Pill uses `surface` background, `onSurface` text.",
-        "locked": "Photo uses `blurRadius={10}`. A MASS gold lock icon is centered on the photo. Price is approximated (e.g. `~ 850k`).",
-        "verified": "Blue check badge overlaps top-right of the photo circle.",
-        "boosted": "Pill has a subtle `brandTertiary` glow or gradient.",
-        "friends_saved": "Small overlapping avatar cluster (initials/photos) at the bottom left of the marker.",
-        "selected": "Scale marker to 1.15x. Z-index to front. Price pill background inverts to `brandPrimary`, text to `onBrandPrimary`.",
-        "cluster": "Circular white/surface badge with count. Tap zooms map bounding box."
-      },
-      "animation": "Appear: scale 0 -> 1 spring. Tap: scale 1 -> 1.15 -> 1.05 spring. Use `react-native-reanimated` with `mass: 1, damping: 15, stiffness: 250`."
-    },
-    "compact_preview_tile": {
-      "layout": "Appears docked above the bottom sheet upon tapping a marker. Glass container (`expo-blur` tint=light, intensity=80, fallback `surface`). Width ~92%, absolute positioned. Row direction: 80x80pt rounded photo on left, content column on right. Content: Price (Base 20pt, 800 weight), Spec row (14pt muted), Address line. Top-right absolute: Save icon button. Bottom-right: Unlock (MASS gold) or Open (brandPrimary) button.",
-      "animation": "Slides up from the bottom / scales up slightly. Bottom sheet handle ducks out of the way to 15% snap if currently higher."
-    },
-    "bottom_sheet_tiles": {
-      "layout": "Zillow-inspired. Full-width photo (16:9 or 4:3) with subtle dark bottom scrim for carousel dots. Below photo: Price (24pt+, 800 weight, Plus Jakarta Sans) + Specs inline (Beds, Baths). Next row: Address. Next row: Amenities/labels. Action Row: 'Contact' (icon) and 'Check availability' / 'Unlock'.",
-      "typography_bump": "Ensure Price is large and bold to establish immediate hierarchy. Reduce margin between Price and Specs, increase margin before Action Row."
-    }
-  },
   "images": {
-    "hero_property_1": {
-      "url": "https://images.unsplash.com/photo-1628744448839-a475cc0e90c3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjByZWFsJTIwZXN0YXRlJTIwZXh0ZXJpb3IlMjBob21lfGVufDB8fHx8MTc5MjgyMjM5NHww&ixlib=rb-4.1.0&q=85",
-      "alt": "white and brown wooden house near green trees under blue sky during daytime"
+    "property_preview_sample": {
+      "url": "https://images.pexels.com/photos/36622005/pexels-photo-36622005.jpeg",
+      "alt": "Modern luxury apartment exterior in Lagos"
     },
-    "hero_property_2": {
-      "url": "https://images.unsplash.com/photo-1706164971309-fb4785fe6ceb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjByZWFsJTIwZXN0YXRlJTIwZXh0ZXJpb3IlMjBob21lfGVufDB8fHx8MTc5MjgyMjM5NHww&ixlib=rb-4.1.0&q=85",
-      "alt": "a modern house with a walkway leading to the front door"
-    },
-    "interior_luxury": {
-      "url": "https://images.pexels.com/photos/8135492/pexels-photo-8135492.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-      "alt": "Spacious modern living room featuring elegant chandeliers, plush sofa, and contemporary decor"
+    "property_hero_sample": {
+      "url": "https://images.unsplash.com/photo-1779487552637-50a9bfe99d11",
+      "alt": "Striking modern architecture with smooth curves and a dark sky"
     }
-  },
-  "haptics": {
-    "map_marker_tap": "impactLight",
-    "compact_preview_open": "selection",
-    "bottom_sheet_snap": "impactMedium",
-    "save_property": "notificationSuccess",
-    "unlock_mass": "impactHeavy"
   },
   "instructions_to_main_agent": [
-    "Strictly adhere to the Amass design system tokens (ink, Amass red, warm stone neutral #F7F6F3). Do not invent a new palette.",
-    "Implement the map as a satellite-only view. Crucial: Apply heavy shadow (Shadow Tier 3) and highly tinted glassmorphism to ALL floating map elements (search bar, filter chips, FABs, markers, preview tile) so they remain legible and distinct over the busy, dark satellite imagery.",
-    "Completely remove the MASS and FIX balance displays from the Home page chrome. Keep the logic intact but do not render them visually on this screen.",
-    "Construct the Map Markers as composite elements: A circular photo disc + an attached price pill. Differentiate 'locked' markers using a blurred photo, lock icon, and an approximated price format (e.g., '~ $900K'). Include a `selected` scale animation using `react-native-reanimated`.",
-    "Build the Compact Preview Tile as a floating glass card that appears on marker tap, docking slightly above the bottom sheet. It must include a left-aligned photo, bold right-aligned price/specs, and a primary CTA (Unlock with MASS / Open).",
-    "Design the Bottom Sheet ('N homes here') property tiles following the Zillow reference: Large leading photo, carousel dots over a bottom scrim, bold typography for the Price/Specs row, and a clear action row at the bottom.",
-    "Typography Bump: As requested, utilize larger, bolder weights (up to 700/800 for Prices and Titles using Plus Jakarta Sans) to create a distinct, scan-friendly visual hierarchy. Use DM Serif Display for major editorial headlines where appropriate.",
-    "Keep the 'Unlock homes with MASS' banner untouched in behavior/revenue logic, merely ensuring it fits seamlessly into the updated visual hierarchy.",
-    "Ensure the application opens with a proximity-first view (~2km radius) and includes a floating 'Explore wider' pill to prompt further discovery."
+    "CRITICAL RULE: Respect the existing Design System colors (e.g., brand #E11B22, gold #D4AF37) and radii exactly. Do not invent a new palette.",
+    "CRITICAL RULE: Typography caps at weight 500 for PlusJakartaSans body. Use size for hierarchy. Use DMSerifDisplay for large prices and hero headlines.",
+    "BLUEPRINT 1 - Marker Pill Spec: Shape: `pill` radius, `xs` vertical/`sm` horizontal padding. Default Sale: `surface` bg, `onSurface` text, `borderStrong` (1px) border, shadow 2. Default Rent/Lease: `surfaceTertiary` bg, `onSurface` text, no border, shadow 1. Selected: `brand` bg, `onBrand` text, scale 1.1x. Viewed: `surfaceSecondary` bg, `muted` text, opacity 0.8. Saved: `surface` bg, `brand` 2px border, leading heart icon. Unlocked: `warning` (gold) bg, `onSurfaceInverse` text. Priority: Selected > Unlocked > Saved > Viewed > Default.",
+    "BLUEPRINT 2 - Cluster Spec: Perfect circular pill (`aspectRatio: 1`), `md` size (~36x36). `brandPrimary` bg, `onBrandPrimary` text displaying count (e.g., '45').",
+    "BLUEPRINT 3 - Preview Card Layout (390px): Width: 358px (16px horizontal margins), absolute bottom above tab bar. Container: `surface` bg, `lg` radius, shadow 3. Image: Top half, 16:9 ratio (approx 200px height), top radius `lg`. Image Overlays: Top-left listing type tag (`brandSecondary` bg, `brandPrimary` text, pill radius); Top-right Heart and Close 'X'; Bottom-right '+12 photos' locked tag (`surfaceInverse` 80% opacity, `onSurfaceInverse` text). Details (16px pad): Price in `2xl` DMSerifDisplay, specs ('3 bd · 2 ba · 1500 sq ft') in `base muted`. Action: Full-width bottom CTA inside details (Unlock=gold/massTertiary bg, View=brandPrimary).",
+    "BLUEPRINT 4 - Top Chrome: Absolute top over map, Safe Area inset. Row 1: Search Bar (flex-1, `surface` bg, `md` radius, `muted` placeholder) + Filter Icon Button (44x44, `surface` bg, `md` radius). Row 2: Buy/Rent/Lease segmented control chips (always visible, `surface` bg, `border` outline).",
+    "BLUEPRINT 5 - Full-width Tab Bar: Solid `surface` bar (NOT floating pill). 5 Tabs: Find Home, Feeds, Market, My Home, My Amass (Title case). Height: 65px + bottom safe area. Active: `brandPrimary` filled icon & label. Inactive: `muted` outlined icon & label. Labels are `sm` weight 500.",
+    "BLUEPRINT 6 - Welcome Intent Sheet: Use @gorhom/bottom-sheet. Shows on first launch. Headline 'What are you looking for?' (DMSerifDisplay). 4 full-width touchable rows: Buy, Rent, Lease, Just browsing.",
+    "BLUEPRINT 7 - Map Status Pills: 'Search this area' pill at top-center under chrome (`surface` bg, shadow 2, `brandPrimary` text). Results count pill at bottom-center when no marker selected (`surface` bg, shadow 2, `onSurface` text).",
+    "BLUEPRINT 8 - Accessibility/Loading: If reduced-motion is true, disable heavy spring animations for bottom sheet. Loading states: Image uses a shimmer effect (`surfaceTertiary` to `surfaceSecondary`) with a centered Amass logo fallback if unavailable.",
+    "BLUEPRINT 9 - Property Page Hero: Full-bleed photo gallery on top, going under a transparent header. Header contains glass-circle Back and Save buttons. Below image: Huge price (DMSerifDisplay), FOR SALE tag, and specs. Full-width red primary CTA sticky at bottom."
   ]
 }

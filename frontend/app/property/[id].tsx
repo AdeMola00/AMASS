@@ -27,8 +27,9 @@ import { useTheme } from "@/src/theme";
 import { gradients, motion, radii, space } from "@/src/theme/tokens";
 import { AppText, Avatar, Badge, Button, Card, EmptyState, FrostedCircle, FrostedLabel, IconButton, PressableScale, Skeleton, UnlockDialog, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
-import { PhotoMarker } from "@/src/components/map/PhotoMarker";
+import { PricePin } from "@/src/components/map/PricePin";
 import { toPin } from "@/src/components/map/pins";
+import { AmassLogo } from "@/src/components/AmassLogo";
 import { PriceText } from "@/src/components/PriceText";
 import { ListingCard } from "@/src/components/ListingCard";
 import { HotFlame } from "@/src/components/HotFlame";
@@ -206,13 +207,14 @@ export default function PropertyDetails() {
   }
 
   const images = property.images?.length ? property.images : [""];
+  const hasPhoto = !!images[0];
   const onGalleryScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / width);
     setGalleryIndex(i);
   };
 
-  const priceSuffix = property.listing_type === "rent" ? "/year" : property.listing_type === "shortlet" ? "/night" : "";
-  const kindLabel = property.listing_type === "shortlet" ? "Short let" : property.listing_type === "rent" || property.listing_type === "lease" ? "To rent" : "For sale";
+  const priceSuffix = property.listing_type === "rent" || property.listing_type === "lease" ? "/year" : property.listing_type === "shortlet" ? "/night" : "";
+  const kindLabel = property.listing_type === "shortlet" ? "Short let" : property.listing_type === "lease" ? "To lease" : property.listing_type === "rent" ? "To rent" : "For sale";
   const accessCost = property.access_cost ?? property.token_cost ?? 0;
   const hasAccess = !!(property.unlocked || property.is_free_amass_sale);
   const ctaBottomPad = Math.max(insets.bottom, 16);
@@ -247,29 +249,40 @@ export default function PropertyDetails() {
     <View style={[styles.container, { backgroundColor: colors.bg }]} testID="property-details">
       <StatusBar barStyle="light-content" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 + insets.bottom }}>
-        {/* Gallery */}
+        {/* Gallery — the front photo leads; locked homes only ever get this one */}
         <View style={{ height: GALLERY_H, backgroundColor: colors.surfaceSunken }}>
-          <Pressable onPress={() => setFullscreen(true)} accessibilityRole="imagebutton" accessibilityLabel="Open photo gallery">
-            <FlatList
-              data={images}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={onGalleryScroll}
-              scrollEventThrottle={16}
-              keyExtractor={(_u, i) => `${i}`}
-              renderItem={({ item }) => (
-                <Image
-                  source={{ uri: item }}
-                  style={{ width, height: GALLERY_H }}
-                  contentFit="cover"
-                  transition={250}
-                  placeholder={{ blurhash: BLUR_HASH }}
-                  accessibilityLabel={`Photo of ${property.title}`}
-                />
-              )}
-            />
-          </Pressable>
+          {hasPhoto ? (
+            <Pressable onPress={() => setFullscreen(true)} accessibilityRole="imagebutton" accessibilityLabel="Open photo gallery">
+              <FlatList
+                data={images}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={onGalleryScroll}
+                scrollEventThrottle={16}
+                keyExtractor={(_u, i) => `${i}`}
+                renderItem={({ item }) => (
+                  <Image
+                    source={{ uri: item }}
+                    style={{ width, height: GALLERY_H }}
+                    contentFit="cover"
+                    contentPosition="center"
+                    transition={250}
+                    placeholder={{ blurhash: BLUR_HASH }}
+                    cachePolicy="memory-disk"
+                    accessibilityLabel={`Photo of ${property.title}`}
+                  />
+                )}
+              />
+            </Pressable>
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: colors.surfaceAlt }]} testID="hero-photo-fallback">
+              <AmassLogo size={56} showWordmark={false} />
+              <AppText variant="bodySm" tone="tertiary">
+                Photos coming soon
+              </AppText>
+            </View>
+          )}
           <LinearGradient colors={["rgba(17,17,17,0.5)", "transparent"]} style={styles.topScrim} pointerEvents="none" />
           <LinearGradient colors={[...gradients.scrim]} style={styles.bottomScrim} pointerEvents="none" />
           <SafeAreaView edges={["top"]} style={styles.topBar} pointerEvents="box-none">
@@ -539,7 +552,7 @@ export default function PropertyDetails() {
               >
                 {!hasAccess ? <Circle center={{ latitude: property.latitude, longitude: property.longitude }} radius={160} fillColor="rgba(232,52,52,0.16)" strokeColor="rgba(232,52,52,0.6)" strokeWidth={1.5} /> : null}
                 <Marker coordinate={{ latitude: property.latitude, longitude: property.longitude }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges>
-                  <PhotoMarker pin={miniPin} active muted={false} />
+                  <PricePin pin={miniPin} state={hasAccess ? "unlocked" : "selected"} />
                 </Marker>
               </MapView>
             </View>

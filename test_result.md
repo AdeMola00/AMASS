@@ -1021,3 +1021,11 @@ agent_communication:
       Iteration 72 — Expo SDK 57 → 58 upgrade (RN 0.88, React 19.3, expo-router 58, RNGH 3.3, reanimated 4.7). TS migrations: FlatList
       header/footer/empty null→undefined, instance ref types, StatusBar prop removals, legacy expo-file-system → File API. Testing agent found
       and fixed the custom tab bar crash (expo-router 58 tabBar props: emitter/navigateToTab instead of navigation). All smoke flows pass on web.
+
+  - agent: "main"
+    message: |
+      Iterations 79–80 — Find Home map layout verification (frontend only). regionFor() fits results into the clear band between the
+      chrome and the pill/card with side margins + aspect-correct deltas (fitToPins + Explore wider); in-view count now derived from DRAWN
+      clusters/pins (per-pin label width); Explore-wider pill at 0-in-view regardless of zoom; cluster tap centres in band; filter sheets
+      (Find Home + Market) got bounded heights so Apply is on screen; Market price inputs minWidth 0. Unused components removed.
+      iteration_80: all fixes pass; remaining LOW items accepted (no re-fit when pins already visible, pins behind FAB column).

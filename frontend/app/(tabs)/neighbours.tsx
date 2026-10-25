@@ -70,10 +70,10 @@ export default function NeighboursTab() {
       <View style={styles.header}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <AppText variant="hero" style={width < 360 ? { fontSize: 26, lineHeight: 32 } : undefined} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} testID="neighbours-title">
-            neighbours
+            my home
           </AppText>
           <AppText variant="bodySm" tone="secondary">
-            Decide together · Know your estate · Find local help
+            Your estate · Friends · Shared lists · Local help
           </AppText>
         </View>
         <View style={{ flexDirection: "row", gap: 6 }}>
@@ -99,7 +99,7 @@ export default function NeighboursTab() {
             <SkeletonCard />
           </>
         ) : error || !data ? (
-          <EmptyState variant="error" title="Couldn't load Neighbours" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load(); }} testID="nb-error" />
+          <EmptyState variant="error" title="Couldn't load My Home" body="Check your connection and try again." actionLabel="Retry" onAction={() => { setLoading(true); load(); }} testID="nb-error" />
         ) : (
           <>
             {/* Quick actions */}

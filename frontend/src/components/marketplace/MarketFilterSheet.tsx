@@ -1,8 +1,8 @@
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, useWindowDimensions } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import type { IconName } from "../../ui/icons";
-import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
+import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
 import { radius, spacing } from "@/src/constants/theme";
 import type { MarketCategory } from "@/src/lib/api";
@@ -80,6 +80,9 @@ export const MarketFilterSheet = forwardRef<
   }));
 
   const snapPoints = useMemo(() => ["88%"], []);
+  // Explicit height so the scroll area is bounded and the Apply footer stays on screen (BottomSheetView alone grows with content on web).
+  const { height: winH } = useWindowDimensions();
+  const sheetBodyH = Math.round(winH * 0.88) - 28;
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -112,7 +115,7 @@ export const MarketFilterSheet = forwardRef<
       handleIndicatorStyle={styles.handle}
       enableDynamicSizing={false}
     >
-      <BottomSheetView style={styles.container}>
+      <BottomSheetView style={[styles.container, { height: sheetBodyH }]}>
         <View style={styles.header}>
           <Text style={styles.title}>Filters</Text>
           <Pressable onPress={reset} hitSlop={10} testID="filter-reset">
@@ -120,7 +123,8 @@ export const MarketFilterSheet = forwardRef<
           </Pressable>
         </View>
 
-        <ScrollView
+        <BottomSheetScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
@@ -256,7 +260,7 @@ export const MarketFilterSheet = forwardRef<
               icon="flash"
             />
           </Section>
-        </ScrollView>
+        </BottomSheetScrollView>
 
         <View style={styles.footer}>
           <Pressable style={styles.applyBtn} onPress={apply} testID="filter-apply">
@@ -411,6 +415,7 @@ const makeStyles = (colors: LegacyColors) =>
   priceDash: { color: colors.textMuted, fontSize: 18, fontWeight: "600" },
   priceInput: {
     flex: 1,
+    minWidth: 0,
     height: 44,
     borderRadius: radius.md,
     borderWidth: 1,

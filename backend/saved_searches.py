@@ -33,6 +33,7 @@ class SavedSearchCriteria(BaseModel):
     max_price: Optional[float] = None
     min_beds: Optional[int] = None
     min_baths: Optional[int] = None
+    verified: Optional[bool] = None
     # Optional map bbox: [minLng, minLat, maxLng, maxLat]
     bbox: Optional[List[float]] = None
 
@@ -151,6 +152,8 @@ def register_saved_search_routes(
             query["bedrooms"] = {"$gte": int(c["min_beds"])}
         if c.get("min_baths") is not None:
             query["bathrooms"] = {"$gte": int(c["min_baths"])}
+        if c.get("verified"):
+            query["verified"] = True
         if c.get("bbox"):
             b = c["bbox"]
             if len(b) == 4:
@@ -162,6 +165,12 @@ def register_saved_search_routes(
             .limit(limit)
             .to_list(limit)
         )
+        # Same teaser gate as every other list — a saved search never reveals what the unlock sells.
+        from monetization import annotate_properties
+        from promotions import annotate_promotion
+
+        await annotate_properties(db, docs, user["id"])
+        annotate_promotion(docs)
         # Reset badge & stamp run time
         await db.saved_searches.update_one(
             {"id": search_id},

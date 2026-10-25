@@ -295,6 +295,18 @@ def create_token(user_id: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
 
 
+async def optional_viewer_id(creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer)) -> Optional[str]:
+    """Public routes that still personalise the paywall gate: the viewer's id when a valid token is
+    sent, else None (everything stays at the teaser tier)."""
+    if not creds:
+        return None
+    try:
+        return jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG]).get("sub")
+    except jwt.PyJWTError:
+        return None
+
+
+
 async def get_current_user(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
 ) -> dict:
@@ -990,8 +1002,11 @@ async def get_agent(user_id: str):
 
 
 @api.get("/agents/{user_id}/listings")
-async def agent_listings_public(user_id: str):
+async def agent_listings_public(user_id: str, viewer: Optional[str] = Depends(optional_viewer_id)):
     docs = await db.properties.find({"agent_id": user_id}, {"_id": 0}).to_list(200)
+    # Public profile — teaser tier unless the viewer has unlocked (or owns) the listing.
+    await annotate_properties(db, docs, viewer)
+    annotate_promotion(docs)
     return docs
 
 
@@ -1120,6 +1135,9 @@ async def list_favorites(user: dict = Depends(get_current_user)):
     docs = await db.favorites.find({"user_id": user["id"]}, {"_id": 0}).to_list(500)
     prop_ids = [d["property_id"] for d in docs]
     props = await db.properties.find({"id": {"$in": prop_ids}}, {"_id": 0}).to_list(500)
+    # Saving a home never bypasses the paywall — same teaser gate as every other list.
+    await annotate_properties(db, props, user["id"])
+    annotate_promotion(props)
     return props
 
 
@@ -2113,6 +2131,8 @@ _v2_router, _v2_admin_router = register_agent_platform_v2_routes(
     get_current_user,
     require_admin,
     finalize_subscription_hook=lambda pending: _ap._FINALIZE_SUBSCRIPTION(pending),  # type: ignore
+    optional_viewer=optional_viewer_id,
+    gate_listings=annotate_properties,
 )
 app.include_router(_v2_router)
 app.include_router(_v2_admin_router)
