@@ -18,6 +18,8 @@ export type CelebrateOptions = {
   title?: string;
   icon?: IconName;
   tone?: "success" | "mass" | "fix" | "brand" | "premium";
+  /** Skip the confetti pieces (keep the check + title) — used when a money rain already fills the screen. */
+  confetti?: boolean;
 };
 
 const CelebrateContext = createContext<(opts?: CelebrateOptions) => void>(() => {});
@@ -44,7 +46,7 @@ export function useCelebrate() {
 const PIECES = 18;
 const DURATION = 1500;
 
-function Burst({ title, icon = "checkmark", tone = "success", onDone }: CelebrateOptions & { onDone: () => void }) {
+function Burst({ title, icon = "checkmark", tone = "success", confetti = true, onDone }: CelebrateOptions & { onDone: () => void }) {
   const { colors } = useTheme();
   const { width, height } = useWindowDimensions();
   const reduce = useReducedMotion();
@@ -86,7 +88,7 @@ function Burst({ title, icon = "checkmark", tone = "success", onDone }: Celebrat
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="celebration-overlay">
-      {!reduce ? pieces.map((p, i) => <Piece key={i} p={p} progress={progress} />) : null}
+      {!reduce && confetti ? pieces.map((p, i) => <Piece key={i} p={p} progress={progress} />) : null}
       <View style={[StyleSheet.absoluteFill, styles.center]}>
         <Animated.View style={[styles.badge, { backgroundColor: toneColor }, badgeStyle]} entering={FadeIn.duration(120)} exiting={FadeOut.duration(150)}>
           <Ionicons name={icon} size={44} color={onTone} />

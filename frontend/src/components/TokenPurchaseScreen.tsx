@@ -21,6 +21,7 @@ import {
   ScreenHeader,
   Sheet,
   Skeleton,
+  useMoneyRain,
   useToast,
 } from "@/src/ui";
 import type { IconName } from "@/src/ui";
@@ -57,6 +58,7 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const toast = useToast();
+  const { rainOncePersisted } = useMoneyRain();
   const { mass, fix, refresh } = useWallet();
   const isMass = config.currency === "MASS";
   const balance = (isMass ? mass : fix)?.spendable ?? 0;
@@ -149,6 +151,8 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
         await refresh();
         // Show exactly what the server credited (bundle + bonus + tier bonus) and the receipt number.
         setCredited({ tokens: (paidStatus.credits ?? 0) + (paidStatus.bonus ?? 0), receiptNo: paidStatus.receipt_no ?? null, amountNgn: paidStatus.amount_ngn });
+        // Server-confirmed MASS purchase → celebration, once per reference on this device (the callback route shares the key).
+        if (config.currency === "MASS") rainOncePersisted("celebrate", `pay:${init.reference}`);
       } else if (result.type === "cancel" || result.type === "dismiss") {
         toast.info("Checkout closed", "No payment was made.");
       } else {

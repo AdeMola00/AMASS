@@ -9,13 +9,14 @@ import { api } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Button, Chip, EmptyState, Input, Screen, ScreenHeader, Sheet, Skeleton, useToast } from "@/src/ui";
+import { AppText, Button, Chip, EmptyState, Input, Screen, ScreenHeader, Sheet, Skeleton, useMoneyRain, useToast } from "@/src/ui";
 
 export default function FinanceApply() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const toast = useToast();
+  const { rain } = useMoneyRain();
   const { propertyId, inspection } = useLocalSearchParams<{ propertyId: string; inspection?: string }>();
   const [products, setProducts] = useState<any[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
@@ -67,6 +68,8 @@ export default function FinanceApply() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setCreatedId(res.id);
+      // Submitted ≠ approved: a quiet confirmation only. Approval celebrates on the application screen.
+      rain({ variant: "subtle", key: `finance-apply:${res.id}`, once: true });
     } catch (e: any) {
       toast.error("Couldn't submit application", e?.message ?? "Please try again.");
     } finally {

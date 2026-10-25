@@ -36,6 +36,28 @@ def locked_property(fresh_user):
     return locked[0]
 
 
+def test_markers_carry_unlock_hooks_but_nothing_gated(fresh_user):
+    """Preview-card hooks (AI value, saves/views, amenities, ID-verified agent) are counts/flags only —
+    locked markers still never carry the street, the gallery or any agent identity/contact."""
+    r = requests.get(f"{BASE}/api/map/markers", headers=_hdr(fresh_user), params={"limit": 400})
+    assert r.status_code == 200
+    markers = r.json()["markers"]
+    locked = [m for m in markers if not m["unlocked"]]
+    assert locked
+    for m in locked:
+        for k in ("saves_count", "views_count", "agent_identity_verified", "amenities", "ai_valuation", "investment_score", "year_built", "parking"):
+            assert k in m, k
+        assert isinstance(m["saves_count"], int) and isinstance(m["views_count"], int)
+        assert isinstance(m["agent_identity_verified"], bool)
+        assert isinstance(m["amenities"], list) and len(m["amenities"]) <= 4
+        assert m["images"] is None and m["approx"] is True
+        assert m["place"] in (None, m["city"])
+        for k in ("location", "agent_id", "agent_name", "agent_phone", "agent_email", "agent_avatar", "description"):
+            assert k not in m, k
+    # The hooks are real: at least one marker has social proof or an AI estimate.
+    assert any(m["saves_count"] > 0 or m["views_count"] > 0 or m["ai_valuation"] for m in markers)
+
+
 def test_favorites_are_teaser_tier(fresh_user, locked_property):
     pid = locked_property["id"]
     t = requests.post(f"{BASE}/api/favorites/toggle", headers=_hdr(fresh_user), json={"property_id": pid})

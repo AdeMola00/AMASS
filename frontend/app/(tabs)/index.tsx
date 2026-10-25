@@ -23,7 +23,7 @@ import { useWallet } from "@/src/contexts/wallet";
 import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Button, ILLUSTRATIONS, UnlockDialog, useReducedMotion, useToast } from "@/src/ui";
+import { AppText, Button, ILLUSTRATIONS, UnlockDialog, useMoneyRain, useReducedMotion, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
@@ -61,6 +61,7 @@ const intentFromFilters = (f: FilterState): Intent | null => (f.listingType === 
 export default function HomeMap() {
   const { colors, shadows, isDark } = useTheme();
   const toast = useToast();
+  const { rain } = useMoneyRain();
   const { user } = useAuth();
   const reduce = useReducedMotion();
   const firstName = (user?.full_name || "").trim().split(" ")[0] || "there";
@@ -399,7 +400,8 @@ export default function HomeMap() {
     const via = pinVia(p);
     openedRef.current = p.id;
     setViewedIds((prev) => (prev.has(p.id) ? prev : new Set(prev).add(p.id)));
-    router.push(`/property/${p.id}?via=${via}` as any);
+    // `rained=1` — the map already rained for this pick; the listing page must not rain again.
+    router.push(`/property/${p.id}?via=${via}&rained=1` as any);
   };
 
   /** Primary action — unchanged money path: unlocked → open; 0 MASS → Get MASS; else the paid UnlockDialog. */
@@ -420,6 +422,8 @@ export default function HomeMap() {
   /** Tap a price → select it and, when its label would sit under the preview card or the top chrome, glide it into the clear area. */
   const onMarkerPress = (p: Pin) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Money rain exactly once per selection — re-tapping the open pin, panning or zooming never replays it.
+    if (activeId !== p.id) rain({ variant: "brief", key: `pin:${p.id}` });
     setActiveId(p.id);
     track("marker_tap", { property_id: p.id, unlocked: p.unlocked, category: p.category, arrived_via: pinVia(p) });
     const r = regionRef.current;
@@ -464,7 +468,7 @@ export default function HomeMap() {
     track("payment_completed", { property_id: res.target_id, arrived_via: via, charged: res.charged });
     setPins((prev) => prev.map((p) => (p.id === res.target_id ? { ...p, unlocked: true, approx: false } : p)));
     openedRef.current = res.target_id;
-    router.push(`/property/${res.target_id}?via=${via}` as any);
+    router.push(`/property/${res.target_id}?via=${via}&rained=1` as any);
   };
 
   const onRegionChangeComplete = (r: Region) => {

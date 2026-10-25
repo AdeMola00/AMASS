@@ -6,6 +6,7 @@ import * as Haptics from "expo-haptics";
 import { api, MarketplaceItem } from "@/src/lib/api";
 import { radius, spacing, formatNaira } from "@/src/constants/theme";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
+import { useMoneyRain } from "@/src/ui";
 
 export type MakeOfferSheetRef = {
   open: (item: MarketplaceItem) => void;
@@ -17,6 +18,7 @@ export const MakeOfferSheet = forwardRef<MakeOfferSheetRef, { onSent?: () => voi
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const sheetRef = useRef<BottomSheetModal>(null);
+  const { rain } = useMoneyRain();
   const [item, setItem] = useState<MarketplaceItem | null>(null);
   const [amount, setAmount] = useState<number | undefined>();
   const [msg, setMsg] = useState("");
@@ -54,6 +56,7 @@ export const MakeOfferSheet = forwardRef<MakeOfferSheetRef, { onSent?: () => voi
       await api.marketplaceMakeOffer(item.id, amount, msg.trim() || undefined);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setSent(true);
+      rain({ variant: "subtle", key: `offer:${item.id}` });
       setTimeout(() => {
         sheetRef.current?.dismiss();
         onSent?.();

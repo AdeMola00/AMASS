@@ -25,7 +25,7 @@ import { formatNaira } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { useTheme } from "@/src/theme";
 import { gradients, motion, radii, space } from "@/src/theme/tokens";
-import { AppText, Avatar, Badge, Button, Card, EmptyState, FrostedCircle, FrostedLabel, IconButton, PressableScale, Skeleton, UnlockDialog, useToast } from "@/src/ui";
+import { AppText, Avatar, Badge, Button, Card, EmptyState, FrostedCircle, FrostedLabel, IconButton, PressableScale, Skeleton, UnlockDialog, useMoneyRain, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { PricePin } from "@/src/components/map/PricePin";
 import { toPin } from "@/src/components/map/pins";
@@ -47,9 +47,10 @@ const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 const galleryHeight = (h: number) => Math.min(Math.max(Math.round(h * 0.58), 420), 560);
 
 export default function PropertyDetails() {
-  const { id, unlock, via } = useLocalSearchParams<{ id: string; unlock?: string; via?: string }>();
+  const { id, unlock, via, rained } = useLocalSearchParams<{ id: string; unlock?: string; via?: string; rained?: string }>();
   const arrivedVia = viaFrom(via);
   const router = useRouter();
+  const { rain } = useMoneyRain();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const GALLERY_H = galleryHeight(height);
@@ -85,6 +86,9 @@ export default function PropertyDetails() {
         const list = await api.listProperties({ city: p.city, listing_type: p.listing_type });
         setSimilar(list.filter((x) => x.id !== p.id).slice(0, 6));
       } catch {}
+    } catch {
+      // Missing / removed listing → the designed not-found state below (no unhandled rejection).
+      setProperty(null);
     } finally {
       setLoading(false);
     }
@@ -101,6 +105,15 @@ export default function PropertyDetails() {
       track("property_detail_view", { property_id: id, arrived_via: arrivedVia });
     }
   }, [id, reload]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Opened from a list / search / feed → brief money rain, only once the listing actually loaded. The map already
+  // rained for its own pick (`rained=1`) and a return from top-up (`unlock=1`) re-opens the paid dialog — neither rains.
+  const openRainRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (!property || !id || openRainRef.current === id) return;
+    openRainRef.current = id;
+    if (!rained && !unlock) rain({ variant: "brief", key: `open:${id}` });
+  }, [property, id, rained, unlock, rain]);
 
   // Returning from a top-up? Re-open the unlock confirmation automatically.
   useEffect(() => {

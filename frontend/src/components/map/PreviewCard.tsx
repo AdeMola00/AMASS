@@ -17,13 +17,13 @@ import { radii, space } from "@/src/theme/tokens";
 import { AppText, Button, PressableScale } from "@/src/ui";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { TokenIcon } from "@/src/components/TokenIcon";
-import { fullPrice, hasNudge, kindLabel, listingKind, nudgeText, priceSuffix, specLine, typeLabel, type Pin } from "./pins";
+import { compactPrice, fullPrice, hasNudge, kindLabel, listingKind, nudgeText, priceSuffix, specLine, typeLabel, type Pin } from "./pins";
 
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 /** Photo height cap — keeps the card to ≈ 45 % of a 390 × 844 screen so pins stay visible above it. */
 const PHOTO_MAX_H = 168;
-/** Approximate rendered height (photo + details + CTA) — used by the map to work out which pins are still visible. */
-export const PREVIEW_CARD_H = 372;
+/** Approximate rendered height (photo + details + hooks + CTA) — used by the map to work out which pins are still visible. */
+export const PREVIEW_CARD_H = 424;
 
 export function PreviewCard({
   pin,
@@ -57,6 +57,14 @@ export function PreviewCard({
   const photoH = Math.min(Math.round((width - space[3] * 2) * 9 / 16), PHOTO_MAX_H);
   const extraPhotos = Math.max((pin.image_count ?? 0) - 1, 0);
   const primaryLabel = !locked ? "View home" : noMass ? "Get MASS to unlock" : pin.access_cost ? `Unlock · ${pin.access_cost.toLocaleString()} MASS` : "Unlock";
+  // Unlock hooks — public signals that make the fee worth it. Nothing here is part of what the unlock pays for.
+  const aiValue = pin.ai_valuation && pin.ai_valuation > 0 ? pin.ai_valuation : null;
+  const underBy = aiValue && pin.price && pin.price > 0 && aiValue > pin.price * 1.03 ? Math.round(((aiValue - pin.price) / aiValue) * 100) : 0;
+  const saves = pin.saves_count ?? 0;
+  const views = pin.views_count ?? 0;
+  const proof = [saves > 0 ? `${saves} saved` : null, views >= 5 ? `${views} views` : null].filter(Boolean).join(" · ");
+  const amenities = (pin.amenities ?? []).slice(0, pin.year_built ? 3 : 4);
+  const unlocks = [extraPhotos > 0 ? `+${extraPhotos} photo${extraPhotos === 1 ? "" : "s"}` : null, "full address", "agent contact"].filter(Boolean).join(" · ");
 
   return (
     <Animated.View
@@ -96,22 +104,43 @@ export function PreviewCard({
               {kindLabel(pin).toUpperCase()}
             </AppText>
           </View>
-          {/* Locked photos */}
-          {locked ? (
-            <View style={styles.lockTag} testID="preview-locked-photos">
-              <Ionicons name="lock-closed" size={12} color={colors.mass} />
-              <AppText variant="micro" color="#fff" style={styles.kindText}>
-                {extraPhotos > 0 ? `+${extraPhotos} photo${extraPhotos === 1 ? "" : "s"}` : "Photos unlock"}
-              </AppText>
+          {/* Bottom of the photo: value + proof hooks on the left, photo count on the right (dark scrim keeps it legible) */}
+          <View style={styles.photoFoot} pointerEvents="none">
+            <View style={styles.hooks} testID="preview-hooks">
+              {aiValue ? (
+                <View style={[styles.footPill, { backgroundColor: "rgba(17,17,17,0.78)" }]} testID="preview-ai-value">
+                  <Ionicons name="sparkles" size={11} color={colors.mass} />
+                  <AppText variant="micro" color="#fff" style={styles.kindText} numberOfLines={1}>
+                    AI value {compactPrice(aiValue)}
+                    {underBy >= 3 ? ` · ${underBy}% under` : ""}
+                  </AppText>
+                </View>
+              ) : null}
+              {proof ? (
+                <View style={[styles.footPill, { backgroundColor: "rgba(17,17,17,0.78)" }]} testID="preview-proof">
+                  <Ionicons name="heart" size={11} color={colors.brand} />
+                  <AppText variant="micro" color="#fff" style={styles.kindText} numberOfLines={1}>
+                    {proof}
+                  </AppText>
+                </View>
+              ) : null}
             </View>
-          ) : extraPhotos > 0 ? (
-            <View style={styles.lockTag}>
-              <Ionicons name="images" size={12} color="#fff" />
-              <AppText variant="micro" color="#fff" style={styles.kindText}>
-                {extraPhotos + 1} photos
-              </AppText>
-            </View>
-          ) : null}
+            {locked ? (
+              <View style={styles.lockTag} testID="preview-locked-photos">
+                <Ionicons name="lock-closed" size={12} color={colors.mass} />
+                <AppText variant="micro" color="#fff" style={styles.kindText}>
+                  {extraPhotos > 0 ? `+${extraPhotos} photo${extraPhotos === 1 ? "" : "s"}` : "Photos unlock"}
+                </AppText>
+              </View>
+            ) : extraPhotos > 0 ? (
+              <View style={styles.lockTag}>
+                <Ionicons name="images" size={12} color="#fff" />
+                <AppText variant="micro" color="#fff" style={styles.kindText}>
+                  {extraPhotos + 1} photos
+                </AppText>
+              </View>
+            ) : null}
+          </View>
         </View>
       </Pressable>
 
@@ -157,11 +186,26 @@ export function PreviewCard({
             {locked ? " · approx." : ""}
           </AppText>
         </View>
-        {pin.verified || pin.documents_verified || hasNudge(pin) ? (
+        {locked && amenities.length ? (
+          <AppText variant="micro" tone="tertiary" numberOfLines={1} testID="preview-amenities">
+            {amenities.join(" · ")}
+            {pin.year_built ? ` · Built ${pin.year_built}` : ""}
+          </AppText>
+        ) : null}
+        {pin.verified || pin.documents_verified || pin.agent_identity_verified || hasNudge(pin) ? (
           <View style={styles.tags}>
             {pin.verified ? <Tag icon="shield-checkmark" label="Verified" color={colors.success} soft={colors.successSoft} /> : null}
             {pin.documents_verified ? <Tag icon="document-text" label="Title docs ✓" color={colors.fixText} soft={colors.fixSoft} /> : null}
+            {pin.agent_identity_verified ? <Tag icon="person-circle" label="ID-verified agent" color={colors.info} soft={colors.infoSoft} /> : null}
             {hasNudge(pin) ? <Tag icon="people" label={nudgeText(pin)} color={colors.brandText} soft={colors.brandSoft} /> : null}
+          </View>
+        ) : null}
+        {locked ? (
+          <View style={styles.unlockLine} testID="preview-unlocks">
+            <Ionicons name="lock-open" size={12} color={colors.massText} />
+            <AppText variant="micro" color={colors.massText} numberOfLines={2} style={{ flex: 1, fontFamily: "PlusJakartaSans-700" }}>
+              Unlock: {unlocks}
+            </AppText>
           </View>
         ) : null}
       </Pressable>
@@ -206,7 +250,10 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", justifyContent: "center" },
   kind: { position: "absolute", left: 12, top: 12, paddingHorizontal: 9, height: 24, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   kindText: { fontSize: 12, lineHeight: 15, fontFamily: "PlusJakartaSans-800", letterSpacing: 0.3 },
-  lockTag: { position: "absolute", right: 12, bottom: 12, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, height: 26, borderRadius: 8, backgroundColor: "rgba(17,17,17,0.78)" },
+  photoFoot: { position: "absolute", left: 12, right: 12, bottom: 12, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
+  hooks: { flex: 1, gap: 6, alignItems: "flex-start" },
+  footPill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, height: 24, borderRadius: 8, maxWidth: "100%" },
+  lockTag: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, height: 26, borderRadius: 8, backgroundColor: "rgba(17,17,17,0.78)" },
   photoActions: { position: "absolute", right: 12, top: 12, flexDirection: "row", gap: 8 },
   roundBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   body: { paddingHorizontal: space[4], paddingTop: 10, gap: 3 },
@@ -218,6 +265,7 @@ const styles = StyleSheet.create({
   placeRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   tags: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 3 },
   tag: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, height: 22, borderRadius: 6 },
+  unlockLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
   cta: { paddingHorizontal: space[4], paddingTop: 10, paddingBottom: 14 },
   massHint: { position: "absolute", left: space[4] + 16, top: 10, bottom: 14, justifyContent: "center" },
 });

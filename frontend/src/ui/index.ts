@@ -14,6 +14,8 @@ export { Illustration, ILLUSTRATIONS } from "./Illustration";
 export type { IllustrationName } from "./Illustration";
 export { CelebrationProvider, useCelebrate } from "./Celebrate";
 export type { CelebrateOptions } from "./Celebrate";
+export { MoneyRainProvider, useMoneyRain } from "./MoneyRain";
+export type { MoneyRainVariant, MoneyRainOptions } from "./MoneyRain";
 export { SegmentedControl, BalanceChip } from "./Controls";
 export { Sheet, ChargeConfirm, SheetLink } from "./Sheet";
 export { PressableScale, Appear, usePop } from "./Motion";

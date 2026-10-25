@@ -1029,3 +1029,13 @@ agent_communication:
       clusters/pins (per-pin label width); Explore-wider pill at 0-in-view regardless of zoom; cluster tap centres in band; filter sheets
       (Find Home + Market) got bounded heights so Apply is on screen; Market price inputs minWidth 0. Unused components removed.
       iteration_80: all fixes pass; remaining LOW items accepted (no re-fit when pins already visible, pins behind FAB column).
+
+  - agent: "main"
+    message: |
+      Iterations 81–82 — Money Rain overlay (src/ui/MoneyRain.tsx) + preview-card unlock hooks + /map/markers hook fields.
+      Triggers: pin tap (brief, once/selection), property open from lists (brief, after load, skipped with ?rained=1), confirmed
+      unlock (subtle), MASS purchase paid (celebrate, once per ref persisted), offer/finance/inspection/booking (subtle),
+      checkout + finance approved (celebrate). Testing agent found: reduced-motion notes built before the setting resolved
+      (→ Reanimated sync hook) and Reanimated skipping the fade under reduce-motion (→ ReduceMotion.Never), rain on
+      not-found property (→ rain after load + catch), callback repeat (→ rainOncePersisted) — all fixed. Demo account has
+      test offers/orders/finance/inspection docs prefixed "TEST" from the agent runs.

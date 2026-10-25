@@ -6,9 +6,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { api } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
+import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, Card, EmptyState, Screen, ScreenHeader, Section, Skeleton } from "@/src/ui";
+import { AppText, Badge, Button, Card, EmptyState, Screen, ScreenHeader, Section, Skeleton, useMoneyRain } from "@/src/ui";
 import type { BadgeTone } from "@/src/ui";
 
 const STATUS_TONE: Record<string, BadgeTone> = {
@@ -29,6 +30,17 @@ export default function FinanceDetail() {
   const [doc, setDoc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const { rainOncePersisted } = useMoneyRain();
+
+  // Approval / disbursement is the milestone (not the submission) — celebrate the first time it's seen.
+  useEffect(() => {
+    if (!doc || !id) return;
+    if (doc.status === "approved" || doc.status === "disbursed") {
+      rainOncePersisted("celebrate", `finance:${id}:${doc.status}`).then((played) => {
+        if (played) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      });
+    }
+  }, [doc, id, rainOncePersisted]);
 
   const load = useCallback(async () => {
     if (!id) return;

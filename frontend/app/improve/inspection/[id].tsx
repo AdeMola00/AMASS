@@ -9,7 +9,7 @@ import { api } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AnimatedNumber, AppText, Button, Card, EmptyState, ProgressBar, Screen, ScreenHeader, Section, Skeleton } from "@/src/ui";
+import { AnimatedNumber, AppText, Button, Card, EmptyState, ProgressBar, Screen, ScreenHeader, Section, Skeleton, useMoneyRain } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 
 const CATEGORIES: { key: string; label: string; icon: IconName }[] = [
@@ -30,6 +30,12 @@ export default function InspectionView() {
   const [doc, setDoc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const { rainOncePersisted } = useMoneyRain();
+
+  // The visit is confirmed once AMASS schedules it — a quiet nod the first time the user sees that.
+  useEffect(() => {
+    if (doc?.status === "scheduled" && id) rainOncePersisted("subtle", `inspection:${id}:scheduled`);
+  }, [doc?.status, id, rainOncePersisted]);
 
   const load = useCallback(async () => {
     if (!id) return;

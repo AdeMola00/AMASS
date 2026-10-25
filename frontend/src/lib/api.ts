@@ -793,6 +793,15 @@ export type MapMarker = {
   access_cost?: number;
   is_free_amass_sale?: boolean;
   documents_verified?: boolean;
+  /** Unlock hooks — public, non-identifying signals (never the address, gallery or agent). */
+  ai_valuation?: number | null;
+  investment_score?: number | null;
+  amenities?: string[];
+  year_built?: number | null;
+  parking?: number | null;
+  saves_count?: number;
+  views_count?: number;
+  agent_identity_verified?: boolean;
 };
 export type ProviderPreview = {
   id: string;

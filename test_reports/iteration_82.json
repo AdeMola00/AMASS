@@ -1,0 +1,31 @@
+{
+  "summary": "Frontend-only retest of the iteration_81 money-rain fixes, at a 390x844 viewport with demo@amass.africa. FIX-2, FIX-3, FIX-4, FIX-5 and FIX-6 pass, and so do all smoke flows. FIX-1 (reduced motion) is only partly fixed. With prefers-reduced-motion: reduce emulated before load, money-rain-brief renders exactly 5 notes. The notes are static (translateY travel 0, rotation change 0), sit at y≈209-427 inside the 20-55% band, and the layer is removed after ~1.1s. However, every note keeps opacity 0 for the whole run (max opacity 0 across 23 samples, inline style opacity:0 at 300ms, and the screenshot shows no notes). The user with reduced motion sees nothing. The normal path is OK: 12 notes start at y=-51 (above the top edge) and fall to y≈809, with rotation, over ~2.1s.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "MoneyRain reduced-motion variant", "issue": "Notes are never visible: opacity stays 0 for the whole 1.1s layer lifetime. RCA: Reanimated 4.7.1 withTiming/withDelay default to ReduceMotion.System. When the OS reduce-motion setting is on, Reanimated skips the animation and jumps t straight to 1 (utilCommon.ts getReduceMotionFromConfig). interpolate(1,[0,.3,.65,1],[0,a,a,0]) gives 0, so the designed calm fade never plays. This affects native too. Reference: /app/frontend/src/ui/MoneyRain.tsx:197", "testID": "money-rain-brief", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "MoneyRainProvider reduced-motion hooks", "issue": "useReducedMotionSync() || useReducedMotionLive() calls a hook conditionally (short-circuit), which breaks the rules of hooks. It is stable today only because Reanimated's value is constant per session. It also means a user who starts the app with reduce motion ON and turns it OFF live keeps the calm variant. Call both hooks unconditionally, then OR the results. Reference: /app/frontend/src/ui/MoneyRain.tsx:58"}
+    ]
+  },
+  "test_report_links": ["/app/tests/i81_helpers.py", "/app/tests/i82_helpers.py"],
+  "action_items": [
+    "HIGH: MoneyRain.tsx:197. Import ReduceMotion from react-native-reanimated and opt the banknote animation out of Reanimated's automatic reduce-motion skip: t.value = withDelay(note.delay, withTiming(1, { duration, easing, reduceMotion: ReduceMotion.Never }), ReduceMotion.Never). The reduced variant is already motion-safe (opacity only). Optionally apply it only when reduce is true. Then re-verify that 5 notes fade in to ~0.7-0.96 opacity and back out.",
+    "LOW: MoneyRain.tsx:58. Call both reduced-motion hooks unconditionally: const a = useReducedMotionSync(); const b = useReducedMotionLive(); const reduce = a || b."
+  ],
+  "critical_code_review_comments": [
+    "FIX-5 verified by code: rainOncePersisted writes the seen key only when rain() returns true (MoneyRain.tsx:82-83). done is a useCallback([]) so the Rain onDone timer is stable (lines 89, 163-166).",
+    "property/[id].tsx:111-116 rains only when property is loaded, using an openRainRef per id, and skips it when rained or unlock is set. This is correct.",
+    "payment/callback.tsx: a 404 now sets 'failed', and the MASS celebration uses rainOncePersisted('celebrate', 'pay:'+ref), the same key as TokenPurchaseScreen.tsx:155. This is correct."
+  ],
+  "updated_files": ["/app/tests/i82_helpers.py (new, test helper only)"],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "~92% (12/13 checks; reduced-motion notes are invisible)"},
+  "seed_data_creation": "demo account: unlocked rent pin bf3a95a5 (-20 MASS), bought FIX Pro (+220 FIX, mock), temporarily saved 13c198cb (removed afterwards). Reused paid MASS ref amass_7d0e612cf4d644f299c1c3032da40bd3 for FIX-4.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "exec /app/tests/i81_helpers.py and then /app/tests/i82_helpers.py, then add_init_script(RAIN_INIT) and add_init_script(SAMPLER_INIT) before goto. summarize(await samples(page)) gives note count, visible y range, translateY travel and rotation change. For reduced motion, call page.emulate_media(reduced_motion='reduce') BEFORE the first goto and check that 'max opacity' > 0. Locked rent pins that are still available: 13c198cb (₦28M, 6 amenities, shows 'Elevator · 24/7 Security · Gym · Built 2022') and 6c8f373c (40 MASS). bf3a95a5 and 6983469a are now unlocked for demo. unlock-confirm sits outside the viewport while the sheet animates, so use a JS click or wait ~1.2s.",
+  "rca_of_issue": "Reduced motion. Reproduction: emulate reduce, load the app, log in and tap a map pin. The money-rain-brief layer shows 5 children with opacity 0 for 1.1s. Root cause: Reanimated's default ReduceMotion.System makes withTiming/withDelay complete instantly at the toValue, and toValue=1 maps to opacity 0. Mitigation: set reduceMotion: ReduceMotion.Never on the note animation."
+}

@@ -3,11 +3,11 @@ import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { api } from "@/src/lib/api";
+import { api, ApiError } from "@/src/lib/api";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
-import { AppText, Button, EmptyState, IconButton, Screen, useCelebrate } from "@/src/ui";
+import { AppText, Button, EmptyState, IconButton, Screen, useCelebrate, useMoneyRain } from "@/src/ui";
 
 /**
  * Deep-link callback landing screen — providers redirect here after checkout.
@@ -20,6 +20,7 @@ export default function PaymentCallback() {
   const { refresh } = useWallet();
   const [state, setState] = useState<"checking" | "success" | "pending" | "failed">("checking");
   const celebrate = useCelebrate();
+  const { rainOncePersisted } = useMoneyRain();
   const [details, setDetails] = useState<any>(null);
 
   useEffect(() => {
@@ -45,11 +46,25 @@ export default function PaymentCallback() {
           setDetails(s);
           if (s.status === "paid") {
             setState("success");
-            celebrate({ title: s.credits ? `+${(s.credits + (s.bonus ?? 0)).toLocaleString()} ${s.currency ?? ""}`.trim() : "Paid!", icon: "wallet", tone: s.currency === "FIX" ? "fix" : "mass" });
+            // Confirmed by the server (status "paid") — only now may anything celebrate. MASS top-ups get the money
+            // rain once per reference on this device (the purchase screen shares the key); FIX keeps confetti.
+            const isMass = s.currency !== "FIX";
+            if (isMass) rainOncePersisted("celebrate", `pay:${ref}`);
+            celebrate({ title: s.credits ? `+${(s.credits + (s.bonus ?? 0)).toLocaleString()} ${s.currency ?? ""}`.trim() : "Paid!", icon: "wallet", tone: isMass ? "mass" : "fix", confetti: !isMass });
             await refresh();
             return;
           }
-        } catch {}
+          if (s.status === "verification_failed" || s.status === "failed") {
+            setState("failed");
+            return;
+          }
+        } catch (e: any) {
+          // Unknown reference → nothing to wait for.
+          if (e instanceof ApiError && e.status === 404) {
+            if (!cancelled) setState("failed");
+            return;
+          }
+        }
         await new Promise((r) => setTimeout(r, 1500));
       }
       if (!cancelled) setState("pending");

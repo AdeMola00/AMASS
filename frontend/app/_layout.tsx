@@ -21,6 +21,7 @@ import { PushPromptProvider } from "@/src/contexts/pushPrompt";
 import { ThemeProvider, useTheme } from "@/src/theme";
 import { ToastProvider } from "@/src/ui/Toast";
 import { CelebrationProvider } from "@/src/ui/Celebrate";
+import { MoneyRainProvider } from "@/src/ui/MoneyRain";
 import { OfflineBanner } from "@/src/ui/OfflineBanner";
 
 LogBox.ignoreAllLogs(true);
@@ -123,11 +124,13 @@ export default function RootLayout() {
                   <CartProvider>
                     <ShopBasketProvider>
                       <ToastProvider>
-                        <CelebrationProvider>
-                          <PushPromptProvider>
-                            <ThemedStack />
-                          </PushPromptProvider>
-                        </CelebrationProvider>
+                        <MoneyRainProvider>
+                          <CelebrationProvider>
+                            <PushPromptProvider>
+                              <ThemedStack />
+                            </PushPromptProvider>
+                          </CelebrationProvider>
+                        </MoneyRainProvider>
                       </ToastProvider>
                     </ShopBasketProvider>
                   </CartProvider>

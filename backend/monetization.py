@@ -979,12 +979,20 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
             query["latitude"] = {"$gte": min_lat, "$lte": max_lat}
             query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
         docs = await db.properties.find(query, {"_id": 0, "id": 1, "title": 1, "listing_type": 1, "property_type": 1, "latitude": 1, "longitude": 1, "agent_id": 1, "verified": 1, "promotion": 1,
-                                               "price": 1, "image": 1, "images": 1, "bedrooms": 1, "bathrooms": 1, "size_sqm": 1, "city": 1, "state": 1, "location": 1, "status": 1, "is_amass_exclusive": 1, "documents_verified": 1}).limit(min(limit, 500)).to_list(500)
+                                               "price": 1, "image": 1, "images": 1, "bedrooms": 1, "bathrooms": 1, "size_sqm": 1, "city": 1, "state": 1, "location": 1, "status": 1, "is_amass_exclusive": 1, "documents_verified": 1,
+                                               "ai_valuation": 1, "investment_score": 1, "amenities": 1, "year_built": 1, "parking": 1, "views_count": 1}).limit(min(limit, 500)).to_list(500)
         from promotions import active_promotion as _active_promo
         from tokens import is_free_amass_sale as _is_free_sale
         ent_ids = {e["target_id"] for e in await db.entitlements.find({"user_id": user["id"], "feature_key": "property", "status": "active"}, {"_id": 0, "target_id": 1}).to_list(2000)}
         # Friend nudges: counts only (friends who share their saves + my shared lists). Never reveals paid data.
-        social = await marker_social_context(db, user["id"], [d["id"] for d in docs])
+        ids = [d["id"] for d in docs]
+        social = await marker_social_context(db, user["id"], ids)
+        # Teaser hooks (counts only, nothing identifying): how many people saved / viewed each home, and whether the
+        # listing agent passed identity KYC. These sell the unlock without revealing anything the unlock pays for.
+        saves = {r["_id"]: int(r["n"]) for r in await db.favorites.aggregate([{"$match": {"property_id": {"$in": ids}}}, {"$group": {"_id": "$property_id", "n": {"$sum": 1}}}]).to_list(len(ids) or 1)}
+        views = {r["_id"]: int(r["n"]) for r in await db.property_events.aggregate([{"$match": {"property_id": {"$in": ids}, "event_type": "view"}}, {"$group": {"_id": "$property_id", "n": {"$sum": 1}}}]).to_list(len(ids) or 1)}
+        agent_ids = list({d["agent_id"] for d in docs if d.get("agent_id")})
+        kyc_agents = {u["id"] for u in await db.users.find({"id": {"$in": agent_ids}, "identity_verified": True}, {"_id": 0, "id": 1}).to_list(len(agent_ids) or 1)}
         # Zone/category fee per marker (same O(1)-per-zone cache as list endpoints) so tiles can say "Unlock · N MASS".
         lookup = await pricing.zone_lookup()
         free_flag = bool(cfg.get("free_amass_sale"))
@@ -1022,6 +1030,13 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
                 "bedrooms": d.get("bedrooms"), "bathrooms": d.get("bathrooms"), "size_sqm": d.get("size_sqm"),
                 "city": d.get("city"), "place": d.get("location") if unlocked else d.get("city"),
                 "status": d.get("status", "available"), "access_cost": 0 if is_free else fee_cache[(cat, zone)], "is_free_amass_sale": is_free,
+                # Unlock hooks — public, non-identifying signals that make the fee worth paying.
+                "ai_valuation": d.get("ai_valuation"), "investment_score": d.get("investment_score"),
+                "amenities": [a for a in (d.get("amenities") or []) if a][:4],
+                "year_built": d.get("year_built"), "parking": d.get("parking"),
+                "saves_count": saves.get(d["id"], 0),
+                "views_count": max(int(d.get("views_count") or 0), views.get(d["id"], 0)),
+                "agent_identity_verified": d.get("agent_id") in kyc_agents,
             })
         return {"markers": out, "count": len(out), "approx_radius_m": 150}
 

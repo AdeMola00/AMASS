@@ -12,7 +12,7 @@ import { api } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Button, Card, Input, Screen, ScreenHeader, Sheet, EmptyState, useToast } from "@/src/ui";
+import { AppText, Button, Card, Input, Screen, ScreenHeader, Sheet, EmptyState, useMoneyRain, useToast } from "@/src/ui";
 
 const DATES = () => {
   const arr: { key: string; label: string; sub: string }[] = [];
@@ -34,6 +34,7 @@ export default function InspectionRequest() {
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const toast = useToast();
+  const { rain } = useMoneyRain();
   const { propertyId } = useLocalSearchParams<{ propertyId: string }>();
   const [property, setProperty] = useState<any>(null);
   const [goals, setGoals] = useState("");
@@ -149,6 +150,7 @@ export default function InspectionRequest() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setCreatedId(res.id);
+      rain({ variant: "subtle", key: `inspection:${res.id}`, once: true });
     } catch (e: any) {
       toast.error("Couldn't submit request", e?.message ?? "Please try again.");
     } finally {

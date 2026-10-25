@@ -11,6 +11,7 @@ import { AppText } from "./Text";
 import { Button } from "./Button";
 import { Sheet } from "./Sheet";
 import { Skeleton } from "./Feedback";
+import { useMoneyRain } from "./MoneyRain";
 import { TokenIcon } from "@/src/components/TokenIcon";
 
 /**
@@ -44,6 +45,7 @@ export function UnlockDialog({
   const { colors } = useTheme();
   const router = useRouter();
   const { refresh } = useWallet();
+  const { rain } = useMoneyRain();
   const [quote, setQuote] = useState<UnlockQuote | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +99,15 @@ export function UnlockDialog({
     onClose();
   };
 
+  /** Server said the unlock went through — hand the result back and, when MASS actually moved for a home,
+   *  let a few notes fall. Already-unlocked / owner opens (charged 0) are routine and never rain. */
+  const settle = (res: UnlockResult) => {
+    settledRef.current = true;
+    if (res.charged > 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (res.charged > 0 && featureKey === "property") rain({ variant: "subtle", key: `unlock:${featureKey}:${res.target_id}`, once: true });
+    onUnlocked(res);
+  };
+
   const confirm = async () => {
     if (!targetId || confirming) return;
     setConfirming(true);
@@ -107,8 +118,7 @@ export function UnlockDialog({
       const res = await api.unlock(featureKey, targetId, key);
       settledRef.current = true;
       await refresh().catch(() => {});
-      if (res.charged > 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      onUnlocked(res);
+      settle(res);
     } catch (e: any) {
       // Unknown outcome (timeout / network) → resolve status before letting the user retry.
       if (!(e instanceof ApiError)) {
@@ -117,7 +127,7 @@ export function UnlockDialog({
           if (st.status === "completed" && st.result) {
             settledRef.current = true;
             await refresh().catch(() => {});
-            onUnlocked(st.result);
+            settle(st.result);
             return;
           }
         } catch {}

@@ -16,7 +16,7 @@ import * as Haptics from "expo-haptics";
 import { api, MarketplaceItem } from "@/src/lib/api";
 import { radius, spacing, formatNaira, shadows } from "@/src/constants/theme";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
-import { Illustration, useCelebrate } from "@/src/ui";
+import { Illustration, useCelebrate, useMoneyRain } from "@/src/ui";
 
 export type BookingSheetRef = {
   open: (item: MarketplaceItem) => void;
@@ -43,6 +43,7 @@ function nextDates(count: number = 7) {
 export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
   const colors = useLegacyColors();
   const celebrate = useCelebrate();
+  const { rain } = useMoneyRain();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -105,7 +106,8 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setConfirmed(true);
-      celebrate({ title: "Booked!", icon: "calendar", tone: "fix" });
+      rain({ variant: "subtle", key: `booking:${item.id}:${dateKey}:${timeSlot}` });
+      celebrate({ title: "Booked!", icon: "calendar", tone: "fix", confetti: false });
       setTimeout(() => sheetRef.current?.dismiss(), 1600);
     } catch (e: any) {
       Alert.alert("Booking failed", e?.message || "Please try again.");
@@ -200,6 +202,7 @@ export const BookingSheet = forwardRef<BookingSheetRef, object>((_, ref) => {
                       setTimeSlot(slot);
                     }}
                     style={[styles.timeChip, active && styles.timeChipActive]}
+                    testID={`fixa-time-${TIME_SLOTS.indexOf(slot)}`}
                   >
                     <Text style={[styles.timeChipText, active && { color: "#fff" }]}>{slot}</Text>
                   </Pressable>
