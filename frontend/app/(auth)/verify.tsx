@@ -56,7 +56,7 @@ export default function VerifyCode() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (purpose === "signin") {
         if (r.access_token && r.user) await adoptSession(r.access_token, r.user);
-        if (r.is_new) router.replace({ pathname: "/neighbours/settings", params: { welcome: "1" } } as any);
+        if (r.is_new && !p.redirect) router.replace("/(tabs)/home" as any);
         else finish(p.redirect);
       } else {
         await refresh();

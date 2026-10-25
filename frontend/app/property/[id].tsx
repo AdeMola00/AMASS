@@ -39,10 +39,8 @@ import { useWallet } from "@/src/contexts/wallet";
 import { useAuth } from "@/src/contexts/auth";
 import { recordRecentlyViewed } from "@/src/lib/recently-viewed";
 import { track, viaFrom } from "@/src/lib/analytics";
-import { AddToCollectionSheet } from "@/src/components/neighbours/AddToCollectionSheet";
 import { ViewingSheet } from "@/src/components/viewings/ViewingSheet";
 import { fmtDay, fmtTime, statusBadge } from "@/src/lib/viewingTime";
-import type { PropertySocialContext } from "@/src/lib/api";
 
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 /** Photo-led hero: ~58% of the screen, clamped so tablets don't get a wall of photo. */
@@ -75,8 +73,6 @@ export default function PropertyDetails() {
   /** Open viewing (requested / confirmed / rescheduled) for this home — `undefined` until loaded, `null` when none. */
   const [viewing, setViewing] = useState<Viewing | null | undefined>(undefined);
   const [bookOpen, setBookOpen] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
-  const [social, setSocial] = useState<PropertySocialContext[string] | null>(null);
   const heart = useSharedValue(1);
   const heartAnim = useAnimatedStyle(() => ({ transform: [{ scale: heart.value }] }));
 
@@ -106,7 +102,6 @@ export default function PropertyDetails() {
       api.recordView(id).catch(() => {});
       recordRecentlyViewed(id).catch(() => {});
       api.markNotifReadByTarget("property", id).catch(() => {});
-      api.socialContext([id]).then((r) => setSocial(r[id] ?? null)).catch(() => {});
       track("property_detail_view", { property_id: id, arrived_via: arrivedVia });
     }
   }, [id, reload]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -328,11 +323,6 @@ export default function PropertyDetails() {
               </FrostedCircle>
             </Pressable>
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <Pressable onPress={() => { Haptics.selectionAsync().catch(() => {}); setListOpen(true); }} testID="add-to-list-btn" accessibilityRole="button" accessibilityLabel="Add to a shared list" hitSlop={8}>
-                <FrostedCircle size={44} tone="dark">
-                  <Ionicons name="albums-outline" size={20} color="#fff" />
-                </FrostedCircle>
-              </Pressable>
               <Pressable onPress={onShare} testID="share-btn" accessibilityRole="button" accessibilityLabel="Share this property" hitSlop={8}>
                 <FrostedCircle size={44} tone="dark">
                   <Ionicons name="share-outline" size={20} color="#fff" />
@@ -417,35 +407,6 @@ export default function PropertyDetails() {
               {property.location}
               {hasAccess ? "" : " · exact address unlocks with MASS"}
             </AppText>
-          </View>
-
-          {/* Decide together — social context (never reveals paid info) */}
-          <View style={[styles.socialRow, { backgroundColor: colors.surfaceAlt }]} testID="social-row">
-            {social?.saved_by?.length ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
-                <View style={{ flexDirection: "row" }}>
-                  {social.saved_by.slice(0, 3).map((u, i) => (
-                    <View key={u.id} style={{ marginLeft: i ? -8 : 0 }}>
-                      <Avatar name={u.full_name} uri={u.avatar_url} size={24} tone="soft" />
-                    </View>
-                  ))}
-                </View>
-                <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
-                  Saved by {social.saved_by[0].full_name.split(" ")[0]}
-                  {social.saved_by.length > 1 ? ` +${social.saved_by.length - 1}` : ""}
-                  {social.in_collections?.length ? ` · in ${social.in_collections[0].emoji ?? ""} ${social.in_collections[0].name}` : ""}
-                </AppText>
-              </View>
-            ) : social?.in_collections?.length ? (
-              <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
-                In {social.in_collections.map((c) => `${c.emoji ?? ""} ${c.name}`.trim()).slice(0, 2).join(", ")}
-              </AppText>
-            ) : (
-              <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
-                Share with someone? Add to a list.
-              </AppText>
-            )}
-            <Button label="Add to list" size="xs" variant="secondary" iconLeft="albums-outline" onPress={() => setListOpen(true)} testID="add-to-list-inline" />
           </View>
 
           {property.ai_valuation ? (
@@ -849,7 +810,6 @@ export default function PropertyDetails() {
           }}
         />
       ) : null}
-      <AddToCollectionSheet visible={listOpen} onClose={() => setListOpen(false)} targetId={property.id} kind="property" onAdded={() => api.socialContext([property.id]).then((r) => setSocial(r[property.id] ?? null)).catch(() => {})} />
 
       {/* Fullscreen gallery modal */}
       <Modal visible={fullscreen} animationType="fade" onRequestClose={() => setFullscreen(false)}>
@@ -1036,7 +996,6 @@ const styles = StyleSheet.create({
   specInlineText: { fontFamily: "PlusJakartaSans-800", fontSize: 20, lineHeight: 25, letterSpacing: -0.3 },
   bodyCopy: { fontSize: 18, lineHeight: 29 },
   locRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
-  socialRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, padding: 10, borderRadius: radii.md },
   valPill: {
     flexDirection: "row",
     alignItems: "center",

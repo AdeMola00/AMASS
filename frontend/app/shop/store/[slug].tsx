@@ -13,7 +13,7 @@ import { api, ShopProduct, ShopRetailerDetail } from "@/src/lib/api";
 import { track } from "@/src/lib/analytics";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, EmptyState, Gloss, IconButton, PressableScale, Sheet, Skeleton, useToast } from "@/src/ui";
+import { AppText, Badge, EmptyState, Gloss, IconButton, PressableScale, Sheet, Skeleton, useToast } from "@/src/ui";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { RetailerLogo } from "@/src/components/shop/RetailerLogo";
@@ -21,7 +21,6 @@ import { ShopProductCard } from "@/src/components/shop/ShopProductCard";
 import { BasketPill, OfferTag, PurchaseRoutes, ShopChip, ShopHeading, ShopSearchField, VerifiedNote } from "@/src/components/shop/ShopBits";
 import { accentColors, fmtDate, naira, shareLink } from "@/src/components/shop/shopFormat";
 import { shopFont } from "@/src/components/shop/shopTheme";
-import { AddToCollectionSheet } from "@/src/components/neighbours/AddToCollectionSheet";
 
 type Fulfil = "delivery" | "pickup" | "showroom";
 const FULFIL: { key: Fulfil; label: string; icon: any }[] = [
@@ -48,7 +47,6 @@ export default function StoreScreen() {
   const [sort, setSort] = useState("relevance");
   const [fulfil, setFulfil] = useState<Fulfil | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -94,7 +92,7 @@ export default function StoreScreen() {
     try {
       const r = await api.shopToggleSave("store", store.id);
       setStore({ ...store, saved: r.saved });
-      toast.show({ kind: "success", title: r.saved ? `Saved ${store.short_name}` : `Removed ${store.short_name}`, actionLabel: r.saved ? "Add to a list" : undefined, onAction: r.saved ? () => setListOpen(true) : undefined });
+      toast.show({ kind: "success", title: r.saved ? `Saved ${store.short_name}` : `Removed ${store.short_name}` });
       if (r.saved) setTimeout(() => requestContextualPush("brand_follow").catch(() => {}), 900);
     } catch (e: any) {
       toast.error("Couldn't save", e?.message);
@@ -351,11 +349,9 @@ export default function StoreScreen() {
             <AppText variant="title">Verification</AppText>
             <AppText variant="bodySm" tone="secondary">{store.verification.note}</AppText>
             <VerifiedNote date={store.verification.last_verified_at} source={store.verification.sources?.[0]} label="Checked" />
-            <Button label="Add store to a shared list" variant="secondary" iconLeft="albums-outline" fullWidth onPress={() => { setInfoOpen(false); setListOpen(true); }} testID="shop-store-add-to-list" />
           </ScrollView>
         </Sheet>
       ) : null}
-      {store ? <AddToCollectionSheet visible={listOpen} onClose={() => setListOpen(false)} targetId={store.id} kind="store" /> : null}
     </View>
   );
 }

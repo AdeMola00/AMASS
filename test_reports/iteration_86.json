@@ -1,0 +1,57 @@
+{
+  "summary": "Frontend-only test of the Home Hub (My Home) at 390x844 on the Expo web preview. Tested: login, hub, home switcher, Manage Homes CRUD, Bills CRUD with pay/undo/quick-pay, Records CRUD, Items CRUD, Repairs CRUD with mark-done, the history log and the FIXA link, Calendar (grid, prev/next, day filter, quick Paid/Done, FAB), removal of Neighbours, and regression on all 5 tabs. Every flow worked end to end. No screen crashed and no red screen appeared. All QA data was cleaned up. Bugs found: (1) Repair schedule: picking Monthly keeps interval 3 from the default, so the repair saves as 'Every 3 months'. (2) The Bills tile shows the overdue count for bills plus repairs. (3) The item warranty pill reads 'Paid' / 'Due in Nd' instead of warranty wording. (4) records/new nests a <button> inside a <button>, which fires a console error and a LogBox toast that covers the Save button in dev web. (5) Delete handlers call router.back() with no canGoBack fallback, so a deep-linked detail stays open after delete. (6) In the item form, the Paid/Worth row overflows horizontally on web.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "seed data", "issue": "'Ikeja rental' has 0 bills/items/repairs/records (review request said it is seeded). Lekki flat is seeded correctly."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ScheduleChips (repairs/new)", "issue": "Repair default schedule is {freq:'custom', interval:3}. ScheduleChips.onChange keeps value.interval when you switch freq, so picking 'Monthly' saves {freq:'monthly', interval:3}. The repair then shows 'Every 3 months' and next_due is moved 3 months on after Done. Verified via GET /api/home/repairs/<id>. Fix: reset interval to 1 when freq !== 'custom'. Reference: src/components/home/FormBits.tsx:93, app/home/repairs/new.tsx:31", "testID": "repair-sched-monthly", "priority": "HIGH"},
+      {"component": "Hub Bills tile caption", "issue": "tile-bills caption uses ov.attention.overdue, which counts bills AND repairs. It shows '2 overdue' while only 1 bill is overdue (the bills-summary shows 1). Use bill-only counts. Reference: app/(tabs)/home.tsx:90", "testID": "tile-bills", "priority": "MEDIUM"},
+      {"component": "Item warranty pill", "issue": "An active warranty is shown with StatusPill status='paid', so it reads 'Paid' (QA Fridge, Samsung TV). An expiring warranty reads 'Due in 20d'. Use warranty wording ('Covered' / 'Ends in Nd' / 'Expired'). Reference: app/home/items/index.tsx:76, app/home/items/[id].tsx:76", "testID": "item-warranty-pill", "priority": "MEDIUM"},
+      {"component": "Delete navigation on detail screens", "issue": "The delete handlers call router.back() with no canGoBack() fallback. When a detail screen is opened by deep link or from a notification, deleting the item leaves the user on the deleted item's screen, with the console error 'GO_BACK was not handled'. Reproduced for bill and repair. Reference: app/home/bills/[id].tsx:128, items/[id].tsx:46, records/[id].tsx:59, repairs/[id].tsx:100. The loading/missing headers have the same problem (bills/[id].tsx:137,144 etc.).", "testID": "bill-delete / repair-delete / item-delete / record-delete", "priority": "MEDIUM"},
+      {"component": "Item form price/value row", "issue": "On web, the two flex:1 MoneyInputs side by side overflow: 'Worth now' runs past the right edge and the form scrolls horizontally when focused. Add minWidth:0 to the flex children. Reference: app/home/items/new.tsx:138-144", "testID": "item-value", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Calendar", "issues": ["When the agenda is short (e.g. a day is selected), calendar-fab covers the quick Paid/Done button of the first or only event row, and the content cannot scroll out from under it."]},
+      {"screen": "Hub", "issues": ["home-fab overlaps the Records tile badge and the Repairs tile corner at the first scroll position."]},
+      {"screen": "Repair detail", "issues": ["Action buttons are cut off: 'Book a FI…' and 'Mark d…'."]},
+      {"screen": "Record detail", "issues": ["A stray 'Agreements' badge floats below the Delete button (looks duplicated)."]},
+      {"screen": "Global / first login", "issues": ["The Find Home intent sheet ('What are you looking for?') stays open on top of Feeds, Market, My Home and My Amass after switching tabs on a fresh session."]},
+      {"screen": "Notifications", "issues": ["Legacy friend-request notification ('wants to connect · Accept to share collections…') is still listed. Tapping it does nothing (it correctly does not navigate to /neighbours). Consider hiding legacy social/collection notifications."]}
+    ],
+    "react_native_issues": [
+      {"component": "Nested Pressable (records/new)", "issue": "The 'Linked bill' Pressable wraps a Chip (Pressable) and the 'Unlink' Pressable, so a <button> sits inside a <button> on web. This causes a hydration/DOM-nesting console error, and the dev LogBox toast covers the Save button. Reference: app/home/records/new.tsx:146-155"},
+      {"component": "Duplicate testID", "issue": "'repair-sched-custom' / 'bill-sched-custom' is used both on the Custom chip (ChipRow prefix + key 'custom') and on the custom-interval panel View. Reference: src/components/home/FormBits.tsx:93,95"},
+      {"component": "Require cycle", "issue": "Metro warns of a require cycle: src/ui/Button.tsx -> src/ui/Shimmer.tsx -> src/ui/Feedback.tsx -> src/ui/Button.tsx"}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_home_hub.py (existing, not re-run: frontend-only request)", ".screenshots/ (browser automation)"],
+  "action_items": [
+    "HIGH: ScheduleChips: when you pick a non-custom freq, reset interval to 1 (and unit to the freq's natural unit). Otherwise repairs default to 'Every 3 months' even after the user picks Monthly/Weekly/Yearly.",
+    "MEDIUM: Hub tile-bills caption: use bill-only overdue/due_soon counts (the overview API could return attention per section).",
+    "MEDIUM: Items warranty pill: replace StatusPill 'paid'/'due_soon' with warranty-specific labels.",
+    "MEDIUM: Bills/Items/Records/Repairs detail: after delete (and on the missing/loading back buttons) use router.canGoBack() ? router.back() : router.replace('/home/<section>').",
+    "MEDIUM: records/new.tsx: do not nest Pressables. Make the Chip itself the press target, and move Unlink outside the outer Pressable.",
+    "LOW: items/new.tsx price/value row: add minWidth:0 to the flex:1 wrappers.",
+    "LOW: Calendar/Hub FAB overlapping content; truncated repair-detail action buttons; stray badge on record detail; duplicate *-sched-custom testID; intent sheet staying over other tabs.",
+    "LOW: app/admin/neighbours.tsx:251 still builds /neighbours/posts|events|users|collections links. Those routes are removed, so admin report deep-links land on Unmatched Route. Point them to /social/post/<id> or drop them.",
+    "LOW: seed bills/items/repairs for 'Ikeja rental', or update the docs."
+  ],
+  "critical_code_review_comments": [
+    "FormBits ScheduleChips onChange carries interval across freq changes. This is the root cause of the repair schedule bug and affects editing bills that have a custom interval too.",
+    "home.tsx tile captions reuse the aggregate attention counts for the Bills tile.",
+    "Detail-screen delete flows are inconsistent: the headers use the canGoBack fallback but the delete handlers do not.",
+    "No deprecated expo packages found (expo-av / expo-barcode-scanner / expo-background-fetch absent). Forms use KeyboardAwareScrollView (react-native-keyboard-controller)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "~90% (all flows functional; 1 high + 4 medium logic/UX bugs)"},
+  "seed_data_creation": "Created and then deleted: home 'QA Test Home', bill 'QA Water bill', record 'QA Tenancy agreement', item 'QA Fridge', repair 'QA Service generator', and (via API, for the calendar quick-action test) 'QA Cal repair' and 'QA Cal bill'. Verified none remain. Side effect: no seeded data was changed. Quick actions were only run on QA items.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login demo@amass.africa/amass2026 (API returns access_token). Seeded home Lekki flat id 2ef9df23-..., Ikeja rental 8ac48fb7-... (empty). The device date in the env is Oct 2026. DueRow testIDs (home-due-N, calendar-event-<id>) sit on the outer View; tap the inner title text to open the detail, and use the '-quick' suffix for quick actions. On web, the dev LogBox toast can intercept force-clicks; use element.evaluate('e=>e.click()'). The Find Home intent sheet appears on fresh sessions.",
+  "rca_of_issue": "Repair schedule bug: repairs/new.tsx initial schedule is {freq:'custom', interval:3, unit:'months'}. FormBits.tsx:93 onChange => {freq, interval: value.interval ?? 1, ...} keeps 3 → backend stores monthly with interval 3 → schedule_label 'Every 3 months', next due +3 months. Repro: Repairs FAB → pick trade → tap Monthly → set due → save → detail shows 'Every 3 months'."
+}

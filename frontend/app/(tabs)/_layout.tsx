@@ -3,7 +3,7 @@
  * A solid, full-width bar (never floating over content): five big, evenly spaced tabs —
  * Find Home · Feeds · Market · My Home · My Amass. The active tab is AMASS-red (filled icon,
  * bold label) on a soft red capsule that slides between tabs; inactive tabs stay legible in
- * secondary ink. Badges: Feeds (unread alerts) and My Home (unread chats + requests).
+ * secondary ink. Badges: Feeds (unread alerts) and My Home (bills / maintenance overdue or due today).
  * Every tab is a full-height 66 pt press target.
  */
 import React, { useEffect, useState } from "react";
@@ -17,6 +17,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, w
 import { useAuth } from "@/src/contexts/auth";
 import { api } from "@/src/lib/api";
 import { subscribeBadges } from "@/src/lib/badgeSignal";
+import { homeApi } from "@/src/lib/homeHub";
 import { useTheme } from "@/src/theme";
 import { motion, radii } from "@/src/theme/tokens";
 import { AppText, useReducedMotion } from "@/src/ui";
@@ -33,20 +34,20 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: "Find Home" }} />
       <Tabs.Screen name="updates" options={{ title: "Feeds" }} />
       <Tabs.Screen name="marketplace" options={{ title: "Market" }} />
-      <Tabs.Screen name="neighbours" options={{ title: "My Home" }} />
+      <Tabs.Screen name="home" options={{ title: "My Home" }} />
       <Tabs.Screen name="profile" options={{ title: "My Amass" }} />
     </Tabs>
   );
 }
 
-/** Badge counts — Feeds = unread alerts; My Home = unread chats + requests waiting on me. Polls every 30 s, on foreground, and whenever a screen signals a change. */
+/** Badge counts — Feeds = unread alerts; My Home = bills & maintenance overdue or due today. Polls every 30 s, on foreground, and whenever a screen signals a change. */
 function useBadges(activeIndex: number) {
-  const [counts, setCounts] = useState({ updates: 0, neighbours: 0 });
+  const [counts, setCounts] = useState({ updates: 0, home: 0 });
   useEffect(() => {
     let alive = true;
     const load = () =>
-      Promise.all([api.notifUnreadCount().catch(() => ({ unread: 0 })), api.chatUnreadCount().catch(() => ({ unread_count: 0 })), api.communityAlerts().catch(() => ({ total: 0 }))])
-        .then(([n, c, a]) => alive && setCounts({ updates: n.unread ?? 0, neighbours: (c.unread_count ?? 0) + (a.total ?? 0) }))
+      Promise.all([api.notifUnreadCount().catch(() => ({ unread: 0 })), homeApi.badge().catch(() => ({ count: 0 }))])
+        .then(([n, h]) => alive && setCounts({ updates: n.unread ?? 0, home: h.count ?? 0 }))
         .catch(() => {});
     load();
     const id = setInterval(load, 30000);
@@ -99,7 +100,7 @@ function BottomNav({ state, emitter, navigateToTab }: BottomTabBarProps) {
             active={state.index === i}
             compact={tabW < 72}
             reduce={reduce}
-            badge={r.name === "updates" ? badges.updates : r.name === "neighbours" ? badges.neighbours : 0}
+            badge={r.name === "updates" ? badges.updates : r.name === "home" ? badges.home : 0}
             onPress={() => {
               const event = emitter.emit({ type: "tabPress", target: r.key, canPreventDefault: true });
               if (state.index !== i && !event.defaultPrevented) navigateToTab(r.key);
@@ -160,7 +161,7 @@ function tabConfig(routeName: string): { label: string; icon: IconName; iconActi
       return { label: "Feeds", icon: "newspaper-outline", iconActive: "newspaper" };
     case "marketplace":
       return { label: "Market", icon: "storefront-outline", iconActive: "storefront" };
-    case "neighbours":
+    case "home":
       return { label: "My Home", icon: "home-outline", iconActive: "home" };
     case "profile":
       return { label: "My Amass", icon: "person-circle-outline", iconActive: "person-circle" };

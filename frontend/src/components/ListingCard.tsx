@@ -28,7 +28,6 @@ export function ListingCard({
   compact,
   testID,
   via,
-  onAddToList,
 }: {
   property: Property;
   width?: number | `${number}%`;
@@ -39,8 +38,6 @@ export function ListingCard({
   testID?: string;
   /** Funnel attribution appended as ?via= (e.g. "collection:<id>", "friend", "estate"). */
   via?: string;
-  /** Shows a second overlay button that lets the user drop the home into a shared list. */
-  onAddToList?: (property: Property) => void;
 }) {
   const { colors, isDark } = useTheme();
   const router = useRouter();
@@ -149,23 +146,6 @@ export function ListingCard({
           </FrostedCircle>
         </Pressable>
       </Animated.View>
-      {onAddToList ? (
-        <Pressable
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            onAddToList(property);
-          }}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Add to a shared list"
-          testID={`add-to-list-${property.id}`}
-          style={[styles.heart, styles.listBtn]}
-        >
-          <FrostedCircle size={34} tone={isDark ? "dark" : "light"}>
-            <Ionicons name="albums-outline" size={17} color={isDark ? "#FFFFFF" : colors.text} />
-          </FrostedCircle>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -176,7 +156,6 @@ const styles = StyleSheet.create({
   topRow: { position: "absolute", top: 10, left: 10, right: 50, flexDirection: "row", alignItems: "flex-start" },
   heartWrap: { position: "absolute", top: 10, right: 10 },
   heart: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
-  listBtn: { position: "absolute", top: 10, right: 50 },
   pricePlate: { position: "absolute", left: 10, bottom: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radii.md, overflow: "hidden" },
   pricePlateCompact: { paddingHorizontal: 8, paddingVertical: 4 },
   body: { padding: 14, gap: 4 },

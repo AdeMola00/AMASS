@@ -66,6 +66,7 @@ CATEGORIES: dict[str, dict[str, Any]] = {
     "admin": {"label": "Admin decisions", "caption": "Approvals, rejections and moderation", "icon": "shield-checkmark", "digest": False, "default_frequency": "immediate"},
     "messages": {"label": "Messages", "caption": "Chats with agents, buyers and neighbours", "icon": "chatbubble", "digest": False, "default_frequency": "immediate"},
     "services": {"label": "Services & projects", "caption": "Viewings, inspections, FIXA bookings, renovations", "icon": "construct", "digest": False, "default_frequency": "immediate"},
+    "home": {"label": "My Home reminders", "caption": "Bills due, maintenance, document and warranty expiry", "icon": "home", "digest": False, "default_frequency": "immediate"},
 }
 FREQUENCIES = ("immediate", "daily", "weekly")
 
@@ -137,6 +138,13 @@ KIND_CATEGORY: dict[str, str] = {
     "badge_update": "admin",
     "review_moderation": "admin",
     "review_received": "services",
+    # My Home hub reminders
+    "HOME_BILL_DUE": "home",
+    "HOME_BILL_OVERDUE": "home",
+    "HOME_REPAIR_DUE": "home",
+    "HOME_REPAIR_OVERDUE": "home",
+    "HOME_RECORD_EXPIRY": "home",
+    "HOME_WARRANTY_EXPIRY": "home",
 }
 
 

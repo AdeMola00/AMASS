@@ -198,7 +198,7 @@ export default function AdminNeighboursScreen() {
               <EmptyState variant={estateStatus === "pending" ? "success" : "empty"} compact icon="business-outline" title={estateStatus === "pending" ? "No estates waiting" : `No ${estateStatus} estates`} body={estateStatus === "pending" ? "New proposals from residents land here for approval." : undefined} testID="nb-admin-estates-empty" />
             ) : (
               estates.map((e) => (
-                <EstateCard key={e.id} estate={e} busy={busyId === e.id} onApprove={() => reviewEstate(e, "approve")} onReject={() => setConfirm({ kind: "reject", estate: e })} onOpen={() => router.push(`/neighbours/estates/${e.id}` as any)} />
+                <EstateCard key={e.id} estate={e} busy={busyId === e.id} onApprove={() => reviewEstate(e, "approve")} onReject={() => setConfirm({ kind: "reject", estate: e })} />
               ))
             )}
           </>
@@ -247,8 +247,8 @@ export default function AdminNeighboursScreen() {
 }
 
 function openTarget(router: ReturnType<typeof useRouter>, r: SocialReport) {
-  const path =
-    r.target_type === "post" || r.target_type === "reply" ? `/neighbours/posts/${r.target_id}` : r.target_type === "event" ? `/neighbours/events/${r.target_id}` : r.target_type === "user" ? `/neighbours/users/${r.target_id}` : r.target_type === "collection" ? `/neighbours/collections/${r.target_id}` : r.target_type === "place" ? "/neighbours/places" : null;
+  // Only Nearby (social) posts still have a screen; legacy Neighbours targets (events, users, collections, places) were removed.
+  const path = r.target_type === "post" || r.target_type === "reply" ? `/social/post/${r.target_id}` : null;
   if (path) router.push(path as any);
 }
 
@@ -425,12 +425,12 @@ function FunnelView({ funnel, days, onDays, onExport, exporting }: { funnel: Adm
 }
 
 /* ─── Estate card ────────────────────────────────────────────────────── */
-function EstateCard({ estate, busy, onApprove, onReject, onOpen }: { estate: AdminEstate; busy: boolean; onApprove: () => void; onReject: () => void; onOpen: () => void }) {
+function EstateCard({ estate, busy, onApprove, onReject }: { estate: AdminEstate; busy: boolean; onApprove: () => void; onReject: () => void }) {
   const { colors } = useTheme();
   const pending = estate.status === "pending";
   const place = [estate.area, estate.city, estate.state].filter(Boolean).join(" · ");
   return (
-    <Card elevation="xs" style={{ gap: 10 }} onPress={estate.status === "active" ? onOpen : undefined} testID={`nb-admin-estate-${estate.id}`}>
+    <Card elevation="xs" style={{ gap: 10 }} testID={`nb-admin-estate-${estate.id}`}>
       <View style={styles.rowBetween}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
           <View style={[styles.viaIcon, { backgroundColor: colors.brandSoft, width: 36, height: 36, borderRadius: 12 }]}>

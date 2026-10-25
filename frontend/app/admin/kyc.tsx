@@ -14,7 +14,7 @@ import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Avatar, Badge, Button, Card, Chip, EmptyState, Input, Screen, ScreenHeader, SegmentedControl, Sheet, SkeletonRows, StatTile, useToast } from "@/src/ui";
-import { AuthedImage } from "@/src/components/neighbours/AuthedImage";
+import { AuthedImage } from "@/src/components/common/AuthedImage";
 
 type Tab = "identity" | "documents";
 type Status = "pending" | "approved" | "rejected";
@@ -200,9 +200,6 @@ export default function AdminKyc() {
                       {target.row.phone ? ` · ${target.row.phone}` : ""}
                     </AppText>
                   </View>
-                  <Pressable onPress={() => router.push(`/neighbours/users/${target.row.user_id}` as any)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Open profile" testID="kyc-open-profile">
-                    <Ionicons name="open-outline" size={18} color={colors.textSecondary} />
-                  </Pressable>
                 </View>
                 <View style={{ flexDirection: "row", gap: 10 }}>
                   <Shot label="ID document" url={target.row.id_document_url} testID="kyc-shot-id" />

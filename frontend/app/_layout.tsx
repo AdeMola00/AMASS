@@ -53,6 +53,7 @@ if (Platform.OS === "android") {
 function openPushUrl(router: ReturnType<typeof useRouter>, data: any) {
   const url = data?.deeplink || data?.action_url;
   if (!url || typeof url !== "string") return;
+  if (url.startsWith("/neighbours")) return; // legacy Neighbours screens were removed
   try {
     if (url.startsWith("http")) Linking.openURL(url);
     else router.push(url as any);

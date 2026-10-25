@@ -16,7 +16,7 @@ import { AppText, Avatar, Badge, Button, Card, Chip, EmptyState, Input, Screen, 
 import { PromotionBadge } from "@/src/components/PromotionBadge";
 import { PhotoField } from "@/src/components/kyc/PhotoField";
 import { DocumentsBadge, DOCS_META } from "@/src/components/kyc/badges";
-import { AuthedImage } from "@/src/components/neighbours/AuthedImage";
+import { AuthedImage } from "@/src/components/common/AuthedImage";
 import { LISTING_STATUS_TONE, normalizeStatus, type ListingStatus } from "@/src/components/agent/ListingManagerRow";
 
 type Tab = "leads" | "docs";
@@ -177,7 +177,7 @@ export default function ManageListing() {
                 <StatTile icon="clipboard" tone="success" value={counts?.inspections ?? 0} label="Inspections" testID="manage-stat-inspections" />
               </View>
               {leads && leads.leads.length > 0 ? (
-                leads.leads.map((l) => <LeadRow key={l.id} lead={l} onPress={l.kind === "chat" && l.conversation_id ? () => router.push(`/chat/${l.conversation_id}` as any) : l.kind === "inspection" && l.inspection_id ? () => router.push(`/improve/inspection/${l.inspection_id}` as any) : l.user_id ? () => router.push(`/neighbours/users/${l.user_id}` as any) : undefined} />)
+                leads.leads.map((l) => <LeadRow key={l.id} lead={l} onPress={l.kind === "chat" && l.conversation_id ? () => router.push(`/chat/${l.conversation_id}` as any) : l.kind === "inspection" && l.inspection_id ? () => router.push(`/improve/inspection/${l.inspection_id}` as any) : undefined} />)
               ) : (
                 <EmptyState icon="people-outline" title="No leads yet" body="Every chat started from this home, every MASS unlock and every inspection request shows up here." actionLabel={property.promotion ? undefined : "Boost this listing"} onAction={property.promotion ? undefined : () => router.push(`/agent/boost/${property.id}` as any)} testID="manage-leads-empty" />
               )}

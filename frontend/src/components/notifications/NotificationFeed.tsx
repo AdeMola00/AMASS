@@ -104,7 +104,7 @@ export const CHIP_LABEL: Record<string, string> = {
   nearby_listings: "Near you",
   brand_offers: "Brands",
   marketplace: "Marketplace",
-  social: "Neighbours",
+  social: "Nearby",
   nearby_free: "Free nearby",
   passport: "Passport",
   receipts: "Receipts",
@@ -135,17 +135,12 @@ function dayLabel(iso: string) {
 
 /** Where a notification lands — backend `action_url` first, then meta fallbacks for legacy rows. */
 export function routeFor(n: AppNotification): string | null {
+  // Legacy Neighbours destinations (estates, friends, shared lists, events, posts, services) no longer exist.
+  if (n.action_url && n.action_url.startsWith("/neighbours")) return null;
   if (n.action_url) return n.action_url;
   const meta = n.meta || {};
   if (n.kind === "MARKET_OFFER" && meta.offer_id) return `/marketplace/my-listings?tab=${meta.tab === "sent" ? "sent" : "received"}`;
   if (n.kind === "MARKET_MODERATION") return "/marketplace/my-listings";
-  if (n.kind === "ESTATE_REQUEST" && meta.estate_id) return `/neighbours/estates/${meta.estate_id}?tab=people`;
-  if (meta.service_request_id) return `/neighbours/services/${meta.service_request_id}`;
-  if (meta.post_id) return `/neighbours/posts/${meta.post_id}`;
-  if (meta.event_id) return `/neighbours/events/${meta.event_id}`;
-  if (meta.collection_id) return `/neighbours/collections/${meta.collection_id}`;
-  if (meta.connection_id) return "/neighbours/friends";
-  if (meta.estate_id) return `/neighbours/estates/${meta.estate_id}`;
   if (meta.conversation_id) return `/chat/${meta.conversation_id}`;
   if (meta.item_id) return `/marketplace/${meta.item_id}`;
   if (meta.inspection_id) return `/improve/inspection/${meta.inspection_id}`;

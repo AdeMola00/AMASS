@@ -408,8 +408,8 @@ export default function SocialComposeScreen() {
       <Sheet visible={sheet === "visibility"} onClose={() => setSheet(null)} title="Who can see this post" testID="social-visibility-sheet">
         <View style={{ gap: 6 }}>
           {([
-            { key: "estate" as SocialScope, label: meta?.scopes.estates[0]?.name ?? "Your estate", caption: meta?.scopes.estates.length ? "Only approved residents of your estate" : "Join your estate in Neighbours to unlock", icon: "home", disabled: !meta?.scopes.estates.length },
-            { key: "area" as SocialScope, label: meta?.scopes.areas[0] ?? "Your area", caption: meta?.scopes.areas.length ? "Your estate and nearby streets" : "Set by your estate — join one in Neighbours", icon: "navigate", disabled: !meta?.scopes.areas.length },
+            { key: "estate" as SocialScope, label: meta?.scopes.estates[0]?.name ?? "Your estate", caption: meta?.scopes.estates.length ? "Only approved residents of your estate" : "Not available for your account yet", icon: "home", disabled: !meta?.scopes.estates.length },
+            { key: "area" as SocialScope, label: meta?.scopes.areas[0] ?? "Your area", caption: meta?.scopes.areas.length ? "Your estate and nearby streets" : "Not available for your account yet", icon: "navigate", disabled: !meta?.scopes.areas.length },
             { key: "city" as SocialScope, label: meta?.scopes.city ?? "City", caption: "Everyone in the city — widest reach", icon: "business", disabled: false },
           ]).map((o) => {
             const active = visibility === o.key;
@@ -427,7 +427,6 @@ export default function SocialComposeScreen() {
             );
           })}
         </View>
-        {!meta?.scopes.estates.length ? <SheetLink label="join your estate in Neighbours" onPress={() => { setSheet(null); router.push("/neighbours/estates" as any); }} testID="social-visibility-join" /> : null}
       </Sheet>
 
       {/* Photo options */}

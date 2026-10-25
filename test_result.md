@@ -296,6 +296,42 @@ frontend:
         comment: "Added idempotent create_index calls on properties, wallets, token_transactions, notifications, users, favorites, marketplace, agent_referrals."
 
 frontend:
+  - task: "Home Hub — My Home tab + Bills/Records/Items/Repairs/Calendar/Homes (frontend E2E)"
+    implemented: true
+    working: true
+    file: "frontend/app/(tabs)/home.tsx, frontend/app/home/**, frontend/src/components/home/*, frontend/src/lib/homeHub.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Hub tab + CRUD screens scaffolded last session; this session fixed tsc errors and added
+          app/home/calendar.tsx and app/home/homes.tsx. Smoke screenshot of /home renders switcher,
+          Next up, This month, tiles. Needs full E2E (add/edit/delete each kind, quick Paid/Done,
+          calendar day agenda, home switcher + manage homes).
+      - working: true
+        agent: "testing"
+        comment: |
+          iteration_86: every flow passes. Found: repair interval kept at 3 when switching Custom→Monthly (HIGH),
+          Bills tile counted repairs, warranty pill said "Paid", nested button in record form, delete handlers
+          router.back() without canGoBack. All fixed by main afterwards (FormBits interval reset, per-type
+          attention counts from backend, warrantyPill/expiryPill, record form restructure, canGoBack fallbacks).
+  - task: "Neighbours removal — no stray routes/links"
+    implemented: true
+    working: true
+    file: "frontend/app/property/[id].tsx, frontend/app/saved-properties.tsx, frontend/app/shop/**, frontend/src/components/notifications/NotificationFeed.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          app/neighbours/* and src/components/neighbours/* deleted; Add-to-list buttons removed; notification
+          deep links to /neighbours ignored; verify.tsx new users land on /(tabs)/home.
+
   - task: "Map filters — status chips + tappable legend listing-type filter (map+list+legend synced)"
     implemented: true
     working: "NA"
@@ -374,13 +410,24 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Phase1 — Two-tier property access (access + agent-contact) charging"
-    - "Phase1 — Two-tier property access UX (access gate + agent reveal)"
+    - "Home Hub — My Home tab + Bills/Records/Items/Repairs/Calendar/Homes (frontend E2E)"
+    - "Neighbours removal — no stray routes/links"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: |
+      Iteration 86 (to run) — HOME HUB frontend (replaces Neighbours). Backend /api/home/* already passes tests/test_home_hub.py.
+      New screens: app/(tabs)/home.tsx (hub: switcher, Next up, This month, 6 tiles, + FAB → AddSheet), app/home/{bills,records,
+      items,repairs}/{index,new,[id]}.tsx, app/home/calendar.tsx (NEW this session), app/home/homes.tsx (NEW — manage homes:
+      add/edit/colour/default/delete with HOME_NOT_EMPTY force confirm). Fixed tsc errors (items/new placeholder quote, outbox.list
+      null, FileThumb style, bills footer). Neighbours removed: app/neighbours/*, src/components/neighbours/* deleted (AuthedImage
+      moved to src/components/common/), "Add to list" buttons removed from property/saved/shop screens, notification routeFor()
+      drops /neighbours links, verify.tsx new users → /(tabs)/home, Social welcome has 2 steps now. Demo user demo@amass.africa /
+      amass2026 has seeded homes "Lekki flat" + "Ikeja rental" with bills/items/repairs. Web confirm() used for deletes on web.
+
   - agent: "main"
     message: |
       PHASE 2 polish — please verify (demo@amass.africa / amass2026; login testIDs:

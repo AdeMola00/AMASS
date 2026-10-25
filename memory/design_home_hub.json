@@ -1,0 +1,194 @@
+{
+  "app_name": "Amass Home Hub",
+  "personality": "4 Tactile / Playful LIGHT",
+  "personality_one_liner": "A visual-first, colorful, and highly approachable home management hub that makes tracking property details feel rewarding rather than like a chore.",
+  "color": {
+    "surface": "#FFFFFF",
+    "onSurface": "#111111",
+    "surfaceSecondary": "#F7F6F3",
+    "onSurfaceSecondary": "#111111",
+    "surfaceTertiary": "#F0EFEA",
+    "onSurfaceTertiary": "#111111",
+    "surfaceInverse": "#111111",
+    "onSurfaceInverse": "#F7F6F3",
+    "brand": "#E11B22",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#E11B22",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#F97316",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#FDE8E9",
+    "onBrandTertiary": "#E11B22",
+    "success": "#2E8B57",
+    "onSuccess": "#FFFFFF",
+    "warning": "#C99E0E",
+    "onWarning": "#FFFFFF",
+    "error": "#E11B22",
+    "onError": "#FFFFFF",
+    "info": "#4F46E5",
+    "onInfo": "#FFFFFF",
+    "marketOrange": "#F97316",
+    "declutterTeal": "#14B8A6",
+    "massGold": "#D4AF37",
+    "border": "#E5E5E5",
+    "borderStrong": "#CCCCCC",
+    "divider": "#E5E5E5",
+    "muted": "#666666"
+  },
+  "typography": {
+    "displayFontFamily": "DM Serif Display",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24,
+      "3xl": 32
+    }
+  },
+  "spacing": {
+    "rule": "Generous spacing for large touch targets. Use safe-area for header and tab bar.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "xl": 24,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Use glass on the bottom tab bar",
+      "Use glass on the Add action sheet background overlay",
+      "Use glass for sticky date headers in the calendar view"
+    ],
+    "dont's": [
+      "Avoid glass on the primary colorful tiles",
+      "Do not use glass for form inputs or standard list rows"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Home Hub",
+      "purpose": "A visual-first dashboard replacing 'My Home', giving a scannable summary of upcoming bills and quick access to 6 core property modules.",
+      "states": {
+        "loading": "Skeleton grids for the 6 tiles and top reminder strip.",
+        "empty": "A friendly empty state inside the next-3-due strip: 'Everything is up to date! Enjoy your day.'",
+        "error": "Failed to load home data. [Retry] button."
+      },
+      "layout": "1. Header: 'Home Switcher' (e.g., '123 Main St ▼' in DM Serif Display). \n2. Monthly Total: A bold stat block showing this month's expenses. \n3. Next 3 Due Strip: A horizontal scroll of 3 compact cards. Left border color-coded by status (Red=Overdue, Yellow=Due Soon, Green=Paid). \n4. 6 Big Tiles Grid: 2 columns. Massive touch targets. Each tile has a tinted background, a thick-stroke Ionicon, and bold label. Bills (Orange), Records (Indigo), Items (Teal), Repairs (Red), Saved (Gold), Calendar (Green). \n5. Floating Action Button (FAB): A prominent oversized '+' anchored at bottom right, opening the Add Sheet."
+    },
+    {
+      "name": "Add Sheet (Bottom Sheet)",
+      "purpose": "A 4-option unified add menu (Bill, Record, Item, Repair) keeping addition within 3 taps.",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "BottomSheet with 4 large list rows or a 2x2 grid of huge tap targets. Tapping one instantly transitions to a simplified form."
+    },
+    {
+      "name": "Add Bill Form",
+      "purpose": "Quick entry form designed to hit the '3 taps to add' metric.",
+      "states": {
+        "loading": "Spinner on 'Save' button during submission.",
+        "empty": "N/A",
+        "error": "Inline validation errors (e.g., 'Amount required')."
+      },
+      "layout": "Large numeric input for amount. Horizontal scrolling chips for Schedule (Once, Weekly, Monthly) and Reminders (3 days before). Big sticky 'Save' CTA at bottom."
+    },
+    {
+      "name": "Bills & Reminders",
+      "purpose": "List of all bills, categorized by status, with quick-pay actions.",
+      "states": {
+        "loading": "List skeleton.",
+        "empty": "Icon: `receipt-outline`. Text: 'No upcoming bills. You're all caught up!'",
+        "error": "Failed to load bills. [Retry]"
+      },
+      "layout": "Segmented Control (Upcoming, Paid). ListRows with left icon, title, amount, and due date. Swiping or tapping a 'Mark Paid' checkbox triggers a micro-celebration animation."
+    },
+    {
+      "name": "Records",
+      "purpose": "Digital filing cabinet for home documents.",
+      "states": {
+        "loading": "Grid skeleton.",
+        "empty": "Icon: `folder-open-outline`. Text: 'Your digital filing cabinet is empty. Add receipts or warranties here.'",
+        "error": "Failed to load records."
+      },
+      "layout": "Folder-style navigation. 2-column grid of folders (Receipts, Agreements, Property docs, Warranties, Utility bills, Other). Inside: list of uploaded files."
+    },
+    {
+      "name": "Items",
+      "purpose": "Visual inventory of household items with values.",
+      "states": {
+        "loading": "Grid skeleton.",
+        "empty": "Icon: `sofa-outline` (Note: fallback to `bed-outline` if unavailable). Text: 'What's in your home? Snap a photo to add your first item.'",
+        "error": "Failed to load items."
+      },
+      "layout": "Masonry or 2-column grid of image cards. Each card has a photo cover, item name, and value/warranty tag."
+    },
+    {
+      "name": "Repairs",
+      "purpose": "Track maintenance and directly book FIXA pros.",
+      "states": {
+        "loading": "List skeleton.",
+        "empty": "Icon: `hammer-outline`. Text: 'Everything is running smoothly. Log a repair when needed.'",
+        "error": "Failed to load repairs."
+      },
+      "layout": "List of upcoming maintenance. Each row includes a 'Book a FIXA pro' secondary CTA button and a shortcut to 'Improve My Property'."
+    },
+    {
+      "name": "Calendar",
+      "purpose": "Month view showing bills, maintenance, and expiries.",
+      "states": {
+        "loading": "Calendar grid skeleton.",
+        "empty": "N/A (Calendar always shows days, empty agenda below it).",
+        "error": "Failed to load events."
+      },
+      "layout": "Top half: Month view grid with colored dots (Red=Overdue, Yellow=Due Soon, Green=Paid). Bottom half: Agenda list for the selected day."
+    }
+  ],
+  "images": {
+    "home_switcher_cover": {
+      "url": "https://images.unsplash.com/photo-1649083048770-82e8ffd80431?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBob21lJTIwaW50ZXJpb3IlMjBjb3p5fGVufDB8fHx8MTc5Mjk0NjE3NXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Cozy modern home interior"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to the Amass token palette mapping: Bills (marketOrange #F97316), Records (info/premium indigo #4F46E5), Items (declutterTeal #14B8A6), Repairs (brand red #E11B22), Saved (massGold #D4AF37), Calendar (success green #2E8B57).",
+    "Status colors for the Next 3 Due strip MUST be mapped to: Overdue = brand red (#E11B22), Due Soon = warning yellow (#C99E0E), Paid = success green (#2E8B57).",
+    "Typography: Use DM Serif Display for headings, the 'Home Switcher', and the Monthly Total. Use Plus Jakarta Sans (max weight 500) for all other UI text.",
+    "Implement the large 6-tile grid using `width: '48%'` wrapped in a row with `justifyContent: 'space-between'` and generous gap. Ensure the icons (Ionicons) are large, with thick strokes, and use outline variants (e.g., `receipt-outline`, `folder-outline`, `bed-outline`, `hammer-outline`, `heart-outline`, `calendar-outline`).",
+    "Add a prominent floating action button (FAB) at the bottom right of the Home Hub that opens a BottomSheet to select Bill, Record, Item, or Repair.",
+    "The 'Add Bill' flow MUST be fully optimized for speed (3 taps). Use horizontal scrolling chips for 'Schedule' and 'Reminders'.",
+    "Implement a micro-animation (e.g., Lottie confetti or a Reanimated checkmark pop) when a user taps 'Mark Paid' on a bill.",
+    "Ensure 'Book a FIXA pro' is visible as a secondary CTA button on every repair list item.",
+    "Provide high-contrast, friendly empty states with the specific copy provided in the screen specs.",
+    "Disable emojis everywhere."
+  ]
+}

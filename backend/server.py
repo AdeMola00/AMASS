@@ -2084,6 +2084,10 @@ from map_time import ensure_map_time_indexes, register_map_time_routes
 _map_time_router, _map_time_meter = register_map_time_routes(db, get_current_user)
 app.include_router(_map_time_router)
 
+# ─── My Home hub: homes, bills (reminders only), records, items, repairs, calendar, private uploads
+from home_hub import register_home_hub_routes, start_home_hub, seed_home_hub_demo
+app.include_router(register_home_hub_routes(db, get_current_user, require_admin))
+
 # ─── Agent Platform (Phase 1: onboarding, plans, quotas, founding, admin)
 from agent_platform import (
     register_agent_platform_routes,
@@ -2314,6 +2318,13 @@ async def on_startup():
     await start_viewings(db)  # indexes + 24h reminder sweep
     await ensure_map_time_indexes(db)
     await ensure_fixa_indexes(db)
+    await start_home_hub(db)  # indexes + 30-min bill / maintenance / expiry reminder sweep
+    try:
+        _demo_hh = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0, "id": 1})
+        if _demo_hh:
+            await seed_home_hub_demo(db, _demo_hh)
+    except Exception as _e:  # never block boot
+        logger.warning("home hub demo seed failed: %s", _e)
     # ─── DB Indexes (idempotent) ─────────────────────────────
     try:
         await db.properties.create_index("id", unique=True)

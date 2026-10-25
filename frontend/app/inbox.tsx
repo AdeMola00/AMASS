@@ -211,7 +211,7 @@ export default function InboxScreen() {
           renderItem={({ item }) => {
             const other = item.other_participants?.[0];
             const isUnread = (item.unread_count ?? 0) > 0;
-            const name = item.kind === "group" ? (item.title || "Group chat") : (other?.full_name || "Neighbour");
+            const name = item.kind === "group" ? (item.title || "Group chat") : (other?.full_name || "AMASS member");
             return (
               <Card onPress={() => router.push(`/chat/${item.id}` as any)} testID={`conv-${item.id}`} elevation="xs" style={isUnread ? { borderColor: colors.borderStrong } : undefined}>
                 <View style={styles.row}>

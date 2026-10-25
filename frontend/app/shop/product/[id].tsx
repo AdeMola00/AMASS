@@ -22,7 +22,6 @@ import { AddControl, ShopProductCard } from "@/src/components/shop/ShopProductCa
 import { OfferTag, PurchaseRoutes, ShopHeading, SolidTag, VerifiedNote } from "@/src/components/shop/ShopBits";
 import { discountPct, fmtDate, naira, priceLabel, shareLink, stockLabel } from "@/src/components/shop/shopFormat";
 import { SHOP, shopFont, tint } from "@/src/components/shop/shopTheme";
-import { AddToCollectionSheet } from "@/src/components/neighbours/AddToCollectionSheet";
 
 export default function ShopProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +34,6 @@ export default function ShopProductScreen() {
   const [p, setP] = useState<ShopProductDetail | null>(null);
   const [error, setError] = useState(false);
   const [img, setImg] = useState(0);
-  const [listOpen, setListOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -58,7 +56,7 @@ export default function ShopProductScreen() {
     try {
       const r = await api.shopToggleSave("product", p.id);
       setP({ ...p, saved: r.saved });
-      toast.show({ kind: "success", title: r.saved ? "Saved" : "Removed from saved", actionLabel: r.saved ? "Add to a list" : undefined, onAction: r.saved ? () => setListOpen(true) : undefined });
+      toast.show({ kind: "success", title: r.saved ? "Saved" : "Removed from saved" });
     } catch (e: any) {
       toast.error("Couldn't save", e?.message);
     }
@@ -98,7 +96,6 @@ export default function ShopProductScreen() {
           <View style={[styles.topBar, { top: insets.top + 6 }]}>
             <IconButton icon="arrow-back" label="Back" variant="glass" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/marketplace" as any))} testID="shop-product-back" />
             <View style={{ flex: 1 }} />
-            <IconButton icon="albums-outline" label="Add to a shared list" variant="glass" onPress={() => setListOpen(true)} testID="shop-product-add-to-list" />
             <IconButton icon="share-outline" label="Share product" variant="glass" onPress={() => p && shareLink(`${p.name} · ${price?.main} at ${p.retailer?.name ?? "a Lagos store"} (via AMASS)`, p.share_url)} testID="shop-product-share" />
             <IconButton icon={p?.saved ? "heart" : "heart-outline"} label={p?.saved ? "Unsave" : "Save"} variant="glass" color={p?.saved ? colors.brand : undefined} onPress={toggleSave} testID="shop-product-save" />
           </View>
@@ -232,15 +229,6 @@ export default function ShopProductScreen() {
                 </AppText>
               </View>
             ) : null}
-            {p.in_lists.length ? (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }} testID="shop-product-in-lists">
-                {p.in_lists.map((l) => (
-                  <Pressable key={l.id} onPress={() => router.push(`/neighbours/collections/${l.id}` as any)} accessibilityRole="button">
-                    <Badge label={`${l.emoji ?? "🛒"} in ${l.name}${l.shared ? " · shared" : ""}`} tone="neutral" size="xs" />
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
 
             {/* Variants / specs / warranty */}
             {p.variants.length ? (
@@ -361,7 +349,6 @@ export default function ShopProductScreen() {
           )}
         </View>
       ) : null}
-      {p ? <AddToCollectionSheet visible={listOpen} onClose={() => setListOpen(false)} targetId={p.id} kind="product" /> : null}
     </View>
   );
 }

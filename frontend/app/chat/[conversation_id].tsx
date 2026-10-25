@@ -451,7 +451,7 @@ export default function ConversationScreen() {
   const property = conv?.property;
   const marketItem = conv?.item;
   const socialPost = conv?.social_post as { id: string; title: string; kind: "give" | "sell"; price?: number | null; photo?: string | null; status: string; location_label: string } | null | undefined;
-  const otherName = conv?.kind === "group" ? (conv?.title || "Group chat") : (other?.full_name || "Neighbour");
+  const otherName = conv?.kind === "group" ? (conv?.title || "Group chat") : (other?.full_name || "AMASS member");
   const isOnline = presence.typing || (presence.last_seen ? (Date.now() - new Date(presence.last_seen).getTime()) / 1000 < 60 : false);
 
   const headerSubtitle = useMemo(() => {

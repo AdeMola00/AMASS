@@ -176,11 +176,10 @@ export function SocialFeed() {
   const followingCategory = !!(category && alerts?.following.includes(category));
   const selectedCategoryLabel = meta?.categories.find((c) => c.key === category)?.label ?? "this";
   const followedLive = useMemo(() => (alerts?.categories ?? []).filter((c) => c.following).reduce((n, c) => n + c.nearby_free, 0), [alerts]);
-  const estateJoined = !!meta?.scopes.estates.length;
   const posted = (meta?.counts.mine_active ?? 0) > 0;
-  const steps = [estateJoined, posted, saidHi];
+  const steps = [posted, saidHi];
   const done = steps.filter(Boolean).length;
-  const showWelcome = !welcomeDismissed && meta && done < 3;
+  const showWelcome = !welcomeDismissed && meta && done < steps.length;
   const maxW = Math.min(width, 720);
   const gutter = space[4];
   // FIXA "Pros near you" rail sits after the first few posts so it never pushes the newest items off-screen.
@@ -252,15 +251,14 @@ export function SocialFeed() {
             </Pressable>
           </View>
           <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
-            <WelcomeStep done={estateJoined} label="Join your estate" onPress={() => router.push("/neighbours/estates" as any)} testID="social-step-estate" />
             <WelcomeStep done={posted} label="Share an item" onPress={() => router.push("/social/compose" as any)} testID="social-step-post" />
             <WelcomeStep done={saidHi} label="Like a post" onPress={undefined} testID="social-step-hi" />
           </View>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.max(8, (done / 3) * 100)}%`, backgroundColor: colors.brand }]} />
+            <View style={[styles.progressFill, { width: `${Math.max(8, (done / steps.length) * 100)}%`, backgroundColor: colors.brand }]} />
           </View>
           <AppText variant="micro" color="rgba(255,255,255,0.7)" style={{ marginTop: 6 }}>
-            {done} of 3 steps completed
+            {done} of {steps.length} steps completed
           </AppText>
         </View>
       ) : null}
