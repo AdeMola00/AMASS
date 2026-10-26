@@ -223,18 +223,18 @@ export function ProviderRow({ provider: p, onPress, onMissingContact }: { provid
   const { colors, shadows } = useTheme();
   // Contact buttons are siblings of the card pressable — nested buttons are invalid on web and a call tap must never open the profile.
   return (
-    <View style={[styles.row, shadows.xs, { backgroundColor: colors.surface }]} testID={`fixa-row-${p.id}`}>
+    <View style={[styles.row, shadows.sm, { backgroundColor: colors.surface, borderColor: colors.borderStrong }]} testID={`fixa-row-${p.id}`}>
       <PressableScale
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={`${p.display_name}, ${p.category}${p.rating ? `, rated ${Number(p.rating).toFixed(1)}` : ""}. Open profile`}
         testID={`fixa-row-open-${p.id}`}
-        style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+        style={{ flexDirection: "row", alignItems: "center", gap: 14 }}
       >
-        <ProviderAvatar provider={p} size={56} />
-        <View style={{ flex: 1, gap: 3 }}>
+        <ProviderAvatar provider={p} size={76} />
+        <View style={{ flex: 1, gap: 4 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <AppText variant="title" numberOfLines={1} style={{ flex: 1 }}>
+            <AppText variant="h3" weight="extrabold" numberOfLines={2} style={{ flex: 1 }}>
               {p.display_name}
             </AppText>
             {p.is_boosted ? <Badge label="Boosted" tone="premium" icon="rocket" size="xs" /> : null}
@@ -267,12 +267,12 @@ export function ProviderRow({ provider: p, onPress, onMissingContact }: { provid
 export function ProviderMiniCard({ provider: p, onPress, onMissingContact }: { provider: ProviderPreview; onPress: () => void; onMissingContact?: (what: "phone" | "whatsapp") => void }) {
   const { colors, shadows } = useTheme();
   return (
-    <View style={[styles.mini, shadows.sm, { backgroundColor: colors.surface }]} testID={`fixa-mini-${p.id}`}>
+    <View style={[styles.mini, shadows.sm, { backgroundColor: colors.surface, borderColor: colors.borderStrong }]} testID={`fixa-mini-${p.id}`}>
       <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={`${p.display_name}, ${p.category}. Open profile`} testID={`fixa-mini-open-${p.id}`} style={{ gap: 10 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <ProviderAvatar provider={p} size={44} />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <ProviderAvatar provider={p} size={60} />
           <View style={{ flex: 1 }}>
-            <AppText variant="bodyMedium" numberOfLines={1}>
+            <AppText variant="title" weight="extrabold" numberOfLines={1}>
               {p.display_name}
             </AppText>
             <AppText variant="caption" tone="secondary" numberOfLines={1}>
@@ -367,7 +367,7 @@ export function ReportSheet({ visible, providerName, onClose, onSubmit, busy }: 
 const styles = StyleSheet.create({
   contactBtn: { alignItems: "center", justifyContent: "center" },
   verifyDot: { position: "absolute", bottom: -2, right: -2, alignItems: "center", justifyContent: "center", borderWidth: 2 },
-  row: { padding: space[3], borderRadius: radii.lg, gap: 10 },
+  row: { padding: space[4], borderRadius: radii.xl, gap: 12, borderWidth: 1.5 },
   rowFooter: { flexDirection: "row", alignItems: "center", gap: 8 },
-  mini: { width: 220, padding: space[3], borderRadius: radii.lg, gap: 10 },
+  mini: { width: 240, padding: space[3], borderRadius: radii.xl, gap: 10, borderWidth: 1.5 },
 });

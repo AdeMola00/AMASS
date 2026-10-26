@@ -779,3 +779,6 @@ User choice: fix in code only, keep demo's seeded test rows (CRM "AMASS Buyer" l
 - `FixaBits.tsx`: row + mini-card Call/WhatsApp buttons 44×44. `admin/settings.tsx`: `PROPER` nouns in `prettyFlag` ("Google Places").
 - Tests `test_phase4_reviews_score_crm.py` / `test_phase6c_passport_reps.py` tear down what they seed on demo (note: the phase4 teardown also removed the 59 pre-existing `seed-buyer*` leads when the suite ran).
 - Verified: testing_agent iteration_90 — all 7 items pass, smoke zero console errors. Accepted LOW: `/agent/representations/mine` capped at 200 rows (demo test data only), large files.
+
+## FIXA directory tiles — bolder (Jun 2026)
+- `FixaBits.tsx`: `ProviderRow` avatar 56 → 76, name `h3` extrabold (2 lines), tile `radii.xl`, 1.5 px `borderStrong` border, `shadows.sm`, padding `space[4]`; `ProviderMiniCard` (Feeds rail) avatar 44 → 60, name `title` extrabold, width 240, same border/shadow. Verified by screenshot at 390 px.
