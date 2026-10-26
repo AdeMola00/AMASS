@@ -43,6 +43,26 @@ BASE_URL = (
 DEMO_EMAIL = "demo@amass.africa"
 DEMO_PASSWORD = "amass2026"
 
+# Every property the wizard creates here is remembered so the session teardown can
+# remove it (plus its listing / representation / claims) instead of polluting demo.
+_CREATED_PROPS: list[str] = []
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_created_properties():
+    yield
+    if not _CREATED_PROPS:
+        return
+    from pymongo import MongoClient
+
+    db = MongoClient(os.environ.get("MONGO_URL", "mongodb://localhost:27017"))[os.environ.get("DB_NAME", "amass_db")]
+    q = {"property_id": {"$in": _CREATED_PROPS}}
+    db.property_claims.delete_many(q)
+    db.property_representations.delete_many(q)
+    db.property_listings.delete_many(q)
+    db.property_audit_logs.delete_many(q)
+    db.properties_geo.delete_many({"property_uuid": {"$in": _CREATED_PROPS}})
+
 
 # ─── Fixtures ────────────────────────────────────────────
 @pytest.fixture(scope="session")
@@ -153,6 +173,7 @@ def _make_property(api, headers, csid_tag="mk"):
     )
     assert r.status_code == 200, r.text
     b = r.json()
+    _CREATED_PROPS.append(b["property_id"])
     return b["amass_property_id"], b["property_id"], b["listing_id"], csid, oid
 
 

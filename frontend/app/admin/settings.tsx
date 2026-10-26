@@ -16,6 +16,17 @@ import { useTheme } from "@/src/theme";
 import { fontFamilies, radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, Button, EmptyState, Input, ListRow, RowGroup, Screen, ScreenHeader, Sheet, SkeletonRows, useToast } from "@/src/ui";
 
+/** "AI_VALUATION_NARRATIVE_ENABLED" → "AI valuation narrative" (acronyms and proper nouns keep their case, the _ENABLED suffix goes). */
+const ACRONYMS = new Set(["AI", "GPS", "KYC", "CRM", "API", "SMS", "OTP", "ID"]);
+const PROPER = new Set(["GOOGLE", "PLACES", "WHATSAPP", "PAYSTACK", "FIXA", "AMASS"]);
+const prettyFlag = (k: string) =>
+  k
+    .replace(/_ENABLED$/, "")
+    .split("_")
+    .map((w, i) => (ACRONYMS.has(w) ? w : i === 0 || PROPER.has(w) ? w.charAt(0) + w.slice(1).toLowerCase() : w.toLowerCase()))
+    .join(" ");
+
+
 export default function AdminSettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -96,8 +107,8 @@ export default function AdminSettingsScreen() {
                 key={k}
                 icon={v ? "toggle" : "toggle-outline"}
                 iconTone={v ? "success" : "default"}
-                label={k.replace(/_/g, " ")}
-                caption={k}
+                label={prettyFlag(k)}
+                caption={v ? "On" : "Off"}
                 last={i === flagEntries.length - 1}
                 showChevron={false}
                 trailing={

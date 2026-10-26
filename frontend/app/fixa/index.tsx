@@ -118,10 +118,10 @@ export default function FixaBrowse() {
           ) : (
             <EmptyState
               icon="construct-outline"
-              title="No pros match"
-              body="Try another trade or clear the filters."
-              actionLabel="Clear"
-              actionIcon="close-circle-outline"
+              title={sub ? `No ${sub} pros yet` : "No pros match"}
+              body={sub ? "We're still onboarding this trade. Browse every verified pro or search by name instead." : "Try another trade or clear the filters."}
+              actionLabel={sub ? "Show all pros" : "Clear"}
+              actionIcon={sub ? "people-outline" : "close-circle-outline"}
               onAction={() => {
                 setSub(null);
                 setQuery("");

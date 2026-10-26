@@ -73,10 +73,9 @@ export function SegmentedControl<T extends string>({
 /* ─── Wallet balance chip (header) ─────────────────────────────────── */
 export function BalanceChip({ compact, style, testID = "balance-chip" }: { compact?: boolean; style?: ViewStyle; testID?: string }) {
   const { colors, shadows } = useTheme();
-  const { mass, fix } = useWallet();
+  const { mass } = useWallet();
   const router = useRouter();
   const m = mass?.spendable ?? 0;
-  const f = fix?.spendable ?? 0;
   return (
     <Pressable
       onPress={() => {
@@ -84,7 +83,7 @@ export function BalanceChip({ compact, style, testID = "balance-chip" }: { compa
         router.push("/wallet");
       }}
       accessibilityRole="button"
-      accessibilityLabel={`Wallet: ${m} MASS, ${f} FIX`}
+      accessibilityLabel={`Wallet: ${m} MASS`}
       testID={testID}
       style={({ pressed }) => [
         styles.chip,
@@ -102,17 +101,6 @@ export function BalanceChip({ compact, style, testID = "balance-chip" }: { compa
         </View>
         <AppText variant="caption" weight="bold" tabular>
           {m.toLocaleString()}
-        </AppText>
-      </View>
-      <View style={[styles.chipDivider, { backgroundColor: colors.border }]} />
-      <View style={styles.chipPart}>
-        <View style={[styles.coin, { backgroundColor: colors.fix }]}>
-          <AppText variant="micro" color="#052E1F">
-            F
-          </AppText>
-        </View>
-        <AppText variant="caption" weight="bold" tabular>
-          {f.toLocaleString()}
         </AppText>
       </View>
       {!compact ? <Ionicons name="chevron-forward" size={12} color={colors.textMuted} /> : null}

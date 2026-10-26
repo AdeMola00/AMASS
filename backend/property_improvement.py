@@ -657,17 +657,18 @@ def register_property_improvement_routes(
         ).sort("created_at", -1).to_list(30)
         return {"inspections": insp, "finance_applications": fin, "projects": proj}
 
-    # ═══ Notifications ═══════════════════════════════════════
+    # ═══ Notifications (legacy list — same visibility rules as the notification centre) ═══
     @router.get("/notifications")
     async def list_notifications(
         limit: int = Query(30, le=100), user: dict = Depends(require_auth)
     ):
+        from notification_center import LEGACY_KINDS
+
+        live = {"user_id": user["id"], "dismissed": {"$ne": True}, "kind": {"$nin": list(LEGACY_KINDS)}}
         docs = await db.notifications.find(
-            {"user_id": user["id"]}, {"_id": 0}
+            live, {"_id": 0}
         ).sort("created_at", -1).limit(limit).to_list(limit)
-        unread = await db.notifications.count_documents(
-            {"user_id": user["id"], "read": False}
-        )
+        unread = await db.notifications.count_documents({**live, "read": False})
         return {"unread": unread, "items": docs}
 
     @router.post("/notifications/mark-read")

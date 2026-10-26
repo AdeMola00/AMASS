@@ -269,7 +269,7 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
         if deals:
             top = max(deals, key=lambda p: ((p["promo"].get("previous_price") or 0) - (p["price"].get("amount") or 0)))
             banners.append({"key": "deals", "title": f"{len(deals)} verified price drops in Lagos", "body": "Reductions listed by the retailers themselves. Terms and the verification date are on every item.", "cta": "See deals", "route": "/shop/category/all?deals=1", "tone": "warning", "image": (top.get("images") or [None])[0]})
-        banners.append({"key": "lists", "title": "Furnishing together?", "body": "Start a private shared shopping list — invite your partner or housemates to add, compare and comment.", "cta": "Start a list", "route": "/neighbours/collections?create=1&kind=shopping", "tone": "brand", "image": None})
+        banners.append({"key": "home-hub", "title": "Furnishing a home?", "body": "Keep receipts, warranties and what you bought for each room in My Home — reminders before a warranty runs out.", "cta": "Open My Home", "route": "/home/items", "tone": "brand", "image": None})
         orca = next((r for r in retailers if r["slug"] == "orca-deco"), None)
         if orca:
             banners.append({"key": "orca", "title": "ORCA Mall is open at Eko Atlantic", "body": "Furniture, décor and kitchenware under one roof. Catalogue not yet connected — visit or call the store.", "cta": "Store details", "route": "/shop/store/orca-deco", "tone": "info", "image": None})

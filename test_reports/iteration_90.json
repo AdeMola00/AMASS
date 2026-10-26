@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 90 checked the 6 leftover fixes from iteration_89 plus a smoke test at 390x844. All 7 items pass. Backend: 20/20 new tests in tests/test_iter90_fixes.py pass, and the 75 tests in the 3 existing suites (phase4 CRM, phase6c reps, notification_center) still pass. (1) CRM New filter: the API returns 4 leads and every row has status 'new'. The UI 'New' chip shows the same 4 rows, each with the New badge. (2) Legacy Neighbours kinds are absent from /notifications/center for all 13 categories. unread (527 for demo) equals /unread-count equals the sum of unread_by_category. /notifications and Feeds → Activity show none of the banned strings (resident request / wants to connect / Lekki Gardens Phase 2). Mark-all-read was checked in the UI on adaeze (83 → 0, 'You're all caught up'), then her 83 unread rows were restored in the DB. Dismiss → restore and read/unread round trips work. (3) /agent/representations/mine: 200 rows, all with a non-null property. The header reads '168 need your action', which matches the 168 PENDING/DOCS_REQUESTED rows the API returned. (4) Saved search Run now on a fresh device (localStorage cleared, token only): Find Home opens with Rent selected and the filter badge at 1. intent-sheet never appears (checked at 0.5, 1.5, 3.5 and 5 s), Rent is still selected after 5 s, and there are 0 console errors. (5) FIXA directory call/WhatsApp buttons and the Feeds Nearby 'Pros near you' rail mini buttons all measure 44x44. Nothing is clipped at 390 px (page scrollWidth 390; mini cards 220x152 with no overflowing children). (6) The admin settings flag reads 'Google Places', and 'AI valuation narrative' is unchanged. (7) Smoke: UI login, Find Home (3 pins), Feeds, Market, My Home, My Amass and Inbox all load with 0 console errors or page errors. One minor UX finding: right after Run now, Find Home says 'None in view · Explore wider' even though the run found 7 matches. Tapping Explore wider then shows '7 homes in view'. No deprecated Expo packages and no react-native SafeAreaView imports were found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/notifications (property_improvement.py:661)", "issue": "Old list endpoint does not filter dismissed rows or LEGACY_KINDS in items or in the unread count. The frontend does not call it (api.notifications() has no callers), but any client that uses it would see the retired Neighbours rows again."},
+      {"endpoint": "GET /api/agent/representations/mine", "issue": "Reads only the newest 200 reps (to_list(200)) and then drops orphans. Demo returns exactly 200, so the header's pending count ('168 need your action') only covers those 200 and older reps cannot be reached (no pagination)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Saved search Run now → Find Home", "issue": "The run returns count=7 and Find Home applies Rent + 3 beds, but the map keeps its default viewport, so the pill says 'None in view · Explore wider' until the user taps it (then '7 homes in view'). Fitting the map to the matches, or auto-widening, after an ai_filters handoff would remove this extra tap. Seen on the web preview map.", "affected_testIDs": ["explore-wider-pill", "results-count-pill"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter90_fixes.py",
+    "/app/backend/tests/iter90_unread_snapshot.py",
+    "/app/test_reports/pytest/iter90.xml"
+  ],
+  "action_items": [
+    "(Low) After a saved-search / AI ai_filters handoff on Find Home, fit the map to the returned markers or auto-trigger Explore wider, so Run now never lands on 'None in view'.",
+    "(Low) Remove the old GET /api/notifications + /notifications/mark-read endpoints in property_improvement.py, or apply the same LIVE filter (dismissed != true, kind not in LEGACY_KINDS) to them.",
+    "(Low) Paginate /api/agent/representations/mine or raise the 200 cap so the header count covers all reps."
+  ],
+  "critical_code_review_comments": [
+    "notification_center.py is 1129 lines, (tabs)/index.tsx is 1082 lines and reviews_score_crm.py is 719 lines. All are over the 700-line guideline; consider splitting.",
+    "read-all and read-by-target in notification_center.py do not apply the LIVE filter. This is harmless (hidden rows just get marked read), but it is inconsistent with the other routes.",
+    "The CRM 'new' filter's $or (crm_status new / missing / null) matches the list mapping l.get('crm_status','new'). However, a lead whose crm_status is an unknown string would show as that raw status in Open yet match no filter."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter90_fixes.py (new)",
+    "/app/backend/tests/iter90_unread_snapshot.py (new helper)"
+  ],
+  "success_rate": {"backend": "100% (20/20 new + 75/75 existing)", "frontend": "100% (7/7 items); 1 low-priority UX finding"},
+  "seed_data_creation": "None kept. Temporary TEST_iter90 saved searches were created and deleted. Adaeze's 83 unread notifications were marked read by the mark-all test and then restored to unread in the DB (verified: unread-count is 83 again). Running the existing phase6c suite adds 'Your mandate was approved/revoked/suspended' notifications to demo (pollution from that suite).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login returns 'access_token' (not 'token'). Seed localStorage 'amass_auth_token' = JSON.stringify(token) and 'amass_intent_v1' = JSON.stringify('all') to skip the IntentSheet. Saved-search criteria must use listing_type 'rent'/'buy'/'lease'; 'For Rent' matches 0 homes. Run backend suites with EXPO_BACKEND_URL exported and -n 0. To test mark-all safely, use tests/iter90_unread_snapshot.py snap/restore <email>.",
+  "rca_of_issue": "Run now 'None in view': /api/map/markers?listing_type=rent&bedrooms=3 is fetched without a bbox and the 'in view' count is filtered against the current map viewport, which the ai_filters handoff does not move to the results."
+}

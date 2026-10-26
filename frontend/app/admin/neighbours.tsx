@@ -1,5 +1,5 @@
 /**
- * Admin — Neighbours & community
+ * Admin — Community & moderation (Nearby posts, reports, legacy estate queue)
  * Funnel  : does the social layer move paid unlocks? (ledger = money truth, client events directional)
  * Estates : approve / reject estates proposed by residents
  * Reports : social moderation queue (hide / restore / ban / dismiss)
@@ -142,7 +142,7 @@ export default function AdminNeighboursScreen() {
       setReports((prev) => (prev ?? []).filter((x) => !(x.target_type === report.target_type && x.target_id === report.target_id)));
       setOpenReports((n) => Math.max(0, n - 1));
       setConfirm(null);
-      const msg = { dismiss: "Report dismissed", hide: "Content hidden", restore: "Content restored", ban_user: "User banned from Neighbours" }[action];
+      const msg = { dismiss: "Report dismissed", hide: "Content hidden", restore: "Content restored", ban_user: "User banned from Nearby" }[action];
       toast.success(msg);
     } catch (err: any) {
       toast.error("Couldn't resolve report", err?.message ?? "Try again");
@@ -155,7 +155,7 @@ export default function AdminNeighboursScreen() {
     return (
       <Screen>
         <Stack.Screen options={{ headerShown: false }} />
-        <ScreenHeader title="Neighbours" />
+        <ScreenHeader title="Community & moderation" />
         <EmptyState variant="error" icon="lock-closed" title="Admin access required" body="This area is restricted to AMASS administrators." actionLabel="Go back" onAction={() => router.back()} />
       </Screen>
     );
@@ -164,7 +164,7 @@ export default function AdminNeighboursScreen() {
   return (
     <Screen testID="admin-neighbours">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title="Neighbours" subtitle="Community · Trust & safety · Conversion" />
+      <ScreenHeader title="Community & moderation" subtitle="Nearby posts · Trust & safety · Conversion" />
       <Tabs<Tab>
         tabs={[
           { key: "funnel", label: "Funnel" },

@@ -624,7 +624,10 @@ def register_phase4_routes(
         user: dict = Depends(require_auth),
     ):
         filt: dict = {"agent_id": user["id"]}
-        if status and status in LEAD_STATUSES:
+        if status == "new":
+            # Fresh unlocks are written without crm_status; the list maps that to "new" (see below).
+            filt["$or"] = [{"crm_status": "new"}, {"crm_status": {"$exists": False}}, {"crm_status": None}]
+        elif status and status in LEAD_STATUSES:
             filt["crm_status"] = status
         elif status == "open":
             filt["crm_status"] = {"$nin": ["won", "lost"]}

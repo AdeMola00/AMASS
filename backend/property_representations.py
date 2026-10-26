@@ -212,9 +212,11 @@ def register_representation_routes(db, require_auth, require_admin, optional_use
             {"id": {"$in": listing_ids}}, {"_id": 0}
         ).to_list(500) if listing_ids else []
         lmap = {l["id"]: l for l in listings}
+        # Orphans (property record deleted) have nothing to act on — leave them out.
         return [
             {**r, "property": pmap.get(r["property_id"]), "listing": lmap.get(r.get("listing_id"))}
             for r in reps
+            if r["property_id"] in pmap
         ]
 
     @agent.get("/{rep_id}")

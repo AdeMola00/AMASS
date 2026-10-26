@@ -90,6 +90,8 @@ export default function HomeMap() {
   const [filters, setFilters] = useState<FilterState>({});
   const [intentReady, setIntentReady] = useState(false);
   const [intentSheet, setIntentSheet] = useState(false);
+  /** A saved search / AI handoff already decided the segment — never ask the intent question over it. */
+  const handoffRef = useRef(!!searchParams.ai_filters);
   const [query, setQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [pins, setPins] = useState<Pin[]>([]);
@@ -162,7 +164,7 @@ export default function HomeMap() {
       .getItem<Intent | null>(INTENT_KEY, null)
       .then((saved) => {
         if (saved === "buy" || saved === "rent" || saved === "lease") setFilters((f) => ({ ...f, listingType: saved }));
-        else if (saved !== "all") setTimeout(() => setIntentSheet(true), reduce ? 400 : 1400);
+        else if (saved !== "all") setTimeout(() => { if (!handoffRef.current) setIntentSheet(true); }, reduce ? 400 : 1400);
       })
       .catch(() => {})
       .finally(() => setIntentReady(true));
@@ -454,6 +456,9 @@ export default function HomeMap() {
   // AI search handoff
   useEffect(() => {
     if (!searchParams.ai_filters) return;
+    handoffRef.current = true;
+    firstLoadRef.current = false; // a handoff is a search: fly to its results instead of staying nearby-first
+    setIntentSheet(false);
     try {
       const parsed = JSON.parse(searchParams.ai_filters as string);
       const next: FilterState = {};
@@ -464,7 +469,10 @@ export default function HomeMap() {
       if (parsed.bedrooms) next.bedrooms = parsed.bedrooms;
       if (parsed.verified) next.verifiedOnly = true;
       setFilters(next);
-      if (parsed.city) setQuery(parsed.city);
+      if (parsed.city) {
+        setQuery(parsed.city);
+        setSearchTerm(String(parsed.city).trim());
+      }
       router.setParams({ ai_filters: undefined } as any);
     } catch {}
   }, [searchParams.ai_filters, router]);

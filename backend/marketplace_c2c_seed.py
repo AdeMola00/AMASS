@@ -214,10 +214,9 @@ C2C_ITEMS: list[dict] = [
             "Fuel efficient. Reason for sale: upgrading."
         ),
         "price": 12800000, "brand": "Honda", "condition": "used", "negotiable": True,
-        "image": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1200",
+        "image": "https://images.unsplash.com/photo-1571095839087-5f237247ee28?w=1200",
         "images": [
-            "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1200",
-            "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=1200",
+            "https://images.unsplash.com/photo-1571095839087-5f237247ee28?w=1200",
         ],
         "vendor": "Femi Adebayo", "verified": True, "rating": 4.9, "reviews": 12,
         "specs": {"Mileage": "98,000 km", "Transmission": "Automatic", "Fuel": "Petrol", "Year": "2016"},

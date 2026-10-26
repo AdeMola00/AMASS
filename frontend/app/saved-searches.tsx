@@ -108,12 +108,15 @@ export default function SavedSearchesScreen() {
     try {
       const res = await api.runSavedSearch(s.id);
       setRunning(null);
+      load().catch(() => {}); // refresh "Last ran …"
       if (res.count === 0) {
         toast.info("No matches yet", "We'll notify you as soon as new listings match.");
         return;
       }
-      // Navigate to map with matching bbox / stored criteria — for MVP go to Home
-      router.push({ pathname: "/(tabs)", params: { savedSearch: s.id } });
+      // Hand the stored criteria to Find Home, which applies them as filters (same handoff the AI search uses).
+      const c = s.criteria || {};
+      const handoff = { listing_type: c.listing_type, property_type: c.property_type, min_price: c.min_price, max_price: c.max_price, bedrooms: c.min_beds, verified: c.verified, city: c.q };
+      router.push({ pathname: "/(tabs)", params: { ai_filters: JSON.stringify(handoff) } });
     } catch (e: any) {
       setRunning(null);
       toast.error("Couldn't run search", e?.message ?? "Please try again.");

@@ -1,0 +1,62 @@
+{
+  "summary": "Iteration 88 retest at 390x844 on the web preview, logged in as demo. Every requested fix passes. FIX1: the Brands banner 'Furnishing a home?' and its 'Open My Home' button open /home/items, and the 'Start a list' banner is gone. FIX2: (a) a garbled token sends the user to /login within about 1s, (b) reloading keeps the user signed in, (c) sign out (window.confirm) goes to login and logging back in works. FIX3: 11 notification kinds tapped and 15 distinct notification routes opened directly; none show 'Unmatched Route'. FIX4: /admin/representations has no broken images and no ERR_INVALID_URL. FIX5 cosmetics pass: 'Community & moderation' title, full 'Book viewing' label, Reset and Save visible, 'Planned', 'Saved' toast, property title shown once, offer amount 11,520,000, FIXA 'No Generator pros yet' with 'Show all pros' listing 22 pros. Two exceptions: (1) the Request Inspection phone is not pre-filled on a direct load or reload of the route, and (2) the Honda Accord photo is a white Honda Civic Type R hatchback, not a sedan. Sweep checks pass: saved search create/run/delete, viewings list and detail, Earn, Wallet receipts, agent dashboard tabs, CRM note, chat send, notification preference toggle persists after reload, Help/Privacy/Terms. Tab bar is correct. New issues found: CRM filter chips are clipped and can't be used, /agent/representations still logs ERR_INVALID_URL, 'Run now' on a saved search does not apply the search on Find Home, and Feeds, notifications, inbox, viewings and representations are full of QA/TEST content.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/earn/tasks", "issue": "The phone_verify task only counts as done if a token_transactions row exists. Demo has phone_verified=true but the task shows as open ('Verify phone number +5') on /earn."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Leads CRM filter chips (/crm)", "issue": "The horizontal filter ScrollView (style={{flexGrow:0}}) collapses on web. The chips sit at y=62 with height 40 but the first lead card covers them, so only the top ~15px of the empty pills shows. The All/Open/New/... filters can't be seen or tapped reliably. Fix: add flexShrink:0 (or a fixed height) to the ScrollView style. Reference: app/crm.tsx:116", "testID": "crm-filter-all", "priority": "HIGH"},
+      {"component": "Request Inspection phone prefill", "issue": "useState(user?.phone ?? '') only runs once. On a direct load or reload of /improve/request/<id>, user is not loaded yet, so input-phone stays empty for demo (phone +234806231317). Needs a useEffect to sync when user loads. Reference: app/improve/request/[propertyId].tsx:44", "testID": "input-phone", "priority": "MEDIUM"},
+      {"component": "Agent representations thumbnails", "issue": "/agent/representations still logs 'Failed to load resource: net::ERR_INVALID_URL' and shows one blank thumbnail. The cover = media_ids[0] is passed to <Image> without the isRenderableImage guard used in admin/representations.tsx:20. Reference: app/agent/representations.tsx:130-137", "testID": "n/a", "priority": "MEDIUM"},
+      {"component": "Wallet daily bonus", "issue": "On /wallet the Daily bonus row still shows a 'Claim' button after today's bonus was claimed (/earn shows 'Claimed'). Tapping it returns 'Already claimed today'.", "testID": "wallet-daily-bonus", "priority": "LOW"},
+      {"component": "Notification tap with no destination", "issue": "SOCIAL_POST_COMMENT notifications have meta.post_id, but routeFor has no post_id fallback, so tapping does nothing. Add `if (meta.post_id) return /social/post/${post_id}`. Legacy CONNECTION_REQUEST / ESTATE_REQUEST / SERVICE_REQUEST rows (removed Neighbours screens) are still listed and do nothing when tapped; hide them or mark them read. Reference: src/components/notifications/NotificationFeed.tsx:137-160", "testID": "notif-<id>", "priority": "LOW"},
+      {"component": "Push tap legacy route", "issue": "openPushUrl does not remap '/(tabs)/social' to '/(tabs)/updates' the way routeFor does. Opening /(tabs)/social directly shows Unmatched Route. Reference: app/_layout.tsx:53-61", "testID": "n/a", "priority": "LOW"},
+      {"component": "Marketplace item photo", "issue": "The '2016 Honda Accord' cover image (unsplash photo-1571095839087) shows a white Honda Civic Type R hatchback, not an Accord sedan.", "testID": "n/a", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Saved searches → Run now", "issue": "When a run has matches (e.g. 'Lekki', 23 matches), it calls router.push('/(tabs)', {savedSearch: id}). app/(tabs)/index.tsx never reads the savedSearch param, so the user lands on Find Home with no filters applied. Also, the 'Not yet run' / 'Last ran' caption doesn't refresh after a run until the list reloads.", "affected_testIDs": ["run-<id>"]}
+    ],
+    "design_issues": [
+      {"screen": "/marketplace/<id> action bar", "issues": ["The 'Chat' and 'WhatsApp' labels are truncated with an ellipsis at 390px (scrollWidth > clientWidth)."]},
+      {"screen": "/crm list", "issues": ["Lead names are truncated ('AMASS Buy…'), status pills are truncated ('Negotiati…'), and every lead's subtitle is just 'Property' (no property title). The header says 32 leads but the dashboard Leads tab says 62."]},
+      {"screen": "/admin/settings feature flags", "issues": ["Titles are machine-derived and get truncated: 'Ai valuation enabled' (should be 'AI valuation'), 'Property discovery enabl…', 'Verification expiry sweep…'. Drop the redundant 'enabled' suffix."]},
+      {"screen": "/earn", "issues": ["The referral code 'ADAD-ZDWU' wraps onto two lines."]},
+      {"screen": "/fixa list cards", "issues": ["The green WhatsApp button on provider cards is clipped at the right edge at 390px."]},
+      {"screen": "/viewings", "issues": ["Future cancelled viewings (e.g. Mon 2 Nov) are grouped under 'Show 66 past viewings'. 'Past' is the wrong label for cancelled upcoming visits."]},
+      {"screen": "Find Home (first launch)", "issues": ["The 'What are you looking for?' intent sheet covers the tab bar until you pick an option; it blocks tab taps on first run."]}
+    ],
+    "react_native_issues": []
+  },
+  "data_hygiene": [
+    "Feeds → Activity: 13 'X is giving away “TEST_alert …” / “TEST_spot free desk …”' rows. GET /api/social/feed returns 30 of 50 posts titled TEST_* (posts by QA users 'Spot' and 'Alert').",
+    "Demo notifications: 22 of the latest 100 are QA artefacts ('Test Social 91b2e708ae sent you a message/liked/replied', 'New offer on Test sofa bf4700', 'List Friend' / 'Sharing Friend wants to connect', 'New resident request · Lekki Gardens').",
+    "Demo inbox: 29 of 50 conversations look like test data (e.g. 'Test Social …' user, 'TEST_automation' item).",
+    "Demo /viewings: 66 past viewings, many created by QA runs (TEST notes).",
+    "/agent/representations: 168 pending, with repeated 'duplex · agent mandate' rows and duplicate AMASS IDs (e.g. AMASS-LAG-00002899 listed twice).",
+    "Clean: Find Home properties (64) and map markers (62), Marketplace/Declutter (70, no 'Test sofa'), FIXA providers (22, no 'Tester')."
+  ],
+  "test_report_links": ["/app/backend/tests/test_data_hygiene_iter88.py", "/app/test_reports/pytest/pytest_iter88.xml"],
+  "action_items": [
+    "HIGH: Fix the clipped CRM filter chips (app/crm.tsx:116, add flexShrink:0 or a height to the horizontal ScrollView).",
+    "HIGH (data): Purge QA social posts (TEST_alert*, TEST_spot*) and the QA users 'Spot'/'Alert'/'Test Social…'/'List Friend'/'Sharing Friend'. Also purge their notifications, conversations and viewings on the demo account, and the duplicate QA representations.",
+    "MEDIUM: Saved-search 'Run now' must apply the saved criteria on Find Home (read the savedSearch param in app/(tabs)/index.tsx), and refresh last_run_at after a run.",
+    "MEDIUM: Pre-fill the Request Inspection phone with a useEffect when user loads (improve/request/[propertyId].tsx:44).",
+    "MEDIUM: Add the isRenderableImage guard to agent/representations.tsx:130-137.",
+    "LOW: Show Wallet daily bonus as claimed; mark Earn phone_verify done when user.phone_verified; add a post_id fallback in routeFor; hide legacy Neighbours notifications; remap /(tabs)/social in openPushUrl; fix the Honda Accord photo; fix truncated Chat/WhatsApp labels and feature-flag titles."
+  ],
+  "critical_code_review_comments": [
+    "routeFor (NotificationFeed.tsx) and openPushUrl (_layout.tsx) hold separate legacy-route rules. Share one resolver so push taps and in-app taps behave the same.",
+    "Seeding user-derived state with useState(user?.x) is fragile on web reloads (request inspection phone). Prefer useEffect syncing.",
+    "earn/tasks completion is derived only from token_transactions, which ignores flags already set on the user profile (phone_verified)."
+  ],
+  "updated_files": ["/app/backend/tests/test_data_hygiene_iter88.py"],
+  "success_rate": {"backend": "75% (3/4 data-hygiene checks; feed fails)", "frontend": "~88% (all FIX items pass except inspection phone prefill and the Honda photo; sweep found 1 high UI bug, 1 broken flow ('Run now'), and several minor issues)"},
+  "seed_data_creation": "Created and then deleted the saved search '\"QA Lekki\"'. Left behind: chat message 'QA hello iter88' in conversation 28d5f63f…, and CRM note 'QA note from iteration 88' on the first lead (no delete in the UI). Brand-offers preference toggled and restored; heart save toggled and restored.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Web confirm dialogs (sign out, deletes) need page.on('dialog', accept). The first login in a fresh browser shows the 'What are you looking for?' sheet covering the tab bar; tap 'Just browsing'. Demo owns 7d769d80 (shows Manage) and has a viewing on 01909724. Use c716dc5a-807f-4949-ad84-60014f982846 to see the 'Book viewing' CTA. Generator repair id: 4537713d-33bf-4e18-9511-640e322f975d. Honda item: 1f2d87e3-1004-456c-9f67-7f026c9fcef6. Planned project: 9b53975f-a721-49cd-a3c0-2bd20d4cd2b7. Token key in localStorage: 'amass_auth_token' (JSON string).",
+  "rca_of_issue": "CRM chips: on react-native-web, a horizontal ScrollView with flexGrow:0 inside a column flex container shrinks to near-zero height, and the vertical ScrollView below overlaps it. Saved-search Run: saved-searches.tsx:116 pushes a param that the index screen never consumes. Inspection phone: the initial state is captured before AuthProvider has hydrated user on a cold web load."
+}

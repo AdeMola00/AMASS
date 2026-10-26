@@ -74,6 +74,16 @@ def reviewer(mongo):
     return {"token": r["access_token"], "id": r["user"]["id"], "email": email}
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_seeded_leads(demo, reviewer, mongo):
+    """Leads this module seeds straight into Mongo must not linger in demo's CRM."""
+    yield
+    mongo.lead_unlocks.delete_many({
+        "agent_id": demo["id"],
+        "user_id": {"$in": ["seed-buyer", "seed-buyer-lost", reviewer["id"]]},
+    })
+
+
 # ─── 1. Reviews — anti-spam guardrail ────────────────────
 class TestReviewsGuardrail:
     def test_guardrail_blocks_first_attempt(self, demo, reviewer):

@@ -16,6 +16,9 @@ import { radii, space } from "@/src/theme/tokens";
 import { AppText, Avatar, Badge, Button, Card, Chip, EmptyState, Input, Screen, ScreenHeader, Sheet, SkeletonRows, useToast, type BadgeTone, type IconName } from "@/src/ui";
 
 const STATUSES = ["PENDING", "DOCS_REQUESTED", "APPROVED", "REJECTED", "SUSPENDED", "REVOKED"];
+/** Seeded properties carry placeholder media ids ("data:image/jpeg;base64,PHOTO_000_…") that are not real images. */
+const isRenderableImage = (uri?: string | null): uri is string => !!uri && (/^https?:\/\//.test(uri) || (uri.startsWith("data:image/") && uri.length > 200));
+
 const STATUS_META: Record<string, { tone: BadgeTone; icon: IconName; label: string }> = {
   PENDING: { tone: "warning", icon: "time-outline", label: "Pending" },
   DOCS_REQUESTED: { tone: "info", icon: "document-attach-outline", label: "Docs requested" },
@@ -136,8 +139,8 @@ export default function AdminRepresentationsQueue() {
             return (
               <Card elevation="xs" onPress={() => setActive(item)} style={styles.card} testID={`rep-${item.id}`}>
                 <View style={[styles.thumb, { backgroundColor: colors.surfaceAlt }]}>
-                  {item.property_preview?.media_ids?.[0] ? (
-                    <Image source={{ uri: item.property_preview.media_ids[0] }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={200} />
+                  {isRenderableImage(item.property_preview?.media_ids?.[0]) ? (
+                    <Image source={{ uri: item.property_preview!.media_ids![0] }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={200} />
                   ) : (
                     <Ionicons name="home-outline" size={22} color={colors.textMuted} />
                   )}

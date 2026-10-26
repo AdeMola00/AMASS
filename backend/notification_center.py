@@ -151,6 +151,15 @@ KIND_CATEGORY: dict[str, str] = {
 def kinds_for(category: str) -> list[str]:
     return [k for k, c in KIND_CATEGORY.items() if c == category]
 
+# Written by the retired Neighbours module (estates, friends, shared lists, events, estate issues).
+# Those screens no longer exist, so these rows have nowhere to go: hidden from lists and counts.
+LEGACY_KINDS = (
+    "ESTATE_REQUEST", "ESTATE_APPROVED", "ESTATE_REJECTED", "ESTATE_NOTICE",
+    "CONNECTION_REQUEST", "CONNECTION_ACCEPTED", "COLLECTION_INVITE", "COLLECTION_ACTIVITY",
+    "POST_REPLY", "QUESTION_ANSWERED", "ANSWER_ACCEPTED", "EVENT_REMINDER", "EVENT_CANCELLED",
+    "SERVICE_REQUEST", "SERVICE_REQUEST_UPDATE",
+)
+
 # Only proactive discovery kinds are ever bundled; transactional kinds in the same
 # category (e.g. an offer on YOUR listing) always arrive instantly.
 DIGESTABLE_KINDS = {"SAVED_SEARCH_MATCH", "NEARBY_LISTINGS", "BRAND_OFFER", "MARKET_AD", "SOCIAL_NEARBY_FREE"}
@@ -555,7 +564,7 @@ async def send_email_digest(db, user: dict, prefs: dict, *, force: bool = False)
         return None
     if not items and force:
         items = await email_digest_items(db, user["id"], prefs, None)  # test send: show the latest updates instead of an empty page
-    unread_total = await db.notifications.count_documents({"user_id": user["id"], "read": False, "dismissed": {"$ne": True}})
+    unread_total = await db.notifications.count_documents({"user_id": user["id"], "read": False, "dismissed": {"$ne": True}, "kind": {"$nin": list(LEGACY_KINDS)}})
     subject, html = digest_email_html(user, items, frequency=ed.get("frequency", "daily"), unread_total=unread_total)
     email_id = await send_email(to=user["email"], subject=subject, html=html)
     now = _iso(_now())
@@ -893,7 +902,7 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
         n.setdefault("category", category_for(n.get("kind", "")))
         return n
 
-    LIVE = {"dismissed": {"$ne": True}}  # swiped-away rows stay in the DB (undo) but leave every list and count
+    LIVE = {"dismissed": {"$ne": True}, "kind": {"$nin": list(LEGACY_KINDS)}}  # swiped-away rows stay in the DB (undo) but leave every list and count; retired Neighbours kinds too
 
     async def _unread(user_id: str) -> int:
         return await db.notifications.count_documents({"user_id": user_id, "read": False, **LIVE})

@@ -127,7 +127,9 @@ export default function AgentRepresentationsScreen() {
 function RepRow({ rep, onOpen }: { rep: Rep; onOpen: () => void }) {
   const { colors } = useTheme();
   const s = STATUS_META[rep.status] ?? STATUS_META.PENDING;
-  const cover = rep.property?.media_ids?.[0];
+  const raw = rep.property?.media_ids?.[0];
+  // Seeded properties carry placeholder media ids ("data:image/jpeg;base64,PHOTO_000_…") that are not real images.
+  const cover = raw && (/^https?:\/\//.test(raw) || (raw.startsWith("data:image/") && raw.length > 200)) ? raw : null;
   const areaStr = [rep.property?.area, rep.property?.lga, rep.property?.state].filter(Boolean).join(", ");
   const needsAction = rep.status === "PENDING" || rep.status === "DOCS_REQUESTED";
   return (

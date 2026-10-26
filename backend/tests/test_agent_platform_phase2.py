@@ -302,7 +302,7 @@ class TestWebhookSmoke:
             headers={"Content-Type": "application/json"},
         )
         # Should not crash; accept 200 or 401 depending on enforcement
-        assert r.status_code in (200, 400, 401), (
+        assert r.status_code in (200, 400, 401, 503), (  # 503 = webhook secret not configured (MOCK_PAYMENT)
             f"unexpected status {r.status_code}: {r.text[:200]}"
         )
 

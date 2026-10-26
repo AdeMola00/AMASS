@@ -152,7 +152,7 @@ export default function ProjectTracker() {
         <View style={styles.kpiRow}>
           <StatTile icon="cash-outline" label="Est. cost" value={doc.estimated_cost_ngn ? formatNaira(doc.estimated_cost_ngn) : "—"} />
           <StatTile icon="flag-outline" label="Milestones" value={`${doneCount}/${milestones.length}`} tone="fix" />
-          <StatTile icon="pulse-outline" label="Status" value={String(doc.status || "planned").replace(/_/g, " ")} tone="info" />
+          <StatTile icon="pulse-outline" label="Status" value={String(doc.status || "planned").replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase())} tone="info" />
         </View>
 
         <Section title="Project tracker" caption={nextIdx >= 0 ? `Next: ${milestones[nextIdx].label}` : "All milestones complete"}>

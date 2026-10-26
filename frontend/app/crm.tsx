@@ -113,7 +113,7 @@ export default function CRMScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScreenHeader title="Leads CRM" subtitle={leads.length ? `${leads.length} in view` : "Pipeline"} />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow} style={{ flexGrow: 0 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow} style={{ flexGrow: 0, flexShrink: 0, minHeight: 52 }}>
         {FILTERS.map((f) => (
           <Chip key={f.label} label={f.label} selected={filter === f.id} onPress={() => setFilter(f.id)} testID={`crm-filter-${f.id ?? "all"}`} />
         ))}
@@ -155,16 +155,16 @@ export default function CRMScreen() {
                         <Ionicons name="business" size={20} color={colors.textMuted} />
                       </View>
                     )}
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <AppText variant="title" numberOfLines={1} style={{ flexShrink: 1 }}>
-                          {l.contact_name || "AMASS Buyer"}
-                        </AppText>
-                        <Badge label={meta.label} tone={meta.tone} icon={meta.icon} size="xs" />
-                      </View>
-                      <AppText variant="caption" tone="secondary" numberOfLines={1}>
-                        {l.property_title || "Property"}
+                    <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                      <AppText variant="title" numberOfLines={1}>
+                        {l.contact_name || "AMASS Buyer"}
                       </AppText>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Badge label={meta.label} tone={meta.tone} icon={meta.icon} size="xs" />
+                        <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+                          {l.property_title || "Property"}
+                        </AppText>
+                      </View>
                       {l.property_price ? (
                         <AppText variant="bodyMedium" weight="bold" tabular>
                           {formatNaira(l.property_price)}
@@ -279,7 +279,7 @@ export default function CRMScreen() {
 }
 
 const styles = StyleSheet.create({
-  filtersRow: { gap: 8, paddingHorizontal: space[4], paddingBottom: space[3] },
+  filtersRow: { gap: 8, paddingHorizontal: space[4], paddingBottom: space[3], alignItems: "center" },
   leadImage: { width: 56, height: 56, borderRadius: radii.sm },
   sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space[3], paddingBottom: space[2], borderBottomWidth: StyleSheet.hairlineWidth },
   propertyThumb: { width: 56, height: 56, borderRadius: radii.sm },

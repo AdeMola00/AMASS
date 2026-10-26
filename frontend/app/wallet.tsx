@@ -150,7 +150,7 @@ export default function WalletScreen() {
     return Array.from(map.entries());
   }, [transactions]);
 
-  const dailyClaimed = earn?.daily ? !earn.daily.claimable && earn.daily.completed : false;
+  const dailyClaimed = earn?.daily ? !earn.daily.claimable : false;
 
   return (
     <Screen testID="wallet-screen">

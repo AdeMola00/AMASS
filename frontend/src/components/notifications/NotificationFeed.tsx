@@ -137,10 +137,12 @@ function dayLabel(iso: string) {
 export function routeFor(n: AppNotification): string | null {
   // Legacy Neighbours destinations (estates, friends, shared lists, events, posts, services) no longer exist.
   if (n.action_url && n.action_url.startsWith("/neighbours")) return null;
+  if (n.action_url && n.action_url.startsWith("/(tabs)/social")) return "/(tabs)/updates"; // old Social tab → Feeds
   if (n.action_url) return n.action_url;
   const meta = n.meta || {};
   if (n.kind === "MARKET_OFFER" && meta.offer_id) return `/marketplace/my-listings?tab=${meta.tab === "sent" ? "sent" : "received"}`;
   if (n.kind === "MARKET_MODERATION") return "/marketplace/my-listings";
+  if (n.kind.startsWith("SOCIAL_POST") && meta.post_id) return `/social/post/${meta.post_id}`;
   if (meta.conversation_id) return `/chat/${meta.conversation_id}`;
   if (meta.item_id) return `/marketplace/${meta.item_id}`;
   if (meta.inspection_id) return `/improve/inspection/${meta.inspection_id}`;

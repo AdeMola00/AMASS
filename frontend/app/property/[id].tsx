@@ -54,7 +54,7 @@ export default function PropertyDetails() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const GALLERY_H = galleryHeight(height);
-  const tight = width < 360;
+  const tight = width < 400; // 3 icon buttons + the main pill need ~400pt before the pill can keep its icon
   const ctaIcon = tight ? 46 : 54;
   const { colors, shadows, isDark } = useTheme();
   const toast = useToast();
@@ -150,7 +150,7 @@ export default function PropertyDetails() {
     setFavorited(next);
     try {
       await api.toggleFavorite(property.id);
-      toast.show({ title: next ? "Saved to your list" : "Removed from saved", kind: "info" });
+      toast.show({ title: next ? "Saved" : "Removed from saved", kind: "info" });
     } catch {
       setFavorited(!next);
       toast.error("Couldn't update saved homes", "Check your connection and try again.");

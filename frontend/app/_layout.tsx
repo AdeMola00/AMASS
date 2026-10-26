@@ -1,6 +1,6 @@
 import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Alert, LogBox, Platform, StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -13,7 +13,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { useAppFonts } from "@/src/hooks/use-app-fonts";
 import "@/src/lib/global-font";
-import { AuthProvider } from "@/src/contexts/auth";
+import { AuthProvider, useAuth } from "@/src/contexts/auth";
 import { CartProvider } from "@/src/contexts/cart";
 import { ShopBasketProvider } from "@/src/contexts/shopBasket";
 import { WalletProvider } from "@/src/contexts/wallet";
@@ -51,9 +51,10 @@ if (Platform.OS === "android") {
 }
 
 function openPushUrl(router: ReturnType<typeof useRouter>, data: any) {
-  const url = data?.deeplink || data?.action_url;
+  let url = data?.deeplink || data?.action_url;
   if (!url || typeof url !== "string") return;
   if (url.startsWith("/neighbours")) return; // legacy Neighbours screens were removed
+  if (url.startsWith("/(tabs)/social")) url = "/(tabs)/updates"; // old Social tab → Feeds
   try {
     if (url.startsWith("http")) Linking.openURL(url);
     else router.push(url as any);
@@ -157,7 +158,24 @@ function ThemedStack() {
           animation: "fade",
         }}
       />
+      <SessionWatcher />
       <OfflineBanner />
     </>
   );
+}
+
+/** When a signed-in session ends (expired / revoked token → 401), land on the login screen instead of a page full of errors. */
+function SessionWatcher() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const hadUser = useRef(false);
+  useEffect(() => {
+    if (loading) return;
+    if (user) hadUser.current = true;
+    else if (hadUser.current) {
+      hadUser.current = false;
+      router.replace("/(auth)/login" as any);
+    }
+  }, [user, loading, router]);
+  return null;
 }

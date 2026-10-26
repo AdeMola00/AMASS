@@ -17,7 +17,7 @@ import { BadgeStrip, callProvider, ProviderAvatar, ReputationLine, STATUS_META }
 type Tab = "applications" | "reports";
 type AppFilter = "pending" | "verified" | "hidden" | "suspended" | "rejected";
 type RepFilter = "open" | "resolved" | "dismissed";
-type Action = { kind: "approve" | "reject" | "suspend"; app: FixaApplication } | { kind: "resolve"; report: FixaReport; outcome: "resolved" | "dismissed" };
+type Action = { kind: "approve"; app: FixaApplication } | { kind: "reject"; app: FixaApplication } | { kind: "suspend"; app: FixaApplication } | { kind: "resolve"; report: FixaReport; outcome: "resolved" | "dismissed" };
 
 const REASON_TONE: Record<string, BadgeTone> = { fraud: "error", unsafe: "error", no_show: "warning", poor_work: "warning", overcharging: "info", other: "neutral" };
 

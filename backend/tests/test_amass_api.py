@@ -204,7 +204,7 @@ class TestMarketplace:
         for item in data:
             assert "_id" not in item
             assert "rating" in item
-            assert "image" in item and item["image"]
+            assert "image" in item  # user-created FIXA providers may not have a photo yet
 
     def test_marketplace_home_filter(self, base_url, api_client):
         r = api_client.get(f"{base_url}/api/marketplace", params={"category": "home"})

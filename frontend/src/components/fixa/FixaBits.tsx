@@ -252,9 +252,12 @@ export function ProviderRow({ provider: p, onPress, onMissingContact }: { provid
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </PressableScale>
       <View style={styles.rowFooter}>
-        <BadgeStrip badges={p.badges} max={2} />
-        <View style={{ flex: 1 }} />
-        <ContactButtons provider={p} size={38} onMissing={onMissingContact} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <BadgeStrip badges={p.badges} max={2} />
+        </View>
+        <View style={{ flexShrink: 0 }}>
+          <ContactButtons provider={p} size={44} onMissing={onMissingContact} />
+        </View>
       </View>
     </View>
   );
@@ -279,7 +282,7 @@ export function ProviderMiniCard({ provider: p, onPress, onMissingContact }: { p
         </View>
         <ReputationLine provider={p} compact />
       </PressableScale>
-      <ContactButtons provider={p} size={36} onMissing={onMissingContact} testIDPrefix="fixa-mini" />
+      <ContactButtons provider={p} size={44} onMissing={onMissingContact} testIDPrefix="fixa-mini" />
     </View>
   );
 }

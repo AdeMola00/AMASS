@@ -640,6 +640,13 @@ export function qs(params: Record<string, string | number | boolean | undefined 
   return parts.length ? `?${parts.join("&")}` : "";
 }
 
+/** Called (debounced) when any authed request gets a 401 — the AuthProvider re-checks the session and signs out if it's dead. */
+let unauthorizedHandler: (() => void) | null = null;
+let unauthorizedAt = 0;
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  unauthorizedHandler = fn;
+}
+
 export async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -656,6 +663,10 @@ export async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
       msg = typeof j.detail === "string" ? j.detail : j.detail?.message || j.detail?.error || msg;
     } catch {}
     const err = new ApiError(msg, res.status, detail);
+    if (res.status === 401 && headers.Authorization && !path.startsWith("/auth/") && Date.now() - unauthorizedAt > 5000) {
+      unauthorizedAt = Date.now();
+      unauthorizedHandler?.();
+    }
     throw err;
   }
   if (res.status === 204) return undefined as T;

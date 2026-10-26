@@ -371,9 +371,9 @@ export default function ItemDetail() {
       ) : (
         <View style={[styles.actionBar, { backgroundColor: colors.bgElevated, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + 4 }, shadows.lg]}>
           <View style={styles.actionRow}>
-            <Button label="Chat" variant="outline" iconLeft="chatbubble-ellipses-outline" size="md" onPress={openChat} loading={chatBusy} testID="action-chat" style={{ flex: 1 }} />
+            <IconButton icon="chatbubble-ellipses-outline" label="Chat with seller" variant="secondary" size={48} iconSize={22} onPress={openChat} disabled={chatBusy} testID="action-chat" />
             <Button label="Call" variant="primary" iconLeft="call" size="md" onPress={openCall} testID="action-call" style={{ flex: 1 }} />
-            <Button label="WhatsApp" iconLeft="logo-whatsapp" size="md" onPress={openWhatsApp} testID="action-whatsapp" style={{ flex: 1.2, backgroundColor: WHATSAPP }} />
+            <Button label="WhatsApp" iconLeft="logo-whatsapp" size="md" onPress={openWhatsApp} testID="action-whatsapp" style={{ flex: 1.3, backgroundColor: WHATSAPP }} />
           </View>
           <Button label={`Make an offer · ${formatNaira(item.price)}`} variant="primary" size="lg" fullWidth iconLeft="pricetag" onPress={() => offerRef.current?.open(item)} testID="action-offer" />
         </View>

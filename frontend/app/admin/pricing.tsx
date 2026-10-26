@@ -184,7 +184,7 @@ function PricesTab() {
             <AppText variant="bodySm" tone="secondary">
               Current: {editing.amount.toLocaleString()} {editing.currency} (≈ ₦{ngn(editing).toLocaleString()}). New price applies to future unlocks only; past charges are never edited.
             </AppText>
-            <Input label="New price (MASS)" value={amount} onChangeText={setAmount} keyboardType="number-pad" helper={amount && Number(amount) > 0 ? `≈ ₦${(Number(amount) * (editing.currency === "FIX" ? conversion.FIX_ngn : conversion.MASS_ngn)).toLocaleString()}` : undefined} error={error} testID="price-amount" />
+            <Input label="New price (MASS)" value={amount} onChangeText={setAmount} keyboardType="number-pad" helper={amount && Number(amount) > 0 ? `≈ ₦${(Number(amount) * conversion.MASS_ngn).toLocaleString()}` : undefined} error={error} testID="price-amount" />
             <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Why is this changing?" testID="price-note" />
             <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
               <Button label="Cancel" variant="secondary" size="lg" onPress={() => setEditing(null)} disabled={saving} style={{ flex: 1 }} testID="price-cancel" />

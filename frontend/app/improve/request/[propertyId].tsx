@@ -9,6 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { api } from "@/src/lib/api";
+import { useAuth } from "@/src/contexts/auth";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
@@ -39,7 +40,12 @@ export default function InspectionRequest() {
   const [property, setProperty] = useState<any>(null);
   const [goals, setGoals] = useState("");
   const [budget, setBudget] = useState("");
-  const [phone, setPhone] = useState("");
+  const { user } = useAuth();
+  const [phone, setPhone] = useState(user?.phone ?? "");
+  useEffect(() => {
+    // The profile may arrive after first render (direct open / reload) — fill the number once it does, never overwrite typing.
+    if (user?.phone) setPhone((p) => (p ? p : user.phone!));
+  }, [user?.phone]);
   const [notes, setNotes] = useState("");
   const [preferredDate, setPreferredDate] = useState<string>("");
   const [photos, setPhotos] = useState<string[]>([]);

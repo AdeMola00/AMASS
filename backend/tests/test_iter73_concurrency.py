@@ -27,7 +27,8 @@ def test_parallel_unlock_single_charge():
     t = _user()
     admin = requests.post(f"{BASE}/api/auth/login", json={"email": "demo@amass.africa", "password": "amass2026"}).json()["access_token"]
     items = requests.get(f"{BASE}/api/properties?limit=100", headers=H(admin)).json()
-    pid = next(p["id"] for p in items if p.get("token_cost") == 10 and (p.get("listing_type") or "") == "rent")
+    target = next(p for p in items if (p.get("token_cost") or 0) > 0 and (p.get("listing_type") or "") == "rent")
+    pid, fee = target["id"], target["token_cost"]
     b0 = _bal(t)
 
     def go(_):
@@ -36,7 +37,7 @@ def test_parallel_unlock_single_charge():
     with ThreadPoolExecutor(6) as ex:
         codes = list(ex.map(go, range(6)))
     print("codes", codes)
-    assert b0 - _bal(t) == 10
+    assert b0 - _bal(t) == fee
     recs = requests.get(f"{BASE}/api/receipts", headers=H(t)).json()["items"]
     assert len([r for r in recs if r["kind"] == "property_access"]) == 1
 

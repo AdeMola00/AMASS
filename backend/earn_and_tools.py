@@ -173,6 +173,10 @@ def register_earn_routes(db: AsyncIOMotorDatabase) -> APIRouter:
                     if isinstance(ts, datetime) and (not latest_daily or ts > latest_daily):
                         latest_daily = ts
         tasks_out = []
+        # Phone verified through sign-in (OTP) or the account screen counts as done even if the reward was never claimed.
+        udoc = await db.users.find_one({"id": user_id}, {"_id": 0, "phone_verified": 1}) or {}
+        if udoc.get("phone_verified"):
+            completed_ids.add("phone_verify")
         for task_id, cfg in TASK_REWARDS.items():
             done = cfg.get("one_time") and task_id in completed_ids
             claimable_today = True

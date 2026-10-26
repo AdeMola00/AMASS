@@ -97,7 +97,7 @@ export const MakeOfferSheet = forwardRef<MakeOfferSheetRef, { onSent?: () => voi
               <Text style={styles.currency}>₦</Text>
               <TextInput
                 keyboardType="numeric"
-                value={amount !== undefined ? String(amount) : ""}
+                value={amount !== undefined ? amount.toLocaleString("en-NG") : ""}
                 onChangeText={(t) => setAmount(t ? parseInt(t.replace(/\D/g, "")) || undefined : undefined)}
                 style={styles.amountInput}
                 placeholder="Your offer"

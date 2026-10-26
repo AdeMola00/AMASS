@@ -131,7 +131,9 @@ export default function RepairDetail() {
 
   const m = statusMeta(rep.status, rep.days_until);
   const active = rep.status !== "done" && rep.status !== "none";
-  const fixaParams = { category: rep.trade === "Other" || rep.trade === "Handyman" ? "" : rep.trade };
+  // FIXA's directory names this trade differently.
+  const FIXA_TRADE: Record<string, string> = { "CCTV & Security": "CCTV" };
+  const fixaParams = { category: rep.trade === "Other" || rep.trade === "Handyman" ? "" : FIXA_TRADE[rep.trade] ?? rep.trade };
 
   return (
     <Screen testID="repair-detail-screen">

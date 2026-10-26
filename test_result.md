@@ -296,6 +296,20 @@ frontend:
         comment: "Added idempotent create_index calls on properties, wallets, token_transactions, notifications, users, favorites, marketplace, agent_referrals."
 
 frontend:
+  - task: "Dead-link fixes — /property-picker, /improve/project/new, /admin/settings/[section]; FIX leftovers removed from BalanceChip/admin pricing"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/property-picker.tsx, frontend/app/improve/project/new.tsx, frontend/app/admin/settings/[section].tsx, frontend/src/ui/Controls.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Route scan found 3 dead links (Improve "Start an improvement" → /property-picker, inspection/finance "Start project" →
+          /improve/project/new, Admin Settings › Advanced rows → /admin/settings/{duplicate,verification,google,valuation}).
+          Built the missing screens. Header wallet chip no longer shows the deleted FIX token. tsc is clean (0 errors).
   - task: "Home Hub — My Home tab + Bills/Records/Items/Repairs/Calendar/Homes (frontend E2E)"
     implemented: true
     working: true
@@ -410,13 +424,24 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Home Hub — My Home tab + Bills/Records/Items/Repairs/Calendar/Homes (frontend E2E)"
-    - "Neighbours removal — no stray routes/links"
+    - "Full-app regression sweep (iteration 87)"
+    - "Dead-link fixes — /property-picker, /improve/project/new, /admin/settings/[section]; FIX leftovers removed from BalanceChip/admin pricing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: |
+      Iteration 88 (to run) — fixes after the iteration-87 full-app sweep: (1) Shop "Start a list" banner → now "Open My Home"
+      → /home/items (backend shop.py); (2) auth no longer signs out on 502/network at startup — only on 401; cached profile keeps
+      the user signed in; any 401 on an authed call re-checks the session and a dead token → /(auth)/login (SessionWatcher in
+      app/_layout.tsx); (3) old notification links /(tabs)/social → /(tabs)/updates; (4) admin/representations ignores placeholder
+      media ids; (5) cosmetics: admin Neighbours page title → "Community & moderation", property sticky CTA keeps full "Book
+      viewing" label < 400pt, Advanced settings "Reset", project status capitalised, feature-flag rows show On/Off, heart toast
+      "Saved", project form no duplicate title, inspection phone pre-filled, offer amount thousands separators, Honda Accord photo,
+      FIXA empty state "No <trade> pros yet → Show all pros", CCTV trade mapping. Also removed 358 TEST_* properties / 10 Test sofa
+      items / 13 TEST estates from the DB (scripts/cleanup_test_data.py) — Find Home now shows 64 real listings.
   - agent: "main"
     message: |
       Iteration 86 (to run) — HOME HUB frontend (replaces Neighbours). Backend /api/home/* already passes tests/test_home_hub.py.
@@ -1109,3 +1134,22 @@ agent_communication:
       (buyer_id, property_id, status in open) + DuplicateKeyError → 409; pre-existing duplicates auto-cancelled at boot.
       tests/test_viewings_race_iter83.py passes again. (3) Gate card moved into the bottom band (no overlap with the FAB column);
       map-time-chip 44 pt tall. Request: retest races + gate layout only.
+
+  - agent: "main"
+    message: |
+      Iteration 90 (to run) — fixes for the iteration_89 leftovers, code only (user chose to keep demo's seeded test rows):
+      (1) GET /api/crm/leads?status=new now matches leads with no crm_status (fresh unlocks) — reviews_score_crm.py.
+      (2) Retired Neighbours notification kinds (ESTATE_*, CONNECTION_*, COLLECTION_*, POST_REPLY, QUESTION_*/ANSWER_ACCEPTED,
+      EVENT_*, SERVICE_REQUEST*) are excluded from /notifications/center, unread counts, read_count and the digest total
+      (LEGACY_KINDS in notification_center.py, folded into LIVE). test_notification_center::test_social_request_notification_routed
+      rewritten to assert the hidden behaviour.
+      (3) /api/agent/representations/mine drops reps whose properties_geo record no longer exists.
+      (4) Find Home: the IntentSheet is suppressed when the tab opens with ai_filters (saved search "Run now"), so Rent/beds stay applied.
+      (5) FIXA row + mini-card Call/WhatsApp buttons 44×44; admin flag label "Google Places".
+      (6) tests/test_phase4_reviews_score_crm.py and tests/test_phase6c_passport_reps.py now tear down what they seed on demo.
+
+  - agent: "main"
+    message: |
+      Iteration 90 result: all 7 pass. Follow-ups applied: Run now hand-off now fits the map to the results (firstLoadRef reset in the
+      ai_filters effect; verified by screenshot "8 homes in view", no IntentSheet); legacy GET /api/notifications in property_improvement.py
+      applies the LIVE/LEGACY_KINDS rules. Accepted LOW: reps list capped at 200 (demo test data only), file sizes.

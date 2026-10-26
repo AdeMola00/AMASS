@@ -190,18 +190,16 @@ class TestEmitFunnel:
         requests.put(f"{API}/notifications/prefs", headers=hb, json={"categories": {"messages": {"enabled": True}}}, timeout=30)
 
     def test_social_request_notification_routed(self, alice, bob):
-        """social_common.notify now goes through emit → category 'social'."""
+        """Neighbours is retired: connection requests are written but hidden from the centre and every count."""
         hb, ub = bob
         hc, uc = _register("carol")
         requests.post(f"{API}/notifications/read-all", headers=hb, timeout=30)
         r = requests.post(f"{API}/social/connections", headers=hc, json={"user_id": ub["id"]}, timeout=30)
         assert r.status_code == 200, r.text
         c = requests.get(f"{API}/notifications/center?category=social", headers=hb, timeout=30).json()
-        assert any(i["kind"] == "CONNECTION_REQUEST" and i["meta"].get("connection_id") == r.json()["id"] for i in c["items"])
-        assert c["unread_by_category"].get("social", 0) >= 1
-        # read-sync by kind (friends screen opens)
-        r2 = requests.post(f"{API}/notifications/read-by-target", headers=hb, json={"target_type": "kind", "target_id": "CONNECTION_REQUEST"}, timeout=30)
-        assert r2.status_code == 200 and r2.json()["marked"] >= 1
+        assert not any(i["kind"] == "CONNECTION_REQUEST" for i in c["items"])
+        assert c["unread_by_category"].get("social", 0) == 0
+        assert requests.get(f"{API}/notifications/unread-count", headers=hb, timeout=30).json()["unread"] == 0
 
 
 class TestDigestAndMatchers:

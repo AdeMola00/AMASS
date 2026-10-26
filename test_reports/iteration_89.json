@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 89 retest at 390x844 on web preview, plus the backend hygiene test. Of the 12 requested items, 10 pass. CRM chips are now visible and tappable. Saved search Run now applies its filters (Rent segment selected, beds badge shown) and the caption changes to 'Last ran …'. Representations show placeholder thumbnails with no ERR_INVALID_URL. Wallet shows the daily bonus as Claimed. Earn shows Verify phone as Done. SOCIAL_POST_COMMENT and SOCIAL_POST_LIKE notifications both open /social/post/<id>. Request Inspection opened directly by URL has the phone pre-filled. The Declutter bottom bar shows the icon chat button, Call and WhatsApp with full labels. FIXA WhatsApp buttons are not clipped (17 rows, no Bolu/Half Done duplicates). Admin flag titles read well ('AI valuation narrative', On/Off). The smoke test passed with zero console errors: UI login, map with pins, Feeds, Market, My Home, My Amass and Inbox all load. test_data_hygiene_iter88.py passed 4/4. NEW or remaining issues: (1) the CRM 'New' filter returns 0 leads even though Open contains a lead with the New badge; (2) demo /agent/representations holds 200 orphan PENDING 'duplex · agent mandate' reps created today by test_phase6c_passport_reps.py, and the screen reads '168 need your action'; (3) demo CRM holds 59 seeded test leads ('AMASS Buyer' / 'Property', property_id null) from test_phase4_reviews_score_crm.py; (4) legacy Neighbours notifications are still shown in /notifications and in Feeds Activity ('New resident request · Lekki Gardens Phase 2', 'Sharing Friend wants to connect', 'Electrical · Lekki Gardens Phase 2'), and tapping them does nothing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/crm/leads?status=new", "issue": "Returns []. Fresh leads have no crm_status field (the API maps them to status 'new' at line 650), but the filter at reviews_score_crm.py:627-628 matches crm_status == 'new' exactly. The Open bucket shows a 'New' lead, yet the New chip shows the empty state."},
+      {"endpoint": "GET /api/agent/representations/mine (demo)", "issue": "Returns 200 PENDING agent_mandate reps, all created 2026-10-26 and pointing to deleted properties (GET /api/properties/f5023b43… returns 404). The API also returns orphans, i.e. reps whose property no longer exists."},
+      {"endpoint": "GET /api/crm/leads (demo)", "issue": "59 seeded QA leads (user_id 'seed-buyer-*', property_id null) created today at 13:53 by tests/test_phase4_reviews_score_crm.py. The test has no teardown."},
+      {"endpoint": "GET /api/notifications/center (demo)", "issue": "57 legacy social-category rows (ESTATE_REQUEST, CONNECTION_REQUEST from 'Sharing Friend' / 'Chidi Friend') are still returned and counted in the 504 unread."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CRM New filter", "issue": "Tapping 'New' shows 'No leads in this bucket yet' although Open has a lead badged New. Root cause is in the backend filter, see backend_issues.", "testID": "crm-filter-new", "priority": "MEDIUM"},
+      {"component": "Legacy Neighbours notifications", "issue": "Rows for estate requests, connection requests and estate issues still render in /notifications and Feeds Activity. routeFor returns null for meta estate_id/connection_id, so tapping them does nothing.", "testID": "notif-<id>", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Saved search Run now on a fresh device (no intent stored yet)", "issue": "Find Home applies the ai_filters (Rent + 3 beds), then the IntentSheet pops up 1.4s later. Choosing 'Just browsing' or dismissing it calls chooseIntent('all') and clears the applied Rent. Suppress the IntentSheet when ai_filters is present. LOW.", "affected_testIDs": ["intent-sheet", "intent-all"]}
+    ],
+    "design_issues": [
+      {"screen": "CRM", "issues": ["Every lead row reads 'AMASS Buyer' / 'Property' because the seeded test leads have no property. Data issue, not a layout issue: the rows themselves are not truncated."]},
+      {"screen": "FIXA directory", "issues": ["Call/WhatsApp icon buttons are 38x38, below the 44pt touch-target minimum (FixaBits.tsx:133-144)."]},
+      {"screen": "Admin settings", "issues": ["'Google places' should read 'Google Places' (proper noun). LOW."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_data_hygiene_iter88.py", "/app/backend/tests/iter89_api_probe.py", "/app/test_reports/pytest/pytest_iter89.xml"],
+  "action_items": [
+    "MEDIUM: reviews_score_crm.py:627: for status=='new', filter on {'$or':[{'crm_status':'new'},{'crm_status':{'$exists':False}},{'crm_status':None}]}. Also check that the 'open' $nin filter already includes leads with no crm_status (it does).",
+    "MEDIUM (data): Purge demo's orphan property_representations (status PENDING, property missing; 200 rows, created by test_phase6c_passport_reps.py). Have /agent/representations/mine exclude reps whose property no longer exists. Add teardown to that test.",
+    "MEDIUM (data): Purge the seeded QA lead_unlocks on demo (user_id startswith 'seed-buyer', property_id null) and add teardown to test_phase4_reviews_score_crm.py. Otherwise each test run re-pollutes the demo CRM.",
+    "MEDIUM: Hide legacy Neighbours notification kinds (ESTATE_*, CONNECTION_*, estate issue kinds) in NotificationFeed, or purge them from demo, and exclude them from unread counts. Also purge 'Sharing Friend' / 'Chidi Friend' connection notifications. Extend cleanup_test_data.py TEST_TEXT to cover 'Sharing Friend|Chidi Friend'.",
+    "LOW: Don't open the IntentSheet in (tabs)/index.tsx when searchParams.ai_filters is present (or set intent from the handoff's listing_type).",
+    "LOW: FIXA row call/WhatsApp buttons should be 44px; 'Google places' → 'Google Places'; demo phone '+234806231317' is one digit short for a Nigerian number (seed data)."
+  ],
+  "critical_code_review_comments": [
+    "Backend tests (phase4 CRM, phase6c passport reps) write directly against the demo account without teardown, so every run re-pollutes demo data after the purge.",
+    "NotificationFeed.routeFor returns null for legacy kinds but the rows still render, so users see dead, untappable notifications."
+  ],
+  "updated_files": ["/app/backend/tests/iter89_api_probe.py (new, read-only probe)"],
+  "success_rate": {"backend": "100% (hygiene 4/4)", "frontend": "10/12 requested items pass (CRM New filter bug; residual demo data in representations/notifications)"},
+  "seed_data_creation": "Created and then removed: saved searches '3+ bed', '3+ bed · rent' and 'QA rent 3 bed' (all deleted). Adaeze commented 'QA is this still available?' on demo post 758a8e66 and liked it; the comment was deleted, the like undone, and both demo notifications dismissed.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login by setting localStorage 'amass_auth_token' to JSON.stringify(token) from POST /api/auth/login. A fresh browser shows the IntentSheet: click via JS document.querySelector('[data-testid=intent-all]').click(), because force-click on the text can land outside the viewport. Saved-search API: POST/GET/DELETE /api/saved-searches. Notifications API: /api/notifications/center and /api/notifications/{id}/dismiss. Social: POST /api/social/posts/{id}/comments, DELETE …/comments/{cid}. Demo post: 758a8e66-0ffb-4f1a-a7df-2bb76d750ee9. Declutter item for the bottom bar: c6a70a77-6a81-4f7b-944f-7d9654b1138a. Run the hygiene test with EXPO_PUBLIC_BACKEND_URL exported (frontend/.env uses EXPO_PUBLIC_BACKEND_URL, not EXPO_BACKEND_URL).",
+  "rca_of_issue": "CRM New: lead_unlocks docs created without crm_status; list_leads maps a missing value to 'new' for display but filters on crm_status=='new' exactly. Repro: GET /api/crm/leads?status=open contains id 7fe0b811… with status 'new', while ?status=new returns []. Representations/leads pollution: tests/test_phase6c_passport_reps.py and tests/test_phase4_reviews_score_crm.py run as demo and leave data behind (all created 2026-10-26, after the purge)."
+}
