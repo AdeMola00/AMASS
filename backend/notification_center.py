@@ -145,6 +145,13 @@ KIND_CATEGORY: dict[str, str] = {
     "HOME_REPAIR_OVERDUE": "home",
     "HOME_RECORD_EXPIRY": "home",
     "HOME_WARRANTY_EXPIRY": "home",
+    # Agency teams
+    "AGENCY_CREATED": "admin",
+    "AGENCY_INVITE": "services",
+    "AGENCY_JOINED": "services",
+    "AGENCY_ROLE": "services",
+    "AGENCY_REMOVED": "services",
+    "LEAD_ASSIGNED": "services",
 }
 
 

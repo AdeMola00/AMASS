@@ -13,6 +13,7 @@ import { radii, space } from "@/src/theme/tokens";
 import { AppText, Button, Card, Chip, Input, Screen, ScreenHeader, SkeletonRows, useCelebrate, useToast } from "@/src/ui";
 import { photoUrl } from "@/src/components/social/socialTheme";
 import { tradeIcon } from "@/src/components/fixa/FixaBits";
+import { WorkPhotosPicker } from "@/src/components/fixa/WorkPhotos";
 
 /**
  * Join FIXA — aspiring providers register here. The profile stays hidden from customers until AMASS Admin
@@ -31,7 +32,7 @@ export default function JoinFixaScreen() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [catQuery, setCatQuery] = useState("");
-  const [form, setForm] = useState<FixaApplyIn>({ business_name: "", categories: [], city: "", service_areas: [], phone: "", whatsapp: "", years_experience: 0, bio: "", image: null });
+  const [form, setForm] = useState<FixaApplyIn>({ business_name: "", categories: [], city: "", service_areas: [], phone: "", whatsapp: "", years_experience: 0, bio: "", image: null, work_photos: [] });
   const [areasText, setAreasText] = useState("");
   const [yearsText, setYearsText] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -48,7 +49,7 @@ export default function JoinFixaScreen() {
             return;
           }
           const p = me.profile;
-          setForm({ business_name: p.display_name, categories: p.categories.length ? p.categories : [p.category], city: p.city ?? "", service_areas: p.service_areas, phone: p.phone ?? "", whatsapp: p.whatsapp ?? "", years_experience: p.years_experience ?? 0, bio: p.bio ?? "", image: p.image ?? null });
+          setForm({ business_name: p.display_name, categories: p.categories.length ? p.categories : [p.category], city: p.city ?? "", service_areas: p.service_areas, phone: p.phone ?? "", whatsapp: p.whatsapp ?? "", years_experience: p.years_experience ?? 0, bio: p.bio ?? "", image: p.image ?? null, work_photos: p.work_photos ?? [] });
           setAreasText(p.service_areas.join(", "));
           setYearsText(p.years_experience ? String(p.years_experience) : "");
         } else {
@@ -158,6 +159,7 @@ export default function JoinFixaScreen() {
               </AppText>
               {[
                 { icon: "document-text-outline", text: "Tell us your trades, area and phone number." },
+                { icon: "images-outline", text: "Add a profile photo and up to 5 photos of finished jobs." },
                 { icon: "shield-checkmark-outline", text: "AMASS Admin verifies you — you're hidden until then." },
                 { icon: "call-outline", text: "Homeowners call, WhatsApp or book you for free." },
                 { icon: "star-outline", text: "Finished jobs and ratings build your badges. No fees, ever." },
@@ -220,6 +222,8 @@ export default function JoinFixaScreen() {
           </View>
           <Input label="Years of experience" value={yearsText} onChangeText={setYearsText} placeholder="e.g. 7" keyboardType="number-pad" containerStyle={{ width: 180 }} testID="fixa-join-years" />
           <Input label="About you" value={form.bio} onChangeText={(v) => set("bio", v)} placeholder="What you specialise in, how you work, what customers can expect." multiline maxLength={600} helper={`${form.bio.length}/600`} testID="fixa-join-bio" />
+
+          <WorkPhotosPicker photos={form.work_photos ?? []} onChange={(next) => set("work_photos", next)} testID="fixa-join-work" />
 
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
             <Ionicons name="shield-checkmark-outline" size={16} color={colors.textTertiary} />

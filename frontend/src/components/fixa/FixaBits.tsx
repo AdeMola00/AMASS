@@ -149,22 +149,24 @@ export function ContactButtons({ provider, size = 40, onMissing, testIDPrefix = 
   );
 }
 
-export function ProviderAvatar({ provider, size = 56 }: { provider: Pick<ProviderPreview, "image" | "initials" | "verified">; size?: number }) {
+/** Provider photo — a bold SQUARE portrait (soft corners) with the verified shield tucked in the corner. */
+export function ProviderAvatar({ provider, size = 112 }: { provider: Pick<ProviderPreview, "image" | "initials" | "verified">; size?: number }) {
   const { colors } = useTheme();
-  const dot = Math.max(18, Math.round(size * 0.34));
+  const dot = Math.max(20, Math.round(size * 0.24));
+  const radius = Math.round(size * 0.16);
   return (
     <View style={{ width: size, height: size }}>
       {provider.image ? (
-        <Image source={{ uri: photoUrl(provider.image) }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.skeleton }} contentFit="cover" transition={200} />
+        <Image source={{ uri: photoUrl(provider.image) }} style={{ width: size, height: size, borderRadius: radius, backgroundColor: colors.skeleton }} contentFit="cover" transition={200} />
       ) : (
-        <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surfaceInverse, alignItems: "center", justifyContent: "center" }}>
-          <AppText variant={size >= 72 ? "h2" : "title"} color={colors.textInverse}>
+        <View style={{ width: size, height: size, borderRadius: radius, backgroundColor: colors.surfaceInverse, alignItems: "center", justifyContent: "center" }}>
+          <AppText variant={size >= 120 ? "h1" : size >= 72 ? "h2" : "title"} color={colors.textInverse}>
             {provider.initials}
           </AppText>
         </View>
       )}
       {provider.verified ? (
-        <View style={[styles.verifyDot, { width: dot, height: dot, borderRadius: dot / 2, backgroundColor: colors.fix, borderColor: colors.bg }]}>
+        <View style={[styles.verifyDot, { width: dot, height: dot, borderRadius: Math.round(dot * 0.32), backgroundColor: colors.fix, borderColor: colors.bg }]}>
           <Ionicons name="shield-checkmark" size={dot * 0.55} color="#FFFFFF" />
         </View>
       ) : null}
@@ -231,8 +233,8 @@ export function ProviderRow({ provider: p, onPress, onMissingContact }: { provid
         testID={`fixa-row-open-${p.id}`}
         style={{ flexDirection: "row", alignItems: "center", gap: 14 }}
       >
-        <ProviderAvatar provider={p} size={76} />
-        <View style={{ flex: 1, gap: 4 }}>
+        <ProviderAvatar provider={p} size={152} />
+        <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <AppText variant="h3" weight="extrabold" numberOfLines={2} style={{ flex: 1 }}>
               {p.display_name}
@@ -270,7 +272,7 @@ export function ProviderMiniCard({ provider: p, onPress, onMissingContact }: { p
     <View style={[styles.mini, shadows.sm, { backgroundColor: colors.surface, borderColor: colors.borderStrong }]} testID={`fixa-mini-${p.id}`}>
       <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={`${p.display_name}, ${p.category}. Open profile`} testID={`fixa-mini-open-${p.id}`} style={{ gap: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <ProviderAvatar provider={p} size={60} />
+          <ProviderAvatar provider={p} size={120} />
           <View style={{ flex: 1 }}>
             <AppText variant="title" weight="extrabold" numberOfLines={1}>
               {p.display_name}

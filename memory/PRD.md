@@ -782,3 +782,12 @@ User choice: fix in code only, keep demo's seeded test rows (CRM "AMASS Buyer" l
 
 ## FIXA directory tiles — bolder (Jun 2026)
 - `FixaBits.tsx`: `ProviderRow` avatar 56 → 76, name `h3` extrabold (2 lines), tile `radii.xl`, 1.5 px `borderStrong` border, `shadows.sm`, padding `space[4]`; `ProviderMiniCard` (Feeds rail) avatar 44 → 60, name `title` extrabold, width 240, same border/shadow. Verified by screenshot at 390 px.
+
+## Polish — square FIXA photos ×2, bolder tab bar, money-bundle rain with sound (Jun 2026)
+**Brief (user)**: FIXA provider photo double the size and square (not round); Find Home bottom nav icons + lettering bolder and larger; money rain in large bundles, much more plentiful, with a sound that is good, reassuring and confident → user picked **"Bright celebratory jingle"** (louder, energetic, rising flourish).
+- `FixaBits.tsx` `ProviderAvatar`: square with soft corners (`radius = size*0.16`), verified shield badge in the corner; `ProviderRow` 152 px, `ProviderMiniCard` 120 px, profile header unchanged API.
+- `(tabs)/_layout.tsx`: `ICON_SIZE` 32, capsule 68×38, labels 14 px `PlusJakartaSans-800` (12.5 compact), badge 21 px.
+- `src/ui/MoneyRain.tsx`: notes **and bundles** (`kind: bundle`, 3–5 stacked notes, heavier physics), counts brief 26 · subtle 18 · celebrate 48; sound via `expo-audio` `useAudioPlayer` — `assets/sounds/money_soft.wav` (brief/subtle, vol 0.7–1) and `money_celebrate.wav` (celebrate, vol 1); never plays under reduced motion; toggle persisted at `amass_money_rain_sound` (default on), exposed as `soundEnabled/setSoundEnabled` on `useMoneyRain()`.
+- `scripts/make_money_sounds.py` (numpy, no samples): bright celebratory jingle — snappy thump, rising C-major flourish (C6-E6-G6 → C7/E7 for soft; two-octave C5→C7 run into a big C6 chord with E7/G7 shimmer for celebrate), paper flutter, coin "ting" sparkle; soft-clipped and normalised to −0.5 dBFS (RMS ≈ −7 dBFS). Re-run the script to regenerate.
+- `app/settings.tsx` → Appearance: **Money sound** switch (`settings-money-sound`) + **Preview the money rain** row (`settings-money-preview`, fires a `celebrate` rain) — the deterministic way to see/hear it.
+- Verified by screenshot (web, 390 px): FIXA rows show 152 px square photos; tab bar bold/large; Settings preview fires `money-rain-celebrate` with dense bundles; zero console errors from `expo-audio`.

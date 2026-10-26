@@ -2125,6 +2125,12 @@ _p4_router, _p4_admin_router = register_phase4_routes(db, get_current_user, requ
 app.include_router(_p4_router)
 app.include_router(_p4_admin_router)
 
+# ─── Agency teams: admin-created agencies, email invites accepted in-app, one shared CRM with assignments
+from agency_teams import ensure_agency_indexes, register_agency_routes
+_agency_router, _agency_admin = register_agency_routes(db, get_current_user, require_admin)
+app.include_router(_agency_router)
+app.include_router(_agency_admin)
+
 # ─── Property Identity Core (Phase 6A)
 from property_identity import register_property_identity_routes
 _pi_router, _pi_public = register_property_identity_routes(
@@ -2318,6 +2324,7 @@ async def on_startup():
     await start_viewings(db)  # indexes + 24h reminder sweep
     await ensure_map_time_indexes(db)
     await ensure_fixa_indexes(db)
+    await ensure_agency_indexes(db)
     await start_home_hub(db)  # indexes + 30-min bill / maintenance / expiry reminder sweep
     try:
         _demo_hh = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0, "id": 1})

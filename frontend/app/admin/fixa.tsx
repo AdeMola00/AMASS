@@ -151,7 +151,7 @@ export default function AdminFixaScreen() {
                 return (
                   <Card key={a.id} style={{ gap: 10 }} testID={`admin-fixa-app-${a.id}`}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <ProviderAvatar provider={a} size={52} />
+                      <ProviderAvatar provider={a} size={104} />
                       <View style={{ flex: 1, gap: 2 }}>
                         <AppText variant="title" numberOfLines={1}>
                           {a.display_name}

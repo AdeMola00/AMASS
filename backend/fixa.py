@@ -30,6 +30,7 @@ logger = logging.getLogger("amass.fixa")
 
 HIDDEN_STATUSES = ("pending", "rejected", "suspended", "hidden")
 AUTO_HIDE_REPORTS = 3
+MAX_WORK_PHOTOS = 5  # gallery on the pro's public profile
 
 # Curated trade list for the Join FIXA form (DB subcategories are merged in).
 FIXA_CATEGORIES = [
@@ -87,6 +88,7 @@ class ApplyIn(BaseModel):
     years_experience: int = Field(default=0, ge=0, le=60)
     bio: str = Field(default="", max_length=600)
     image: Optional[str] = None
+    work_photos: list[str] = Field(default_factory=list, max_length=MAX_WORK_PHOTOS)
 
 
 class ReportIn(BaseModel):
@@ -142,6 +144,7 @@ def provider_full(doc: dict) -> dict:
         "service_areas": doc.get("provider_service_areas") or [],
         "call_out_from": doc.get("price"),
         "images": [u for u in (doc.get("images") or []) if u],
+        "work_photos": [u for u in (doc.get("work_photos") or []) if u][:MAX_WORK_PHOTOS],
         "posted_at": doc.get("posted_at"),
     }
 
@@ -250,6 +253,16 @@ def register_fixa_routes(db: AsyncIOMotorDatabase, get_current_user, require_adm
         phone = _digits(body.phone)
         if len(phone) < 7:
             raise HTTPException(400, "Enter a valid phone number")
+        photos: list[str] = []
+        for u in body.work_photos:
+            u = (u or "").strip()
+            if not u:
+                continue
+            if not (u.startswith("https://") or u.startswith("http://") or u.startswith("/api/")):
+                raise HTTPException(400, "Work photos must be uploaded images (links), not raw data")
+            if u not in photos:
+                photos.append(u)
+        photos = photos[:MAX_WORK_PHOTOS]
         return {
             "name": f"{body.business_name.strip()} — {cats[0]}",
             "seller_name": body.business_name.strip(),
@@ -264,7 +277,8 @@ def register_fixa_routes(db: AsyncIOMotorDatabase, get_current_user, require_adm
             "seller_bio": body.bio.strip(),
             "description": body.bio.strip(),
             "image": body.image,
-            "images": [body.image] if body.image else [],
+            "work_photos": photos,
+            "images": ([body.image] if body.image else []) + photos,
             "seller_avatar": body.image or user.get("avatar_url"),
             "tags": ["fixa"],
         }
@@ -319,9 +333,10 @@ def register_fixa_routes(db: AsyncIOMotorDatabase, get_current_user, require_adm
             raise HTTPException(404, "You don't have a FIXA profile yet — tap Join FIXA")
         fields = _profile_fields(body, user)
         if not body.image:
+            # No photo in the payload = keep the current one (the edit form always sends it when set).
             fields.pop("image", None)
-            fields.pop("images", None)
             fields.pop("seller_avatar", None)
+            fields["images"] = ([d["image"]] if d.get("image") else []) + fields["work_photos"]
         await db.marketplace.update_one({"id": d["id"]}, {"$set": {**fields, "updated_at": _iso(_now())}})
         d2 = await _mine(user["id"])
         return {"status": d2.get("fixa_status") or "verified", "profile": provider_full(d2)}

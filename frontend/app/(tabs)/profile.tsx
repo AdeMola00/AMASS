@@ -33,6 +33,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", tone: "brand" },
       { icon: "add-circle-outline", label: "List a Property", route: "/submit-property" },
       { icon: "briefcase-outline", label: "Agent Workspace", route: "/agent-workspace", requires: "agent" },
+      { icon: "people-outline", label: "Agency Team", route: "/agency", tone: "brand" },
       { icon: "time-outline", label: "Viewing Requests & Hours", route: "/viewings?role=agent", requires: "agent", tone: "info" },
       { icon: "pricetags-outline", label: "Agent Plans", route: "/agent-plans", tone: "premium" },
     ],
@@ -80,6 +81,7 @@ export default function Profile() {
   const [saved, setSaved] = useState<number | null>(null);
   const [unlocked, setUnlocked] = useState<number | null>(null);
   const [fixaStatus, setFixaStatus] = useState<FixaStatus | "none" | null>(null);
+  const [agency, setAgency] = useState<{ name: string | null; invites: number }>({ name: null, invites: 0 });
 
   useFocusEffect(
     useCallback(() => {
@@ -89,6 +91,8 @@ export default function Profile() {
       api.myUnlocks("property").then((r) => setUnlocked(r.count)).catch(() => setUnlocked(0));
       // FIXA: providers (pending or verified) get their dashboard; everyone else is invited to join.
       api.fixaMe().then((m) => setFixaStatus(m.status)).catch(() => setFixaStatus("none"));
+      // Agency team: show the agency name, or how many invites are waiting.
+      api.agencyMe().then((m) => setAgency({ name: m.agency?.name ?? null, invites: m.my_invites.length })).catch(() => setAgency({ name: null, invites: 0 }));
     }, [])
   );
 
@@ -289,6 +293,11 @@ export default function Profile() {
                       locked ? (
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                           <Badge label="Agents" tone="neutral" icon="lock-closed" size="xs" />
+                          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                        </View>
+                      ) : m.route === "/agency" && (agency.invites > 0 || agency.name) ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }} testID="menu-agency-trailing">
+                          {agency.invites > 0 ? <Badge label={`${agency.invites} invite${agency.invites === 1 ? "" : "s"}`} tone="warning" icon="mail" size="xs" /> : <Badge label={agency.name!} tone="brand" size="xs" />}
                           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                         </View>
                       ) : undefined

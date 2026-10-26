@@ -1,0 +1,55 @@
+{
+  "summary": "Tested FIXA work photos (A1-A2) and Agency Teams (B1-B8) on backend and frontend at 390x844. Backend: test_agency_teams.py plus test_fixa_free.py ran 14/14 green. The new tests/test_iter91_photos_agency.py ran 4/4 green and covers apply with 5 photos (201), 6 photos (422), GET/PUT /fixa/me keeping the image, approve and public profile, the admin create rules (403, 404, 409), rename/deactivate/reactivate, invites to existing and unknown emails, cancel, B6 permissions, and assign visibility both ways. UI: every flow in the request passed. That covers the Recent work gallery (counter 1/2 → 2/2 on scroll, dots, no gallery for pros without photos), the join picker, and the dashboard row opening edit with photos filled in. It also covers admin list/create/error toasts/edit/handover/toggle, the owner team screen, invite and cancel, the invitee accept flow with the profile badge going from '1 invite' to the agency name, and the Team CRM (filters, assign chips, toast, owner pill, assignee filter, status and notes). As adaeze, only her lead shows and Assigned-to is read-only. LEAD_ASSIGNED notifications deep-link correctly, her personal CRM shows the lead with the crm-team-cta card, and the lead disappears from demo's /crm. Remove member returned her lead to demo; then re-invite and accept. Smoke test of 8 main routes had zero console errors. One medium bug: members of a DEACTIVATED agency get stuck.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/admin/agencies/{id} status=inactive → members", "issue": "Members of a deactivated agency get stuck. GET /agency/me returns agency:null, but their agency_members row is still 'active'. So POST /agency/leave → 404 'not on an agency team', other agencies' invites → 409 'already on an agency team', and admin create with them as owner → 409. Reproduced with helper_iter91_edge_cleanup.py edge."},
+      {"endpoint": "POST /api/fixa/apply, PUT /api/fixa/me (work_photos)", "issue": "work_photos are not validated. Any string is accepted, including 'not-a-url' and raw data:image base64 URIs, which then get stored inline in the marketplace doc. The backend should only accept http(s) or /api/public-files/ URLs."},
+      {"endpoint": "hydrate_leads (agency_teams.py:129)", "issue": "All 29 of demo's seeded lead_unlocks are legacy documents: they store the buyer in `user_id` (not favorite_user_id) and have property_id=None. So every lead in the team CRM and personal CRM shows the fallback 'AMASS Buyer' / 'Property'; no real buyer names appear for demo. Add a buyer fallback to l.get('user_id') or migrate the seed data."},
+      {"endpoint": "PATCH /api/admin/agencies/{id} owner_email", "issue": "Handover only checks the new owner's ACTIVE membership. If they have a pending invite to the same agency, an extra owner row is inserted and the invite row is left behind. Also, the old owner silently becomes a manager, and the UI does not mention this."},
+      {"endpoint": "PATCH /api/agency/leads/{id}/assign", "issue": "assigned_at is saved as a datetime object, while the rest of the module uses ISO strings. This is inconsistent."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Admin agencies — New agency sheet", "issue": "Reopening the 'New agency' sheet about 800 ms after a successful create did not render the sheet's inputs (Playwright waited 30 s for admin-agency-name). It worked on a fresh load. This is likely a race with the close animation.", "testID": "admin-agency-new", "priority": "low"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/agency and /agency/leads header", "issues": ["The agency name is cut off ('AMASS Demo Real…', 'AMASS Demo Realty · C…') because the Invite button crowds the header at 390px."]},
+      {"screen": "/agency manage sheet", "issues": ["'Remove from team' removes the member in one tap, with no confirm step. 'Leave' has a confirm sheet; this destructive action has none."]},
+      {"screen": "/agency (agent view)", "issues": ["The 'Pool' stat shows the team-wide total (29), but tapping it opens a list with only the agent's own leads (0-1). This is confusing, and it shows team volume to agents."]},
+      {"screen": "/fixa/join work photos", "issues": ["Tapping a thumbnail deletes the photo immediately, with no undo or confirm. The X badge is 22px; the whole 96px tile is the tap target, so taps are easy but accidental removals are easy too."]},
+      {"screen": "/fixa/<id> public profile", "issues": ["The city chip in the header is cut off to 'Lag…' next to the 'New on FIXA · no ratings yet' text."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter91_photos_agency.py",
+    "/app/backend/tests/helper_iter91_edge_cleanup.py",
+    "/app/backend/tests/test_agency_teams.py",
+    "/app/backend/tests/test_fixa_free.py",
+    "/app/test_reports/pytest/pytest_iter91.xml",
+    "/app/test_reports/pytest/pytest_iter91b.xml"
+  ],
+  "action_items": [
+    "Fix the deactivated-agency trap. Either treat members of an inactive agency as free in the invite/accept/create checks (use active_membership instead of a raw agency_members status=='active' lookup), or let /agency/leave and /agency/me work for inactive agencies.",
+    "Validate work_photos and image in ApplyIn: allow only http(s):// or /api/public-files/ URLs, and reject data: URIs.",
+    "In hydrate_leads, fall back to l.get('user_id') for the buyer when favorite_user_id is missing, or migrate demo's 29 legacy lead_unlocks, so the CRMs show real buyer names.",
+    "Add a confirm step to 'Remove from team'. Fix the cut-off agency name in the /agency and /agency/leads headers.",
+    "Agent view: either hide the 'Pool' total or label it clearly as team-wide.",
+    "When handing over an agency, delete or merge any pending invite for the new owner, and tell the admin that the old owner becomes a manager."
+  ],
+  "critical_code_review_comments": [
+    "The agency_teams.py permission model looks sound. Agents are scoped through my_leads_query, managers through team_leads_query, and lead_access backs the personal CRM PATCH/note endpoints.",
+    "accept_invite does not re-check MAX_TEAM. Several invites accepted around the cap could push a team past it, because the cap is only counted when the invite is created.",
+    "_release_leads only resets assigned_to. Leads keep agency_id, so a removed member's own unlocks that were ever assigned stay in the team pool."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter91_photos_agency.py", "/app/backend/tests/helper_iter91_edge_cleanup.py"],
+  "success_rate": {"backend": "100% (18/18 pytest); 1 medium + 4 minor edge issues", "frontend": "100% of requested flows passed; 1 low-priority flaky sheet and 5 design nits"},
+  "seed_data_creation": "Created qa91_*@amass-qa.africa users, agencies, invites and FIXA profiles. Cleanup deleted every user with an @amass-qa.africa email (1324 accumulated from previous iterations as well), plus their agency_members, agencies (4), notifications, marketplace services docs and wallets. AMASS Demo Realty is back to owner demo plus agent adaeze (2 members, 29 leads). The lead 8aa8bb0c-… is back with demo (assigned_to None; it now has agency_id set). Notes added on that lead: 'QA91 note' by adaeze.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login returns access_token (not token). GET /api/fixa/providers/{id} requires auth. /api/crm/leads returns a bare list. Team CRM cards have testID team-lead-<id>, and a nested team-lead-<id>-owner pill matches the same prefix, so de-duplicate. Run pytest with -n 0 for single files (pytest.ini adds xdist). Use helper_iter91_edge_cleanup.py cleanup to wipe @amass-qa.africa test data.",
+  "rca_of_issue": "Deactivated-agency trap: active_membership() filters on agencies.status=='active', but invite(), accept_invite(), create_agency() and patch_agency() check db.agency_members.find_one({user_id, status:'active'}) directly, ignoring the agency's status. leave() uses _require_member, which uses active_membership and so returns 404. Repro: create an agency, invite an agent and accept, PATCH status=inactive, then the agent calls POST /agency/leave → 404 and another agency's invite → 409."
+}

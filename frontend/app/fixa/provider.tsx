@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import Animated from "react-native-reanimated";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
@@ -121,7 +121,7 @@ export default function FixaProviderDashboard() {
         <View style={{ paddingHorizontal: space[4], gap: space[3] }}>
           <Card style={{ gap: 12 }} testID="fixa-dash-status">
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <ProviderAvatar provider={p} size={60} />
+              <ProviderAvatar provider={p} size={120} />
               <View style={{ flex: 1, gap: 4 }}>
                 <AppText variant="h3" numberOfLines={1}>
                   {p.display_name}
@@ -142,6 +142,16 @@ export default function FixaProviderDashboard() {
             </AppText>
             {me.status === "rejected" ? <Button label="Update & re-apply" variant="fix" iconLeft="refresh" onPress={() => router.push("/fixa/join?edit=1" as any)} testID="fixa-dash-reapply" /> : null}
             {me.status === "verified" ? <Button label="View my public profile" variant="ghost" size="sm" iconLeft="eye-outline" onPress={() => router.push(`/fixa/${p.id}` as any)} testID="fixa-dash-view" /> : null}
+            <Pressable onPress={() => router.push("/fixa/join?edit=1" as any)} accessibilityRole="button" accessibilityLabel="Manage work photos" style={[styles.photosRow, { backgroundColor: colors.surfaceAlt }]} testID="fixa-dash-work-photos">
+              <Ionicons name="images-outline" size={16} color={colors.text} />
+              <AppText variant="caption" weight="semibold" style={{ flex: 1 }}>
+                Work photos · {(p.work_photos ?? []).length}/5
+              </AppText>
+              <AppText variant="caption" tone="secondary">
+                {(p.work_photos ?? []).length ? "Edit" : "Add"}
+              </AppText>
+              <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
+            </Pressable>
           </Card>
 
           {/* Reputation */}
@@ -280,5 +290,6 @@ export default function FixaProviderDashboard() {
 
 const styles = StyleSheet.create({
   stats: { flexDirection: "row", gap: 10 },
+  photosRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, minHeight: 44, borderRadius: radii.md },
   badgeIcon: { width: 36, height: 36, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
 });

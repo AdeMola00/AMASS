@@ -512,6 +512,7 @@ def register_agent_tool_routes(db: AsyncIOMotorDatabase, chat_factory) -> APIRou
             raise
         await db.lead_unlocks.insert_one(
             {
+                "id": str(uuid.uuid4()),
                 "agent_id": user_id,
                 "property_id": data.property_id,
                 "favorite_user_id": data.favorite_user_id,

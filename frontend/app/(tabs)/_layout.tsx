@@ -63,8 +63,9 @@ function useBadges(activeIndex: number) {
   return counts;
 }
 
-const CAPSULE_W = 60;
-const CAPSULE_H = 32;
+const CAPSULE_W = 68;
+const CAPSULE_H = 38;
+const ICON_SIZE = 32;
 /** Wide screens: the row of tabs stops stretching so icons and labels stay close together. */
 const MAX_ROW_W = 640;
 
@@ -137,7 +138,7 @@ function TabButton({ route, active, onPress, badge, compact, reduce }: any) {
       accessibilityLabel={`${cfg.label} tab${badge ? `, ${badge} unread` : ""}`}
     >
       <Animated.View style={[styles.iconWrap, anim]}>
-        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={27} color={tint} />
+        <Ionicons name={active ? cfg.iconActive : cfg.icon} size={ICON_SIZE} color={tint} />
         {badge > 0 ? (
           <View style={[styles.badge, { backgroundColor: colors.brand, borderColor: active ? colors.brandSoft : colors.bgElevated }]} testID={`tab-badge-${route.name}`}>
             <AppText variant="micro" color="#fff" tabular style={styles.badgeText}>
@@ -174,23 +175,23 @@ const styles = StyleSheet.create({
   bar: { position: "absolute", left: 0, right: 0, bottom: 0, alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth },
   barShadow: { shadowColor: "#111111", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 12 },
   row: { flexDirection: "row", height: TAB_BAR_HEIGHT, alignItems: "stretch", position: "relative" },
-  capsule: { position: "absolute", left: 0, top: 7, width: CAPSULE_W, height: CAPSULE_H, borderRadius: radii.pill },
-  tab: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 4, gap: 4 },
+  capsule: { position: "absolute", left: 0, top: 6, width: CAPSULE_W, height: CAPSULE_H, borderRadius: radii.pill },
+  tab: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 2, gap: 3 },
   iconWrap: { width: CAPSULE_W, height: CAPSULE_H, alignItems: "center", justifyContent: "center" },
-  label: { fontSize: 13, lineHeight: 17, letterSpacing: -0.2, fontFamily: "PlusJakartaSans-700" },
-  labelCompact: { fontSize: 11.5, letterSpacing: -0.4 },
+  label: { fontSize: 14, lineHeight: 18, letterSpacing: -0.4, fontFamily: "PlusJakartaSans-800" },
+  labelCompact: { fontSize: 12.5, letterSpacing: -0.5 },
   labelActive: { fontFamily: "PlusJakartaSans-800" },
   badge: {
     position: "absolute",
-    top: -4,
+    top: -3,
     right: 6,
-    minWidth: 19,
-    height: 19,
-    borderRadius: 10,
-    paddingHorizontal: 4,
+    minWidth: 21,
+    height: 21,
+    borderRadius: 11,
+    paddingHorizontal: 5,
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeText: { fontSize: 10.5, lineHeight: 12, fontFamily: "PlusJakartaSans-700" },
+  badgeText: { fontSize: 11.5, lineHeight: 13, fontFamily: "PlusJakartaSans-800" },
 });

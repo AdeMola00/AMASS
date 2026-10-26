@@ -40,6 +40,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from agency_teams import hydrate_leads, lead_access, my_leads_query
+
 
 # ─── Score weighting (admin-configurable in a later phase) ──────
 SCORE_WEIGHTS = {
@@ -113,7 +115,6 @@ class LeadUpdateIn(BaseModel):
     status: Optional[str] = None  # LEAD_STATUSES
     next_follow_up_at: Optional[datetime] = None
     last_contact_at: Optional[datetime] = None
-    assigned_to: Optional[str] = None
 
 
 class LeadNoteIn(BaseModel):
@@ -623,40 +624,19 @@ def register_phase4_routes(
         status: Optional[str] = Query(None),
         user: dict = Depends(require_auth),
     ):
-        filt: dict = {"agent_id": user["id"]}
+        # Own unlocks nobody re-assigned + team leads assigned to me (agency_teams.my_leads_query).
+        parts: list[dict] = [my_leads_query(user["id"])]
         if status == "new":
-            # Fresh unlocks are written without crm_status; the list maps that to "new" (see below).
-            filt["$or"] = [{"crm_status": "new"}, {"crm_status": {"$exists": False}}, {"crm_status": None}]
+            # Fresh unlocks are written without crm_status; hydrate_leads maps that to "new".
+            parts.append({"$or": [{"crm_status": "new"}, {"crm_status": {"$exists": False}}, {"crm_status": None}]})
         elif status and status in LEAD_STATUSES:
-            filt["crm_status"] = status
+            parts.append({"crm_status": status})
         elif status == "open":
-            filt["crm_status"] = {"$nin": ["won", "lost"]}
-        leads = await db.lead_unlocks.find(filt, {"_id": 0}).sort(
+            parts.append({"crm_status": {"$nin": ["won", "lost"]}})
+        leads = await db.lead_unlocks.find({"$and": parts}, {"_id": 0}).sort(
             "created_at", -1
         ).to_list(500)
-        # Hydrate property meta for the UI
-        prop_ids = list({l.get("property_id") for l in leads if l.get("property_id")})
-        props = (
-            await db.properties.find(
-                {"id": {"$in": prop_ids}}, {"_id": 0, "id": 1, "title": 1, "images": 1, "price": 1}
-            ).to_list(200)
-            if prop_ids
-            else []
-        )
-        pmap = {p["id"]: p for p in props}
-        out: list = []
-        for l in leads:
-            p = pmap.get(l.get("property_id") or "")
-            out.append(
-                {
-                    **l,
-                    "status": l.get("crm_status", "new"),
-                    "property_title": (p or {}).get("title"),
-                    "property_image": ((p or {}).get("images") or [None])[0],
-                    "property_price": (p or {}).get("price"),
-                }
-            )
-        return out
+        return await hydrate_leads(db, leads)
 
     @router.patch("/crm/leads/{lead_id}")
     async def crm_update_lead(
@@ -667,7 +647,7 @@ def register_phase4_routes(
         lead = await db.lead_unlocks.find_one({"id": lead_id}, {"_id": 0})
         if not lead:
             raise HTTPException(404, "Lead not found")
-        if lead["agent_id"] != user["id"] and not user.get("is_admin"):
+        if not await lead_access(db, user, lead):
             raise HTTPException(403, "Not your lead")
         updates: dict = {}
         if data.status:
@@ -681,8 +661,6 @@ def register_phase4_routes(
             updates["next_follow_up_at"] = data.next_follow_up_at
         if data.last_contact_at is not None:
             updates["last_contact_at"] = data.last_contact_at
-        if data.assigned_to is not None:
-            updates["assigned_to"] = data.assigned_to
         if not updates:
             raise HTTPException(400, "Nothing to update")
         updates["updated_at"] = datetime.now(timezone.utc)
@@ -695,10 +673,10 @@ def register_phase4_routes(
         data: LeadNoteIn = Body(...),
         user: dict = Depends(require_auth),
     ):
-        lead = await db.lead_unlocks.find_one({"id": lead_id}, {"_id": 0, "agent_id": 1})
+        lead = await db.lead_unlocks.find_one({"id": lead_id}, {"_id": 0, "agent_id": 1, "assigned_to": 1, "agency_id": 1})
         if not lead:
             raise HTTPException(404, "Lead not found")
-        if lead["agent_id"] != user["id"] and not user.get("is_admin"):
+        if not await lead_access(db, user, lead):
             raise HTTPException(403, "Not your lead")
         note = {
             "id": str(uuid.uuid4()),

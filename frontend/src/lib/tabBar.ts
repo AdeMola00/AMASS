@@ -6,7 +6,7 @@
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /** Height of the bar above the home-indicator inset. */
-export const TAB_BAR_HEIGHT = 66;
+export const TAB_BAR_HEIGHT = 76;
 
 /** Distance from the bottom of the screen to the TOP of the bar — pad scroll content / position FABs with this. */
 export function useTabBarOffset() {

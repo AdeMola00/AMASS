@@ -1153,3 +1153,19 @@ agent_communication:
       Iteration 90 result: all 7 pass. Follow-ups applied: Run now hand-off now fits the map to the results (firstLoadRef reset in the
       ai_filters effect; verified by screenshot "8 homes in view", no IntentSheet); legacy GET /api/notifications in property_improvement.py
       applies the LIVE/LEGACY_KINDS rules. Accepted LOW: reps list capped at 200 (demo test data only), file sizes.
+
+  - agent: "main"
+    message: |
+      Iteration 91 (to run) — two features. (A) FIXA work photos: ApplyIn.work_photos (≤5, deduped) stored on the provider doc
+      (`work_photos`, merged into `images`), returned by provider_full; join form (WorkPhotosPicker, multi-select via socialUpload,
+      tap to remove) + public profile swipeable gallery (WorkPhotosGallery, dots + "n / N" counter) + My FIXA "Work photos · n/5" row.
+      (B) Agency teams (backend agency_teams.py, /api/agency/* + /api/admin/agencies): only admins create agencies (name + owner email);
+      owner/managers invite by email (existing user → AGENCY_INVITE notification + email; unknown email → bound to the account at
+      first /agency/me after sign-up); accept/decline in-app; roles owner/manager/agent; team CRM pools every member's lead_unlocks;
+      owner/managers see all + assign (PATCH /agency/leads/{id}/assign → LEAD_ASSIGNED notification → /agency/leads?lead=…), agents see
+      only leads assigned to them (own unlocks count as theirs until moved); remove/leave releases pooled leads to "Unassigned".
+      Personal /crm/leads now hydrates buyer contact + follows assignments; lead_unlocks get `id` on insert (+ backfill at boot).
+      Frontend: /agency (team, invites, manage sheet, leave), /agency/leads (status + assignee filters, LeadDetailSheet with Assigned-to
+      chips), /admin/agencies (create / rename / hand over / deactivate), My AMASS → "Agency Team" row with invite badge, admin tile,
+      /crm team CTA. Shared crm bits in src/components/crm/LeadBits.tsx. Demo seed: agency "AMASS Demo Realty" (owner demo, agent
+      adaeze). Backend: tests/test_agency_teams.py 8/8 (self-cleaning).

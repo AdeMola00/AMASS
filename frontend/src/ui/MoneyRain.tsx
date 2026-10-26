@@ -1,6 +1,6 @@
 /**
- * Money rain — naira (and a few dollar) banknotes flutter down from the top edge and fade out.
- * One reusable overlay for the whole app, mounted once in the root layout.
+ * Money rain — bundles of naira (and a few dollar notes) tumble down from the top edge and fade out, with a
+ * warm, confident "money lands" sound. One reusable overlay for the whole app, mounted once in the root layout.
  *
  *   const { rain } = useMoneyRain();
  *   rain({ variant: "brief",     key: `pin:${id}` });        // a home was picked / opened
@@ -12,13 +12,16 @@
  *   • dedup: the same `key` is ignored for 2.5 s (or forever in-session with `once`); a brief/subtle request
  *     while notes are still falling is dropped, a celebration replaces whatever is playing.
  *   • reduced motion → a handful of notes gently fade in place; no travel, no spin.
- *   • budget-phone friendly: ≤ 24 notes, transform/opacity only, every note animates on the UI thread.
+ *   • transform/opacity only, every note animates on the UI thread; bundles are plain Views (no images).
+ *   • sound: felt thump + rising bells + paper flutter (assets/sounds, synthesised in scripts/make_money_sounds.py);
+ *     user-switchable in Settings (`amass_money_rain_sound`, default on); never plays under reduced motion.
  *   • call sites fire it from confirmed backend results, never from a tap that merely starts a payment.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { Easing, ReduceMotion, interpolate, useAnimatedStyle, useReducedMotion as useReducedMotionSync, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { FullWindowOverlay } from "react-native-screens";
+import { useAudioPlayer } from "expo-audio";
 import { storage } from "@/src/utils/storage";
 import { useReducedMotion as useReducedMotionLive } from "./Feedback";
 
@@ -36,18 +39,26 @@ type RainApi = {
   rain: (opts?: MoneyRainOptions) => boolean;
   /** Plays once per device for the key (persisted) — for states a screen shows every time, e.g. "approved". */
   rainOncePersisted: (variant: MoneyRainVariant, key: string) => Promise<boolean>;
+  /** Settings toggle for the money sound (persisted). */
+  soundEnabled: boolean;
+  setSoundEnabled: (on: boolean) => void;
 };
 
-const noop: RainApi = { rain: () => false, rainOncePersisted: async () => false };
+const noop: RainApi = { rain: () => false, rainOncePersisted: async () => false, soundEnabled: true, setSoundEnabled: () => {} };
 const Ctx = createContext<RainApi>(noop);
 
-const VARIANTS: Record<MoneyRainVariant, { count: number; duration: number; spread: number; alpha: number; scale: [number, number] }> = {
-  brief: { count: 12, duration: 1500, spread: 380, alpha: 0.96, scale: [0.72, 1.02] },
-  subtle: { count: 9, duration: 1500, spread: 420, alpha: 0.82, scale: [0.66, 0.9] },
-  celebrate: { count: 24, duration: 2500, spread: 950, alpha: 1, scale: [0.7, 1.1] },
+/** count = falling items (≈ bundleShare of them are thick bundles, the rest single notes). */
+const VARIANTS: Record<MoneyRainVariant, { count: number; bundleShare: number; duration: number; spread: number; alpha: number; scale: [number, number] }> = {
+  brief: { count: 26, bundleShare: 0.6, duration: 1700, spread: 520, alpha: 0.97, scale: [0.78, 1.08] },
+  subtle: { count: 18, bundleShare: 0.55, duration: 1700, spread: 560, alpha: 0.88, scale: [0.72, 0.98] },
+  celebrate: { count: 48, bundleShare: 0.65, duration: 2800, spread: 1300, alpha: 1, scale: [0.78, 1.18] },
 };
 const DEDUP_MS = 2500;
 const SEEN_PREFIX = "amass_money_rain_seen_v1:";
+export const MONEY_SOUND_KEY = "amass_money_rain_sound";
+
+const SOUND_SOFT = require("../../assets/sounds/money_soft.wav");
+const SOUND_CELEBRATE = require("../../assets/sounds/money_celebrate.wav");
 
 export function MoneyRainProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState<{ id: number; variant: MoneyRainVariant } | null>(null);
@@ -59,21 +70,57 @@ export function MoneyRainProvider({ children }: { children: React.ReactNode }) {
   const reduceLive = useReducedMotionLive();
   const reduce = reduceSync || reduceLive;
 
-  const rain = useCallback((opts: MoneyRainOptions = {}) => {
-    const variant = opts.variant ?? "brief";
-    const now = Date.now();
-    // Dropped (another rain still falling) → not recorded, so a later legitimate call with the same key can play.
-    if (variant !== "celebrate" && now < busyUntil.current) return false;
-    if (opts.key) {
-      const last = played.current.get(opts.key);
-      if (last != null && (opts.once || now - last < DEDUP_MS)) return false;
-      played.current.set(opts.key, now);
-      if (played.current.size > 300) played.current.delete(played.current.keys().next().value as string);
-    }
-    busyUntil.current = now + VARIANTS[variant].duration + 300;
-    setActive({ id: now, variant });
-    return true;
+  const [soundEnabled, setSoundState] = useState(true);
+  const soundRef = useRef(true);
+  useEffect(() => {
+    storage
+      .getItem<boolean>(MONEY_SOUND_KEY, true)
+      .then((v) => {
+        soundRef.current = v !== false;
+        setSoundState(v !== false);
+      })
+      .catch(() => {});
   }, []);
+  const setSoundEnabled = useCallback((on: boolean) => {
+    soundRef.current = on;
+    setSoundState(on);
+    storage.setItem(MONEY_SOUND_KEY, on).catch(() => {});
+  }, []);
+
+  const soft = useAudioPlayer(SOUND_SOFT);
+  const celebrate = useAudioPlayer(SOUND_CELEBRATE);
+  const playSound = useCallback(
+    (variant: MoneyRainVariant) => {
+      if (!soundRef.current || reduce) return;
+      const p = variant === "celebrate" ? celebrate : soft;
+      try {
+        p.volume = variant === "subtle" ? 0.7 : 1;
+        p.seekTo(0).catch(() => {});
+        p.play();
+      } catch {}
+    },
+    [soft, celebrate, reduce]
+  );
+
+  const rain = useCallback(
+    (opts: MoneyRainOptions = {}) => {
+      const variant = opts.variant ?? "brief";
+      const now = Date.now();
+      // Dropped (another rain still falling) → not recorded, so a later legitimate call with the same key can play.
+      if (variant !== "celebrate" && now < busyUntil.current) return false;
+      if (opts.key) {
+        const last = played.current.get(opts.key);
+        if (last != null && (opts.once || now - last < DEDUP_MS)) return false;
+        played.current.set(opts.key, now);
+        if (played.current.size > 300) played.current.delete(played.current.keys().next().value as string);
+      }
+      busyUntil.current = now + VARIANTS[variant].duration + 300;
+      setActive({ id: now, variant });
+      playSound(variant);
+      return true;
+    },
+    [playSound]
+  );
 
   const rainOncePersisted = useCallback(
     async (variant: MoneyRainVariant, key: string) => {
@@ -89,7 +136,7 @@ export function MoneyRainProvider({ children }: { children: React.ReactNode }) {
   );
 
   const done = useCallback((id: number) => setActive((a) => (a?.id === id ? null : a)), []);
-  const api = useMemo(() => ({ rain, rainOncePersisted }), [rain, rainOncePersisted]);
+  const api = useMemo(() => ({ rain, rainOncePersisted, soundEnabled, setSoundEnabled }), [rain, rainOncePersisted, soundEnabled, setSoundEnabled]);
 
   // iOS: a full-window overlay paints above native Modal sheets (success sheets, unlock dialog) and still lets
   // touches through. Android / web: in-tree overlay — above bottom sheets, below a native Modal if one is open.
@@ -107,9 +154,12 @@ export function useMoneyRain() {
   return useContext(Ctx);
 }
 
-/* ─── The falling notes ─────────────────────────────────────────────── */
+/* ─── The falling notes & bundles ───────────────────────────────────── */
 
 type Note = {
+  kind: "note" | "bundle";
+  /** Notes in the stack (bundles only). */
+  thick: number;
   denom: Denom;
   x0: number;
   drift: number;
@@ -127,9 +177,10 @@ type Note = {
 };
 
 type Denom = "n1000" | "n500" | "n200" | "usd100";
-/** Mostly naira, a few dollars — picked per note. */
-const pickDenom = (): Denom => {
+/** Mostly naira, a few dollars — picked per note. Bundles lean to the big notes. */
+const pickDenom = (bundle: boolean): Denom => {
   const r = Math.random();
+  if (bundle) return r < 0.5 ? "n1000" : r < 0.78 ? "n500" : r < 0.9 ? "usd100" : "n200";
   return r < 0.36 ? "n1000" : r < 0.62 ? "n500" : r < 0.78 ? "n200" : "usd100";
 };
 
@@ -138,20 +189,25 @@ function Rain({ id, variant, reduce, onDone }: { id: number; variant: MoneyRainV
   const cfg = VARIANTS[variant];
 
   const notes = useMemo<Note[]>(() => {
-    const count = reduce ? 5 : cfg.count;
+    const count = reduce ? 6 : cfg.count;
     return Array.from({ length: count }, (_, i) => {
       const depth = Math.random();
+      const bundle = Math.random() < cfg.bundleShare;
+      // Bundles are heavier: less sway and spin, a touch quicker to the bottom.
+      const weight = bundle ? 0.55 : 1;
       return {
-        denom: pickDenom(),
-        // Spread across the width in bands so notes don't bunch; a little jitter inside each band.
-        x0: width * ((i + 0.5) / count) + (Math.random() - 0.5) * (width / count) * 0.9,
+        kind: bundle ? "bundle" : "note",
+        thick: bundle ? 3 + Math.floor(Math.random() * 3) : 1,
+        denom: pickDenom(bundle),
+        // Spread across the width in bands so items don't bunch; a little jitter inside each band.
+        x0: width * ((i + 0.5) / count) + (Math.random() - 0.5) * (width / count) * 1.6,
         drift: (Math.random() - 0.5) * width * 0.18,
-        sway: 10 + Math.random() * 26,
+        sway: (10 + Math.random() * 26) * weight,
         swayFreq: 0.9 + Math.random() * 1.1,
         phase: Math.random() * Math.PI * 2,
         rotZ0: (Math.random() - 0.5) * 70,
-        rotZ: (Math.random() > 0.5 ? 1 : -1) * (60 + Math.random() * 200),
-        flutter: 35 + Math.random() * 40,
+        rotZ: (Math.random() > 0.5 ? 1 : -1) * (60 + Math.random() * 200) * weight,
+        flutter: (35 + Math.random() * 40) * weight,
         flutterFreq: 1.6 + Math.random() * 1.6,
         scale: cfg.scale[0] + depth * (cfg.scale[1] - cfg.scale[0]),
         delay: reduce ? i * 60 : Math.random() * cfg.spread,
@@ -185,6 +241,10 @@ function Rain({ id, variant, reduce, onDone }: { id: number; variant: MoneyRainV
 
 const NOTE_W = 72;
 const NOTE_H = 34;
+/** A bundle's notes are bigger than loose ones (closer to the viewer) and stack with a slight fan. */
+const BUNDLE_W = 104;
+const BUNDLE_H = 50;
+const STACK_STEP = 4;
 
 const DENOMS: Record<Denom, { bg: string; ink: string; frame: string; symbol: string; value: string; label: string }> = {
   n1000: { bg: "#7A5A2E", ink: "#F6E7C8", frame: "rgba(255,236,200,0.55)", symbol: "₦", value: "1000", label: "CENTRAL BANK OF NIGERIA" },

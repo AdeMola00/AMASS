@@ -12,6 +12,7 @@ import { storage } from "@/src/utils/storage";
 import { useTheme, useThemeMode, useTextScale, ThemeMode } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
 import { AppText, ListRow, RowGroup, Screen, ScreenHeader, SegmentedControl, useToast } from "@/src/ui";
+import { useMoneyRain } from "@/src/ui/MoneyRain";
 
 const PREF_EMAIL = "amass_pref_email";
 
@@ -23,6 +24,7 @@ export default function Settings() {
   const { mode, setMode } = useThemeMode();
   const { textScale, setTextScale } = useTextScale();
   const toast = useToast();
+  const { rain, soundEnabled, setSoundEnabled } = useMoneyRain();
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -102,7 +104,6 @@ export default function Settings() {
             iconTone="info"
             label="Larger text"
             caption="Bigger words everywhere"
-            last
             trailing={
               <Switch
                 value={textScale === "large"}
@@ -114,6 +115,32 @@ export default function Settings() {
                 testID="settings-larger-text"
               />
             }
+          />
+          <ListRow
+            icon="musical-notes-outline"
+            iconTone="premium"
+            label="Money sound"
+            caption="A bright jingle when money rains"
+            trailing={
+              <Switch
+                value={soundEnabled}
+                onValueChange={(v) => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setSoundEnabled(v);
+                }}
+                trackColor={{ true: colors.primary }}
+                testID="settings-money-sound"
+              />
+            }
+          />
+          <ListRow
+            icon="cash-outline"
+            iconTone="brand"
+            label="Preview the money rain"
+            caption="See and hear it now"
+            last
+            onPress={() => rain({ variant: "celebrate", key: `preview:${Date.now()}` })}
+            testID="settings-money-preview"
           />
         </RowGroup>
 

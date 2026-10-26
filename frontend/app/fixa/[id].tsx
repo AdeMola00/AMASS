@@ -11,6 +11,7 @@ import { radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, Button, Card, EmptyState, IconButton, PressableScale, Screen, ScreenHeader, Skeleton, useCelebrate, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { BadgeStrip, BOOKING_META, callProvider, formatSlot, ProviderAvatar, RateSheet, ReportSheet, tradeIcon, whatsappProvider } from "@/src/components/fixa/FixaBits";
+import { WorkPhotosGallery } from "@/src/components/fixa/WorkPhotos";
 import { BookingSheet, BookingSheetRef } from "@/src/components/marketplace/BookingSheet";
 
 /**
@@ -152,8 +153,8 @@ export default function FixaProviderScreen() {
 
         {/* Identity */}
         <View style={styles.identity}>
-          <ProviderAvatar provider={p} size={84} />
-          <View style={{ flex: 1, gap: 4 }}>
+          <ProviderAvatar provider={p} size={168} />
+          <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
             <AppText variant="h2" testID="fixa-provider-name">
               {p.display_name}
             </AppText>
@@ -163,7 +164,7 @@ export default function FixaProviderScreen() {
               ))}
               {p.is_boosted ? <Badge label="Boosted" tone="premium" icon="rocket" size="xs" /> : null}
             </View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               {p.rating ? (
                 <>
                   <Ionicons name="star" size={13} color={colors.mass} />
@@ -180,12 +181,12 @@ export default function FixaProviderScreen() {
                 </AppText>
               )}
               {p.area ? (
-                <>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                   <Ionicons name="location" size={12} color={colors.textTertiary} />
-                  <AppText variant="bodySm" tone="tertiary" numberOfLines={1} style={{ flexShrink: 1 }}>
+                  <AppText variant="bodySm" tone="tertiary">
                     {p.area}
                   </AppText>
-                </>
+                </View>
               ) : null}
             </View>
           </View>
@@ -198,6 +199,9 @@ export default function FixaProviderScreen() {
           <Stat icon="shield-checkmark-outline" value={p.verified ? "Yes" : "Pending"} label="Verified" />
         </View>
         <BadgeStrip badges={p.badges} max={6} size="sm" />
+
+        {/* Finished jobs */}
+        <WorkPhotosGallery photos={p.work_photos ?? []} />
 
         {/* Contact — always free */}
         <Card testID="fixa-contact" style={{ gap: 12 }}>
@@ -373,7 +377,7 @@ function ContactLine({ icon, value, onPress, testID, brand }: { icon: IconName; 
 }
 
 const styles = StyleSheet.create({
-  identity: { flexDirection: "row", gap: 14, alignItems: "center" },
+  identity: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
   stats: { flexDirection: "row", gap: 10 },
   stat: { flex: 1, alignItems: "center", gap: 4, paddingVertical: 12, borderRadius: radii.md },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

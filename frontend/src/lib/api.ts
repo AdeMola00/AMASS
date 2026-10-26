@@ -900,6 +900,8 @@ export type ProviderFull = ProviderPreview & {
   service_areas: string[];
   call_out_from?: number | null;
   images: string[];
+  /** Up to 5 photos of finished jobs — swipeable gallery on the public profile. */
+  work_photos: string[];
   posted_at?: string | null;
   reviews_list: FixaReview[];
   is_owner: boolean;
@@ -919,6 +921,7 @@ export type FixaApplyIn = {
   years_experience: number;
   bio: string;
   image?: string | null;
+  work_photos?: string[];
 };
 
 export type FixaMe = {
@@ -933,6 +936,57 @@ export type FixaMe = {
 };
 
 export type FixaReportReason = "no_show" | "poor_work" | "overcharging" | "unsafe" | "fraud" | "other";
+
+// ─── Leads CRM + agency teams ───
+export type CrmNote = { id: string; text: string; author_id?: string; author_name?: string | null; created_at: string };
+export type CrmPerson = { id: string; full_name?: string | null; avatar_url?: string | null; email?: string | null; phone?: string | null };
+export type CrmLead = {
+  id: string;
+  agent_id: string;
+  property_id?: string | null;
+  favorite_user_id?: string | null;
+  property_title?: string | null;
+  property_image?: string | null;
+  property_price?: number | null;
+  status: string;
+  crm_status?: string | null;
+  crm_notes?: CrmNote[];
+  next_follow_up_at?: string | null;
+  last_contact_at?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  assigned_to?: string | null;
+  agency_id?: string | null;
+  /** Who unlocked the lead. */
+  agent?: CrmPerson | null;
+  /** Teammate the lead is assigned to (null → unassigned / stays with `agent`). */
+  assignee?: CrmPerson | null;
+  created_at?: string;
+};
+export type AgencyRole = "owner" | "manager" | "agent";
+export type Agency = { id: string; name: string; owner_id: string; status: "active" | "inactive"; created_at: string };
+export type AgencyMember = {
+  id: string;
+  agency_id: string;
+  user_id?: string | null;
+  email: string;
+  role: AgencyRole;
+  status: "invited" | "active" | "removed" | "declined";
+  invited_by?: string | null;
+  invited_at: string;
+  joined_at?: string | null;
+  user?: CrmPerson | null;
+};
+export type AgencyInvite = AgencyMember & { agency?: Agency | null; inviter?: CrmPerson | null };
+export type AgencyMe = {
+  agency: Agency | null;
+  membership: AgencyMember | null;
+  members: AgencyMember[];
+  my_invites: AgencyInvite[];
+  stats: { members: number; leads_total: number; unassigned: number; mine: number } | null;
+};
+export type AdminAgency = Agency & { owner?: CrmPerson | null; members: number; invited: number; leads: number };
 
 export type FixaReport = {
   id: string;
@@ -2395,14 +2449,13 @@ export const api = {
       updated_at: string;
     }>(`/agent/analytics?period_days=${period_days}`),
   crmListLeads: (status?: string) =>
-    req<any[]>(`/crm/leads${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+    req<CrmLead[]>(`/crm/leads${status ? `?status=${encodeURIComponent(status)}` : ""}`),
   crmUpdateLead: (
     lead_id: string,
     updates: {
       status?: string;
       next_follow_up_at?: string;
       last_contact_at?: string;
-      assigned_to?: string;
     }
   ) =>
     req<{ ok: boolean; updated: string[] }>(`/crm/leads/${encodeURIComponent(lead_id)}`, {
@@ -2410,10 +2463,31 @@ export const api = {
       body: JSON.stringify(updates),
     }),
   crmAddNote: (lead_id: string, text: string) =>
-    req<{ ok: boolean; note: any }>(`/crm/leads/${encodeURIComponent(lead_id)}/note`, {
+    req<{ ok: boolean; note: CrmNote }>(`/crm/leads/${encodeURIComponent(lead_id)}/note`, {
       method: "POST",
       body: JSON.stringify({ text }),
     }),
+
+  // ─── Agency teams (admin-created agencies · email invites accepted in-app · shared CRM) ───
+  agencyMe: () => req<AgencyMe>("/agency/me"),
+  agencyInvite: (email: string, role: "agent" | "manager") => req<AgencyMember>("/agency/invites", { method: "POST", body: JSON.stringify({ email, role }) }),
+  agencyCancelInvite: (invite_id: string) => req<{ ok: boolean }>(`/agency/invites/${invite_id}`, { method: "DELETE" }),
+  agencyAcceptInvite: (invite_id: string) => req<{ ok: boolean; agency: Agency; role: AgencyRole }>(`/agency/invites/${invite_id}/accept`, { method: "POST" }),
+  agencyDeclineInvite: (invite_id: string) => req<{ ok: boolean }>(`/agency/invites/${invite_id}/decline`, { method: "POST" }),
+  agencySetRole: (member_id: string, role: "agent" | "manager") => req<{ ok: boolean; role: AgencyRole }>(`/agency/members/${member_id}`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  agencyRemoveMember: (member_id: string) => req<{ ok: boolean; removed: "invite" | "member" }>(`/agency/members/${member_id}`, { method: "DELETE" }),
+  agencyLeave: () => req<{ ok: boolean }>("/agency/leave", { method: "POST" }),
+  agencyLeads: (params: { status?: string; assignee?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.status) q.set("status", params.status);
+    if (params.assignee) q.set("assignee", params.assignee);
+    const s = q.toString();
+    return req<{ role: AgencyRole; items: CrmLead[] }>(`/agency/leads${s ? `?${s}` : ""}`);
+  },
+  agencyAssignLead: (lead_id: string, assigned_to: string | null) => req<{ ok: boolean; lead: CrmLead }>(`/agency/leads/${encodeURIComponent(lead_id)}/assign`, { method: "PATCH", body: JSON.stringify({ assigned_to }) }),
+  adminAgencies: () => req<{ items: AdminAgency[] }>("/admin/agencies"),
+  adminCreateAgency: (name: string, owner_email: string) => req<AdminAgency>("/admin/agencies", { method: "POST", body: JSON.stringify({ name, owner_email }) }),
+  adminPatchAgency: (agency_id: string, patch: { name?: string; status?: "active" | "inactive"; owner_email?: string }) => req<AdminAgency>(`/admin/agencies/${agency_id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 
   // ─── Phase 6A/6B: Property Onboarding Wizard + Duplicate Detection ───
   onboardingStart: (client_submission_id: string) =>
