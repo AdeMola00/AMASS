@@ -1061,6 +1061,78 @@ export type AdminBrand = {
   accounts: BrandAccount[];
 };
 export type PortalKey = { id: string; prefix: string; label?: string | null; created_at?: string; created_by_name?: string | null; last_used_at?: string | null; uses: number };
+
+// ─── Social publishing ───
+export type SocialPlatform = "facebook" | "instagram" | "x" | "linkedin" | "tiktok";
+export type PublishPlatformStatus = {
+  platform: SocialPlatform;
+  label: string;
+  icon: string;
+  auth: "keys" | "oauth";
+  limit: number;
+  link_in_caption: boolean;
+  configured: boolean;
+  connected: boolean;
+  needs_reauth: boolean;
+  missing_keys: string[];
+  keys: string[];
+  optional_keys: string[];
+  how: string;
+  display_name?: string | null;
+  profile_url?: string | null;
+  expires_at?: string | null;
+  verified_at?: string | null;
+  last_error?: string | null;
+  redirect_uri?: string | null;
+};
+export type PublishSettings = {
+  auto_post: Record<SocialPlatform, boolean>;
+  hashtags: string[];
+  ios_store_url: string;
+  android_store_url: string;
+  instagram_bio_note: string;
+  tiktok_privacy: string;
+  footer: string;
+};
+export type PublishResult = { status: "posted" | "failed" | "queued"; error?: string | null; external_id?: string | null; url?: string | null; note?: string | null; caption?: string; link?: string; at?: string; tiktok_status?: string };
+export type PublishPost = {
+  id: string;
+  property_id: string;
+  property_title?: string | null;
+  property_city?: string | null;
+  price_label?: string | null;
+  image_url?: string | null;
+  platforms: SocialPlatform[];
+  captions: Partial<Record<SocialPlatform, string>>;
+  mode: "manual" | "auto";
+  status: "pending" | "posted" | "partial" | "queued" | "failed";
+  results: Partial<Record<SocialPlatform, PublishResult>>;
+  created_by_name?: string | null;
+  created_at: string;
+  updated_at?: string;
+  clicks?: number;
+};
+export type PublishOverview = {
+  platforms: PublishPlatformStatus[];
+  settings: PublishSettings;
+  stats: { posts_30d: number; published_30d: number; queued: number; clicks_30d: number; clicks_by_source: Record<string, number> };
+  recent: PublishPost[];
+};
+export type PublishListing = { id: string; title?: string; price_label: string; location_label: string; images?: string[]; verified?: boolean; bedrooms?: number; bathrooms?: number; already_posted: boolean };
+export type PublishCompose = {
+  property: { id: string; title?: string; price_label: string; location_label: string; specs: string; verified: boolean; images: string[] };
+  image_url?: string | null;
+  link: string;
+  captions: Record<SocialPlatform, string>;
+  tiktok_title: string;
+  platforms: { platform: SocialPlatform; label: string; icon: string; connected: boolean; limit: number; link_in_caption: boolean }[];
+  previous_posts: PublishPost[];
+};
+export type ShareSocialKit = {
+  smart_link: string;
+  captions: Record<SocialPlatform, string>;
+  intents: { facebook: string; x: string; linkedin: string; instagram: string; tiktok: string; instagram_web: string; tiktok_web: string };
+};
 export type PortalConnection = {
   portal_url: string;
   api_base: string | null;
@@ -2445,6 +2517,7 @@ export const api = {
         agent?: any;
         brand: { name: string; tagline: string; domain: string; accent: string; ink: string };
       };
+      social?: ShareSocialKit | null;
     }>(`/share/property/${encodeURIComponent(property_id)}`),
   agentShareBundle: (slug: string) =>
     req<{
@@ -2457,7 +2530,7 @@ export const api = {
   propertyStory: (property_id: string) => req<ListingStory>(`/share/property/${encodeURIComponent(property_id)}/story`),
   recordPropertyShare: (
     property_id: string,
-    channel: "whatsapp" | "qr" | "copy_link" | "native_share" | "flyer" | "email" | "sms" | "story" | "story_series",
+    channel: "whatsapp" | "qr" | "copy_link" | "native_share" | "flyer" | "email" | "sms" | "story" | "story_series" | SocialPlatform | "copy_caption",
     context?: string
   ) =>
     req<{ ok: boolean }>(`/share/property/${encodeURIComponent(property_id)}/event`, {
@@ -2600,6 +2673,21 @@ export const api = {
   adminPortalConnection: () => req<PortalConnection>("/admin/portal-connection"),
   adminPortalKeyCreate: (label?: string) => req<PortalKey & { key: string }>("/admin/portal-connection/key", { method: "POST", body: JSON.stringify({ label }) }),
   adminPortalKeyRevoke: () => req<{ ok: boolean; revoked: boolean }>("/admin/portal-connection/key", { method: "DELETE" }),
+
+  // ─── Social publishing (official accounts + smart links) ───
+  adminPublishOverview: () => req<PublishOverview>("/admin/social/overview"),
+  adminPublishSettings: (body: Partial<PublishSettings>) => req<PublishSettings>("/admin/social/settings", { method: "PATCH", body: JSON.stringify(body) }),
+  adminSocialTest: (platform: SocialPlatform) => req<{ ok: boolean; display_name?: string; url?: string }>(`/admin/social/test/${platform}`, { method: "POST" }),
+  adminSocialConnect: (platform: SocialPlatform) => req<{ authorize_url: string; redirect_uri: string }>(`/admin/social/connect/${platform}`),
+  adminSocialDisconnect: (platform: SocialPlatform) => req<{ ok: boolean }>(`/admin/social/accounts/${platform}`, { method: "DELETE" }),
+  adminPublishListings: (search?: string) => req<{ items: PublishListing[] }>(`/admin/social/listings${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+  adminPublishCompose: (property_id: string) => req<PublishCompose>(`/admin/social/compose/${encodeURIComponent(property_id)}`),
+  adminSocialPublish: (body: { property_id: string; platforms: SocialPlatform[]; captions?: Partial<Record<SocialPlatform, string>>; image_url?: string }) => req<PublishPost>("/admin/social/posts", { method: "POST", body: JSON.stringify(body) }),
+  adminPublishPosts: (status?: string) => req<{ items: PublishPost[] }>(`/admin/social/posts${status ? `?status=${status}` : ""}`),
+  adminSocialRetry: (post_id: string, platform?: SocialPlatform) => req<PublishPost>(`/admin/social/posts/${post_id}/retry${platform ? `?platform=${platform}` : ""}`, { method: "POST" }),
+  adminSocialRefresh: (post_id: string) => req<PublishPost>(`/admin/social/posts/${post_id}/refresh`, { method: "POST" }),
+  adminSocialDeletePost: (post_id: string) => req<{ ok: boolean }>(`/admin/social/posts/${post_id}`, { method: "DELETE" }),
+  adminSocialPublishQueued: () => req<{ attempted: number; items: PublishPost[] }>("/admin/social/publish-queued", { method: "POST" }),
   adminEmailPreviews: () => req<{ kinds: string[] }>("/admin/email-previews"),
   adminEmailPreview: (kind: string) => req<{ kind: string; subject: string; html: string }>(`/admin/email-previews/${encodeURIComponent(kind)}?format=json`),
   adminCreateAgency: (name: string, owner_email: string) => req<AdminAgency>("/admin/agencies", { method: "POST", body: JSON.stringify({ name, owner_email }) }),

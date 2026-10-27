@@ -1201,3 +1201,23 @@ agent_communication:
       /admin/accounts (search + All/Agents/Admins/Suspended, suspend/reactivate, grant/revoke admin), /admin/portal (status, generate/
       rotate/revoke key shown once with copy, API base copy, managed lists), 3 new Cockpit tiles.
       Smoke (tests/smoke_brand_portal.py) green end-to-end. Brand test login: smoke-brand@amass-qa.africa / BrandPass2026! (brand "Smoke Lighting Co").
+
+  - agent: "main"
+    message: |
+      Iteration 94 (to run) — Social media publishing + smart links.
+      Backend `social_publishing.py` (mounted in server.py): admin `/api/admin/social/*` — overview (platform status/keys, settings, 30-day stats,
+      recent posts), PATCH settings (auto_post per platform, hashtags, store URLs, IG bio line, TikTok privacy, footer), POST test/{platform},
+      GET connect/{platform} (LinkedIn/TikTok OAuth start — 400 until client keys exist), DELETE accounts/{platform}, GET listings?search,
+      GET compose/{property_id} (per-platform captions, image, link), POST posts (create + publish; platforms without keys → result "queued"),
+      GET posts, POST posts/{id}/retry[?platform], POST posts/{id}/refresh (TikTok status), DELETE posts/{id} (queued/failed only), POST publish-queued.
+      Public: GET /api/go/{property_id}?src=…&post=… — server-rendered landing page with OG/Twitter tags; mobile JS tries amass://property/{id}
+      then falls back to the store URL (settings) or the web listing; counts opens in social_link_clicks (bots skipped); unknown id → 307 to /.
+      GET /api/social/oauth/{platform}/callback. Share bundle GET /api/share/property/{id} now returns share_url = smart link and `social`
+      {smart_link, captions per platform, intents}. Auto-post hooks: PATCH /api/portal/properties/{id}/verify and POST /api/admin/cockpit/property/{amass_id}/verify.
+      No platform keys exist in this environment → every publish lands as "queued" (expected). Adapter HTTP contracts are unit-tested with mocked
+      httpx in tests/test_social_adapters.py (8 pass). Collections: social_publish_posts / social_publish_accounts / social_link_clicks (NOT the
+      Feeds collection social_posts).
+      Frontend: /admin/social (stats, clicks by source, platform cards with auto-post toggle, Test/Connect/How to connect/Disconnect, Settings sheet,
+      recent posts + detail sheet with Retry/Open/Copy caption/Remove, Publish waiting), /admin/social-compose (pick listing → photo picker →
+      platform chips → per-platform caption tabs with counters → Publish → result card), Cockpit tile "Social publishing", share screen
+      (/share/{id}) "Post to social media" row (Facebook/X/LinkedIn open share intents; Instagram/TikTok copy caption + share flyer) and Copy caption.

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, StyleSheet, ScrollView, Linking, Share as RNShare } from "react-native";
+import { View, StyleSheet, ScrollView, Linking, Platform, Share as RNShare } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,7 +10,7 @@ import * as Sharing from "expo-sharing";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import QRCode from "react-native-qrcode-svg";
 
-import { api } from "@/src/lib/api";
+import { api, type SocialPlatform } from "@/src/lib/api";
 import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { fontFamilies, palette, radii, space } from "@/src/theme/tokens";
@@ -19,6 +19,15 @@ import { LinearGradient } from "expo-linear-gradient";
 import { gradients } from "@/src/theme/tokens";
 
 type Bundle = Awaited<ReturnType<typeof api.propertyShareBundle>>;
+
+/** Third-party brand colours — identical in light and dark themes. */
+const SOCIALS: { platform: SocialPlatform; label: string; icon: IconName; color: string }[] = [
+  { platform: "facebook", label: "Facebook", icon: "logo-facebook", color: "#1877F2" },
+  { platform: "instagram", label: "Instagram", icon: "logo-instagram", color: "#E1306C" },
+  { platform: "x", label: "X", icon: "logo-twitter", color: "#111111" },
+  { platform: "linkedin", label: "LinkedIn", icon: "logo-linkedin", color: "#0A66C2" },
+  { platform: "tiktok", label: "TikTok", icon: "logo-tiktok", color: "#010101" },
+];
 
 /** The flyer is captured to PNG and shared outside the app, so it keeps a
  *  fixed, print-safe palette regardless of the user's light/dark theme. */
@@ -159,6 +168,52 @@ export default function ShareProperty() {
     }
   };
 
+  /** Facebook / X / LinkedIn open a pre-filled share dialog with the smart link. Instagram and TikTok have no web
+   *  share intent: we copy the caption, hand the flyer to the system share sheet (where the apps appear) and open them. */
+  const onSocial = async (platform: SocialPlatform) => {
+    const kit = bundle?.social;
+    if (!kit) return;
+    setBusyChannel(platform);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      if (platform === "facebook" || platform === "x" || platform === "linkedin") {
+        await Linking.openURL(kit.intents[platform]);
+        if (platform === "linkedin") {
+          await Clipboard.setStringAsync(kit.captions.linkedin);
+          toast.success("Caption copied", "Paste it into your LinkedIn post.");
+        }
+      } else {
+        await Clipboard.setStringAsync(kit.captions[platform]);
+        let shared = false;
+        if (flyerRef.current && (await Sharing.isAvailableAsync())) {
+          const uri = await captureRef(flyerRef, { format: "png", quality: 1 });
+          await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: platform === "instagram" ? "Share to Instagram" : "Share to TikTok" });
+          shared = true;
+        }
+        if (!shared) {
+          const web = kit.intents[platform === "instagram" ? "instagram_web" : "tiktok_web"];
+          const native = kit.intents[platform];
+          const canNative = Platform.OS !== "web" && (await Linking.canOpenURL(native).catch(() => false));
+          await Linking.openURL(canNative ? native : web);
+        }
+        toast.success("Caption copied", platform === "instagram" ? "Pick Instagram in the share sheet, then paste the caption. Put the link in your bio." : "Pick TikTok in the share sheet, then paste the caption.");
+      }
+      track(platform);
+    } catch {
+      toast.error("Couldn't open that app", "Try Copy caption and share the flyer instead.");
+    } finally {
+      setBusyChannel(null);
+    }
+  };
+
+  const onCopyCaption = async () => {
+    const kit = bundle?.social;
+    if (!kit) return;
+    await Clipboard.setStringAsync(kit.captions.facebook);
+    track("copy_caption");
+    toast.success("Caption copied", "Includes the app link — paste it anywhere.");
+  };
+
   if (loading) {
     return (
       <Screen testID="share-screen">
@@ -272,7 +327,7 @@ export default function ShareProperty() {
                   </>
                 )}
                 <AppText variant="caption" color={FLYER.secondary} style={{ marginTop: 4 }}>
-                  amass.africa/property/{p.id.slice(0, 8)}…
+                  Scan to open in the AMASS app
                 </AppText>
               </View>
               <View style={styles.flyerQR}>
@@ -301,9 +356,35 @@ export default function ShareProperty() {
           </View>
           <View style={styles.actionRow}>
             <Button label="Copy link" iconLeft="copy-outline" variant="secondary" style={{ flex: 1 }} loading={busyChannel === "copy"} onPress={onCopyLink} testID="share-copy" />
-            <Button label="More options" iconLeft="paper-plane-outline" variant="secondary" style={{ flex: 1 }} loading={busyChannel === "native"} onPress={onNativeShare} testID="share-more" />
+            <Button label="More" iconLeft="paper-plane-outline" variant="secondary" style={{ flex: 1 }} loading={busyChannel === "native"} onPress={onNativeShare} testID="share-more" />
           </View>
         </View>
+
+        {bundle.social ? (
+          <View style={{ gap: 10 }} testID="share-social">
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <AppText variant="label" tone="secondary" uppercase>
+                Post to social media
+              </AppText>
+              <Button label="Copy caption" size="sm" variant="ghost" iconLeft="copy-outline" onPress={onCopyCaption} testID="share-copy-caption" />
+            </View>
+            <View style={styles.socialRow}>
+              {SOCIALS.map((s) => (
+                <PressableScale key={s.platform} onPress={() => onSocial(s.platform)} accessibilityRole="button" accessibilityLabel={`Share to ${s.label}`} style={styles.socialBtn} testID={`share-${s.platform}`}>
+                  <View style={[styles.socialIcon, { backgroundColor: s.color, opacity: busyChannel === s.platform ? 0.6 : 1 }]}>
+                    <Ionicons name={s.icon} size={22} color="#fff" />
+                  </View>
+                  <AppText variant="micro" tone="secondary">
+                    {s.label}
+                  </AppText>
+                </PressableScale>
+              ))}
+            </View>
+            <AppText variant="caption" tone="tertiary">
+              Ready-made caption + flyer + a smart link that opens this listing in the AMASS app (or sends people to download it).
+            </AppText>
+          </View>
+        ) : null}
 
         <View style={[styles.note, { backgroundColor: colors.surfaceAlt }]}>
           <Ionicons name="analytics-outline" size={16} color={colors.textSecondary} />
@@ -351,5 +432,8 @@ const styles = StyleSheet.create({
   storyThumb: { width: 30, height: 52, borderRadius: 8, overflow: "hidden", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.9)", backgroundColor: "rgba(255,255,255,0.2)" },
   // Actions
   actionRow: { flexDirection: "row", gap: 10 },
+  socialRow: { flexDirection: "row", justifyContent: "space-between", gap: 6 },
+  socialBtn: { alignItems: "center", gap: 6, flex: 1, minWidth: 56, paddingVertical: 4 },
+  socialIcon: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
   note: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.sm },
 });

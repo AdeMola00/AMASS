@@ -25,7 +25,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 AMASS_DOMAIN = "https://amass.africa"
 
 ShareChannel = Literal[
-    "whatsapp", "qr", "copy_link", "native_share", "flyer", "email", "sms", "story", "story_series"
+    "whatsapp", "qr", "copy_link", "native_share", "flyer", "email", "sms", "story", "story_series",
+    "facebook", "instagram", "x", "linkedin", "tiktok", "copy_caption",
 ]
 
 
@@ -40,6 +41,7 @@ class ShareLinkOut(BaseModel):
     whatsapp_url: str
     whatsapp_message: str
     flyer_payload: dict  # everything the client needs to render a flyer
+    social: Optional[dict] = None  # smart link + per-platform captions + open-in-app intents (property shares)
 
 
 class ShareStatsOut(BaseModel):
@@ -131,10 +133,13 @@ def register_share_routes(db: AsyncIOMotorDatabase, require_auth):
         prop = await db.properties.find_one({"id": property_id}, {"_id": 0})
         if not prop:
             raise HTTPException(404, "Property not found")
-        share_url = f"{AMASS_DOMAIN}/property/{property_id}"
+        # Smart link: opens the AMASS app when installed, otherwise the store / web listing (see social_publishing).
+        from social_publishing import get_settings, share_kit, smart_link
+
+        share_url = smart_link(property_id, "share")
         flyer = await _hydrate_flyer(prop)
         agent_name = (flyer.get("agent") or {}).get("full_name")
-        msg = _whatsapp_message(prop, share_url, agent_name)
+        msg = _whatsapp_message(prop, smart_link(property_id, "whatsapp"), agent_name)
         # WhatsApp deep link — wa.me is universal (opens WhatsApp on both
         # iOS/Android; falls back to web when no app is installed).
         from urllib.parse import quote
@@ -145,6 +150,7 @@ def register_share_routes(db: AsyncIOMotorDatabase, require_auth):
             whatsapp_url=wa,
             whatsapp_message=msg,
             flyer_payload=flyer,
+            social=share_kit(prop, await get_settings(db)),
         )
 
     # ═══ 2) Agent profile share bundle ════════════════════════════

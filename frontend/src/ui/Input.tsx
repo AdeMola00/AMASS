@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, StyleSheet, TextInput, TextInputProps, View, ViewStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, TextInput, TextInputProps, View, ViewStyle } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useTheme } from "@/src/theme";
 import { fontFamilies, radii } from "@/src/theme/tokens";
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: radii.md,
   },
-  input: { flex: 1, fontSize: 17, height: "100%", paddingVertical: 0 },
+  input: { flex: 1, fontSize: 17, height: "100%", paddingVertical: 0, ...Platform.select({ web: { outlineStyle: "none" } as any }) },
   inputMulti: { height: undefined, minHeight: 80, textAlignVertical: "top", lineHeight: 24 },
   helperRow: { flexDirection: "row", alignItems: "center", gap: 4, marginLeft: 2 },
   helper: { marginLeft: 2 },

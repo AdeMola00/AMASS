@@ -464,6 +464,10 @@ def register_admin_portal_routes(db: AsyncIOMotorDatabase, admin_emails: set[str
         if p.get("migrated_to_amass_property_id"):
             await db.properties_geo.update_one({"amass_property_id": p["migrated_to_amass_property_id"]}, {"$set": {"property_identity_status": "VERIFIED" if body.verified else "PENDING_REVIEW", "verified_at": now() if body.verified else None, "verified_by": acc["id"] if body.verified else None, "updated_at": now()}})
         await audit(acc, f"{'verified' if body.verified else 'removed verification from'} listing “{p.get('title')}”", prop_id)
+        if body.verified:
+            from social_publishing import schedule_auto_post
+
+            schedule_auto_post(db, prop_id, acc)
         return {"ok": True, "verified": body.verified}
 
     @router.delete("/properties/{prop_id}")

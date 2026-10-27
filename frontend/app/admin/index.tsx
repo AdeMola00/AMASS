@@ -93,6 +93,7 @@ export default function AdminCockpitHub() {
             </View>
 
             <View style={{ gap: 10 }}>
+              <Tile title="Social publishing" caption="Post listings to Facebook · Instagram · X · LinkedIn · TikTok with app smart links" icon="share-social-outline" tone="brand" onPress={() => router.push("/admin/social" as any)} testID="tile-social" />
               <Tile title="Accounts & roles" caption="Members · agents · admins · suspend / reactivate · grant admin" icon="people-circle-outline" tone="info" onPress={() => router.push("/admin/accounts" as any)} testID="tile-accounts" />
               <Tile title="Brands (Market → Brands)" caption="Create brands · invite brand managers by email · hide / sponsor" icon="storefront-outline" tone="premium" onPress={() => router.push("/admin/brands" as any)} testID="tile-brands" />
               <Tile title="Admin Portal connection" caption="amass-control.emergent.host · shared key · what it manages" icon="link-outline" tone="success" onPress={() => router.push("/admin/portal" as any)} testID="tile-portal" />

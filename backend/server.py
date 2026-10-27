@@ -2271,6 +2271,11 @@ app.include_router(_brand_portal)
 from admin_accounts import register_admin_accounts_routes  # noqa: E402
 
 app.include_router(register_admin_accounts_routes(db, require_admin))
+from social_publishing import register_social_routes  # noqa: E402
+
+_social_admin, _social_public = register_social_routes(db, require_admin)
+app.include_router(_social_admin)
+app.include_router(_social_public)
 
 
 @app.middleware("http")

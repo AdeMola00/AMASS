@@ -324,6 +324,13 @@ def register_admin_cockpit_routes(db, require_admin):
         await _audit(db, p["property_uuid"], admin,
                      "PROPERTY_VERIFIED" if data.action == "verify" else "PROPERTY_UNVERIFIED",
                      new={"status": new_status}, reason=data.reason)
+        if data.action == "verify":
+            from social_publishing import schedule_auto_post
+
+            legacy = await db.properties.find_one({"migrated_to_amass_property_id": amass_id}, {"_id": 0, "id": 1})
+            if legacy:
+                await db.properties.update_one({"id": legacy["id"]}, {"$set": {"verified": True, "verified_at": now, "verified_by": admin["id"]}})
+                schedule_auto_post(db, legacy["id"], admin)
         return {"ok": True, "status": new_status}
 
     # ────────────────────────── AUDIT LOG ────────────────────────

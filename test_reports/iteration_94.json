@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 94 tested the Social Publishing feature end to end: the backend (overview, settings, test/connect, listings, compose, posts lifecycle, smart link /api/go with click counting, share bundle and events, the auto-post hook on portal verify, regression) and the frontend at 390x844 (/admin tile, /admin/social, help and settings sheets, the composer, the post detail sheet, and the social section of /share/{id}). Backend: 27/27 pytest pass (20 new API tests plus 7 existing adapter unit tests). Every publish lands as 'queued' as expected because no platform keys exist. Frontend: almost every flow works and there were no console errors. One functional gap: the post detail sheet never shows 'Copy caption' for queued posts. The rest are minor UX/design issues. No deprecated Expo packages detected (expo-av, expo-barcode-scanner and expo-background-fetch are not in package.json).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/social/posts (publish_post queued branch)", "issue": "Queued per-platform results only store {status, error, at}. There is no caption or link, so the admin post sheet's 'Copy caption' button (it renders only when r.caption exists) never appears for queued posts. That is every post in this environment. Reference: social_publishing.py:670"},
+      {"endpoint": "GET /api/admin/social/listings?search=", "issue": "When a search term is given, the verified=True filter is dropped, so search returns unverified listings (Lekki: 14 results, 1 unverified; 'a': 3 of 50 unverified). Without a search term the list is verified-only. This may be intended, but it is inconsistent. Reference: social_publishing.py:861-865"},
+      {"endpoint": "PATCH /api/admin/social/settings", "issue": "The backend accepts non-https store URLs such as ios_store_url 'http://…' with 200. Only the frontend validates them. Add a backend check that the URL starts with https:// or is empty."},
+      {"endpoint": "GET /api/admin/social/compose/{id}", "issue": "property.images returns any string, not only https URLs. If a listing has a base64 or http photo, choosing that thumbnail sends image_url, and POST /posts then returns 400 'Photo must be a public https URL'. Filter images to https:// only. Reference: social_publishing.py:876"},
+      {"endpoint": "schedule_auto_post", "issue": "asyncio.create_task(...) is not stored anywhere. Python's docs warn that such a task can be garbage-collected before it finishes. Keep a reference, e.g. a module-level set with add_done_callback(discard). Separately, the check for an existing auto post and the insert are not atomic, so two fast verifies could create two auto posts (no unique index). Reference: social_publishing.py:698-714"},
+      {"endpoint": "GET /api/go/{id} BOT_UA", "issue": "The regex includes 'tiktok' and 'preview'. Some TikTok in-app browser user agents and other legitimate user agents may match, so real clicks would not be counted. Consider matching only the crawler names (bytespider, the TikTok bot). Reference: social_publishing.py:69"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Post detail sheet", "issue": "'Copy caption' (admin-social-post-copy-<platform>) is never shown for queued posts, because the backend result has no caption. Fall back to post.captions[pl] or the compose caption.", "testID": "admin-social-post-copy-x", "priority": "MEDIUM"},
+      {"component": "Share screen Instagram/TikTok on web", "issue": "On web, Linking.canOpenURL returns true, so the app opens 'instagram://app' (or 'snssdk1233://'), which does nothing in a desktop browser. On Platform.OS==='web', use intents.instagram_web / intents.tiktok_web instead. The caption copy and toast work and nothing crashes.", "testID": "share-instagram", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin/social post sheet and /admin/social-compose result card", "issues": ["Platform names show as raw lowercase keys ('facebook', 'x', 'linkedin', and 'facebook — Facebook Page isn't connected yet') instead of the labels (Facebook Page, X (Twitter)…)", "The expected 'queued — isn't connected yet' message uses the red error tone. A warning or secondary tone would fit better, since this is the normal state."]},
+      {"screen": "/admin/social-compose caption editor", "issue_note": "web only", "issues": ["Focusing the caption editor draws a black rectangular browser focus outline inside the rounded input border (double border). Set outlineStyle none on the web TextInput."]},
+      {"screen": "/share/{id}", "issues": ["The 'More options' button label is cut off as 'More optio…' at 390px width."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_social_publishing_api.py", "/app/backend/tests/test_social_adapters.py", "/app/test_reports/pytest/pytest_iter94.xml"],
+  "action_items": [
+    "Show 'Copy caption' in the post detail sheet for queued/failed results: store the caption and link in queued results (social_publishing.py:670), or fall back to post.captions / the built caption on the frontend (admin/social.tsx:363).",
+    "Filter compose property.images to https:// URLs so a chosen thumbnail can't cause a 400 on publish.",
+    "Add backend https validation for ios_store_url / android_store_url.",
+    "Decide whether /admin/social/listings search should stay verified-only. If yes, keep verified=True when searching.",
+    "Keep a strong reference to the auto-post asyncio task, and consider a unique index or atomic upsert for (property_id, mode='auto').",
+    "On web, the share screen should open instagram_web / tiktok_web instead of the instagram:// and snssdk1233:// schemes.",
+    "Cosmetic: use platform labels instead of raw keys in the post sheet and compose result; use a warning tone for queued; remove the web focus outline on the caption editor; fix the truncated 'More options' label."
+  ],
+  "critical_code_review_comments": [
+    "social_publishing.py is 989 lines, over the 700-line guideline. Consider splitting it into adapters / captions / routes / landing page.",
+    "When keys are added later, 'Publish waiting' or auto-post will push every queued auto post at once (20 per call), which could mean a burst of old listings. Consider an age cut-off or rate limit.",
+    "schedule_auto_post runs on every verify=true, including re-verifies. De-duplication relies on an existing mode=auto post, so deleting a queued auto post and verifying again creates a new one. This is acceptable but should be documented."
+  ],
+  "updated_files": ["/app/backend/tests/test_social_publishing_api.py (new)"],
+  "success_rate": {"backend": "100% (27/27)", "frontend": "~95% (every requested flow works except Copy caption in the post sheet)"},
+  "seed_data_creation": "None kept. All created posts were deleted (the API shows 0 posts). Settings were restored (auto_post.tiktok=false, default hashtags, empty store URLs). The social_publish_accounts 'x' last_error record created by POST /test/x was removed via DELETE /accounts/x. A portal re-verify was run on one verified listing (it was already verified). 5 smart-link clicks with src=instagram were recorded in social_link_clicks.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with EXPO_PUBLIC_BACKEND_URL set: pytest /app/backend/tests/test_social_publishing_api.py (it cleans up after itself). Use the ':visible' suffix for testIDs. Input testIDs sit on the wrapper, so use the inner input/textarea. For share intents on web, stub window.open with add_init_script. Story endpoint /api/share/property/{id}/story requires auth.",
+  "rca_of_issue": "Missing Copy caption: publish_post() writes queued results without a 'caption' key. admin/social.tsx only renders the Copy caption button when r.caption exists, so it is always hidden until a platform is connected."
+}
