@@ -182,6 +182,10 @@ export default function AgentWorkspace() {
               <StatTile icon="thumbs-up" tone="info" value={summary?.approved_count ?? 0} label="Approved" />
               <StatTile icon="checkmark-circle" tone="success" value={summary?.paid_count ?? 0} label="Paid" />
             </View>
+            <RowGroup>
+              <ListRow icon="pricetags-outline" iconTone="premium" label="Agent plans" caption="Listing limits, premium credits, team seats" onPress={() => router.push("/agent-plans")} testID="workspace-agent-plans" />
+              <ListRow icon="home-outline" iconTone="brand" label="My listings" caption="Manage the properties you've uploaded" onPress={() => router.push("/agent-dashboard" as any)} last testID="workspace-my-listings" />
+            </RowGroup>
           </View>
 
           <Section title="Referrals" caption={referrals.length ? `${referrals.length} tracked` : undefined}>

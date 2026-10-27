@@ -24,7 +24,7 @@ export default function Settings() {
   const { mode, setMode } = useThemeMode();
   const { textScale, setTextScale } = useTextScale();
   const toast = useToast();
-  const { rain, soundEnabled, setSoundEnabled } = useMoneyRain();
+  const { rain } = useMoneyRain();
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -117,27 +117,10 @@ export default function Settings() {
             }
           />
           <ListRow
-            icon="musical-notes-outline"
-            iconTone="premium"
-            label="Money sound"
-            caption="A bright jingle when money rains"
-            trailing={
-              <Switch
-                value={soundEnabled}
-                onValueChange={(v) => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setSoundEnabled(v);
-                }}
-                trackColor={{ true: colors.primary }}
-                testID="settings-money-sound"
-              />
-            }
-          />
-          <ListRow
             icon="cash-outline"
             iconTone="brand"
             label="Preview the money rain"
-            caption="See and hear it now"
+            caption="See it now"
             last
             onPress={() => rain({ variant: "celebrate", key: `preview:${Date.now()}` })}
             testID="settings-money-preview"
@@ -167,7 +150,6 @@ export default function Settings() {
 
         <RowGroup title="Account">
           <ListRow icon="star-outline" iconTone="premium" label="Subscription" value={plan ? `${plan} plan` : "No plan"} onPress={() => router.push("/subscribe")} testID="settings-subscription" />
-          <ListRow icon="pricetags-outline" label="Agent plans" onPress={() => router.push("/agent-plans")} testID="settings-agent-plans" />
           <ListRow icon="trash-outline" label={deleting ? "Deleting…" : "Delete account"} onPress={deleting ? undefined : onDeleteAccount} destructive last testID="settings-delete-account" />
         </RowGroup>
 

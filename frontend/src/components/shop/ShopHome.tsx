@@ -166,6 +166,12 @@ export function ShopHome({ headerH, active }: { headerH: number; active: boolean
                 Prices, stock and offers are read from each retailer&apos;s own website and stamped with the date we checked. AMASS doesn&apos;t sell these products or take payment for them — you buy from the retailer.
               </AppText>
             </View>
+            <Pressable onPress={() => router.push("/brand" as any)} style={[styles.footer, { marginHorizontal: gutter, marginTop: 10, backgroundColor: colors.surfaceAlt }]} accessibilityRole="button" accessibilityLabel="Brand sign in" testID="shop-brand-signin">
+              <Ionicons name="storefront" size={18} color={colors.brand} />
+              <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
+                Are you a brand? Brands list here through an AMASS-issued brand login. <AppText variant="caption" color={colors.brand}>Brand sign in →</AppText>
+              </AppText>
+            </Pressable>
           </>
         )}
       </ScrollView>

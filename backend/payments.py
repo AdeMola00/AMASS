@@ -278,6 +278,10 @@ def register_payment_routes(
         api_base = _api_base(request)
         bundle = _lookup_bundle(data.currency, data.bundle_id)
         if not bundle:
+            from tokens import effective_bundles
+
+            bundle = next((b for b in await effective_bundles(db) if b["id"] == data.bundle_id), None)
+        if not bundle:
             raise HTTPException(404, "Bundle not found for currency")
         reference = f"amass_{uuid.uuid4().hex}"
         bundle_name = bundle["name"]

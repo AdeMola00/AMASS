@@ -21,6 +21,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
+from html import escape
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
@@ -290,14 +291,17 @@ def register_agency_routes(db: AsyncIOMotorDatabase, require_auth, require_admin
             how = "Open AMASS → My AMASS → Agency team and tap Accept."
         else:
             how = f"Create your AMASS account with this email address ({email}), then open My AMASS → Agency team to accept."
-        html = (
-            '<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#111">'
-            f"<h2 style=\"margin:0 0 12px\">You're invited to {agency['name']}</h2>"
-            f"<p>{inviter} invited you to join <b>{agency['name']}</b> on AMASS as {'a manager' if body.role == 'manager' else 'an agent'}. "
-            "Team leads are shared in one CRM so nothing falls through the cracks.</p>"
-            f"<p>{how}</p>"
-            + (f'<p><a href="{link}" style="display:inline-block;padding:12px 18px;background:#111;color:#fff;border-radius:10px;text-decoration:none">Open AMASS</a></p>' if link.startswith("https://") else "")
-            + '<p style="color:#666;font-size:12px">If you weren\'t expecting this, you can ignore this email.</p></div>'
+        role_label = "a manager" if body.role == "manager" else "an agent"
+        from email_theme import p, raw_p, render_email
+
+        html = render_email(
+            title=f"You're invited to {agency['name']}",
+            kicker="Agency team",
+            hero="skyline",
+            preheader=f"{inviter} invited you to join {agency['name']} on AMASS as {role_label}.",
+            body_html=raw_p(f"{escape(inviter)} invited you to join <b>{escape(agency['name'])}</b> on AMASS as {role_label}. Team leads are shared in one CRM so nothing falls through the cracks.") + p(how),
+            cta=("Open AMASS", link) if link.startswith("https://") else None,
+            note="If you weren't expecting this, you can ignore this email.",
         )
         await _email(email, f"{inviter} invited you to {agency['name']} on AMASS", html)
         return {**doc, "user": public_user(target)}

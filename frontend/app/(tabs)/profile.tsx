@@ -15,37 +15,54 @@ import { TokenIcon } from "@/src/components/TokenIcon";
 type Row = { icon: IconName; label: string; route: string; requires?: "agent"; tone?: "default" | "brand" | "mass" | "fix" | "success" | "warning" | "info" | "premium" };
 
 // Ordered by product priority (see spec); grouped for scannability. Icon + 1–3 word label only.
+/**
+ * My AMASS menu — reviewed Jun 2026 (owner-approved reorganisation):
+ *   • Wallet & rewards keeps only money things; Home search holds saved homes / searches / viewings.
+ *   • "My listings & posts" is for every member (listing a property never requires Agent status) and gained
+ *     "My Properties", which was previously unreachable from the menu.
+ *   • Agents group = things that need a verified Agent (locked rows show an Agents badge); Agent Plans moved inside
+ *     Agent Workspace. "Find a Pro" left the menu — it lives in Market → FIXA.
+ */
 const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: "Wallet & rewards",
     rows: [
       { icon: "wallet-outline", label: "Wallet", route: "/wallet", tone: "mass" },
       { icon: "lock-open-outline", label: "My Unlocks", route: "/unlocks" },
-      { icon: "heart-outline", label: "Saved Properties", route: "/saved-properties", tone: "brand" },
-      { icon: "calendar-outline", label: "Viewings", route: "/viewings", tone: "info" },
-      { icon: "bookmark-outline", label: "Saved Searches", route: "/saved-searches" },
       { icon: "gift-outline", label: "Earn Tokens", route: "/earn", tone: "success" },
     ],
   },
   {
-    title: "Agents & listings",
+    title: "Home search",
     rows: [
-      { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", tone: "brand" },
-      { icon: "add-circle-outline", label: "List a Property", route: "/submit-property" },
-      { icon: "briefcase-outline", label: "Agent Workspace", route: "/agent-workspace", requires: "agent" },
-      { icon: "people-outline", label: "Agency Team", route: "/agency", tone: "brand" },
-      { icon: "time-outline", label: "Viewing Requests & Hours", route: "/viewings?role=agent", requires: "agent", tone: "info" },
-      { icon: "pricetags-outline", label: "Agent Plans", route: "/agent-plans", tone: "premium" },
+      { icon: "heart-outline", label: "Saved Properties", route: "/saved-properties", tone: "brand" },
+      { icon: "bookmark-outline", label: "Saved Searches", route: "/saved-searches" },
+      { icon: "calendar-outline", label: "Viewings", route: "/viewings", tone: "info" },
     ],
   },
   {
-    title: "Services",
+    title: "My listings & posts",
     rows: [
-      { icon: "storefront-outline", label: "My Market Listings", route: "/marketplace/my-listings", tone: "brand" },
-      { icon: "search-outline", label: "Find a Pro (FIXA)", route: "/fixa", tone: "fix" },
+      { icon: "add-circle-outline", label: "List a Property", route: "/submit-property", tone: "brand" },
+      { icon: "home-outline", label: "My Properties", route: "/agent-dashboard" },
+      { icon: "storefront-outline", label: "My Market Listings", route: "/marketplace/my-listings" },
+      { icon: "megaphone-outline", label: "My Ad Campaigns", route: "/ads" },
+    ],
+  },
+  {
+    title: "Agents",
+    rows: [
+      { icon: "ribbon-outline", label: "Become an Agent", route: "/become-agent", tone: "brand" },
+      { icon: "briefcase-outline", label: "Agent Workspace", route: "/agent-workspace", requires: "agent" },
+      { icon: "time-outline", label: "Viewing Requests & Hours", route: "/viewings?role=agent", requires: "agent", tone: "info" },
+      { icon: "people-outline", label: "Agency Team", route: "/agency", requires: "agent", tone: "brand" },
+    ],
+  },
+  {
+    title: "FIXA & services",
+    rows: [
       { icon: "calendar-outline", label: "My FIXA Bookings", route: "/fixa/bookings" },
       { icon: "construct-outline", label: "Improve My Property", route: "/improve", tone: "info" },
-      { icon: "megaphone-outline", label: "My Ad Campaigns", route: "/ads" },
     ],
   },
   {
@@ -101,7 +118,7 @@ export default function Profile() {
     const fixaRow: Row = isProvider
       ? { icon: "hammer-outline", label: fixaStatus === "pending" ? "My FIXA Profile · Pending" : "My FIXA Dashboard", route: "/fixa/provider", tone: "fix" }
       : { icon: "hammer-outline", label: "Join FIXA", route: "/fixa/join", tone: "fix" };
-    return GROUPS.map((g) => (g.title === "Services" ? { ...g, rows: [g.rows[0], fixaRow, ...g.rows.slice(1)] } : g));
+    return GROUPS.map((g) => (g.title === "FIXA & services" ? { ...g, rows: [fixaRow, ...g.rows] } : g));
   }, [isProvider, fixaStatus]);
 
   const memberYear = user?.created_at ? new Date(user.created_at).getFullYear() : new Date().getFullYear();
@@ -269,7 +286,7 @@ export default function Profile() {
         {user?.is_admin ? (
           <View style={{ paddingHorizontal: space[4] }}>
             <RowGroup title="Admin">
-              <ListRow icon="shield-checkmark" iconTone="brand" label="Admin Cockpit" caption="Duplicate queue · Merge · Audit log · Representations" onPress={() => router.push("/admin" as any)} last testID="menu-admin-cockpit" />
+              <ListRow icon="shield-checkmark" iconTone="brand" label="Admin Cockpit" caption="Accounts · Agents · Brands · Admin Portal · Reviews" onPress={() => router.push("/admin" as any)} last testID="menu-admin-cockpit" />
             </RowGroup>
           </View>
         ) : null}
@@ -279,7 +296,7 @@ export default function Profile() {
           {groups.map((g) => (
             <RowGroup key={g.title} title={g.title}>
               {g.rows.map((m, i) => {
-                const locked = m.requires === "agent" && !user?.is_agent;
+                const locked = m.requires === "agent" && !user?.is_agent && !(m.route === "/agency" && (agency.invites > 0 || !!agency.name));
                 return (
                   <ListRow
                     key={m.label}

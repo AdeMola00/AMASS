@@ -317,9 +317,13 @@ async def get_current_user(
         user_id = payload.get("sub")
     except jwt.PyJWTError:
         raise HTTPException(401, "Invalid token")
+    if payload.get("typ") not in (None, "user"):
+        raise HTTPException(401, "Invalid token")  # portal / brand tokens never act as app users
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(401, "User not found")
+    if user.get("account_status") == "suspended":
+        raise HTTPException(403, "This account has been suspended. Contact support@amass.africa.")
     # Normalize admin flag from allow-list or explicit doc field.
     email = (user.get("email") or "").lower()
     user["is_admin"] = bool(user.get("is_admin")) or email in ADMIN_EMAILS
@@ -405,6 +409,8 @@ async def login(data: LoginIn):
         await record_login_failure(db, email)
         raise HTTPException(401, "Invalid email or password")
     await clear_login_failures(db, email)
+    if user.get("account_status") == "suspended":
+        raise HTTPException(403, "This account has been suspended. Contact support@amass.africa.")
     return TokenOut(access_token=create_token(user["id"]), user=user_to_out(user))
 
 
@@ -780,8 +786,8 @@ async def create_property(data: PropertyCreateIn, user: dict = Depends(get_curre
         mandate=data.mandate.model_dump() if data.mandate else None,
     )
     await db.properties.insert_one(prop.model_dump())
-    if not user.get("is_agent"):
-        await db.users.update_one({"id": user["id"]}, {"$set": {"is_agent": True}})
+    # Listing a property does NOT make someone an Agent — Agent status is granted only when an AMASS admin
+    # verifies their application (agent_platform.set_agent_verification).
     # Reward: 40 tokens for uploading a property (rate-limited to 5/day server-side).
     try:
         from tokens import WalletService as _WS
@@ -920,8 +926,11 @@ async def agent_apply(data: AgentApplyIn, user: dict = Depends(get_current_user)
         await db.agent_applications.insert_one(doc)
         agent = doc
 
-    # Mark user as agent
-    await db.users.update_one({"id": user["id"]}, {"$set": {"is_agent": True}})
+    # Applying does not grant Agent status — an AMASS admin must verify the application first.
+    # A re-application after rejection/suspension stays pending until reviewed again.
+    if existing and existing.get("status") == "approved":
+        await db.agent_applications.update_one({"user_id": user["id"]}, {"$set": {"status": "approved"}})
+        agent = await db.agent_applications.find_one({"user_id": user["id"]}, {"_id": 0})
 
     return _agent_to_public(agent)
 
@@ -2242,6 +2251,33 @@ from auth_security import (
 )
 app.include_router(register_auth_security_routes(db, hash_password))
 
+# ─── Branded emails: public logo assets + admin previews; public origin learned from inbound requests ───
+from email_theme import register_email_asset_routes, register_email_preview_routes  # noqa: E402
+from public_url import load_remembered as _load_public_base, remember_from_request as _remember_public_base  # noqa: E402
+
+app.include_router(register_email_asset_routes())
+app.include_router(register_email_preview_routes(require_admin))
+
+# ─── Roles & admin integration: AMASS Admin Portal compat API + Brands (brand-only logins) ───
+from admin_portal import register_admin_portal_routes  # noqa: E402
+from brands import register_brand_routes  # noqa: E402
+
+_portal_router = register_admin_portal_routes(db, ADMIN_EMAILS)
+app.include_router(_portal_router, prefix="/api/portal")       # portal API base = https://<backend>/api/portal
+app.include_router(_portal_router, prefix="/api/portal/api")   # …or keep the portal's "+ /api" suffix
+_brands_admin, _brand_portal = register_brand_routes(db, require_admin)
+app.include_router(_brands_admin)
+app.include_router(_brand_portal)
+from admin_accounts import register_admin_accounts_routes  # noqa: E402
+
+app.include_router(register_admin_accounts_routes(db, require_admin))
+
+
+@app.middleware("http")
+async def _learn_public_base(request, call_next):
+    await _remember_public_base(db, request)
+    return await call_next(request)
+
 @app.get("/api/files/{file_path:path}")
 async def _download_file(file_path: str, user: dict = Depends(get_current_user)):
     """Auth-checked passthrough to Emergent Object Storage.
@@ -2319,6 +2355,7 @@ async def _monetization_startup():
 
 @app.on_event("startup")
 async def on_startup():
+    await _load_public_base(db)  # origin for logos/links in emails sent from background tasks
     await _monetization_startup()
     await start_notification_center(db)  # indexes + hourly matcher/digest sweep
     await start_viewings(db)  # indexes + 24h reminder sweep

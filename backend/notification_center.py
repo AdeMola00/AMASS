@@ -509,8 +509,10 @@ def category_for_doc(d: dict) -> str:
 
 
 def digest_email_html(user: dict, items: list[dict], *, frequency: str, unread_total: int) -> tuple[str, str]:
-    """Returns (subject, html). Table layout, inline styles, absolute https links only (G3), no forms (G2)."""
-    name = escape((user.get("full_name") or "there").split(" ")[0])
+    """Returns (subject, html). Branded layout, inline styles, absolute https links only (G3), no forms (G2)."""
+    from email_theme import INK, LINE, MUTED, RED, p, render_email
+
+    name = (user.get("full_name") or "there").split(" ")[0]
     n = len(items)
     period = "today" if frequency == "daily" else "this week"
     subject = f"{n} new update{'s' if n != 1 else ''} on AMASS {period}" if n else "You're all caught up on AMASS"
@@ -520,12 +522,12 @@ def digest_email_html(user: dict, items: list[dict], *, frequency: str, unread_t
     for d in items:
         cat = CATEGORIES.get(category_for_doc(d), {})
         link = _abs_link(d.get("action_url"))
-        dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:#E11B22;margin-right:8px;vertical-align:middle"></span>' if not d.get("read") else ""
-        open_html = f'<a href="{escape(link)}" style="color:#E11B22;font-weight:700;text-decoration:none;font-size:13px">Open →</a>' if link else ""
+        dot = f'<span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:{RED};margin-right:8px;vertical-align:middle"></span>' if not d.get("read") else ""
+        open_html = f'<a href="{escape(link)}" style="color:{RED};font-weight:700;text-decoration:none;font-size:13px">Open →</a>' if link else ""
         rows.append(
-            '<tr><td style="padding:14px 0;border-bottom:1px solid #EEEBE6">'
-            f'<div style="font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#8A8680;margin-bottom:4px">{escape(cat.get("label", "Update"))} · {escape(_when(d.get("created_at", "")))}</div>'
-            f'<div style="font-size:16px;font-weight:700;color:#111">{dot}{escape(d.get("title", ""))}</div>'
+            f'<tr><td style="padding:14px 0;border-bottom:1px solid {LINE}">'
+            f'<div style="font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:{MUTED};margin-bottom:4px">{escape(cat.get("label", "Update"))} · {escape(_when(d.get("created_at", "")))}</div>'
+            f'<div style="font-size:16px;font-weight:700;color:{INK}">{dot}{escape(d.get("title", ""))}</div>'
             + (f'<div style="font-size:14px;color:#444;margin-top:4px;line-height:20px">{escape(d.get("body", ""))}</div>' if d.get("body") else "")
             + (f'<div style="margin-top:6px">{open_html}</div>' if open_html else "")
             + "</td></tr>"
@@ -535,24 +537,18 @@ def digest_email_html(user: dict, items: list[dict], *, frequency: str, unread_t
         "Price drops, matches, messages and receipts will show up here as they happen.</td></tr>"
     )
     unread_line = f"You have {unread_total} unread update{'s' if unread_total != 1 else ''} waiting in the app." if unread_total else "Your Updates tab is clear."
-    html = (
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F6F4F0;padding:24px 0;font-family:Arial,Helvetica,sans-serif">'
-        '<tr><td align="center">'
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:16px;overflow:hidden">'
-        '<tr><td style="background:#111111;padding:20px 24px">'
-        '<div style="font-size:22px;font-weight:900;letter-spacing:-.5px;color:#FFFFFF">AMASS</div>'
-        f'<div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:2px">Your {escape(frequency)} updates</div>'
-        "</td></tr>"
-        '<tr><td style="padding:24px">'
-        f'<p style="font-size:16px;color:#111;margin:0 0 6px">Hi {name},</p>'
-        f'<p style="font-size:14px;color:#555;margin:0 0 8px">{unread_line}</p>'
-        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{list_html}</table>'
-        f'<p style="margin:22px 0 0"><a href="{escape(_abs_link("/updates") or APP_PUBLIC_URL)}" style="display:inline-block;background:#E11B22;color:#FFFFFF;font-weight:700;font-size:14px;padding:12px 18px;border-radius:999px;text-decoration:none">Open Updates in AMASS</a></p>'
-        "</td></tr>"
-        '<tr><td style="padding:16px 24px 22px;background:#FAF8F5;font-size:12px;color:#8A8680;line-height:18px">'
-        f'You get this summary because email digests are on in your AMASS notification preferences. <a href="{escape(prefs_link)}" style="color:#555">Manage preferences</a> · <a href="{escape(unsub_link)}" style="color:#555">Turn off email digests</a>.<br>'
-        "AMASS will never ask you to share a password or code by reply."
-        "</td></tr></table></td></tr></table>"
+    html = render_email(
+        title=f"Your {frequency} updates",
+        kicker=f"{frequency} digest",
+        hero="city",
+        greeting=f"Hi {name},",
+        preheader=subject,
+        body_html=p(unread_line, muted=True, size=14) + f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border-collapse:collapse">{list_html}</table>',
+        cta=("Open Updates in AMASS", _abs_link("/updates") or APP_PUBLIC_URL),
+        footer_links_html=(
+            "You get this summary because email digests are on in your AMASS notification preferences. "
+            f'<a href="{escape(prefs_link)}" style="color:#555">Manage preferences</a> · <a href="{escape(unsub_link)}" style="color:#555">Turn off email digests</a>.'
+        ),
     )
     return subject, html
 

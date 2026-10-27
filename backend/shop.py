@@ -40,6 +40,8 @@ PRODUCT_PUBLIC = {"_id": 0, "retailer_slug": 0, "source_id": 0}
 
 # ─────────────────────────── projections ───────────────────────────
 def logo_url(r: dict) -> Optional[str]:
+    if r.get("logo_url"):  # brand-managed logos are absolute (object storage / CDN)
+        return r["logo_url"]
     return f"/api/shop/assets/logos/{r['logo']}" if r.get("logo") else None
 
 

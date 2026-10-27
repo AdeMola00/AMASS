@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 92 - branded emails. I ran 23/23 new tests against the public URL: email assets, admin preview list and kinds, the guardrail on all 8 preview HTMLs, and 2 real sends to delivered@resend.dev. All passed. The regression suites also passed (44/44): forgot/reset/lockout, viewings, home hub, agency teams, and notification read-state/digest. backend.err.log shows no 'Email send failed', ValueError or Traceback lines from these runs. Frontend at 390x844: the admin tile-emails opens /admin/emails and all 8 email-kind chips render. The subject updates when a chip is tapped (unlock -> 'Your AMASS receipt', digest -> '3 new updates on AMASS today', agency -> invite subject). Inside the iframe, the AMASS logo, the Unsplash hero and the FIXA PRO footer logo all load (naturalWidth > 0). The non-admin agent sees 'Admins only'. No page errors. No deprecated Expo packages found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/email-assets/{name}", "issue": "The app sends 'Cache-Control: public, max-age=604800' (checked directly on upstream :8001). Through the preview URL, the Cloudflare/ingress edge replaces it with 'no-store, no-cache, must-revalidate'. This is the edge, not the app. Check it again on the production domain."},
+      {"endpoint": "public_url.remember_from_request (middleware)", "issue": "The public origin is learned from the first inbound X-Forwarded-Host/Host header and saved permanently in runtime_state. On a fresh DB (e.g. a new prod deploy), a first request with a forged X-Forwarded-Host could make every later email point its logo URLs at that host. Low risk, because the guardrail still requires https and the value is already set in preview. Suggest setting PUBLIC_API_BASE in prod, or checking the host against an allow-list / *.emergentagent.com / the custom domain."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin/emails", "issues": [
+        "The email-kind-* chips are 40px tall, below the 44px minimum touch target.",
+        "At 390px the ScreenHeader subtitle 'Every email · AMASS & FIXA logos · real photos' is cut off ('real ...').",
+        "The 'Admins only' EmptyState branch has no testID on its Screen (the admin branch has admin-emails-screen)."
+      ]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_email_branding_iter92.py",
+    "/app/test_reports/pytest/iter92_email.xml",
+    "/app/test_reports/pytest/iter92_regression.xml",
+    "/app/test_reports/iter92_emails_reset.png",
+    "/app/test_reports/iter92_emails_digest.png",
+    "/app/test_reports/iter92_emails_footer.png",
+    "/app/test_reports/iter92_emails_nonadmin.png"
+  ],
+  "action_items": [
+    "Optional: set minHeight 44 on the Chip used in /admin/emails, or add hitSlop.",
+    "Optional: shorten the /admin/emails subtitle, or let it wrap to 2 lines.",
+    "Optional: harden public_url, either with a PUBLIC_API_BASE env in prod or by checking the learned host against an allow-list.",
+    "Optional: add testID='admin-emails-locked' to the non-admin branch."
+  ],
+  "critical_code_review_comments": [
+    "All 6 send_email call sites use email_theme.render_email: agency_teams, viewings, receipts, notification_center, auth_security and home_hub. Every email gets the new look.",
+    "Email asset route: name is checked against a fixed allow-list (_ASSETS), so path traversal is not possible (tested, 404).",
+    "Preview iframe uses sandbox='' with srcDoc, which is safe; the images still load.",
+    "uvicorn --reload watches backend/tests/, so editing test files reloads the backend. Keep this in mind for flaky mid-run 502s."
+  ],
+  "updated_files": ["/app/backend/tests/test_email_branding_iter92.py"],
+  "success_rate": {"backend": "100% (23/23 new + 44/44 regression)", "frontend": "100%"},
+  "seed_data_creation": "None. The delivered@resend.dev user already existed (login worked).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The login response key is access_token, not token. conftest defaults BASE_URL to localhost:8001; the new test file reads EMAIL_TEST_BASE_URL (set it to the public URL) and falls back to EXPO_BACKEND_URL. Run with -n 0. Real sends done this iteration: 2x forgot-password and 1x digest to delivered@resend.dev.",
+  "rca_of_issue": ""
+}

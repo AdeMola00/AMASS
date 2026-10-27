@@ -1169,3 +1169,35 @@ agent_communication:
       chips), /admin/agencies (create / rename / hand over / deactivate), My AMASS → "Agency Team" row with invite badge, admin tile,
       /crm team CTA. Shared crm bits in src/components/crm/LeadBits.tsx. Demo seed: agency "AMASS Demo Realty" (owner demo, agent
       adaeze). Backend: tests/test_agency_teams.py 8/8 (self-cleaning).
+
+  - agent: "main"
+    message: |
+      Iteration 92 (to run) — branded emails. New backend/email_theme.py: render_email() = red brand bar, AMASS logo header
+      (served by GET /api/email-assets/{amass-logo.png|fixa-logo.png|amass-wordmark.png}, public, 7-day cache), a real Lagos photo
+      hero (Unsplash CDN, HEROES map), body, optional code block / amount block / details table / CTA, footer with the FIXA PRO logo.
+      Public origin for logo URLs = backend/public_url.py (PUBLIC_API_BASE/EXPO_BACKEND_URL env → origin learned from the first
+      inbound request via an HTTP middleware, persisted in runtime_state). All six senders now use it: password reset
+      (auth_security), receipts (receipts.receipt_html), viewings (_email_html + email_hero), My Home reminders (home_hub),
+      digests (notification_center.digest_email_html), agency invites (agency_teams). Admin previews: GET /api/admin/email-previews
+      (list) and /{kind} (html; ?format=json → {subject, html}) for reset|receipt|unlock|viewing|viewing-confirmed|home|digest|agency.
+      Frontend: /admin/emails "Email designs" screen (chips per kind, subject, iframe on web / WebView native) + admin tile.
+      Already verified: all 8 previews pass auth_security._assert_safe_email; pytest auth/viewings/home_hub/agency/payments/digest
+      green (incl. a real send to delivered@resend.dev); screenshots of receipt/reset/digest + the admin screen.
+
+  - agent: "main"
+    message: |
+      Iteration 93 (to run) — Roles & admin integration, Brand portal, Admin Portal shared key.
+      Backend: brands.py — admin creates brand (POST /api/admin/brands) and INVITES brand managers by email
+      (POST /api/admin/brands/{id}/accounts {name,email} → single-use set-password link, 72 h, sha256 hash stored; email failure →
+      response carries invite_link so the admin can share it); resend (POST …/accounts/{aid}/invite); brand side:
+      POST /api/brand/auth/forgot-password (enumeration-safe), GET /api/brand/auth/invite/{token}, POST /api/brand/auth/set-password
+      {token,password} → brand token; login 401 until a password is set. Brand tokens (typ=brand) rejected by app/admin routes.
+      Fixed: shop_products unique source_id index collided on null for portal/brand-created products (source_id now "<source>:<id>").
+      portal_keys.py + admin_accounts.py: POST/DELETE /api/admin/portal-connection/key (one active key, plaintext shown once),
+      GET /api/admin/portal-connection includes `key`; admin_portal.current_account accepts X-AMASS-Portal-Key / Bearer amass_pk_…
+      (super_admin, X-AMASS-Portal-Actor named in audit) or the scoped staff token.
+      Frontend: /brand (login + "Forgot password" sheet), /brand/set-password?token=… (validates link, sets password, signs in),
+      /admin/brands (list/search, create, detail sheet: visibility/sponsored toggles, invite manager, resend, disable, remove, edit),
+      /admin/accounts (search + All/Agents/Admins/Suspended, suspend/reactivate, grant/revoke admin), /admin/portal (status, generate/
+      rotate/revoke key shown once with copy, API base copy, managed lists), 3 new Cockpit tiles.
+      Smoke (tests/smoke_brand_portal.py) green end-to-end. Brand test login: smoke-brand@amass-qa.africa / BrandPass2026! (brand "Smoke Lighting Co").

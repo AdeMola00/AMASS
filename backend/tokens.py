@@ -146,6 +146,15 @@ def tier_bonus_for(bundle: dict, mcfg: dict) -> int:
     return tier_bonus
 
 
+async def effective_bundles(db: AsyncIOMotorDatabase, include_hidden: bool = False) -> list[dict]:
+    """Built-in catalogue + admin-added bundles (`token_bundles`), minus built-ins hidden from the admin portal."""
+    hidden = set((((await db.runtime_state.find_one({"key": "hidden_token_bundles"}, {"_id": 0, "value": 1})) or {}).get("value")) or [])
+    out = [{**b, "builtin": True, "hidden": b["id"] in hidden} for b in TOKEN_BUNDLES if include_hidden or b["id"] not in hidden]
+    async for b in db.token_bundles.find({"active": {"$ne": False}}, {"_id": 0}):
+        out.append({"id": b["id"], "name": b["name"], "tokens": int(b["tokens"]), "bonus": int(b.get("bonus", 0)), "price_ngn": int(b["price_ngn"]), "builtin": False, "hidden": False})
+    return out
+
+
 async def bundles_with_bonus(db: AsyncIOMotorDatabase, currency: str) -> list[dict]:
     """Catalog rows + `tier_bonus` and `total` (tokens + bundle bonus + tier bonus).
     Bundles under the admin top-up minimum are omitted — /payments/initialize would reject them,
@@ -154,7 +163,7 @@ async def bundles_with_bonus(db: AsyncIOMotorDatabase, currency: str) -> list[di
     min_ngn = int(mcfg.get("topup_min_ngn", 1000) or 1000)
     if currency.upper() != "MASS":
         return []
-    src = TOKEN_BUNDLES
+    src = await effective_bundles(db)
     out = []
     for b in src:
         if int(b["price_ngn"]) < min_ngn:

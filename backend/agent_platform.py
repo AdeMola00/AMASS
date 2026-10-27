@@ -276,6 +276,42 @@ async def _plan_by_id(db, plan_id: str) -> Optional[dict]:
     return await db.agent_plans.find_one({"id": plan_id}, {"_id": 0})
 
 
+async def set_agent_verification(db, user_id: str, *, approve: bool, reviewer_id: str, reason: Optional[str] = None, verification_level: Optional[int] = None) -> dict:
+    """The single place Agent status is granted or removed.
+
+    Approve → application `approved` + `users.is_agent = True` (unlocks Agent Workspace, agent tools, agent badge).
+    Decline → application `rejected` + `users.is_agent = False`. Used by the in-app cockpit, the agents admin API and
+    the external admin portal, so every path notifies the applicant the same way."""
+    app = await db.agent_applications.find_one({"user_id": user_id})
+    if not app:
+        raise HTTPException(404, "Agent application not found")
+    now = datetime.now(timezone.utc)
+    updates: dict = {"reviewed_at": now, "reviewed_by": reviewer_id}
+    if approve:
+        updates["status"] = "approved"
+        updates["rejection_reason"] = None
+        if verification_level is not None:
+            updates["verification_level"] = int(verification_level)
+        elif app.get("verification_level", 1) < 2:
+            updates["verification_level"] = 2  # bump to Identity Verified
+    else:
+        updates["status"] = "rejected"
+        updates["rejection_reason"] = reason or "Verification declined"
+    await db.agent_applications.update_one({"user_id": user_id}, {"$set": updates})
+    await db.users.update_one({"id": user_id}, {"$set": {"is_agent": bool(approve), "agent_verified_at": now if approve else None}})
+    from notification_center import emit
+
+    await emit(
+        db, user_id, "verification_result",
+        "AMASS verification approved" if approve else "AMASS verification declined",
+        ("Congratulations — your AMASS Agent verification is approved. Agent Workspace is now unlocked." if approve else (reason or "Please review and resubmit your details.")),
+        {"level": updates.get("verification_level", app.get("verification_level")), "decision": "approved" if approve else "rejected"},
+        action_url="/become-agent",
+    )
+    return {"status": updates["status"], "name": app.get("full_name"), "verification_level": updates.get("verification_level", app.get("verification_level"))}
+
+
+
 async def _active_subscription(db, user_id: str) -> Optional[dict]:
     return await db.agent_subscriptions.find_one(
         {"user_id": user_id, "status": {"$in": ["active", "trial"]}}, {"_id": 0}
@@ -776,39 +812,10 @@ def register_agent_platform_routes(
     async def admin_verify_agent(
         user_id: str,
         data: AdminVerifyIn,
-        _admin=Depends(require_admin),
+        admin=Depends(require_admin),
     ):
-        app = await db.agent_applications.find_one({"user_id": user_id})
-        if not app:
-            raise HTTPException(404, "Agent application not found")
-        now = datetime.now(timezone.utc)
-        updates: dict = {"reviewed_at": now}
-        if data.approve:
-            updates["status"] = "approved"
-            if data.verification_level is not None:
-                updates["verification_level"] = int(data.verification_level)
-            elif app.get("verification_level", 1) < 2:
-                updates["verification_level"] = 2  # bump to Identity Verified
-        else:
-            updates["status"] = "rejected"
-            updates["rejection_reason"] = data.reason or "Verification declined"
-        await db.agent_applications.update_one(
-            {"user_id": user_id}, {"$set": updates}
-        )
-        # Notify
-        from notification_center import emit
-        await emit(
-            db, user_id, "verification_result",
-            "AMASS verification approved" if data.approve else "AMASS verification declined",
-            (
-                "Congratulations — your AMASS Agent verification is approved."
-                if data.approve
-                else (data.reason or "Please review and resubmit your details.")
-            ),
-            {"level": updates.get("verification_level"), "decision": "approved" if data.approve else "rejected"},
-            action_url="/become-agent",
-        )
-        return {"ok": True, "status": updates["status"]}
+        res = await set_agent_verification(db, user_id, approve=data.approve, reviewer_id=admin["id"], reason=data.reason, verification_level=data.verification_level)
+        return {"ok": True, "status": res["status"]}
 
     @admin_router.post("/agents/{user_id}/suspend")
     async def admin_suspend(
@@ -827,6 +834,8 @@ def register_agent_platform_routes(
                 }
             },
         )
+        # Agent tools follow the application status: suspended agents lose the badge until reinstated.
+        await db.users.update_one({"id": user_id}, {"$set": {"is_agent": not data.suspend}})
         from notification_center import emit
         await emit(
             db, user_id, "account_status",

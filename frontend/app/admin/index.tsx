@@ -93,6 +93,9 @@ export default function AdminCockpitHub() {
             </View>
 
             <View style={{ gap: 10 }}>
+              <Tile title="Accounts & roles" caption="Members · agents · admins · suspend / reactivate · grant admin" icon="people-circle-outline" tone="info" onPress={() => router.push("/admin/accounts" as any)} testID="tile-accounts" />
+              <Tile title="Brands (Market → Brands)" caption="Create brands · invite brand managers by email · hide / sponsor" icon="storefront-outline" tone="premium" onPress={() => router.push("/admin/brands" as any)} testID="tile-brands" />
+              <Tile title="Admin Portal connection" caption="amass-control.emergent.host · shared key · what it manages" icon="link-outline" tone="success" onPress={() => router.push("/admin/portal" as any)} testID="tile-portal" />
               <Tile title="Duplicate review queue" caption={`${dash.pending_duplicate_review} propert${dash.pending_duplicate_review === 1 ? "y" : "ies"} flagged`} icon="git-compare-outline" badge={dash.pending_duplicate_review} tone="mass" onPress={() => router.push("/admin/duplicate-queue" as any)} testID="tile-dup-queue" />
               <Tile title="Representation reviews" caption={`${dash.pending_representations} pending · ${dash.docs_requested} docs requested`} icon="ribbon-outline" badge={dash.pending_representations + dash.docs_requested} tone="success" onPress={() => router.push("/admin/representations" as any)} testID="tile-rep-queue" />
               <Tile title="Identity & documents (KYC)" caption={`${dash.kyc_identity_pending ?? 0} identity checks · ${dash.kyc_documents_pending ?? 0} title documents waiting`} icon="shield-checkmark-outline" badge={(dash.kyc_identity_pending ?? 0) + (dash.kyc_documents_pending ?? 0)} tone="brand" onPress={() => router.push("/admin/kyc" as any)} testID="tile-kyc" />
@@ -101,6 +104,7 @@ export default function AdminCockpitHub() {
               <Tile title="Market reports" caption="Flagged Declutter listings · pause · remove" icon="flag-outline" tone="warning" onPress={() => router.push("/admin/market-reports" as any)} testID="tile-market-reports" />
               <Tile title="FIXA providers" caption="Verify Join FIXA applications · provider reports · hide / reinstate" icon="hammer-outline" tone="fix" onPress={() => router.push("/admin/fixa" as any)} testID="tile-fixa" />
               <Tile title="Agency teams" caption="Create agencies · name owners · shared team CRMs" icon="people-circle-outline" tone="brand" onPress={() => router.push("/admin/agencies" as any)} testID="tile-agencies" />
+              <Tile title="Email designs" caption="Preview every branded email · logos · photos" icon="mail-open-outline" tone="info" onPress={() => router.push("/admin/emails" as any)} testID="tile-emails" />
               <Tile title="Audit log" caption="Immutable event stream across all properties" icon="document-text-outline" tone="default" onPress={() => router.push("/admin/audit-log" as any)} testID="tile-audit" />
               <Tile title="Merge / Verify properties" caption="Search by AMASS ID → compare → merge or verify" icon="swap-horizontal-outline" tone="brand" onPress={() => router.push("/admin/duplicate-queue" as any)} testID="tile-merge" />
               <Tile title="Property Discovery" caption="Google Places search · Cost meter · Candidate → Lead pipeline" icon="compass-outline" tone="fix" onPress={() => router.push("/admin/discovery" as any)} testID="tile-discovery" />

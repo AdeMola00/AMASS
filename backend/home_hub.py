@@ -21,7 +21,6 @@ import logging
 import os
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from html import escape
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -365,15 +364,18 @@ async def _email_reminder(db, user_id: str, subject: str, headline: str, body: s
     if not cat.get("enabled", True) or not cat.get("email", True):
         return False
     link = f"{APP_PUBLIC_URL}{path}"
-    name = escape((user.get("full_name") or "there").split(" ")[0])
-    html = (
-        '<div style="font-family:Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111">'
-        f'<p style="margin:0 0 12px;font-size:14px;color:#5C5C59">Hi {name},</p>'
-        f'<h1 style="margin:0 0 8px;font-size:22px">{escape(headline)}</h1>'
-        f'<p style="margin:0 0 20px;font-size:15px;line-height:22px">{escape(body)}</p>'
-        f'<p style="margin:0 0 24px"><a href="{link}" style="display:inline-block;background:#E11B22;color:#FFFFFF;font-weight:700;font-size:14px;padding:12px 18px;border-radius:999px;text-decoration:none">Open in My Home</a></p>'
-        '<p style="margin:0;font-size:12px;color:#8A8A85">AMASS reminds you — it never takes payments for your bills. Manage reminders under My Home or Notification preferences.</p>'
-        "</div>"
+    name = (user.get("full_name") or "there").split(" ")[0]
+    from email_theme import p, render_email
+
+    html = render_email(
+        title=headline,
+        kicker="My Home",
+        hero="home",
+        greeting=f"Hi {name},",
+        preheader=body,
+        body_html=p(body),
+        cta=("Open in My Home", link),
+        note="AMASS reminds you — it never takes payments for your bills. Manage reminders under My Home or Notification preferences.",
     )
     try:
         await send_email(to=user["email"], subject=subject, html=html)

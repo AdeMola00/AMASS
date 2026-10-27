@@ -1,6 +1,6 @@
 /**
- * Money rain — bundles of naira (and a few dollar notes) tumble down from the top edge and fade out, with a
- * warm, confident "money lands" sound. One reusable overlay for the whole app, mounted once in the root layout.
+ * Money rain — bundles of naira (and a few dollar notes) tumble down from the top edge and fade out. Silent by
+ * design (owner decision). One reusable overlay for the whole app, mounted once in the root layout.
  *
  *   const { rain } = useMoneyRain();
  *   rain({ variant: "brief",     key: `pin:${id}` });        // a home was picked / opened
@@ -13,15 +13,12 @@
  *     while notes are still falling is dropped, a celebration replaces whatever is playing.
  *   • reduced motion → a handful of notes gently fade in place; no travel, no spin.
  *   • transform/opacity only, every note animates on the UI thread; bundles are plain Views (no images).
- *   • sound: felt thump + rising bells + paper flutter (assets/sounds, synthesised in scripts/make_money_sounds.py);
- *     user-switchable in Settings (`amass_money_rain_sound`, default on); never plays under reduced motion.
  *   • call sites fire it from confirmed backend results, never from a tap that merely starts a payment.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { Easing, ReduceMotion, interpolate, useAnimatedStyle, useReducedMotion as useReducedMotionSync, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { FullWindowOverlay } from "react-native-screens";
-import { useAudioPlayer } from "expo-audio";
 import { storage } from "@/src/utils/storage";
 import { useReducedMotion as useReducedMotionLive } from "./Feedback";
 
@@ -39,12 +36,9 @@ type RainApi = {
   rain: (opts?: MoneyRainOptions) => boolean;
   /** Plays once per device for the key (persisted) — for states a screen shows every time, e.g. "approved". */
   rainOncePersisted: (variant: MoneyRainVariant, key: string) => Promise<boolean>;
-  /** Settings toggle for the money sound (persisted). */
-  soundEnabled: boolean;
-  setSoundEnabled: (on: boolean) => void;
 };
 
-const noop: RainApi = { rain: () => false, rainOncePersisted: async () => false, soundEnabled: true, setSoundEnabled: () => {} };
+const noop: RainApi = { rain: () => false, rainOncePersisted: async () => false };
 const Ctx = createContext<RainApi>(noop);
 
 /** count = falling items (≈ bundleShare of them are thick bundles, the rest single notes). */
@@ -55,10 +49,6 @@ const VARIANTS: Record<MoneyRainVariant, { count: number; bundleShare: number; d
 };
 const DEDUP_MS = 2500;
 const SEEN_PREFIX = "amass_money_rain_seen_v1:";
-export const MONEY_SOUND_KEY = "amass_money_rain_sound";
-
-const SOUND_SOFT = require("../../assets/sounds/money_soft.wav");
-const SOUND_CELEBRATE = require("../../assets/sounds/money_celebrate.wav");
 
 export function MoneyRainProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState<{ id: number; variant: MoneyRainVariant } | null>(null);
@@ -70,57 +60,21 @@ export function MoneyRainProvider({ children }: { children: React.ReactNode }) {
   const reduceLive = useReducedMotionLive();
   const reduce = reduceSync || reduceLive;
 
-  const [soundEnabled, setSoundState] = useState(true);
-  const soundRef = useRef(true);
-  useEffect(() => {
-    storage
-      .getItem<boolean>(MONEY_SOUND_KEY, true)
-      .then((v) => {
-        soundRef.current = v !== false;
-        setSoundState(v !== false);
-      })
-      .catch(() => {});
+  const rain = useCallback((opts: MoneyRainOptions = {}) => {
+    const variant = opts.variant ?? "brief";
+    const now = Date.now();
+    // Dropped (another rain still falling) → not recorded, so a later legitimate call with the same key can play.
+    if (variant !== "celebrate" && now < busyUntil.current) return false;
+    if (opts.key) {
+      const last = played.current.get(opts.key);
+      if (last != null && (opts.once || now - last < DEDUP_MS)) return false;
+      played.current.set(opts.key, now);
+      if (played.current.size > 300) played.current.delete(played.current.keys().next().value as string);
+    }
+    busyUntil.current = now + VARIANTS[variant].duration + 300;
+    setActive({ id: now, variant });
+    return true;
   }, []);
-  const setSoundEnabled = useCallback((on: boolean) => {
-    soundRef.current = on;
-    setSoundState(on);
-    storage.setItem(MONEY_SOUND_KEY, on).catch(() => {});
-  }, []);
-
-  const soft = useAudioPlayer(SOUND_SOFT);
-  const celebrate = useAudioPlayer(SOUND_CELEBRATE);
-  const playSound = useCallback(
-    (variant: MoneyRainVariant) => {
-      if (!soundRef.current || reduce) return;
-      const p = variant === "celebrate" ? celebrate : soft;
-      try {
-        p.volume = variant === "subtle" ? 0.7 : 1;
-        p.seekTo(0).catch(() => {});
-        p.play();
-      } catch {}
-    },
-    [soft, celebrate, reduce]
-  );
-
-  const rain = useCallback(
-    (opts: MoneyRainOptions = {}) => {
-      const variant = opts.variant ?? "brief";
-      const now = Date.now();
-      // Dropped (another rain still falling) → not recorded, so a later legitimate call with the same key can play.
-      if (variant !== "celebrate" && now < busyUntil.current) return false;
-      if (opts.key) {
-        const last = played.current.get(opts.key);
-        if (last != null && (opts.once || now - last < DEDUP_MS)) return false;
-        played.current.set(opts.key, now);
-        if (played.current.size > 300) played.current.delete(played.current.keys().next().value as string);
-      }
-      busyUntil.current = now + VARIANTS[variant].duration + 300;
-      setActive({ id: now, variant });
-      playSound(variant);
-      return true;
-    },
-    [playSound]
-  );
 
   const rainOncePersisted = useCallback(
     async (variant: MoneyRainVariant, key: string) => {
@@ -136,7 +90,7 @@ export function MoneyRainProvider({ children }: { children: React.ReactNode }) {
   );
 
   const done = useCallback((id: number) => setActive((a) => (a?.id === id ? null : a)), []);
-  const api = useMemo(() => ({ rain, rainOncePersisted, soundEnabled, setSoundEnabled }), [rain, rainOncePersisted, soundEnabled, setSoundEnabled]);
+  const api = useMemo(() => ({ rain, rainOncePersisted }), [rain, rainOncePersisted]);
 
   // iOS: a full-window overlay paints above native Modal sheets (success sheets, unlock dialog) and still lets
   // touches through. Android / web: in-tree overlay — above bottom sheets, below a native Modal if one is open.

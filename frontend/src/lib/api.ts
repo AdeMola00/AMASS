@@ -988,6 +988,91 @@ export type AgencyMe = {
 };
 export type AdminAgency = Agency & { owner?: CrmPerson | null; members: number; invited: number; leads: number };
 
+/* ─── Roles & admin integration ─── */
+export type AdminUserRow = {
+  id: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  avatar_url?: string | null;
+  is_admin?: boolean;
+  is_agent?: boolean;
+  identity_verified?: boolean;
+  status: "active" | "suspended";
+  agent_application?: string | null;
+  has_brand_login?: boolean;
+  created_at?: string;
+};
+export type AdminAgentApplication = {
+  id: string;
+  user_id: string;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  agency_name?: string | null;
+  state?: string | null;
+  status: "pending" | "approved" | "rejected" | "suspended";
+  verification_level: number;
+  years_experience?: number | null;
+  areas_of_operation?: string[];
+  specialisations?: string[];
+  has_mandate_authority?: boolean;
+  id_document_url?: string | null;
+  selfie_url?: string | null;
+  rejection_reason?: string | null;
+  created_at?: string;
+  current_plan_id?: string;
+  active_listings?: number;
+};
+export type BrandAccount = {
+  id: string;
+  name?: string | null;
+  email: string;
+  brand_id: string;
+  disabled: boolean;
+  created_at?: string;
+  last_login_at?: string | null;
+  password_set: boolean;
+  invite_sent_at?: string | null;
+  invite_expires_at?: string | null;
+  invite_kind?: "invite" | "reset" | null;
+  invite_error?: string | null;
+};
+export type BrandInviteResult = BrandAccount & { email_sent: boolean; email_error?: string | null; invite_link?: string | null };
+export type AdminBrand = {
+  id: string;
+  slug?: string;
+  name: string;
+  tagline?: string | null;
+  logo_url?: string | null;
+  accent?: string | null;
+  categories: string[];
+  website?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  published: boolean;
+  sponsored: boolean;
+  managed: boolean;
+  product_count: number;
+  in_stock_count: number;
+  created_at?: string;
+  accounts: BrandAccount[];
+};
+export type PortalKey = { id: string; prefix: string; label?: string | null; created_at?: string; created_by_name?: string | null; last_used_at?: string | null; uses: number };
+export type PortalConnection = {
+  portal_url: string;
+  api_base: string | null;
+  key: PortalKey | null;
+  staff_accounts: number;
+  builtin_admins: number;
+  last_portal_activity: { at: string; actor_name?: string; action?: string } | null;
+  managed: string[];
+  in_app_only: string[];
+  not_managed: string[];
+};
+
 export type FixaReport = {
   id: string;
   provider_item_id: string;
@@ -2486,6 +2571,37 @@ export const api = {
   },
   agencyAssignLead: (lead_id: string, assigned_to: string | null) => req<{ ok: boolean; lead: CrmLead }>(`/agency/leads/${encodeURIComponent(lead_id)}/assign`, { method: "PATCH", body: JSON.stringify({ assigned_to }) }),
   adminAgencies: () => req<{ items: AdminAgency[] }>("/admin/agencies"),
+  // Roles & admin integration
+  adminUsers: (params: { search?: string; status?: string; role?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.search) q.set("search", params.search);
+    if (params.status) q.set("status", params.status);
+    if (params.role) q.set("role", params.role);
+    const s = q.toString();
+    return req<{ items: AdminUserRow[]; totals: { users: number; suspended: number; admins: number; agents: number } }>(`/admin/users${s ? `?${s}` : ""}`);
+  },
+  adminPatchUser: (user_id: string, patch: { account_status?: "active" | "suspended"; is_admin?: boolean }) => req<{ ok: boolean }>(`/admin/users/${encodeURIComponent(user_id)}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  adminAgentApplications: (params: { status?: string; q?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.status) q.set("status", params.status);
+    if (params.q) q.set("q", params.q);
+    const s = q.toString();
+    return req<AdminAgentApplication[]>(`/admin/agents${s ? `?${s}` : ""}`);
+  },
+  adminVerifyAgent: (user_id: string, body: { approve: boolean; reason?: string; verification_level?: number }) => req<{ ok: boolean; status: string }>(`/admin/agents/${encodeURIComponent(user_id)}/verify`, { method: "POST", body: JSON.stringify(body) }),
+  adminSuspendAgent: (user_id: string, body: { suspend: boolean; reason?: string }) => req<{ ok: boolean; status: string }>(`/admin/agents/${encodeURIComponent(user_id)}/suspend`, { method: "POST", body: JSON.stringify(body) }),
+  adminBrands: () => req<{ items: AdminBrand[]; categories: { key: string; label: string; icon: string; color: string }[] }>("/admin/brands"),
+  adminCreateBrand: (body: { name: string; tagline?: string; categories?: string[]; website?: string; whatsapp?: string; phone?: string; email?: string; logo_url?: string }) => req<AdminBrand>("/admin/brands", { method: "POST", body: JSON.stringify(body) }),
+  adminPatchBrand: (brand_id: string, patch: Partial<{ name: string; tagline: string; categories: string[]; website: string; whatsapp: string; phone: string; email: string; logo_url: string; published: boolean; sponsored: boolean }>) => req<AdminBrand>(`/admin/brands/${encodeURIComponent(brand_id)}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  adminCreateBrandAccount: (brand_id: string, body: { name: string; email: string }) => req<BrandInviteResult>(`/admin/brands/${encodeURIComponent(brand_id)}/accounts`, { method: "POST", body: JSON.stringify(body) }),
+  adminResendBrandInvite: (brand_id: string, account_id: string) => req<BrandInviteResult>(`/admin/brands/${encodeURIComponent(brand_id)}/accounts/${encodeURIComponent(account_id)}/invite`, { method: "POST" }),
+  adminToggleBrandAccount: (brand_id: string, account_id: string, disabled: boolean) => req<{ ok: boolean }>(`/admin/brands/${encodeURIComponent(brand_id)}/accounts/${encodeURIComponent(account_id)}`, { method: "PATCH", body: JSON.stringify({ disabled }) }),
+  adminDeleteBrandAccount: (brand_id: string, account_id: string) => req<{ ok: boolean }>(`/admin/brands/${encodeURIComponent(brand_id)}/accounts/${encodeURIComponent(account_id)}`, { method: "DELETE" }),
+  adminPortalConnection: () => req<PortalConnection>("/admin/portal-connection"),
+  adminPortalKeyCreate: (label?: string) => req<PortalKey & { key: string }>("/admin/portal-connection/key", { method: "POST", body: JSON.stringify({ label }) }),
+  adminPortalKeyRevoke: () => req<{ ok: boolean; revoked: boolean }>("/admin/portal-connection/key", { method: "DELETE" }),
+  adminEmailPreviews: () => req<{ kinds: string[] }>("/admin/email-previews"),
+  adminEmailPreview: (kind: string) => req<{ kind: string; subject: string; html: string }>(`/admin/email-previews/${encodeURIComponent(kind)}?format=json`),
   adminCreateAgency: (name: string, owner_email: string) => req<AdminAgency>("/admin/agencies", { method: "POST", body: JSON.stringify({ name, owner_email }) }),
   adminPatchAgency: (agency_id: string, patch: { name?: string; status?: "active" | "inactive"; owner_email?: string }) => req<AdminAgency>(`/admin/agencies/${agency_id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 

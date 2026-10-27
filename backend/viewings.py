@@ -17,7 +17,6 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from html import escape
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -86,20 +85,14 @@ class NoteIn(BaseModel):
     note: Optional[str] = Field(default=None, max_length=400)
 
 
-# ─── Email (link-free HTML: passes the email guardrails) ─────────────────────
-def _email_html(heading: str, lines: list[str], footer: str = "Open the AMASS app → My Amass → Viewings to respond.") -> str:
-    body = "".join(f"<p style='margin:0 0 10px;color:#333;font-size:15px;line-height:1.5'>{escape(l)}</p>" for l in lines)
-    return (
-        "<div style='font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px'>"
-        "<p style='margin:0 0 4px;font-size:12px;letter-spacing:1px;color:#8A6D14;font-weight:700'>AMASS · VIEWINGS</p>"
-        f"<h2 style='margin:0 0 16px;font-size:22px;color:#111'>{escape(heading)}</h2>"
-        f"{body}"
-        f"<p style='margin:18px 0 0;color:#777;font-size:13px'>{escape(footer)}</p>"
-        "</div>"
-    )
+# ─── Email (branded layout; passes the email guardrails) ─────────────────────
+def _email_html(heading: str, lines: list[str], footer: str = "Open the AMASS app → My Amass → Viewings to respond.", hero: str = "estate") -> str:
+    from email_theme import p, render_email
+
+    return render_email(title=heading, kicker="Viewings", hero=hero, body_html="".join(p(l) for l in lines if l), note=footer)
 
 
-async def _email_user(db, user_id: str, subject: str, heading: str, lines: list[str]) -> None:
+async def _email_user(db, user_id: str, subject: str, heading: str, lines: list[str], hero: str = "estate") -> None:
     """Best-effort email copy — never raises, never blocks the request."""
     from auth_security import send_email
 
@@ -107,17 +100,17 @@ async def _email_user(db, user_id: str, subject: str, heading: str, lines: list[
     if not u or not u.get("email"):
         return
     try:
-        await send_email(to=u["email"], subject=subject, html=_email_html(heading, lines))
+        await send_email(to=u["email"], subject=subject, html=_email_html(heading, lines, hero=hero))
     except Exception as e:  # noqa: BLE001
         logger.warning("viewing email to %s failed: %s", user_id, e)
 
 
-async def _tell(db, user_id: str, kind: str, title: str, body: str, viewing: dict, *, email_heading: Optional[str] = None, email_lines: Optional[list[str]] = None):
+async def _tell(db, user_id: str, kind: str, title: str, body: str, viewing: dict, *, email_heading: Optional[str] = None, email_lines: Optional[list[str]] = None, email_hero: str = "estate"):
     """In-app notification now (deep-links to the viewing) + email in the background."""
     from notification_center import emit
 
     await emit(db, user_id, kind, title, body, {"viewing_id": viewing["id"], "property_id": viewing["property_id"]}, action_url=f"/viewings/{viewing['id']}")
-    asyncio.create_task(_email_user(db, user_id, f"AMASS · {title}", email_heading or title, email_lines or [body]))
+    asyncio.create_task(_email_user(db, user_id, f"AMASS · {title}", email_heading or title, email_lines or [body], email_hero))
 
 
 # ─── Router ──────────────────────────────────────────────────────────────────
@@ -356,6 +349,7 @@ def register_viewing_routes(db: AsyncIOMotorDatabase, require_auth) -> APIRouter
             v2,
             email_heading="Your viewing is confirmed",
             email_lines=[f"{v.get('property_title')} ({v.get('property_city') or ''}).", f"When: {_when(start)} (Lagos time).", "We'll remind you a day before."],
+            email_hero="luxury",
         )
         return await _enrich(v2, user)
 
@@ -497,6 +491,7 @@ async def send_reminders(db: AsyncIOMotorDatabase) -> int:
                 v,
                 email_heading="Reminder: viewing tomorrow",
                 email_lines=[f"{v.get('property_title')} ({v.get('property_city') or ''}).", f"When: {when} (Lagos time)."],
+                email_hero="garden",
             )
         sent += 1
     return sent

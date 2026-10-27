@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 93 tested brands-only Market (admin brands, brand email invites with set-password links, brand portal), the Admin Portal shared key, and Accounts & roles. Backend: 19/19 pytest pass after one fix by T1. Bug fixed: password_set was always false in every brand-account response because the queries removed password_hash before _account_public read it. The admin UI therefore kept showing 'Invite pending' / 'Resend invite' for activated logins, and the 'Invites pending' stat was wrong. Frontend at 390x844: every requested flow passed (cockpit tiles, /admin/brands, set-password, /brand portal, /admin/accounts, /admin/portal) plus the regression smoke. Remaining issues are minor: nested <button> console error on /brand, stale invite fallback card after the login is removed, one-tap Remove with no confirmation, truncated stat labels. No deprecated Expo packages detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/admin/brands, PATCH /api/admin/brands/{id}, POST …/accounts, POST …/accounts/{aid}/invite, GET /api/brand/me, POST /api/brand/auth/set-password", "issue": "FIXED BY T1: password_set was always false. The account queries used the projection {'_id':0,'password_hash':0}, but _account_public computes password_set = bool(a.get('password_hash')). The projections now only remove _id. _account_public is an explicit whitelist, so the hash is never returned (checked: no hash in any response)."},
+      {"endpoint": "PATCH /api/portal/leads/{lead_id}/status", "issue": "Doesn't check that lead_id exists. Any id is upserted into portal_leads_meta and written to the audit log."},
+      {"endpoint": "/api/admin/brands", "issue": "There is no delete or archive endpoint for brands, so a QA or mistaken brand can only be hidden, not removed (T1 cleaned up through the DB)."},
+      {"endpoint": "POST /api/admin/brands/{id}/accounts", "issue": "The email_error text comes from the generic send_email helper: \"…can't receive email right now. Check the address on your profile.\" 'On your profile' makes no sense for an admin inviting a brand manager; use wording specific to brand invites."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Brand portal product row", "issue": "Console error 'In HTML, <button> cannot be a descendant of <button>' (hydration warning) because Card onPress wraps the Hide/Show Button. Reference: /app/frontend/app/brand/index.tsx:117 and :137", "testID": "brand-product-toggle-*", "priority": "MEDIUM"},
+      {"component": "Admin brand sheet invite fallback card", "issue": "After the account is removed (or disabled), the 'Share this single-use link' fallback card still shows the now-dead link, because lastInvite isn't cleared on delete/toggle. Reference: /app/frontend/app/admin/brands.tsx:201,344", "testID": "admin-brand-invite-fallback", "priority": "LOW"},
+      {"component": "Admin brand account Remove", "issue": "Remove deletes a brand login in one tap with no confirmation.", "testID": "admin-brand-account-delete-*", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin/accounts", "issues": ["StatTile values and labels are cut off at 390px: '3,…' Members, 'Suspe…'"]},
+      {"screen": "/brand", "issues": ["The 'Add product' button squeezes the header title ('QA UI Brand …', 'Smoke Lighti…'); the 'Live produ…' stat label is cut off", "The brand card shows a 'Verified brand' badge even when an admin has hidden the brand from Market → Brands; nothing tells the brand it is hidden"]},
+      {"screen": "/brand/set-password", "issues": ["The submit button is silently disabled for passwords under 8 characters or that don't match; there is no inline hint explaining why"]},
+      {"screen": "/admin/accounts sheet", "issues": ["After 'Make AMASS admin', the sheet body shows no 'AMASS admin' badge (the button label does change). Minor."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter93_brands_portal_roles.py", "/app/backend/tests/helper_iter93_cleanup.py", "/app/test_reports/pytest/pytest_iter93.xml"],
+  "action_items": [
+    "Review T1's fix in /app/backend/brands.py: the account projections no longer remove password_hash, so password_set is correct and the admin UI shows Active / 'Send reset link'.",
+    "Fix the nested <button> on /brand product rows (/app/frontend/app/brand/index.tsx:117/137): stop the Hide/Show Button sitting inside a pressable Card, or render the Card as a non-button wrapper.",
+    "Clear lastInvite in AdminBrandSheet when the matching account is deleted or disabled; add a confirm step to Remove.",
+    "Optional: make send_email errors specific to brand invites; validate lead_id in PATCH /api/portal/leads/{id}/status; add an archive/delete endpoint for brands; fix truncated stat labels on /admin/accounts and /brand; add an inline password hint on set-password."
+  ],
+  "critical_code_review_comments": [
+    "brands.py: removing password_hash in the projection and then deriving password_set from it was a logic bug (fixed). Pattern to avoid: derive flags before stripping secrets.",
+    "portal_keys.authenticate_key does a find plus a separate update_one ($inc uses) on every portal request. Fine at this scale; consider throttling the last_used writes.",
+    "Brand forgot-password is enumeration-safe and throttled per account. Set-password unsets the invite, so links are single-use (410 on reuse). Good.",
+    "Brand-scoped JWTs are correctly rejected on /api/auth/me and /api/admin/* (401). Portal keys are rejected on app/admin APIs (401)."
+  ],
+  "updated_files": ["/app/backend/brands.py (projections at former lines 165,196,261,273,297,370: {'_id':0,'password_hash':0} -> {'_id':0})", "/app/backend/tests/test_iter93_brands_portal_roles.py (new)", "/app/backend/tests/helper_iter93_cleanup.py (new)"],
+  "success_rate": {"backend": "100% (19/19, after the password_set fix)", "frontend": "~95% (all requested flows pass; minor UI issues listed)"},
+  "seed_data_creation": "Created and then removed: QA Brand <u> plus its account and product (pytest teardown), QA UI Brand 080661 plus qa-ui-080661@amass-qa.africa, TEST_UI Lamp product on Smoke Lighting Co, user qa-roles-i93@amass-qa.africa. Smoke Lighting Co was kept and its tagline restored to 'Lamps'. All portal keys revoked (status 'Not connected'). adaeze is active again.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use the ':visible' locator suffix. RN-web stacks keep hidden copies of screens, so plain [data-testid] matches hidden nodes. Toggles have no aria-checked; check persistence through the API or DB. Shop routes: /shop/stores and /shop/store/<slug> (no /shop index). Invite links only come from the fallback (amass-qa.africa can't receive email). Run python /app/backend/tests/helper_iter93_cleanup.py to clean up.",
+  "rca_of_issue": "password_set always false. Repro: GET /api/admin/brands as admin, and Smoke Lighting Co's account (password set) showed password_set=false. RCA: db.brand_accounts.find(..., {'_id':0,'password_hash':0}) then _account_public -> bool(a.get('password_hash')) is always False. Fix: keep password_hash in the internal fetch; _account_public whitelists the output fields, so nothing leaks. Verified: both Lumen and Smoke now return true and no hash appears in the responses."
+}

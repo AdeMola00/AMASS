@@ -17,7 +17,6 @@ import hashlib
 import secrets
 import logging
 from datetime import datetime, timedelta, timezone
-from html import escape
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -232,21 +231,20 @@ def register_auth_security_routes(db: AsyncIOMotorDatabase, hash_password) -> AP
             }},
             upsert=True,
         )
-        name = escape((user.get("full_name") or "there").split(" ")[0])
+        name = (user.get("full_name") or "there").split(" ")[0]
         subject = "Your AMASS password reset code"
-        html = (
-            '<table role="presentation" width="100%" style="max-width:480px;margin:0 auto;'
-            'font-family:Arial,Helvetica,sans-serif"><tr><td style="padding:24px">'
-            f'<p style="font-size:16px;color:#111">Hi {name},</p>'
-            '<p style="font-size:15px;color:#333">Use this code to reset your AMASS password. '
-            f'It expires in {RESET_CODE_TTL_MIN} minutes.</p>'
-            f'<p style="font-size:34px;font-weight:800;letter-spacing:8px;color:#111;'
-            f'margin:20px 0">{code}</p>'
-            '<p style="font-size:13px;color:#666">If you did not request this, you can safely '
-            'ignore this email — your password will not change.</p>'
-            '<p style="font-size:12px;color:#999;margin-top:24px">Sent by AMASS. For your '
-            'security, AMASS will never ask you to share this code by reply.</p>'
-            '</td></tr></table>'
+        from email_theme import code_block, p, render_email
+
+        html = render_email(
+            title="Your password reset code",
+            kicker="Account security",
+            hero="night",
+            greeting=f"Hi {name},",
+            preheader=f"Use code {code} within {RESET_CODE_TTL_MIN} minutes to reset your AMASS password.",
+            body_html=p(f"Use this code to reset your AMASS password. It expires in {RESET_CODE_TTL_MIN} minutes.")
+            + code_block(code, f"Valid for {RESET_CODE_TTL_MIN} minutes · single use")
+            + p("If you did not request this, you can safely ignore this email — your password will not change."),
+            note="For your security, AMASS will never ask you to share this code by reply.",
         )
         try:
             await send_email(to=email, subject=subject, html=html)
