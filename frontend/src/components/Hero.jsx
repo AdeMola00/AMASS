@@ -155,6 +155,19 @@ export default function Hero() {
             );
           })}
         </motion.div>
+
+        {/* Inline app download reminder */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5, duration: 0.9 }}
+          className="mt-5 flex items-center gap-3 text-xs font-medium text-white/80"
+          data-testid="hero-app-downloads"
+        >
+          <span className="hidden sm:inline">Download the app:</span>
+          <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1">App Store</span>
+          <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1">Google Play</span>
+        </motion.div>
       </div>
     </section>
   );

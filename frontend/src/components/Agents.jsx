@@ -24,14 +24,26 @@ export default function Agents() {
               List once, reach millions. Manage every property, lead and transaction from a
               dashboard designed to close deals.
             </p>
-            <button
-              onClick={() => openForm("become_agent")}
-              data-testid="agents-cta"
-              className="group mt-9 flex items-center gap-2 rounded-full bg-brand-emerald px-8 py-4 text-sm font-semibold text-white shadow-glow transition-transform hover:scale-[1.03]"
-            >
-              Become an AMASS Agent
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </button>
+            <div className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+              <button
+                onClick={() => openForm("become_agent")}
+                data-testid="agents-cta"
+                className="group flex items-center justify-center gap-2 rounded-full bg-brand-emerald px-8 py-4 text-sm font-semibold text-white shadow-glow transition-transform hover:scale-[1.03]"
+              >
+                Apply as an AMASS Agent
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </button>
+              <button
+                onClick={() => openForm("fixa_provider")}
+                data-testid="agents-fixa-cta"
+                className="rounded-full border border-white/30 bg-white/5 px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white hover:text-black"
+              >
+                Apply as a FIXA Pro
+              </button>
+            </div>
+            <p className="mt-3 text-xs text-white/60">
+              All applications are reviewed. Approval is required before onboarding.
+            </p>
           </Reveal>
 
           <Stagger className="grid gap-4 sm:grid-cols-2">

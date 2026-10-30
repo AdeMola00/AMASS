@@ -42,7 +42,7 @@ export default function Navbar() {
         }`}
       >
         <button onClick={() => go("#top")} className="flex items-center" data-testid="logo">
-          <Logo height={26} chip={!scrolled || theme === "dark"} />
+          <Logo height={38} chip={!scrolled || theme === "dark"} />
         </button>
 
         <div className="hidden items-center gap-1 lg:flex">

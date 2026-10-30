@@ -52,7 +52,7 @@ async def require_admin(
 # ---------------------------------------------------------------------------
 VALID_FORMS = {
     "become_agent", "list_property", "contact", "book_demo",
-    "partner", "waiting_list", "newsletter",
+    "partner", "waiting_list", "newsletter", "fixa_provider",
 }
 LEAD_STATUSES = {"new", "contacted", "closed"}
 

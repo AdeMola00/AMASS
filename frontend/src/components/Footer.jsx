@@ -6,13 +6,26 @@ import { subscribeNewsletter } from "@/lib/api";
 import { useLeadForm } from "@/context/LeadFormProvider";
 import { scrollToSection } from "@/context/SmoothScroll";
 import Logo from "@/components/Logo";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const SOCIAL = [Twitter, Instagram, Linkedin, Facebook];
+
+const LEGAL = {
+  Privacy: {
+    title: "Privacy Policy",
+    body: "AMASS collects only the information you provide (name, email, phone, applications and messages) to introduce the AMASS app, respond to enquiries and review agent / FIXA Pro applications. We never sell your data. For data access, correction or deletion requests, email privacy@amass.app.",
+  },
+  Terms: {
+    title: "Terms of Use",
+    body: "By using this site and submitting forms you confirm the information is accurate and agree that applications are reviewed and approval is required before onboarding. Content on this landing page is for information only; the AMASS app governs transactions. For details, email legal@amass.app.",
+  },
+};
 
 export default function Footer() {
   const { openForm } = useLeadForm();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [legalKey, setLegalKey] = useState(null);
 
   const subscribe = async (e) => {
     e.preventDefault();
@@ -29,6 +42,11 @@ export default function Footer() {
     }
   };
 
+  const handleLink = (label) => {
+    if (LEGAL[label]) setLegalKey(label);
+    else openForm("contact");
+  };
+
   return (
     <footer className="relative bg-brand-charcoal pt-20 text-white" data-testid="footer">
       <div className="absolute inset-x-0 top-0 flex h-1.5">
@@ -40,7 +58,7 @@ export default function Footer() {
         <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr]">
           <div>
             <button onClick={() => scrollToSection("#top")} className="flex items-center">
-              <Logo height={30} chip />
+              <Logo height={46} chip />
             </button>
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/60">
               Africa's intelligent property discovery, real estate, construction and home
@@ -80,7 +98,7 @@ export default function Footer() {
                   {links.map((l) => (
                     <li key={l}>
                       <button
-                        onClick={() => openForm("contact")}
+                        onClick={() => handleLink(l)}
                         className="text-sm text-white/70 transition-colors hover:text-brand-gold"
                         data-testid={`footer-link-${l.toLowerCase().replace(/\s/g, "-")}`}
                       >
@@ -112,6 +130,17 @@ export default function Footer() {
           </div>
         </div>
       </div>
+
+      <Dialog open={!!legalKey} onOpenChange={(o) => !o && setLegalKey(null)}>
+        <DialogContent className="max-w-lg rounded-3xl bg-background p-8" data-testid="legal-dialog">
+          <DialogTitle className="font-display text-2xl font-bold text-ink">
+            {legalKey ? LEGAL[legalKey].title : ""}
+          </DialogTitle>
+          <DialogDescription className="mt-3 text-sm leading-relaxed text-subtle">
+            {legalKey ? LEGAL[legalKey].body : ""}
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
     </footer>
   );
 }

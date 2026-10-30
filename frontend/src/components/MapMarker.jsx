@@ -11,6 +11,14 @@ const COLOR = {
   sold: "var(--m-sold)",
 };
 
+const STATUS_LABEL = {
+  available: "For Sale",
+  coming_soon: "Short-let",
+  verified: "Hotel",
+  premium: "For Lease",
+  sold: "For Rent",
+};
+
 // Glossy teardrop pin (matches the AMASS brand mark), tinted per status.
 function StatusPin({ color }) {
   const gid = React.useId();
@@ -93,7 +101,7 @@ export default function MapMarker({ marker }) {
             className="absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
             style={{ backgroundColor: color }}
           >
-            {marker.status.replace("_", " ")}
+            {STATUS_LABEL[marker.status] || marker.status.replace("_", " ")}
           </span>
         </div>
         <div className="p-4 text-left">

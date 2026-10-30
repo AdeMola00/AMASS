@@ -49,11 +49,11 @@ export const MARKERS = [
 ];
 
 export const MARKER_LEGEND = [
-  { status: "available", label: "Available", color: "var(--m-available)" },
-  { status: "coming_soon", label: "Coming Soon", color: "var(--m-coming)" },
-  { status: "verified", label: "Verified", color: "var(--m-verified)" },
-  { status: "premium", label: "Premium", color: "var(--m-premium)" },
-  { status: "sold", label: "Sold", color: "var(--m-sold)" },
+  { status: "available", label: "For Sale", color: "var(--m-available)" },
+  { status: "sold", label: "For Rent", color: "var(--m-sold)" },
+  { status: "premium", label: "For Lease", color: "var(--m-premium)" },
+  { status: "coming_soon", label: "Short-let", color: "var(--m-coming)" },
+  { status: "verified", label: "Hotel", color: "var(--m-verified)" },
 ];
 
 export const TRUST = [
@@ -76,39 +76,39 @@ export const CATEGORIES = [
 export const PILLARS = [
   {
     id: "marketplace", index: "01", title: "Property Marketplace",
-    desc: "Buy, sell, rent, lease — from luxury homes and commercial to land and short lets.",
-    items: ["Buy", "Sell", "Rent", "Lease", "Commercial", "Land", "Short Let", "Luxury Homes"],
-    icon: "Building2",
+    desc: "Sales, rentals, leases, short-lets and hotels on one intelligent map.",
+    items: ["For Sale (Green)", "For Rent (Red)", "For Lease (Purple)", "Short-lets", "Hotels", "Commercial", "Land"],
+    icon: "MapPin",
   },
   {
-    id: "intelligence", index: "02", title: "Property Intelligence",
-    desc: "Satellite discovery, verification and analytics that turn guesswork into certainty.",
-    items: ["Satellite Discovery", "Verification", "Market Analytics", "Valuation", "Ownership Insights", "Neighbourhood Intel", "Investment Analysis"],
-    icon: "Satellite",
+    id: "passport", index: "02", title: "Property Passport",
+    desc: "A verified identity for every property — documents, ownership and inspection history, portable across transactions.",
+    items: ["Verified Ownership", "Documents", "Inspection Trail", "Transferable", "Tamper-proof"],
+    icon: "ShieldCheck",
   },
   {
-    id: "construction", index: "03", title: "Construction Marketplace",
-    desc: "Everything to build — materials, equipment and vetted professionals in one place.",
-    items: ["Building Materials", "Equipment Rental", "Professionals", "Architects", "Engineers", "Surveyors", "Interior Designers", "Project Mgmt"],
-    icon: "HardHat",
+    id: "fixa", index: "03", title: "FIXA Home Services",
+    desc: "Trusted pros for repairs, plumbing, electrical and maintenance — booked from inside the app.",
+    items: ["Plumbing", "Electrical", "Painting", "Cleaning", "Carpentry", "HVAC", "Appliance Repair"],
+    icon: "Wrench",
   },
   {
-    id: "home", index: "04", title: "Home Marketplace",
-    desc: "Furnish and finish your space with curated furniture, appliances and decor.",
-    items: ["Furniture", "Appliances", "Electronics", "Kitchen", "Garden", "Decoration", "Office", "Lifestyle"],
-    icon: "Sofa",
+    id: "declutter", index: "04", title: "Declutter",
+    desc: "Sell what you no longer need via listings and share-ready social posts.",
+    items: ["Marketplace Listings", "Social Posts", "In-app Chat", "Secure Payouts"],
+    icon: "Boxes",
   },
   {
-    id: "ai", index: "05", title: "AI Services",
-    desc: "An intelligent copilot for search, valuation, risk and market predictions.",
-    items: ["AI Search", "Investment Assistant", "AI Valuation", "Recommendations", "Risk Analysis", "Neighbourhood Score", "Predictions"],
-    icon: "Sparkles",
+    id: "brands", index: "05", title: "Brand Products & Offers",
+    desc: "Curated deals from trusted home, lifestyle and construction brands.",
+    items: ["Furniture", "Appliances", "Finishes", "Electronics", "Decor"],
+    icon: "Tag",
   },
   {
-    id: "finance", index: "06", title: "Financial Services",
-    desc: "Mortgages, BNPL, financing and escrow — secure money movement, end to end.",
-    items: ["Mortgage", "BNPL", "Financing", "Loans", "Insurance", "Escrow", "Secure Payments"],
-    icon: "Landmark",
+    id: "myhome", index: "06", title: "My Home",
+    desc: "Keep records, track repairs, store warranties and never miss a payment or renewal.",
+    items: ["Records", "Repairs", "Warranties", "Payment Reminders", "Documents"],
+    icon: "Home",
   },
 ];
 

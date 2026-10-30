@@ -17,7 +17,8 @@ const FORM_CONFIG = {
     subtitle: "Join thousands of verified agents growing with AMASS.",
     fields: ["name", "email", "phone", "company", "message"],
     selects: [{ key: "experience", label: "Experience", options: ["0-1 years", "2-4 years", "5-9 years", "10+ years"] }],
-    cta: "Apply to Join",
+    cta: "Submit Application",
+    isApplication: true,
   },
   list_property: {
     title: "List Your Property",
@@ -53,6 +54,17 @@ const FORM_CONFIG = {
     fields: ["name", "email"],
     selects: [{ key: "city", label: "City of Interest", options: ["Lagos", "Abuja", "Port Harcourt", "Ibadan", "Accra", "Nairobi", "Other"] }],
     cta: "Reserve My Spot",
+  },
+  fixa_provider: {
+    title: "Apply as a FIXA Pro",
+    subtitle: "Join FIXA — the AMASS home-services network for repairs, plumbing, electrical, cleaning and more.",
+    fields: ["name", "email", "phone", "location", "message"],
+    selects: [
+      { key: "service", label: "Primary Service", options: ["Plumbing", "Electrical", "Carpentry", "Painting", "Cleaning", "HVAC", "Masonry", "Appliance Repair", "Other"] },
+      { key: "experience", label: "Experience", options: ["0-1 years", "2-4 years", "5-9 years", "10+ years"] },
+    ],
+    cta: "Submit Application",
+    isApplication: true,
   },
 };
 
@@ -154,7 +166,9 @@ export function LeadFormProvider({ children }) {
                     </div>
                     <h3 className="font-display text-2xl font-bold text-ink">You're all set</h3>
                     <p className="mt-3 max-w-xs text-sm text-subtle">
-                      Thank you — the AMASS team has received your details and will reach out soon.
+                      {config.isApplication
+                        ? "Thank you — your application has been received. Our team reviews each application and will contact you once you are approved to onboard."
+                        : "Thank you — the AMASS team has received your details and will reach out soon."}
                     </p>
                     <button
                       onClick={close}
@@ -174,6 +188,11 @@ export function LeadFormProvider({ children }) {
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-emerald">AMASS</p>
                     <h3 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink">{config.title}</h3>
                     <p className="mt-2 text-sm text-subtle">{config.subtitle}</p>
+                    {config.isApplication && (
+                      <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-brand-emerald/10 px-3 py-1 text-[11px] font-semibold text-brand-emerald">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Applications are reviewed. Approval is required to onboard.
+                      </p>
+                    )}
 
                     <div className="mt-7 space-y-4">
                       {config.fields.map((f) => {
