@@ -1,11 +1,12 @@
 import React from "react";
-import { FAQS } from "@/data/content";
+import { useContent } from "@/context/ContentProvider";
 import { Reveal } from "@/components/anim/Reveal";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 
 export default function FAQSection() {
+  const { faqs } = useContent();
   return (
     <section id="faq" className="bg-background py-24 md:py-32">
       <div className="mx-auto grid max-w-[1400px] gap-12 px-6 md:px-12 lg:grid-cols-[0.8fr_1.2fr]">
@@ -21,7 +22,7 @@ export default function FAQSection() {
 
         <Reveal delay={0.1}>
           <Accordion type="single" collapsible className="w-full" data-testid="faq-accordion">
-            {FAQS.map((f, i) => (
+            {faqs.map((f, i) => (
               <AccordionItem key={i} value={`item-${i}`} className="border-b border-hairline">
                 <AccordionTrigger
                   data-testid={`faq-trigger-${i}`}

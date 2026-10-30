@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
-import { STATS, AFRICAN_CITIES } from "@/data/content";
+import { useContent } from "@/context/ContentProvider";
 import { Reveal } from "@/components/anim/Reveal";
 
 const FEATURES = [
@@ -42,6 +42,7 @@ function CountUp({ value }) {
 }
 
 export default function Stats() {
+  const { stats, africanCities } = useContent();
   return (
     <section className="relative overflow-hidden bg-brand-emerald py-16 sm:py-24 md:py-32" data-testid="stats">
       <div className="absolute inset-0 grain opacity-[0.15]" />
@@ -56,7 +57,7 @@ export default function Stats() {
         </Reveal>
 
         <div className="mt-16 grid grid-cols-2 gap-x-6 gap-y-12 md:grid-cols-3 lg:grid-cols-6">
-          {STATS.map((s, i) => (
+          {stats.map((s, i) => (
             <motion.div
               key={s.label}
               initial={{ opacity: 0, y: 24 }}
@@ -88,7 +89,7 @@ export default function Stats() {
             Live in 20+ cities across Africa
           </p>
           <div className="mt-5 flex flex-wrap gap-x-6 gap-y-3">
-            {AFRICAN_CITIES.map((c) => (
+            {africanCities.map((c) => (
               <span key={c} className="font-display text-lg font-bold text-white/85 sm:text-2xl">
                 {c}
                 <span className="ml-6 text-brand-gold/70">·</span>

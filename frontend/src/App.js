@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/context/ThemeProvider";
 import SmoothScroll from "@/context/SmoothScroll";
 import { LeadFormProvider } from "@/context/LeadFormProvider";
+import { ContentProvider, useContent } from "@/context/ContentProvider";
 
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
@@ -24,25 +25,27 @@ import FinalCTA from "@/components/FinalCTA";
 import Footer from "@/components/Footer";
 
 function Landing() {
+  const { sections } = useContent();
+  const on = (key) => sections?.[key] !== false;
   return (
     <>
       <Navbar />
       <main>
         <Hero />
-        <SearchBar />
-        <Marquee />
-        <CategorySection />
-        <Pillars />
-        <PropertyShowcase />
-        <Stats />
-        <HowItWorks />
-        <Agents />
-        <ConstructionPros />
-        <HomeMarketplace />
-        <MobileApp />
-        <Testimonials />
-        <FAQSection />
-        <FinalCTA />
+        {on("search") && <SearchBar />}
+        {on("marquee") && <Marquee />}
+        {on("categories") && <CategorySection />}
+        {on("pillars") && <Pillars />}
+        {on("showcase") && <PropertyShowcase />}
+        {on("stats") && <Stats />}
+        {on("howItWorks") && <HowItWorks />}
+        {on("agents") && <Agents />}
+        {on("constructionPros") && <ConstructionPros />}
+        {on("homeMarketplace") && <HomeMarketplace />}
+        {on("mobileApp") && <MobileApp />}
+        {on("testimonials") && <Testimonials />}
+        {on("faq") && <FAQSection />}
+        {on("finalCta") && <FinalCTA />}
       </main>
       <Footer />
     </>
@@ -52,18 +55,20 @@ function Landing() {
 function App() {
   return (
     <ThemeProvider>
-      <LeadFormProvider>
-        <SmoothScroll>
-          <div className="App bg-background">
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Landing />} />
-              </Routes>
-            </BrowserRouter>
-            <Toaster position="top-center" richColors />
-          </div>
-        </SmoothScroll>
-      </LeadFormProvider>
+      <ContentProvider>
+        <LeadFormProvider>
+          <SmoothScroll>
+            <div className="App bg-background">
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Landing />} />
+                </Routes>
+              </BrowserRouter>
+              <Toaster position="top-center" richColors />
+            </div>
+          </SmoothScroll>
+        </LeadFormProvider>
+      </ContentProvider>
     </ThemeProvider>
   );
 }

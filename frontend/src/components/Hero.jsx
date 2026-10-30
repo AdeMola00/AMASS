@@ -1,20 +1,19 @@
 import React, { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, ShieldCheck, Sparkles, Lock, MapPinned } from "lucide-react";
-import { IMAGES, TRUST, MARKER_LEGEND } from "@/data/content";
+import { IMAGES, MARKER_LEGEND } from "@/data/content";
 import { MarkerField } from "@/components/MapMarker";
 import { useLeadForm } from "@/context/LeadFormProvider";
+import { useContent } from "@/context/ContentProvider";
 import Magnetic from "@/components/anim/Magnetic";
 
 const EASE = [0.16, 1, 0.3, 1];
 const TRUST_ICONS = [ShieldCheck, Sparkles, Lock, MapPinned];
 
-const LINES = ["Discover Africa's", "Properties Like", "Never Before"];
-
-function MaskedHeading() {
+function MaskedHeading({ lines }) {
   return (
     <h1 className="font-display text-[2.6rem] font-extrabold leading-[0.98] tracking-tight text-white sm:text-6xl lg:text-[5.5rem]">
-      {LINES.map((line, i) => (
+      {lines.map((line, i) => (
         <span key={i} className="block overflow-hidden py-[0.05em]">
           <motion.span
             className="block"
@@ -36,6 +35,8 @@ function MaskedHeading() {
 
 export default function Hero() {
   const { openForm } = useLeadForm();
+  const { hero, trust } = useContent();
+  const headingLines = [hero.line1, hero.line2, hero.line3];
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "18%"]);
@@ -98,10 +99,10 @@ export default function Hero() {
           transition={{ delay: 0.2, duration: 0.7 }}
           className="mb-5 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.25em] text-white/80"
         >
-          <span className="h-px w-8 bg-brand-gold" /> The Google Maps of African Real Estate
+          <span className="h-px w-8 bg-brand-gold" /> {hero.overline}
         </motion.p>
 
-        <MaskedHeading />
+        <MaskedHeading lines={headingLines} />
 
         <motion.p
           initial={{ opacity: 0, y: 16 }}
@@ -109,8 +110,7 @@ export default function Hero() {
           transition={{ delay: 0.9, duration: 0.8 }}
           className="mt-6 max-w-xl text-base text-white/85 md:text-lg"
         >
-          The AMASS app lets you search, verify, buy, rent, finance and explore properties with
-          intelligent maps, verified listings and AI-powered property intelligence.
+          {hero.subheading}
         </motion.p>
 
         <motion.div
@@ -125,7 +125,7 @@ export default function Hero() {
               data-testid="hero-getapp-btn"
               className="group flex w-full items-center justify-center gap-2 rounded-full bg-brand-emerald px-8 py-4 text-sm font-semibold text-white shadow-glow transition-transform hover:scale-[1.03] sm:w-auto"
             >
-              Get Early Access
+              {hero.ctaPrimary}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </button>
           </Magnetic>
@@ -135,7 +135,7 @@ export default function Hero() {
               data-testid="hero-agent-btn"
               className="w-full rounded-full border border-white/30 glass-dark px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white hover:text-black sm:w-auto"
             >
-              Become an Agent
+              {hero.ctaSecondary}
             </button>
           </Magnetic>
         </motion.div>
@@ -146,8 +146,8 @@ export default function Hero() {
           transition={{ delay: 1.3, duration: 0.9 }}
           className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3"
         >
-          {TRUST.map((t, i) => {
-            const Icon = TRUST_ICONS[i];
+          {trust.map((t, i) => {
+            const Icon = TRUST_ICONS[i % TRUST_ICONS.length];
             return (
               <div key={t} className="flex items-center gap-2 text-sm font-medium text-white/85">
                 <Icon className="h-4 w-4 text-brand-gold" /> {t}

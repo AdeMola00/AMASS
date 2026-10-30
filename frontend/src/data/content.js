@@ -197,3 +197,32 @@ export const FOOTER_LINKS = {
   Developers: ["API", "Documentation", "Status", "Integrations"],
   Support: ["Help Center", "Privacy", "Terms", "Contact"],
 };
+
+// Editable CMS defaults (fallback when the backend content is unavailable).
+export const HERO_DEFAULT = {
+  overline: "The Google Maps of African Real Estate",
+  line1: "Discover Africa's",
+  line2: "Properties Like",
+  line3: "Never Before",
+  subheading:
+    "The AMASS app lets you search, verify, buy, rent, finance and explore properties with intelligent maps, verified listings and AI-powered property intelligence.",
+  ctaPrimary: "Get Early Access",
+  ctaSecondary: "Become an Agent",
+};
+
+export const SECTIONS_DEFAULT = {
+  search: true, marquee: true, categories: true, pillars: true,
+  showcase: true, stats: true, howItWorks: true, agents: true,
+  constructionPros: true, homeMarketplace: true, mobileApp: true,
+  testimonials: true, faq: true, finalCta: true,
+};
+
+export const DEFAULT_CONTENT = {
+  hero: HERO_DEFAULT,
+  trust: TRUST,
+  stats: STATS,
+  africanCities: AFRICAN_CITIES,
+  testimonials: TESTIMONIALS,
+  faqs: FAQS,
+  sections: SECTIONS_DEFAULT,
+};

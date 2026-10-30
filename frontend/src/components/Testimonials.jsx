@@ -1,10 +1,11 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Quote } from "lucide-react";
-import { TESTIMONIALS } from "@/data/content";
+import { useContent } from "@/context/ContentProvider";
 import { Reveal } from "@/components/anim/Reveal";
 
 export default function Testimonials() {
+  const { testimonials } = useContent();
   return (
     <section className="bg-surface py-24 md:py-32">
       <div className="mx-auto max-w-[1400px] px-6 md:px-12">
@@ -16,7 +17,7 @@ export default function Testimonials() {
         </Reveal>
 
         <div className="mt-14 columns-1 gap-6 md:columns-2 lg:columns-3 [&>*]:mb-6">
-          {TESTIMONIALS.map((t, i) => (
+          {testimonials.map((t, i) => (
             <motion.figure
               key={t.name}
               initial={{ opacity: 0, y: 30 }}
