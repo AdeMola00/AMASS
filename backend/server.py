@@ -67,16 +67,18 @@ bearer = HTTPBearer(auto_error=False)
 
 
 # ─── Health Check Endpoints (Kubernetes Ingress) ──────────
+# Must stay trivial (no DB) — the pod is probed on /health from the moment the port is bound.
+# `startup` reports the background bootstrap (indexes + seeds) so deploy logs can tell the two apart.
 @app.get("/health")
 def health_check():
     """Health check endpoint for Kubernetes liveness/readiness probes."""
-    return {"status": "ok"}
+    return {"status": "ok", "startup": getattr(app.state, "startup", "pending")}
 
 
 @app.get("/api/health")
 def api_health_check():
     """Health check endpoint accessible via /api ingress path."""
-    return {"status": "ok"}
+    return {"status": "ok", "startup": getattr(app.state, "startup", "pending")}
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("amass")
@@ -2357,6 +2359,30 @@ async def _monetization_startup():
 
 @app.on_event("startup")
 async def on_startup():
+    """Bind the port first, bootstrap second.
+
+    The bootstrap below (≈500 sequential Mongo round-trips: index creation, idempotent seeds,
+    reconciliation) used to run *before* uvicorn started listening. Against a remote Atlas cluster
+    that is 30-60 s during which nginx gets "connection refused" on /health and Kubernetes fails the
+    deploy. It now runs as a background task; requests are served meanwhile (indexes only make them
+    faster, every seed is idempotent) and /health reports `startup: running|ready|failed`.
+    """
+    app.state.startup = "running"
+
+    async def _run():
+        t0 = asyncio.get_event_loop().time()
+        try:
+            await _startup_work()
+            app.state.startup = "ready"
+            logger.info("startup bootstrap finished in %.1fs", asyncio.get_event_loop().time() - t0)
+        except Exception:
+            app.state.startup = "failed"
+            logger.exception("startup bootstrap failed (API keeps serving)")
+
+    app.state.startup_task = asyncio.create_task(_run())
+
+
+async def _startup_work():
     await _load_public_base(db)  # origin for logos/links in emails sent from background tasks
     await _monetization_startup()
     await start_notification_center(db)  # indexes + hourly matcher/digest sweep
@@ -2655,4 +2681,7 @@ async def on_startup():
 
 @app.on_event("shutdown")
 async def on_shutdown():
+    task = getattr(app.state, "startup_task", None)
+    if task and not task.done():
+        task.cancel()
     client.close()
