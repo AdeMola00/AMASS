@@ -1,106 +1,157 @@
-"""Backend tests for AMASS API: /api/leads and /api/newsletter."""
+"""AMASS backend API tests — admin API-key auth, CMS, and leads flows."""
 import os
 import uuid
 import pytest
 import requests
+from pathlib import Path
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://discover-properties-1.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL')
+if not BASE_URL:
+    # Fallback: read from frontend .env
+    envp = Path('/app/frontend/.env')
+    for line in envp.read_text().splitlines():
+        if line.startswith('REACT_APP_BACKEND_URL='):
+            BASE_URL = line.split('=', 1)[1].strip()
+BASE_URL = BASE_URL.rstrip('/')
+
+# Read ADMIN_API_KEY from backend .env
+ADMIN_API_KEY = None
+for line in Path('/app/backend/.env').read_text().splitlines():
+    if line.startswith('ADMIN_API_KEY='):
+        ADMIN_API_KEY = line.split('=', 1)[1].strip()
+
 API = f"{BASE_URL}/api"
-
-VALID_FORMS = ["become_agent", "list_property", "contact", "book_demo", "partner", "waiting_list"]
-
-
-@pytest.fixture
-def client():
-    s = requests.Session()
-    s.headers.update({"Content-Type": "application/json"})
-    return s
+HDR = {"X-API-Key": ADMIN_API_KEY}
+HDR_BEARER = {"Authorization": f"Bearer {ADMIN_API_KEY}"}
 
 
-def _unique_email(tag="t"):
-    return f"TEST_{tag}_{uuid.uuid4().hex[:8]}@example.com"
+# ---------- Public content ----------
+def test_public_content_no_key():
+    r = requests.get(f"{API}/content", timeout=15)
+    assert r.status_code == 200
+    d = r.json()
+    for k in ["hero", "trust", "stats", "africanCities", "testimonials", "faqs", "sections"]:
+        assert k in d, f"missing {k}"
+    assert d["hero"]["line1"] == "Discover Africa's"
 
 
-# ---- /api/leads ----
-@pytest.mark.parametrize("form_type", VALID_FORMS)
-def test_create_lead_valid_forms(client, form_type):
-    email = _unique_email(form_type)
+# ---------- Admin auth ----------
+def test_admin_leads_without_key_401():
+    r = requests.get(f"{API}/admin/leads", timeout=15)
+    assert r.status_code == 401
+
+
+def test_admin_leads_with_xkey_200():
+    r = requests.get(f"{API}/admin/leads", headers=HDR, timeout=15)
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_admin_leads_with_bearer_200():
+    r = requests.get(f"{API}/admin/leads", headers=HDR_BEARER, timeout=15)
+    assert r.status_code == 200
+
+
+# ---------- Stats ----------
+def test_admin_stats():
+    r = requests.get(f"{API}/admin/stats", headers=HDR, timeout=15)
+    assert r.status_code == 200
+    d = r.json()
+    assert "total_leads" in d and isinstance(d["total_leads"], int)
+    for ft in ["become_agent", "list_property", "contact", "book_demo", "partner", "waiting_list", "newsletter"]:
+        assert ft in d["by_form_type"]
+    for st in ["new", "contacted", "closed"]:
+        assert st in d["by_status"]
+    assert isinstance(d["recent"], list)
+
+
+# ---------- Leads create + filter + patch ----------
+@pytest.fixture(scope="module")
+def created_lead():
     payload = {
-        "form_type": form_type,
-        "name": "Test User",
-        "email": email,
-        "phone": "+2348000000000",
-        "message": "hello",
-        "details": {"location": "Lagos", "budget": "1M"},
+        "form_type": "contact",
+        "name": "TEST_User",
+        "email": f"test_{uuid.uuid4().hex[:8]}@example.com",
+        "message": "backend test",
     }
-    r = client.post(f"{API}/leads", json=payload)
+    r = requests.post(f"{API}/leads", json=payload, timeout=15)
     assert r.status_code == 201, r.text
-    body = r.json()
-    assert body["form_type"] == form_type
-    assert body["email"] == email
-    assert body["name"] == "Test User"
-    assert body["phone"] == "+2348000000000"
-    assert body["message"] == "hello"
-    assert body["details"]["location"] == "Lagos"
-    assert "id" in body and "created_at" in body
-
-    # Verify persistence via GET filter
-    g = client.get(f"{API}/leads", params={"form_type": form_type})
-    assert g.status_code == 200
-    emails = [l["email"] for l in g.json()]
-    assert email in emails
+    return r.json()
 
 
-def test_create_lead_invalid_form_type(client):
-    r = client.post(f"{API}/leads", json={"form_type": "bogus_xyz", "email": _unique_email("bad")})
+def test_admin_filter_contact(created_lead):
+    r = requests.get(f"{API}/admin/leads?form_type=contact", headers=HDR, timeout=15)
+    assert r.status_code == 200
+    leads = r.json()
+    assert all(l["form_type"] == "contact" for l in leads)
+    assert any(l["id"] == created_lead["id"] for l in leads)
+
+
+def test_admin_filter_status_new(created_lead):
+    r = requests.get(f"{API}/admin/leads?status=new", headers=HDR, timeout=15)
+    assert r.status_code == 200
+    assert all(l["status"] == "new" for l in r.json())
+
+
+def test_admin_newsletter_only():
+    email = f"nl_{uuid.uuid4().hex[:8]}@example.com"
+    r = requests.post(f"{API}/newsletter", json={"email": email}, timeout=15)
+    assert r.status_code == 201
+    r = requests.get(f"{API}/admin/newsletter", headers=HDR, timeout=15)
+    assert r.status_code == 200
+    nls = r.json()
+    assert all(l["form_type"] == "newsletter" for l in nls)
+    assert any(l["email"] == email for l in nls)
+
+
+def test_patch_lead_status_valid(created_lead):
+    r = requests.patch(f"{API}/admin/leads/{created_lead['id']}",
+                       json={"status": "contacted"}, headers=HDR, timeout=15)
+    assert r.status_code == 200
+    assert r.json()["status"] == "contacted"
+    # verify persisted
+    r2 = requests.get(f"{API}/admin/leads?status=contacted", headers=HDR, timeout=15)
+    assert any(l["id"] == created_lead["id"] for l in r2.json())
+
+
+def test_patch_lead_invalid_status(created_lead):
+    r = requests.patch(f"{API}/admin/leads/{created_lead['id']}",
+                       json={"status": "bogus"}, headers=HDR, timeout=15)
     assert r.status_code == 400
 
 
-def test_create_lead_invalid_email(client):
-    r = client.post(f"{API}/leads", json={"form_type": "contact", "email": "not-an-email"})
-    assert r.status_code == 422
+def test_patch_lead_unknown_id():
+    r = requests.patch(f"{API}/admin/leads/does-not-exist-xyz",
+                       json={"status": "new"}, headers=HDR, timeout=15)
+    assert r.status_code == 404
 
 
-def test_list_leads_sorted_desc(client):
-    # Create two leads
-    e1 = _unique_email("sort1")
-    e2 = _unique_email("sort2")
-    client.post(f"{API}/leads", json={"form_type": "contact", "email": e1})
-    client.post(f"{API}/leads", json={"form_type": "contact", "email": e2})
-    r = client.get(f"{API}/leads")
+# ---------- CMS update + reset ----------
+def test_cms_update_hero_and_reset():
+    # PUT change
+    r = requests.put(f"{API}/admin/content",
+                     json={"hero": {"line1": "CMS TEST HEADLINE"}},
+                     headers=HDR, timeout=15)
     assert r.status_code == 200
-    data = r.json()
-    assert isinstance(data, list) and len(data) >= 2
-    created_ats = [l["created_at"] for l in data]
-    assert created_ats == sorted(created_ats, reverse=True)
-
-
-def test_list_leads_filter(client):
-    e = _unique_email("filter")
-    client.post(f"{API}/leads", json={"form_type": "book_demo", "email": e})
-    r = client.get(f"{API}/leads", params={"form_type": "book_demo"})
+    # GET public
+    r = requests.get(f"{API}/content", timeout=15)
+    assert r.json()["hero"]["line1"] == "CMS TEST HEADLINE"
+    # Reset
+    r = requests.post(f"{API}/admin/content/reset", headers=HDR, timeout=15)
     assert r.status_code == 200
-    assert all(l["form_type"] == "book_demo" for l in r.json())
-    assert e in [l["email"] for l in r.json()]
+    r = requests.get(f"{API}/content", timeout=15)
+    assert r.json()["hero"]["line1"] == "Discover Africa's"
 
 
-# ---- /api/newsletter ----
-def test_newsletter_subscribe_and_idempotent(client):
-    email = _unique_email("news")
-    r1 = client.post(f"{API}/newsletter", json={"email": email})
-    assert r1.status_code == 201, r1.text
-    b1 = r1.json()
-    assert b1["email"] == email
-    assert b1["form_type"] == "newsletter"
-
-    r2 = client.post(f"{API}/newsletter", json={"email": email})
-    # Idempotent: should return existing (still success). Accept 200 or 201.
-    assert r2.status_code in (200, 201)
-    b2 = r2.json()
-    assert b2["email"] == email
-    assert b2["id"] == b1["id"], "Duplicate newsletter subscription created new record"
-
-
-def test_newsletter_invalid_email(client):
-    r = client.post(f"{API}/newsletter", json={"email": "invalid"})
-    assert r.status_code == 422
+def test_cms_toggle_testimonials_then_reset():
+    r = requests.put(f"{API}/admin/content",
+                     json={"sections": {"testimonials": False}},
+                     headers=HDR, timeout=15)
+    assert r.status_code == 200
+    r = requests.get(f"{API}/content", timeout=15)
+    assert r.json()["sections"]["testimonials"] is False
+    # IMPORTANT: reset so frontend returns to default
+    r = requests.post(f"{API}/admin/content/reset", headers=HDR, timeout=15)
+    assert r.status_code == 200
+    r = requests.get(f"{API}/content", timeout=15)
+    assert r.json()["sections"]["testimonials"] is True

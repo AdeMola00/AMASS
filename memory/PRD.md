@@ -37,3 +37,10 @@ final CTA, footer w/ newsletter, lead-capture forms, dark mode.
 - P1: Admin/CRM view of captured leads; email notifications (Resend/SendGrid).
 - P2: i18n, blog/careers pages, App Store/Play deep links, real property API.
 - P2: Payments/escrow, mortgage/BNPL flows, agent dashboard, AI valuation.
+
+## Update — Admin API + Content-Driven CMS (2025-12)
+- Decision: NO standalone admin UI. Landing page is content-driven; an external "AMASS ADMIN" controls it via an API-key-protected REST API.
+- Backend: `ADMIN_API_KEY` (X-API-Key or Bearer). New endpoints: public GET /api/content; admin GET/PUT /api/admin/content (partial deep-merge), POST /api/admin/content/reset, GET /api/admin/leads, PATCH /api/admin/leads/{id}, GET /api/admin/newsletter, GET /api/admin/stats. Leads now have status (new/contacted/closed). site_content collection seeded from DEFAULT_CONTENT.
+- Frontend: ContentProvider fetches /api/content (fallback to static defaults); Hero/Stats/Testimonials/FAQ read from content; App.js honors sections visibility toggles.
+- Verified: testing_agent iteration_3 — backend 13/13, frontend 100%. Deep-merge partial updates curl-verified.
+- Note: production must be REDEPLOYED to expose the new API + content-driven build.

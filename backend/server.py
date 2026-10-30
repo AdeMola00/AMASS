@@ -250,12 +250,26 @@ async def admin_get_content(_: bool = Depends(require_admin)):
     return doc
 
 
+def deep_merge(base: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merge patch into base. Dicts merge; lists/scalars replace."""
+    for k, v in patch.items():
+        if isinstance(v, dict) and isinstance(base.get(k), dict):
+            base[k] = deep_merge(base[k], v)
+        else:
+            base[k] = v
+    return base
+
+
 @api_router.put("/admin/content")
 async def admin_update_content(payload: Dict[str, Any], _: bool = Depends(require_admin)):
     payload.pop("key", None)
     payload.pop("_id", None)
-    payload["updated_at"] = now_iso()
-    await db.site_content.update_one({"key": "default"}, {"$set": payload}, upsert=True)
+    current = await db.site_content.find_one({"key": "default"}, {"_id": 0})
+    if not current:
+        current = {"key": "default", **DEFAULT_CONTENT}
+    merged = deep_merge(current, payload)
+    merged["updated_at"] = now_iso()
+    await db.site_content.update_one({"key": "default"}, {"$set": merged}, upsert=True)
     doc = await db.site_content.find_one({"key": "default"}, {"_id": 0})
     return doc
 
