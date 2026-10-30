@@ -1105,6 +1105,9 @@ import modules_ext  # noqa: E402  (registers extension routes on `api`)
 
 app.include_router(api)
 
+import portal_proxy  # noqa: E402
+portal_proxy.register(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
