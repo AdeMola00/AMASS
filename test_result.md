@@ -1224,7 +1224,7 @@ agent_communication:
 
   - agent: "main"
     message: |
-      Iteration 95 (ran — 22/22 backend, all frontend flows green; fixes applied: web uploaded-video player fills box, "Open on YouTube/Vimeo" fallback link, sheet buttons stacked (Save / Delete current video), heading "Walkthrough", chunk errors show detail + no retry on 4xx, upload URLs restricted to own storage) — Walkthrough videos (Redfin-style camera badge).
+      Deployment readiness pass applied after iteration 95 (see PRD). Iteration 95 (ran — 22/22 backend, all frontend flows green; fixes applied: web uploaded-video player fills box, "Open on YouTube/Vimeo" fallback link, sheet buttons stacked (Save / Delete current video), heading "Walkthrough", chunk errors show detail + no retry on 4xx, upload URLs restricted to own storage) — Walkthrough videos (Redfin-style camera badge).
       Backend `walkthrough_video.py`: parse_video_link() normalises YouTube / Vimeo links or an uploaded https video URL → stored
       `properties.walkthrough_video {url, provider, video_id, embed_url, thumbnail}`; `has_video` is public on /api/properties/{id},
       /api/properties list and /api/map/markers; `walkthrough_video` itself only when the listing is unlocked / owned.

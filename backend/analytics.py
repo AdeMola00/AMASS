@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 import statistics
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -27,6 +28,8 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("amass.analytics")
 
 ALLOWED = {
     "marker_impression", "marker_tap", "property_detail_view", "paid_action_start", "payment_completed",
@@ -234,4 +237,12 @@ def register_analytics_routes(db, bearer, decode_user_id, require_admin):
 async def ensure_analytics_indexes(db) -> None:
     await db.analytics_events.create_index([("name", 1), ("created_at", -1)])
     await db.analytics_events.create_index([("user_id", 1), ("created_at", -1)])
-    await db.analytics_events.create_index("created_at", expireAfterSeconds=60 * 60 * 24 * 400)
+    # Funnel events are kept (no TTL). Earlier builds registered a 400-day TTL on `created_at_1`;
+    # drop that variant so the plain index can be created without an options conflict.
+    try:
+        existing = await db.analytics_events.index_information()
+        if "created_at_1" in existing and "expireAfterSeconds" in existing["created_at_1"]:
+            await db.analytics_events.drop_index("created_at_1")
+    except Exception as e:  # pragma: no cover — best effort
+        logger.warning("could not inspect analytics_events indexes: %s", e)
+    await db.analytics_events.create_index("created_at")

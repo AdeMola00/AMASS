@@ -80,9 +80,10 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/
-.env
-.env.*
-*.env
+# Note: backend/.env and frontend/.env are intentionally NOT ignored — the Emergent deploy
+# pipeline ships them with the build (local-only overrides belong in .env.local).
+.env.local
+.env.*.local
 credentials.json
 *.key
 .credentials

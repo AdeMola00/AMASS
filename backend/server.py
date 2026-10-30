@@ -1,5 +1,6 @@
 """AMASS - Africa's Property Operating System — Backend API"""
 import os
+import re
 import asyncio
 import uuid
 import logging
@@ -496,7 +497,7 @@ async def list_properties(
     if bedrooms is not None:
         query["bedrooms"] = {"$gte": bedrooms}
     if city:
-        query["city"] = {"$regex": city, "$options": "i"}
+        query["city"] = {"$regex": re.escape(city), "$options": "i"}
     if verified is not None:
         query["verified"] = verified
     if listing_source:
@@ -519,6 +520,7 @@ async def list_properties(
             price_q["$lte"] = max_price
         query["price"] = price_q
     if q:
+        q = re.escape(q.strip())
         query["$or"] = [
             {"title": {"$regex": q, "$options": "i"}},
             {"location": {"$regex": q, "$options": "i"}},
@@ -1226,7 +1228,7 @@ async def marketplace(
     if condition:
         query["condition"] = condition
     if city:
-        query["city"] = {"$regex": city, "$options": "i"}
+        query["city"] = {"$regex": re.escape(city), "$options": "i"}
     if seller_type:
         query["seller_type"] = seller_type
     if boosted_only:
@@ -1239,6 +1241,7 @@ async def marketplace(
             price_q["$lte"] = max_price
         query["price"] = price_q
     if q:
+        q = re.escape(q.strip())
         query["$or"] = [
             {"name": {"$regex": q, "$options": "i"}},
             {"description": {"$regex": q, "$options": "i"}},
@@ -1929,8 +1932,9 @@ SEED_NEIGHBORHOODS = [
 
 @api.post("/seed")
 async def seed_data(dry_run: bool = False, _admin: dict = Depends(require_admin)):
-    """Dev reset: wipes + reseeds listings, marketplace, vendors, collections,
-    neighbourhoods. `?dry_run=true` only reports what would be seeded."""
+    """Dev helper: tops up the starter listings, marketplace, vendors, collections and
+    neighbourhoods (only rows that are missing are inserted — nothing is wiped).
+    `?dry_run=true` only reports what would be seeded."""
     if dry_run:
         return {
             "dry_run": True,
@@ -1943,56 +1947,37 @@ async def seed_data(dry_run: bool = False, _admin: dict = Depends(require_admin)
     return await _do_seed()
 
 
+async def _seed_missing(col, docs, key: str) -> int:
+    """Insert the seed rows that aren't there yet, matched on `key` — never deletes or overwrites."""
+    inserted = 0
+    for d in docs:
+        if await col.find_one({key: d[key]}, {"_id": 1}) is None:
+            await col.insert_one(d)
+            inserted += 1
+    return inserted
+
+
 async def _do_seed():
-    # Seed properties
-    await db.properties.delete_many({})
-    for p in SEED_PROPERTIES:
-        prop = Property(**p)
-        await db.properties.insert_one(prop.model_dump())
-
-    # Seed marketplace
-    await db.marketplace.delete_many({})
-    for m in SEED_MARKETPLACE:
-        item = MarketplaceItem(**m)
-        await db.marketplace.insert_one(item.model_dump())
-    # C2C classifieds seed (OfferUp/Letgo-style)
-    for m in C2C_MARKET_ITEMS:
-        try:
-            item = MarketplaceItem(**m)
-            await db.marketplace.insert_one(item.model_dump())
-        except Exception as e:
-            logger.warning(f"skip c2c seed item {m.get('name','?')}: {e}")
-
-    # FIXA verified service providers
-    for m in FIXA_PROVIDERS:
-        try:
-            item = MarketplaceItem(**m)
-            await db.marketplace.insert_one(item.model_dump())
-        except Exception as e:
-            logger.warning(f"skip fixa seed item {m.get('name','?')}: {e}")
-
-    # Seed vendors
-    await db.vendors.delete_many({})
-    for v in SEED_VENDORS:
-        await db.vendors.insert_one(v.copy())
-
-    # Seed collections
-    await db.collections.delete_many({})
-    for c in SEED_COLLECTIONS:
-        await db.collections.insert_one(c.copy())
-
-    # Seed neighborhoods
-    await db.neighborhoods.delete_many({})
-    for n in SEED_NEIGHBORHOODS:
-        await db.neighborhoods.insert_one(n.copy())
-
-    return {
-        "properties": len(SEED_PROPERTIES),
-        "marketplace": len(SEED_MARKETPLACE),
-        "vendors": len(SEED_VENDORS),
-        "collections": len(SEED_COLLECTIONS),
-        "neighborhoods": len(SEED_NEIGHBORHOODS),
+    """Idempotent: safe to run on every boot (and against a live production DB)."""
+    out = {
+        "properties": await _seed_missing(db.properties, [Property(**p).model_dump() for p in SEED_PROPERTIES], "title"),
+        "marketplace": await _seed_missing(db.marketplace, [MarketplaceItem(**m).model_dump() for m in SEED_MARKETPLACE], "id"),
     }
+    # C2C classifieds (OfferUp/Letgo-style) + FIXA verified service providers — keyed by name.
+    extra = 0
+    for group, label in ((C2C_MARKET_ITEMS, "c2c"), (FIXA_PROVIDERS, "fixa")):
+        docs = []
+        for m in group:
+            try:
+                docs.append(MarketplaceItem(**m).model_dump())
+            except Exception as e:
+                logger.warning(f"skip {label} seed item {m.get('name','?')}: {e}")
+        extra += await _seed_missing(db.marketplace, docs, "name")
+    out["marketplace"] += extra
+    out["vendors"] = await _seed_missing(db.vendors, [v.copy() for v in SEED_VENDORS], "id")
+    out["collections"] = await _seed_missing(db.collections, [c.copy() for c in SEED_COLLECTIONS], "id")
+    out["neighborhoods"] = await _seed_missing(db.neighborhoods, [n.copy() for n in SEED_NEIGHBORHOODS], "id")
+    return out
 
 
 @api.get("/")

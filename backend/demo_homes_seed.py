@@ -14,11 +14,15 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import os
+
 logger = logging.getLogger("amass.demo_homes")
 
 TEST_TITLE_RX = re.compile(r"^(TEST[_ ]|Test |Phase2 Chat|Chat Test|E2E[_ ]|Pytest|QA[_ ])", re.I)
 
-AGENT_PASSWORD = "Agent2026!"
+# Login password for the four demo agents. Override with DEMO_AGENT_PASSWORD in production so the
+# seeded (verified) agent accounts don't share the well-known development password.
+AGENT_PASSWORD = os.environ.get("DEMO_AGENT_PASSWORD") or "Agent2026!"
 
 DEMO_AGENTS = [
     {"key": "adaeze", "full_name": "Adaeze Okoye", "email": "adaeze.okoye@amass.africa", "phone": "+2348031000001", "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300", "agency_name": "Okoye & Partners Realty", "state": "Lagos", "lga": "Eti-Osa", "years": 9, "areas": ["Lekki Phase 1", "Ikoyi", "Victoria Island"], "specs": ["Luxury homes", "Waterfront"], "level": 3},

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import math
 import re
 import time
@@ -517,16 +518,24 @@ class UnlockService:
         try:
             await self.db.entitlements.insert_one(dict(pending))
         except DuplicateKeyError:
-            # Another request won. Wait briefly for it to settle, then serve its outcome.
-            for _ in range(20):
-                other = await self.db.entitlements.find_one({"user_id": uid, "feature_key": feature_key, "target_id": target_id}, {"_id": 0})
-                if other and other.get("status") == "active":
-                    await self._event(uid, feature_key, target_id, "free_repeat", 0, currency, t, {"reason": "concurrent"})
-                    return await self._result(user, t, other, charged=0, currency=currency, free_reason="already_unlocked")
-                if not other:
-                    raise HTTPException(409, "Concurrent unlock failed — please retry")
-                await asyncio.sleep(0.1)
-            raise HTTPException(409, "Unlock in progress — check status before retrying")
+            # A lock row already exists. If it is a dead one (expired by reconcile, or a failed debit)
+            # take it over in place — same unique key, fresh id/status — so the retry can proceed.
+            taken = await self.db.entitlements.find_one_and_update(
+                {"user_id": uid, "feature_key": feature_key, "target_id": target_id, "status": {"$in": ["expired", "failed"]}},
+                {"$set": dict(pending), "$unset": {"expired_at": "", "failed_at": "", "error": ""}},
+                projection={"_id": 0, "id": 1},
+            )
+            if taken is None:
+                # Another request won. Wait briefly for it to settle, then serve its outcome.
+                for _ in range(20):
+                    other = await self.db.entitlements.find_one({"user_id": uid, "feature_key": feature_key, "target_id": target_id}, {"_id": 0})
+                    if other and other.get("status") == "active":
+                        await self._event(uid, feature_key, target_id, "free_repeat", 0, currency, t, {"reason": "concurrent"})
+                        return await self._result(user, t, other, charged=0, currency=currency, free_reason="already_unlocked")
+                    if not other or other.get("status") in ("expired", "failed"):
+                        raise HTTPException(409, "Concurrent unlock failed — please retry")
+                    await asyncio.sleep(0.1)
+                raise HTTPException(409, "Unlock in progress — check status before retrying")
         # 6. debit atomically + ledger
         try:
             updated = await self.wallet.debit(
@@ -540,7 +549,11 @@ class UnlockService:
                 },
             )
         except HTTPException as e:
-            await self.db.entitlements.delete_one({"id": ent_id, "status": "pending"})
+            # Keep the row (audit) but release the lock: a later attempt takes over `failed` rows.
+            await self.db.entitlements.update_one(
+                {"id": ent_id, "status": "pending"},
+                {"$set": {"status": "failed", "failed_at": _now(), "error": str(e.detail)}},
+            )
             await self._event(uid, feature_key, target_id, "failed" if e.status_code != 402 else "insufficient", fee, currency, t, {"reason": str(e.detail)})
             raise
         tx = await self.db.token_transactions.find_one({"idempotency_key": idem, "user_id": uid}, {"_id": 0, "id": 1})
@@ -650,7 +663,13 @@ class UnlockService:
     # ── reconciliation / auto-credit ──
     async def reconcile(self) -> dict:
         now = _now()
-        stale = await self.db.entitlements.delete_many({"status": "pending", "created_at": {"$lt": now - timedelta(minutes=5)}})
+        # A pending entitlement is a lock row for an unlock in flight. If it is still pending after
+        # 5 min the process died mid-unlock: mark it expired (kept for audit) so the next attempt can
+        # take the lock over (see `unlock`) — nothing is deleted.
+        stale = await self.db.entitlements.update_many(
+            {"status": "pending", "created_at": {"$lt": now - timedelta(minutes=5)}},
+            {"$set": {"status": "expired", "expired_at": now, "error": "timed out"}},
+        )
         await self.db.unlock_requests.update_many(
             {"status": "pending", "created_at": {"$lt": now - timedelta(minutes=5)}},
             {"$set": {"status": "failed", "error": "timed out", "error_code": 409}},
@@ -667,7 +686,7 @@ class UnlockService:
             if prop is None or (prop.get("status") in ("sold", "unavailable", "removed", "withdrawn")):
                 if await self.auto_credit(ent, "listing_unavailable", actor="system"):
                     credited += 1
-        return {"stale_pending_removed": stale.deleted_count, "auto_credited": credited}
+        return {"stale_pending_expired": stale.modified_count, "auto_credited": credited}
 
     async def auto_credit(self, ent: dict, reason: str, actor: str = "system") -> bool:
         """Refund an unlock through the ledger exactly once; keeps the record (never edits completed rows)."""
@@ -799,7 +818,15 @@ async def ensure_monetization_indexes(db: AsyncIOMotorDatabase) -> None:
     await db.entitlements.create_index([("user_id", ASCENDING), ("feature_key", ASCENDING), ("target_id", ASCENDING)], unique=True, name="entitlement_uniq")
     await db.entitlements.create_index([("target_id", ASCENDING), ("status", ASCENDING)], name="entitlement_target")
     await db.unlock_requests.create_index([("key", ASCENDING)], unique=True, name="unlock_request_key_uniq")
-    await db.unlock_requests.create_index([("created_at", ASCENDING)], expireAfterSeconds=60 * 60 * 24 * 14, name="unlock_request_ttl")
+    # Idempotency / payment records are kept — no TTL. Earlier builds created a 14-day TTL index under
+    # this name; drop that variant so the plain index can be created without an options conflict.
+    try:
+        existing = await db.unlock_requests.index_information()
+        if "unlock_request_ttl" in existing and "expireAfterSeconds" in existing["unlock_request_ttl"]:
+            await db.unlock_requests.drop_index("unlock_request_ttl")
+    except Exception as e:  # pragma: no cover — best effort; a stale TTL index is not fatal
+        logging.getLogger("amass.monetization").warning("could not inspect unlock_requests indexes: %s", e)
+    await db.unlock_requests.create_index([("created_at", ASCENDING)], name="unlock_request_created")
     await db.token_transactions.create_index(
         [("idempotency_key", ASCENDING)], unique=True, name="tx_idempotency_uniq",
         partialFilterExpression={"idempotency_key": {"$type": "string"}},

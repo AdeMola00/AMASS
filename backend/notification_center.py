@@ -314,7 +314,7 @@ async def emit(
     if dedupe_key:
         if await db.notifications.find_one({"user_id": user_id, "dedupe_key": dedupe_key}, {"_id": 0, "id": 1}):
             return None
-        if await db.notification_queue.find_one({"user_id": user_id, "dedupe_key": dedupe_key}, {"_id": 0, "id": 1}):
+        if await db.notification_queue.find_one({"user_id": user_id, "dedupe_key": dedupe_key, "done_at": {"$exists": False}}, {"_id": 0, "id": 1}):
             return None
     else:
         target = _target_of(meta)
@@ -411,9 +411,15 @@ def _digest_copy(category: str, items: list[dict]) -> tuple[str, str]:
 
 
 async def flush_digests(db) -> int:
-    """Turn queued items into one summary notification per user/category when the interval has elapsed."""
+    """Turn queued items into one summary notification per user/category when the interval has elapsed.
+
+    Queue rows are never deleted: once handled they get `done_at` + `outcome` ("digested" with the
+    digest id, or "discarded" when the user switched the category off) and drop out of the pending set.
+    """
     sent = 0
+    pending = {"done_at": {"$exists": False}}
     groups = await db.notification_queue.aggregate([
+        {"$match": pending},
         {"$group": {"_id": {"user_id": "$user_id", "category": "$category"}, "n": {"$sum": 1}, "oldest": {"$min": "$created_at"}}},
     ]).to_list(5000)
     now = _now()
@@ -422,7 +428,10 @@ async def flush_digests(db) -> int:
         prefs = await get_prefs(db, user_id)
         cat_pref = prefs["categories"].get(category) or {}
         if not cat_pref.get("enabled", True):
-            await db.notification_queue.delete_many({"user_id": user_id, "category": category})
+            await db.notification_queue.update_many(
+                {"user_id": user_id, "category": category, **pending},
+                {"$set": {"done_at": _iso(now), "outcome": "discarded"}},
+            )
             continue
         freq = cat_pref.get("frequency", "daily")
         if freq == "immediate":
@@ -434,7 +443,7 @@ async def flush_digests(db) -> int:
             due = last is None or now - last >= _interval(freq)
         if not due:
             continue
-        items = await db.notification_queue.find({"user_id": user_id, "category": category}, {"_id": 0}).sort("created_at", 1).to_list(200)
+        items = await db.notification_queue.find({"user_id": user_id, "category": category, **pending}, {"_id": 0}).sort("created_at", 1).to_list(200)
         if not items:
             continue
         title, body = _digest_copy(category, items)
@@ -452,7 +461,10 @@ async def flush_digests(db) -> int:
         }
         await db.notifications.insert_one(dict(doc))
         await _push(db, prefs, user_id, title, body, doc["action_url"], f"digest:{doc['id']}", category)
-        await db.notification_queue.delete_many({"id": {"$in": [i["id"] for i in items]}})
+        await db.notification_queue.update_many(
+            {"id": {"$in": [i["id"] for i in items]}},
+            {"$set": {"done_at": _iso(now), "outcome": "digested", "digest_id": doc["id"]}},
+        )
         await db.notification_digest_state.update_one({"user_id": user_id, "category": category}, {"$set": {"last_sent_at": _iso(now)}}, upsert=True)
         sent += 1
     return sent
