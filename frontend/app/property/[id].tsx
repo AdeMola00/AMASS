@@ -25,9 +25,10 @@ import { formatNaira } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { useTheme } from "@/src/theme";
 import { gradients, motion, radii, space } from "@/src/theme/tokens";
-import { AppText, Avatar, Badge, Button, Card, EmptyState, FrostedCircle, FrostedLabel, IconButton, PressableScale, Skeleton, UnlockDialog, useMoneyRain, useToast } from "@/src/ui";
+import { AppText, Avatar, Badge, Button, Card, EmptyState, FrostedCircle, FrostedLabel, IconButton, PressableScale, Sheet, Skeleton, UnlockDialog, useMoneyRain, useToast } from "@/src/ui";
+import { WalkthroughPicker, WalkthroughPlayer } from "@/src/components/WalkthroughVideo";
 import type { IconName } from "@/src/ui";
-import { PricePin } from "@/src/components/map/PricePin";
+import { PricePin, WALKTHROUGH_PURPLE } from "@/src/components/map/PricePin";
 import { toPin } from "@/src/components/map/pins";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { PriceText } from "@/src/components/PriceText";
@@ -68,6 +69,9 @@ export default function PropertyDetails() {
   const [favorited, setFavorited] = useState(false);
   const [intel, setIntel] = useState<Awaited<ReturnType<typeof api.propertyIntelligence>> | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [walkOpen, setWalkOpen] = useState(false);
+  const [walkDraft, setWalkDraft] = useState<string | null>(null);
+  const [walkSaving, setWalkSaving] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
   /** Open viewing (requested / confirmed / rescheduled) for this home — `undefined` until loaded, `null` when none. */
@@ -469,6 +473,37 @@ export default function PropertyDetails() {
             ) : null}
           </View>
 
+          {/* Walkthrough video — the camera badge on the map pin leads here */}
+          {property.has_video || isOwnListing ? (
+            <View style={styles.section} testID="walkthrough-section">
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <AppText variant="h2" style={{ flex: 1 }} numberOfLines={1}>
+                  Walkthrough
+                </AppText>
+                {isOwnListing ? <Button label={property.has_video ? "Replace" : "Add video"} size="sm" variant="secondary" iconLeft={property.has_video ? "swap-horizontal" : "add"} onPress={() => setWalkOpen(true)} testID="walkthrough-manage" /> : null}
+              </View>
+              {property.walkthrough_video ? (
+                <WalkthroughPlayer video={property.walkthrough_video} />
+              ) : property.has_video ? (
+                <Pressable onPress={() => !hasAccess && setUnlockOpen(true)} style={[styles.walkLocked, { backgroundColor: colors.surfaceInverse }]} accessibilityRole="button" accessibilityLabel="Walkthrough video unlocks with MASS" testID="walkthrough-locked">
+                  <View style={[styles.playBtn, { backgroundColor: WALKTHROUGH_PURPLE }]}>
+                    <Ionicons name="lock-closed" size={22} color="#fff" />
+                  </View>
+                  <AppText variant="bodyMedium" color={colors.textInverse}>
+                    This home has a video walkthrough
+                  </AppText>
+                  <AppText variant="caption" color={colors.textInverse} style={{ opacity: 0.8, textAlign: "center" }}>
+                    It unlocks with the photos, exact address and agent — one payment, yours forever.
+                  </AppText>
+                </Pressable>
+              ) : (
+                <AppText variant="caption" tone="tertiary">
+                  Add a walkthrough so your listing gets the purple camera badge on the map — homes with video get far more taps.
+                </AppText>
+              )}
+            </View>
+          ) : null}
+
           {(property.amenities?.length ?? 0) > 0 && (
             <View style={styles.section}>
               <AppText variant="h2">Home highlights</AppText>
@@ -796,6 +831,72 @@ export default function PropertyDetails() {
         )}
       </View>
       <UnlockDialog visible={unlockOpen} featureKey="property" targetId={property.id} onClose={() => setUnlockOpen(false)} onUnlocked={onUnlocked} />
+      {isOwnListing ? (
+        <Sheet
+          visible={walkOpen}
+          onClose={() => {
+            if (walkSaving) return;
+            setWalkOpen(false);
+            setWalkDraft(null);
+          }}
+          title={property.has_video ? "Replace walkthrough video" : "Add a walkthrough video"}
+          testID="walkthrough-sheet"
+        >
+          <View style={{ gap: space[3] }}>
+            <AppText variant="bodySm" tone="secondary">
+              Buyers see a purple camera badge on your pin and the video plays on this page once they unlock the listing.
+            </AppText>
+            <WalkthroughPicker value={walkDraft} onChange={setWalkDraft} />
+            <Button
+              label={walkSaving ? "Saving…" : "Save video"}
+              variant="primary"
+              fullWidth
+              iconLeft="checkmark"
+              disabled={!walkDraft || walkSaving}
+              loading={walkSaving}
+              onPress={async () => {
+                if (!walkDraft) return;
+                setWalkSaving(true);
+                try {
+                  await api.setWalkthrough(property.id, walkDraft);
+                  setWalkOpen(false);
+                  setWalkDraft(null);
+                  toast.success("Walkthrough saved", "Your pin now shows the camera badge.");
+                  reload();
+                } catch (e: any) {
+                  toast.error("Couldn't save the video", e?.message);
+                } finally {
+                  setWalkSaving(false);
+                }
+              }}
+              testID="walkthrough-save"
+            />
+            {property.has_video && !walkDraft ? (
+              <Button
+                label="Delete current video"
+                variant="ghost"
+                fullWidth
+                iconLeft="trash-outline"
+                disabled={walkSaving}
+                onPress={async () => {
+                  setWalkSaving(true);
+                  try {
+                    await api.setWalkthrough(property.id, null);
+                    setWalkOpen(false);
+                    toast.success("Walkthrough removed");
+                    reload();
+                  } catch (e: any) {
+                    toast.error("Couldn't remove the video", e?.message);
+                  } finally {
+                    setWalkSaving(false);
+                  }
+                }}
+                testID="walkthrough-remove-current"
+              />
+            ) : null}
+          </View>
+        </Sheet>
+      ) : null}
       {canBook && property.agent_id ? (
         <ViewingSheet
           visible={bookOpen}
@@ -1035,6 +1136,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   section: { marginTop: space[7], gap: space[3] },
+  walkLocked: { width: "100%", aspectRatio: 16 / 9, borderRadius: radii.lg, alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: space[5] },
+  playBtn: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   amenities: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   amenity: {
     flexDirection: "row",

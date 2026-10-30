@@ -20,6 +20,8 @@ import { MapView, Marker, PROVIDER_DEFAULT } from "@/src/lib/map";
 import { api } from "@/src/lib/api";
 import { radius, shadows, spacing, typography, formatNaira } from "@/src/constants/theme";
 import { PropertyMarker } from "@/src/components/PropertyMarker";
+import { WalkthroughPicker, describeVideoLink } from "@/src/components/WalkthroughVideo";
+import { WALKTHROUGH_PURPLE } from "@/src/components/map/PricePin";
 import { TokenIcon } from "@/src/components/TokenIcon";
 import { useWallet } from "@/src/contexts/wallet";
 import { useTheme } from "@/src/theme";
@@ -82,6 +84,7 @@ export default function SubmitProperty() {
   const [coords, setCoords] = useState<{ latitude: number; longitude: number }>({ latitude: 6.4361, longitude: 3.4739 });
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [walkthroughUrl, setWalkthroughUrl] = useState<string | null>(null);
 
   // Trust / mandate
   const [isOwner, setIsOwner] = useState(false);
@@ -151,6 +154,7 @@ export default function SubmitProperty() {
         is_owner: isOwner,
         has_mandate: !isOwner && hasMandate,
         mandate: mandatePayload,
+        walkthrough_video_url: walkthroughUrl ?? undefined,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       celebrate({ title: "Listed!", icon: "home", tone: "brand" });
@@ -254,6 +258,8 @@ export default function SubmitProperty() {
             selectedImages={selectedImages}
             addImages={addImages}
             removeImage={removeImage}
+            walkthroughUrl={walkthroughUrl}
+            setWalkthroughUrl={setWalkthroughUrl}
           />
         )}
         {step === 4 && (
@@ -261,7 +267,7 @@ export default function SubmitProperty() {
             data={{
               title, description, price, listingType, propertyType,
               bedrooms, bathrooms, sizeSqm, location, city, state,
-              selectedAmenities, selectedImages,
+              selectedAmenities, selectedImages, walkthroughUrl,
             }}
           />
         )}
@@ -670,6 +676,8 @@ function Step3({
   selectedImages,
   addImages,
   removeImage,
+  walkthroughUrl,
+  setWalkthroughUrl,
 }: any) {
   const colors = useLegacyColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -834,6 +842,18 @@ function Step3({
           </View>
         )}
       </View>
+
+      {/* Walkthrough video — optional; earns the purple camera badge on the map pin */}
+      <View style={{ gap: spacing.sm }} testID="walkthrough-step">
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={{ width: 24, height: 24, borderRadius: 7, backgroundColor: WALKTHROUGH_PURPLE, alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="videocam" size={13} color="#fff" />
+          </View>
+          <Text style={[styles.h2, { flex: 1 }]} numberOfLines={1}>Walkthrough video</Text>
+        </View>
+        <Text style={styles.sub}>Optional · homes with a video get the purple camera badge on the map and far more taps.</Text>
+        <WalkthroughPicker value={walkthroughUrl} onChange={setWalkthroughUrl} testIDPrefix="submit-walkthrough" />
+      </View>
     </View>
   );
 }
@@ -868,6 +888,7 @@ function Step4({ data }: any) {
       <ReviewRow label="Beds / Baths / Size" value={`${data.bedrooms} bd · ${data.bathrooms} ba · ${data.sizeSqm} m²`} />
       <ReviewRow label="Amenities" value={data.selectedAmenities.slice(0, 4).join(" · ") || "None"} />
       <ReviewRow label="Photos" value={`${data.selectedImages.length} attached`} />
+      <ReviewRow label="Walkthrough video" value={data.walkthroughUrl ? describeVideoLink(data.walkthroughUrl)?.label ?? "Attached" : "None"} />
 
       <View style={styles.notice}>
         <Ionicons name="shield-checkmark" size={16} color={colors.red} />

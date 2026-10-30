@@ -26,7 +26,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from social_common import award, blocked_ids_for, ensure, muted_ids_for, new_id, notify, now, public_users
@@ -668,8 +668,9 @@ def register_social_feed_routes(db, get_current_user, require_admin):
         return {"url": _public_url(path), "path": path}
 
     @files.get("/api/public-files/{file_path:path}")
-    async def public_file(file_path: str):
-        """Unauthenticated read for objects under `amass/public/` only (Social post photos)."""
+    async def public_file(file_path: str, request: Request):
+        """Unauthenticated read for objects under `amass/public/` only (Social post photos, walkthrough videos).
+        Honours HTTP Range so video players can seek / stream."""
         if not file_path.startswith("amass/public/") or ".." in file_path:
             raise HTTPException(404, "Not found")
         from object_storage import get_object
@@ -679,7 +680,20 @@ def register_social_feed_routes(db, get_current_user, require_admin):
             raise
         except Exception:
             raise HTTPException(404, "File not found")
-        return Response(content=data, media_type=ct, headers={"Cache-Control": "public, max-age=86400"})
+        headers = {"Cache-Control": "public, max-age=86400", "Accept-Ranges": "bytes"}
+        rng = request.headers.get("range")
+        if rng and rng.startswith("bytes="):
+            try:
+                start_s, end_s = rng[6:].split("-", 1)
+                start = int(start_s) if start_s else max(0, len(data) - int(end_s))
+                end = min(int(end_s), len(data) - 1) if end_s and start_s else len(data) - 1
+            except ValueError:
+                raise HTTPException(416, "Bad range")
+            if start >= len(data) or start > end:
+                return Response(status_code=416, headers={"Content-Range": f"bytes */{len(data)}"})
+            chunk = data[start : end + 1]
+            return Response(content=chunk, status_code=206, media_type=ct, headers={**headers, "Content-Range": f"bytes {start}-{end}/{len(data)}", "Content-Length": str(len(chunk))})
+        return Response(content=data, media_type=ct, headers=headers)
 
     # ─── Admin moderation ───
     @router.get("/posts/admin/reports")

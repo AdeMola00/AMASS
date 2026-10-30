@@ -12,6 +12,7 @@ import { useTheme } from "@/src/theme";
 import { gradients, motion, radii } from "@/src/theme/tokens";
 import { AppText, Badge, FrostedCircle, FrostedLabel, GlassFill, PhotoSheen, PressableScale } from "@/src/ui";
 import { PromotionPhotoLabel } from "@/src/components/PromotionBadge";
+import { WALKTHROUGH_PURPLE } from "@/src/components/map/PricePin";
 
 const BLUR_HASH = "L6PZfSi_.AyE_3t7t7R**0o#DgR4";
 
@@ -103,6 +104,17 @@ export function ListingCard({
               {formatMarkerPrice(property.price, property.listing_type)}
             </AppText>
           </View>
+          {/* Walkthrough video tag — same purple cue as the camera tab on the map pin */}
+          {property.has_video ? (
+            <View style={[styles.videoTag, { backgroundColor: WALKTHROUGH_PURPLE }]} accessibilityLabel="Has walkthrough video" testID={`card-video-${property.id}`}>
+              <Ionicons name="videocam" size={12} color="#fff" />
+              {!compact ? (
+                <AppText variant="micro" color="#fff" weight="bold">
+                  Video
+                </AppText>
+              ) : null}
+            </View>
+          ) : null}
         </View>
         <View style={styles.body}>
           <AppText variant="bodyMedium" numberOfLines={1}>
@@ -158,6 +170,7 @@ const styles = StyleSheet.create({
   heart: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   pricePlate: { position: "absolute", left: 10, bottom: 10, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radii.md, overflow: "hidden" },
   pricePlateCompact: { paddingHorizontal: 8, paddingVertical: 4 },
+  videoTag: { position: "absolute", right: 10, bottom: 10, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.9)" },
   body: { padding: 14, gap: 4 },
   locRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   specRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },

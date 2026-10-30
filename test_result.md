@@ -1221,3 +1221,21 @@ agent_communication:
       recent posts + detail sheet with Retry/Open/Copy caption/Remove, Publish waiting), /admin/social-compose (pick listing → photo picker →
       platform chips → per-platform caption tabs with counters → Publish → result card), Cockpit tile "Social publishing", share screen
       (/share/{id}) "Post to social media" row (Facebook/X/LinkedIn open share intents; Instagram/TikTok copy caption + share flyer) and Copy caption.
+
+  - agent: "main"
+    message: |
+      Iteration 95 (ran — 22/22 backend, all frontend flows green; fixes applied: web uploaded-video player fills box, "Open on YouTube/Vimeo" fallback link, sheet buttons stacked (Save / Delete current video), heading "Walkthrough", chunk errors show detail + no retry on 4xx, upload URLs restricted to own storage) — Walkthrough videos (Redfin-style camera badge).
+      Backend `walkthrough_video.py`: parse_video_link() normalises YouTube / Vimeo links or an uploaded https video URL → stored
+      `properties.walkthrough_video {url, provider, video_id, embed_url, thumbnail}`; `has_video` is public on /api/properties/{id},
+      /api/properties list and /api/map/markers; `walkthrough_video` itself only when the listing is unlocked / owned.
+      Routes: POST /api/uploads/video/chunk (multipart: upload_id, index, total, chunk ≤4 MB), POST /api/uploads/video/complete
+      {upload_id,total,mime,filename} → {url,path,bytes} (object storage, served by /api/public-files with Range),
+      PATCH /api/properties/{id}/walkthrough {url|null} (owner/admin only → 403 otherwise, 400 on junk link),
+      POST /api/properties accepts optional `walkthrough_video_url`. Demo seed: 6 verified homes got YouTube tours (idempotent).
+      Frontend: PricePin camera tab (testID pin-video-{id}), ListingCard tag (card-video-{id}), property page section
+      (walkthrough-section · WalkthroughPlayer with poster → embed; walkthrough-locked teaser opens the unlock dialog; owner sees
+      "Add video"/"Replace" → walkthrough-sheet with WalkthroughPicker: walkthrough-upload / walkthrough-link / walkthrough-link-input /
+      walkthrough-link-save / walkthrough-save / walkthrough-remove-current), submit-property Step 3 "Walkthrough video" (optional,
+      testIDs submit-walkthrough-*) + Review row, payload `walkthrough_video_url`.
+      Already verified by main: map pin badge renders on web, locked teaser renders for a non-owner, owner Replace → paste YouTube →
+      Save → poster updates.

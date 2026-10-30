@@ -1,0 +1,49 @@
+{
+  "summary": "Walkthrough video feature regression (backend + Expo web preview at 390x844). Backend: 22/22 pytest pass. That covers login for both accounts, has_video on /map/markers (37 buy markers, 7 with video), locked detail/list/favorites not leaking walkthrough_video, owner detail returning the full object, PATCH walkthrough for youtube/youtu.be/vimeo/upload/null, admin override, 403/400/404/401 errors, the chunked upload (2 chunks of a 3 MB blob) then complete, then a Range GET returning 206 with Content-Range and the exact bytes, wrong total 400, a chunk over 4 MB 413, bad upload_id 400, non-video mime 400, and POST /properties with walkthrough_video_url. Frontend: every requested flow passed with no console errors. Checked: the purple camera tab on the map pin (pin-video-f2342766…), the locked teaser opening the unlock dialog, the owner poster and the YouTube iframe swap, Replace with a pasted link then Save (toast shown, poster updated to 9fbA9vri-Fk), the Step 4 walkthrough block with paste, Remove and re-add, a photo added through the file chooser, the Review row showing 'YouTube video' (not published), and card-video-a4ba0122 in Nearby homes. Two problems: an uploaded-file video does not fill its player on web, and both demo accounts are at the Starter 5-listing limit, so neither can publish.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/properties", "issue": "Both demo@amass.africa (an admin) and adaeze are at the Starter 5-listing limit, so POST returns 402 plan_limit_reached. Neither demo account can publish from /submit-property, including a listing with a video. Test 'create with video' used a freshly registered TEST_ user (passed; the property was archived and the user deleted afterwards)."},
+      {"endpoint": "walkthrough_video.parse_video_link", "issue": "provider 'upload' accepts ANY https URL ending in .mp4/.mov… or containing '/api/public-files/' on any host. It should be limited to public_api_base() so listers cannot hotlink arbitrary external files."},
+      {"endpoint": "POST /api/uploads/video/*", "issue": "Nothing cleans up abandoned chunk dirs in /tmp/amass_uploads (no TTL). Replaced or removed uploaded videos stay in object storage forever. Two test uploads (~3 MB and 200 KB) remain under amass/public/264b2e63…/walkthrough-*.mp4 because there is no delete endpoint."},
+      {"endpoint": "HEAD /api/public-files/{path}", "issue": "Returns 405. GET with Range works (206, accept-ranges: bytes), but some players and CDNs probe with HEAD. The response is also served with cache-control: no-store, so videos are never cached."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "WalkthroughPlayer → UploadedPlayer (expo-video VideoView, web)", "issue": "For provider 'upload' the <video> element renders at the browser default size of about 300x150 in the top-left of the 16:9 black box instead of filling it. StyleSheet.absoluteFill on VideoView is not applied on web. Controls also have fullscreen disabled (controlslist=nofullscreen).", "testID": "walkthrough-player-video", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "YouTube embed playback in the preview", "issue": "After tapping play, the youtube-nocookie iframe showed 'Video unavailable – This content isn't available' in headless Chromium. oEmbed returns 200 for all 6 demo IDs, so they are embeddable and this is most likely YouTube blocking the datacenter/headless browser. Verify on a real device/browser, and consider an 'Open on YouTube' fallback link under the player.", "affected_testIDs": ["walkthrough-player-embed"]}
+    ],
+    "design_issues": [
+      {"screen": "property/[id] walkthrough section and submit-property Step 4", "issues": ["The 'Walkthrough video' h2 heading wraps onto 2 lines at 390px next to the 'Replace' button or the 'Optional' label. Use a smaller variant or numberOfLines={1}.", "The Replace sheet shows two 'Remove' buttons at once: the draft-clear button inside walkthrough-selected and walkthrough-remove-current, which deletes the live video. This is ambiguous and risky. Rename the second one to 'Delete current video' or show it only when no draft is selected.", "Step 4: the upload and link tiles start at y≈731 at 390x844, under the sticky Continue bar. The user has to scroll before tapping them, which is fine since the content has paddingBottom:140."]}
+    ],
+    "react_native_issues": [
+      {"component": "uploadVideoChunked (native)", "issue": "On native, the whole video (up to 80 MB) is loaded into memory through expo/fetch → blob, then Blob.slice chunks are appended to the global RN FormData. RN FormData/fetch compatibility with an expo/fetch Blob is unverified, so test on a device build. Reference: /app/frontend/src/utils/upload.ts:20-57"}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_walkthrough_video.py", "/app/test_reports/pytest/pytest_walkthrough.xml"],
+  "action_items": [
+    "Make the uploaded-file player fill its 16:9 container on web (wrap VideoView in an absoluteFill View or set style width/height 100% on web) and allow fullscreen.",
+    "Raise the listing quota for demo@amass.africa (admin) and/or adaeze, or exempt admins, so the submit-property → publish-with-video flow can be demoed.",
+    "Restrict 'upload' provider URLs in parse_video_link to the app's own /api/public-files/ host.",
+    "Clarify the two 'Remove' buttons in walkthrough-sheet.",
+    "Optional: add a TTL cleanup for /tmp/amass_uploads, delete old storage objects when a walkthrough is replaced, and support HEAD on /api/public-files.",
+    "Optional: in uploadVideoChunked, do not retry 4xx (413/400) chunk responses, and parse the JSON 'detail' for chunk errors (the toast currently shows raw JSON).",
+    "Verify YouTube embed playback and the native chunked upload on a physical device / Expo Go."
+  ],
+  "critical_code_review_comments": [
+    "upload.ts:57-59: retries 3x even on 4xx responses, and network exceptions thrown by fetch are not retried at all.",
+    "upload.ts:59: the error message is raw r.text(), e.g. '{\"detail\":\"Chunk too large…\"}', which then appears verbatim in the toast.",
+    "walkthrough_video.py:136: /complete only counts parts and never checks that the indices are 0..total-1. Harmless today because the upload dir is per upload_id.",
+    "WalkthroughVideo.tsx:106: the handler is named 'useLink', which react-hooks lint will treat as a hook. Rename it to applyLink."
+  ],
+  "updated_files": ["/app/backend/tests/test_walkthrough_video.py (new)"],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "100% of requested flows (one medium web-only UI bug with the uploaded-file player)"},
+  "seed_data_creation": "Temporary TEST_ users test_wv_* were registered and later deleted. Their TEST_ properties (e.g. 8482c1b3-55ec-4162-ac7e-8e3b4f1a8264) were archived through the DB because there is no non-admin DELETE endpoint. f2342766 was restored to https://www.youtube.com/watch?v=XgfKgbQhtNs. Two orphan upload objects remain in storage.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_walkthrough_video.py -n0 -q. The suite restores f2342766 at teardown. Clean up with the TEST_ title regex and test_wv_ emails. In the submit-property UI, scroll elements to center before force-clicking: the sticky Continue bar covers the lower part of the screen. Photos can be added on web through page.expect_file_chooser on picker-library.",
+  "rca_of_issue": ""
+}

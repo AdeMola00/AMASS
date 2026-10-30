@@ -135,6 +135,8 @@ class Property(BaseModel):
     longitude: float
     images: List[str] = []
     amenities: List[str] = []
+    # Walkthrough video (Redfin-style camera badge) — see walkthrough_video.py for the shape
+    walkthrough_video: Optional[dict] = None
     status: Literal["available", "coming_soon", "verified", "premium", "sold"] = "available"
     verified: bool = False
     agent_id: Optional[str] = None
@@ -625,6 +627,7 @@ async def get_property(
             "approx": True,
             "image_count": max(len(gallery), 1 if first_image else 0),
             "images": [first_image] if first_image else [],
+            "has_video": bool((doc.get("walkthrough_video") or {}).get("url")),
             "amenities": [],
             "status": doc.get("status", "available"),
             "verified": doc.get("verified", False),
@@ -655,6 +658,7 @@ async def get_property(
     # Agent PRIVATE contact (phone/email) stays gated behind the agent tier.
     doc["views_recent"] = doc.get("views_recent", 0)
     doc["favorites_recent"] = doc.get("favorites_recent", 0)
+    doc["has_video"] = bool((doc.get("walkthrough_video") or {}).get("url"))
     doc.update(_docs_summary(doc))
     if doc.get("agent_id"):
         _agent_user = await db.users.find_one({"id": doc["agent_id"]}, {"_id": 0, "identity_verified": 1})
@@ -748,6 +752,8 @@ class PropertyCreateIn(BaseModel):
     amenities: List[str] = []
     year_built: Optional[int] = None
     parking: Optional[int] = None
+    # Optional walkthrough: YouTube / Vimeo link or an uploaded video URL (see /uploads/video/*)
+    walkthrough_video_url: Optional[str] = None
     # Trust & authority
     is_owner: bool = False
     has_mandate: bool = False
@@ -774,9 +780,12 @@ async def create_property(data: PropertyCreateIn, user: dict = Depends(get_curre
         # Agent is marketing without a confirmed mandate
         listing_source = "independent"
 
-    prop_kwargs = data.model_dump(exclude={"is_owner", "has_mandate", "mandate"})
+    from walkthrough_video import parse_video_link
+
+    prop_kwargs = data.model_dump(exclude={"is_owner", "has_mandate", "mandate", "walkthrough_video_url"})
     prop = Property(
         **prop_kwargs,
+        walkthrough_video=parse_video_link(data.walkthrough_video_url),
         status="coming_soon",
         verified=False,
         agent_id=user["id"],
@@ -2272,6 +2281,9 @@ from admin_accounts import register_admin_accounts_routes  # noqa: E402
 
 app.include_router(register_admin_accounts_routes(db, require_admin))
 from social_publishing import register_social_routes  # noqa: E402
+from walkthrough_video import register_walkthrough_routes  # noqa: E402
+
+app.include_router(register_walkthrough_routes(db, get_current_user))
 
 _social_admin, _social_public = register_social_routes(db, require_admin)
 app.include_router(_social_admin)
@@ -2413,6 +2425,12 @@ async def on_startup():
             logger.info("demo homes seed: %s", await seed_demo_homes(db, Property, hash_password))
         except Exception as _e:  # never block boot
             logger.warning("demo homes seed failed: %s", _e)
+        try:
+            from walkthrough_video import seed_demo_walkthroughs
+
+            logger.info("walkthrough seed: %s", await seed_demo_walkthroughs(db))
+        except Exception as _e:  # never block boot
+            logger.warning("walkthrough seed failed: %s", _e)
 
         async def _reminder_loop():
             while True:

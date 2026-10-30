@@ -25,14 +25,18 @@ const CARET = 7;
 export const PIN_H = PILL_H + CARET + 7;
 /** Widest label ("₦8.5M/yr" with a heart) — the fit keeps coordinates this far from the side edges. */
 export const PIN_HALF_W = 62;
-/** Per-pin half width: ~5 px per glyph at this size plus padding, dot and border. */
-export const pinHalfWidth = (pin: Pin) => 22 + markerPrice(pin).length * 5.4;
+/** Per-pin half width: ~5 px per glyph at this size plus padding, dot and border (+ the camera tab when there's a walkthrough). */
+export const pinHalfWidth = (pin: Pin) => 22 + markerPrice(pin).length * 5.4 + (pin.has_video ? 7 : 0);
 export const clusterSize = (count: number) => (count >= 100 ? 58 : count >= 10 ? 52 : 46);
+
+/** Walkthrough-video purple — Redfin's "has 3D / video tour" cue; deliberately the same in both themes so it reads on any map. */
+export const WALKTHROUGH_PURPLE = "#7C3AED";
 
 export function PricePin({ pin, state, testID }: { pin: Pin; state: PinState; testID?: string }) {
   const { colors } = useTheme();
   const tint = kindColor(pin); // Sale green · Rent red · Lease blue
   const dark = "#111111";
+  const hasVideo = !!pin.has_video;
 
   const look = (() => {
     switch (state) {
@@ -50,16 +54,24 @@ export function PricePin({ pin, state, testID }: { pin: Pin; state: PinState; te
   })();
 
   return (
-    <View style={[styles.wrap, { transform: [{ scale: look.scale }] }]} collapsable={false} testID={testID}>
-      <View style={[styles.pill, { backgroundColor: look.bg, borderColor: look.border, borderWidth: state === "unlocked" ? 2 : 1.5 }]}>
-        {state === "saved" ? <Ionicons name="heart" size={13} color="#FFFFFF" /> : state === "unlocked" ? <Ionicons name="lock-open" size={12} color={colors.mass} /> : null}
-        <AppText color={look.fg} tabular numberOfLines={1} style={styles.price}>
-          {markerPrice(pin)}
-        </AppText>
+    <View style={[styles.wrap, hasVideo && styles.wrapVideo, { transform: [{ scale: look.scale }] }]} collapsable={false} testID={testID} accessibilityLabel={hasVideo ? `${markerPrice(pin)}, has walkthrough video` : undefined}>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {/* Camera tab — sits on the pill's left shoulder like Redfin's video-tour cue, in walkthrough purple. */}
+        {hasVideo ? (
+          <View style={[styles.camera, { backgroundColor: WALKTHROUGH_PURPLE }]} testID={`pin-video-${pin.id}`}>
+            <Ionicons name="videocam" size={11} color="#FFFFFF" />
+          </View>
+        ) : null}
+        <View style={[styles.pill, { backgroundColor: look.bg, borderColor: look.border, borderWidth: state === "unlocked" ? 2 : 1.5 }, hasVideo && styles.pillWithCamera]}>
+          {state === "saved" ? <Ionicons name="heart" size={13} color="#FFFFFF" /> : state === "unlocked" ? <Ionicons name="lock-open" size={12} color={colors.mass} /> : null}
+          <AppText color={look.fg} tabular numberOfLines={1} style={styles.price}>
+            {markerPrice(pin)}
+          </AppText>
+        </View>
       </View>
       <View style={[styles.caret, { borderTopColor: look.caret }]} />
       {pin.boosted && state !== "selected" ? (
-        <View style={[styles.boost, { backgroundColor: colors.mass }]} testID={`pin-boost-${pin.id}`}>
+        <View style={[styles.boost, { backgroundColor: colors.mass }, hasVideo && { left: 12, top: 0 }]} testID={`pin-boost-${pin.id}`}>
           <Ionicons name="rocket" size={9} color="#1A1200" />
         </View>
       ) : null}
@@ -82,6 +94,25 @@ export function ClusterPin({ count, testID }: { count: number; testID?: string }
 
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", paddingHorizontal: 6, paddingTop: 6, paddingBottom: 2 },
+  wrapVideo: { paddingLeft: 10 },
+  /** Redfin-style video-tour tab: a small purple rounded square tucked against the pill's left shoulder. */
+  camera: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: -6,
+    zIndex: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 5,
+  },
+  pillWithCamera: { paddingLeft: 14 },
   pill: {
     height: PILL_H,
     paddingHorizontal: 11,

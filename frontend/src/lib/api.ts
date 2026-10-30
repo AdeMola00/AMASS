@@ -25,6 +25,14 @@ export type ListingStory = {
   brand: { name: string; tagline: string; domain: string; accent: string; ink: string };
 };
 
+export type WalkthroughVideo = {
+  url: string;
+  provider: "youtube" | "vimeo" | "upload";
+  video_id?: string | null;
+  embed_url?: string | null;
+  thumbnail?: string | null;
+};
+
 export type Property = {
   id: string;
   title: string;
@@ -80,6 +88,9 @@ export type Property = {
   approx?: boolean;
   /** Locked preview: how many photos unlock (the full gallery is gated). */
   image_count?: number;
+  /** Walkthrough video — `has_video` is public, the video comes with the unlock. */
+  has_video?: boolean;
+  walkthrough_video?: WalkthroughVideo | null;
   /** Title documents (C of O, survey plan…) reviewed by AMASS — public trust signal, no files. */
   documents_verified?: boolean;
   documents_status?: "none" | "pending" | "verified" | "rejected";
@@ -619,6 +630,8 @@ async function authHeaders(): Promise<Record<string, string>> {
   const token = await storage.secureGet<string>(AUTH_KEY, "");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
+/** Bearer headers for callers outside this module (e.g. multipart uploads in src/utils/upload.ts). */
+export const getAuthHeaders = authHeaders;
 
 /** Error carrying HTTP status + structured `detail` (e.g. {code:"UNLOCK_REQUIRED", fee, balance}). */
 export class ApiError extends Error {
@@ -807,6 +820,8 @@ export type MapMarker = {
   images?: string[] | null;
   /** Total photos on the listing (locked homes still learn how many unlock). */
   image_count?: number;
+  /** Listing has a walkthrough video (camera badge on the pin); the video itself unlocks with the gallery. */
+  has_video?: boolean;
   bedrooms?: number | null;
   bathrooms?: number | null;
   size_sqm?: number | null;
@@ -1615,6 +1630,8 @@ export const api = {
   neighborhoods: () => req<Neighborhood[]>("/neighborhoods"),
 
   // Agent
+  /** Add / replace (url) or remove (null) the walkthrough video on a listing you own. */
+  setWalkthrough: (property_id: string, url: string | null) => req<{ ok: boolean; has_video: boolean; walkthrough_video?: WalkthroughVideo | null }>(`/properties/${encodeURIComponent(property_id)}/walkthrough`, { method: "PATCH", body: JSON.stringify({ url }) }),
   createProperty: (data: {
     title: string;
     description: string;
@@ -1633,6 +1650,8 @@ export const api = {
     amenities: string[];
     year_built?: number;
     parking?: number;
+    /** YouTube / Vimeo link or an uploaded video URL (see uploadVideoChunked). */
+    walkthrough_video_url?: string;
     is_owner?: boolean;
     has_mandate?: boolean;
     mandate?: {

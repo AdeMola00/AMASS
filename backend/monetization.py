@@ -995,7 +995,7 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
             query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
         docs = await db.properties.find(query, {"_id": 0, "id": 1, "title": 1, "listing_type": 1, "property_type": 1, "latitude": 1, "longitude": 1, "agent_id": 1, "verified": 1, "promotion": 1,
                                                "price": 1, "image": 1, "images": 1, "bedrooms": 1, "bathrooms": 1, "size_sqm": 1, "city": 1, "state": 1, "location": 1, "status": 1, "is_amass_exclusive": 1, "documents_verified": 1,
-                                               "ai_valuation": 1, "investment_score": 1, "amenities": 1, "year_built": 1, "parking": 1, "views_count": 1}).limit(min(limit, 500)).to_list(500)
+                                               "ai_valuation": 1, "investment_score": 1, "amenities": 1, "year_built": 1, "parking": 1, "views_count": 1, "walkthrough_video.url": 1}).limit(min(limit, 500)).to_list(500)
         from promotions import active_promotion as _active_promo
         from tokens import is_free_amass_sale as _is_free_sale
         ent_ids = {e["target_id"] for e in await db.entitlements.find({"user_id": user["id"], "feature_key": "property", "status": "active"}, {"_id": 0, "target_id": 1}).to_list(2000)}
@@ -1041,6 +1041,8 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
                 # The gallery itself is part of the unlock: only unlocked/free homes get it; everyone learns the count.
                 "images": gallery[:8] if unlocked else None,
                 "image_count": len(gallery) or (1 if d.get("image") else 0),
+                # Walkthrough: everyone sees the camera badge; the video itself unlocks with the gallery.
+                "has_video": bool((d.get("walkthrough_video") or {}).get("url")),
                 "documents_verified": bool(d.get("documents_verified")),
                 "bedrooms": d.get("bedrooms"), "bathrooms": d.get("bathrooms"), "size_sqm": d.get("size_sqm"),
                 "city": d.get("city"), "place": d.get("location") if unlocked else d.get("city"),
@@ -1313,6 +1315,7 @@ async def annotate_properties(db: AsyncIOMotorDatabase, docs: list[dict], user_i
         p["access_cost"] = fee
         p["zone_tier"] = zone
         p["unlocked"] = is_free or p["id"] in ent_ids or (user_id is not None and p.get("agent_id") == user_id)
+        p["has_video"] = bool((p.get("walkthrough_video") or {}).get("url"))
         if not p["unlocked"]:
             # Teaser tier only — same gate as GET /properties/{id} and /map/markers: the front photo,
             # city-level place and an approximate pin. Gallery, street address and the agent stay paid.
@@ -1320,6 +1323,7 @@ async def annotate_properties(db: AsyncIOMotorDatabase, docs: list[dict], user_i
             first_image = p.get("image") or (gallery[0] if gallery else None)
             p["image_count"] = max(len(gallery), 1 if first_image else 0)
             p["images"] = [first_image] if first_image else []
+            p.pop("walkthrough_video", None)
             p["location"] = p.get("city") or ""
             if p.get("latitude") is not None and p.get("longitude") is not None:
                 p["latitude"], p["longitude"] = _jitter(p["id"], p["latitude"], p["longitude"])
