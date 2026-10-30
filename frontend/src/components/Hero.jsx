@@ -6,6 +6,7 @@ import { MarkerField } from "@/components/MapMarker";
 import { useLeadForm } from "@/context/LeadFormProvider";
 import { useContent } from "@/context/ContentProvider";
 import Magnetic from "@/components/anim/Magnetic";
+import { StoreBadges } from "@/components/StoreBadges";
 
 const EASE = [0.16, 1, 0.3, 1];
 const TRUST_ICONS = [ShieldCheck, Sparkles, Lock, MapPinned];
@@ -44,7 +45,7 @@ export default function Hero() {
   const overlayOpacity = useTransform(scrollYProgress, [0, 1], [1, 1.4]);
 
   return (
-    <section ref={ref} id="top" className="relative isolate h-[100svh] min-h-[720px] w-full overflow-hidden bg-brand-charcoal">
+    <section ref={ref} id="top" className="relative isolate min-h-[100svh] w-full overflow-hidden bg-brand-charcoal">
       {/* Aerial background with parallax */}
       <motion.div style={{ y, scale }} className="absolute inset-0 z-0">
         <img
@@ -79,7 +80,7 @@ export default function Hero() {
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 1.4, duration: 0.8, ease: EASE }}
-        className="absolute right-4 top-28 z-30 hidden flex-col gap-2 rounded-2xl glass-dark border border-white/10 p-4 md:flex"
+        className="absolute right-4 top-36 z-30 hidden flex-col gap-2 rounded-2xl glass-dark border border-white/10 p-4 md:flex"
         data-testid="marker-legend"
       >
         <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">Live Listings</p>
@@ -92,7 +93,7 @@ export default function Hero() {
       </motion.div>
 
       {/* Content */}
-      <div className="relative z-10 mx-auto flex h-full max-w-[1400px] flex-col justify-end px-6 pb-24 md:px-12 md:pb-32">
+      <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-[1400px] flex-col justify-end px-6 pb-20 pt-36 md:px-12 md:pb-16">
         <motion.p
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -144,7 +145,7 @@ export default function Hero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.3, duration: 0.9 }}
-          className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3"
+          className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-3"
         >
           {trust.map((t, i) => {
             const Icon = TRUST_ICONS[i % TRUST_ICONS.length];
@@ -156,17 +157,16 @@ export default function Hero() {
           })}
         </motion.div>
 
-        {/* Inline app download reminder */}
+        {/* App download badges */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.5, duration: 0.9 }}
-          className="mt-5 flex items-center gap-3 text-xs font-medium text-white/80"
+          className="mt-6"
           data-testid="hero-app-downloads"
         >
-          <span className="hidden sm:inline">Download the app:</span>
-          <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1">App Store</span>
-          <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1">Google Play</span>
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-white/80">Download the app</p>
+          <StoreBadges size="lg" testids={{ ios: "hero-app-store-btn", android: "hero-play-store-btn" }} />
         </motion.div>
       </div>
     </section>

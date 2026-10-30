@@ -8,7 +8,6 @@ import { ContentProvider, useContent } from "@/context/ContentProvider";
 
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import SearchBar from "@/components/SearchBar";
 import CategorySection from "@/components/CategorySection";
 import Marquee from "@/components/Marquee";
 import Pillars from "@/components/Pillars";
@@ -32,7 +31,6 @@ function Landing() {
       <Navbar />
       <main>
         <Hero />
-        {on("search") && <SearchBar />}
         {on("marquee") && <Marquee />}
         {on("categories") && <CategorySection />}
         {on("pillars") && <Pillars />}

@@ -1,7 +1,8 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Apple, Play, Sparkles, Map, MessageCircle } from "lucide-react";
+import { Sparkles, Map, MessageCircle } from "lucide-react";
 import { Reveal } from "@/components/anim/Reveal";
+import { StoreBadges } from "@/components/StoreBadges";
 
 const SCREENS = [
   { img: "https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=600&auto=format&fit=crop", label: "Map", rotate: -6, y: 30 },
@@ -57,22 +58,7 @@ export default function MobileApp() {
               <span className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-brand-emerald" /> Secure Messages</span>
             </div>
 
-            <div className="mt-9 flex flex-wrap gap-3">
-              <button data-testid="app-store-btn" className="flex items-center gap-3 rounded-2xl bg-brand-charcoal px-6 py-3.5 text-white transition-transform hover:scale-[1.03] dark:bg-white dark:text-black">
-                <Apple className="h-6 w-6" />
-                <span className="text-left leading-tight">
-                  <span className="block text-[10px] uppercase tracking-wide opacity-70">Download on the</span>
-                  <span className="block text-sm font-semibold">App Store</span>
-                </span>
-              </button>
-              <button data-testid="play-store-btn" className="flex items-center gap-3 rounded-2xl border border-hairline px-6 py-3.5 text-ink transition-colors hover:bg-surface">
-                <Play className="h-6 w-6 text-brand-emerald" />
-                <span className="text-left leading-tight">
-                  <span className="block text-[10px] uppercase tracking-wide opacity-70">Get it on</span>
-                  <span className="block text-sm font-semibold">Google Play</span>
-                </span>
-              </button>
-            </div>
+            <StoreBadges size="lg" className="mt-9" testids={{ ios: "app-store-btn", android: "play-store-btn" }} />
           </Reveal>
 
           <div className="relative flex items-end justify-center gap-[-2rem]">

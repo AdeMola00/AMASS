@@ -44,3 +44,12 @@ final CTA, footer w/ newsletter, lead-capture forms, dark mode.
 - Frontend: ContentProvider fetches /api/content (fallback to static defaults); Hero/Stats/Testimonials/FAQ read from content; App.js honors sections visibility toggles.
 - Verified: testing_agent iteration_3 — backend 13/13, frontend 100%. Deep-merge partial updates curl-verified.
 - Note: production must be REDEPLOYED to expose the new API + content-driven build.
+
+## Update — Bigger Logo + Official Store Badges + Search Removed (2026-07)
+- User request: AMASS logo "much bigger"; add obvious iOS App Store + Google Play badges; users don't search for properties on the website.
+- Logo: Navbar 38px -> 64px, Footer 46px -> 80px (Logo.jsx unchanged, exact artwork preserved).
+- New `StoreBadges.jsx`: official-style black badges with inline SVG Apple logo + 4-colour Google Play triangle; sizes md/lg; clicking opens waiting-list lead form. Used in Hero (hero-app-store-btn / hero-play-store-btn), MobileApp (keeps app-store-btn / play-store-btn), FinalCTA (final-app-store-btn / final-play-store-btn; replaced ghost "Download App" button, final-download-btn testid removed).
+- SearchBar section REMOVED (component deleted; "search" key removed from DEFAULT_CONTENT sections and unset from live site_content doc).
+- Hero: section/content now min-h-[100svh] with pt-36 so taller navbar + badges never clip the H1; legend moved top-28 -> top-36; tightened bottom padding/margins so badges sit near the fold.
+- Verified: screenshots at 375/768/1366 (no clipping), badge click opens waiting-list dialog, GET /api/content healthy without "search" key.
+- NOTE: a deployment was in progress while these changes were made — they are in PREVIEW only; press Deploy/Redeploy to ship them live.

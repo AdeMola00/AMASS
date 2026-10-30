@@ -58,7 +58,7 @@ export default function Footer() {
         <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr]">
           <div>
             <button onClick={() => scrollToSection("#top")} className="flex items-center">
-              <Logo height={46} chip />
+              <Logo height={80} chip />
             </button>
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/60">
               Africa's intelligent property discovery, real estate, construction and home

@@ -1,7 +1,8 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Download } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { IMAGES } from "@/data/content";
+import { StoreBadges } from "@/components/StoreBadges";
 import { Reveal } from "@/components/anim/Reveal";
 import { useLeadForm } from "@/context/LeadFormProvider";
 import Magnetic from "@/components/anim/Magnetic";
@@ -47,15 +48,7 @@ export default function FinalCTA() {
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </button>
               </Magnetic>
-              <Magnetic>
-                <button
-                  onClick={() => openForm("waiting_list")}
-                  data-testid="final-download-btn"
-                  className="flex items-center gap-2 rounded-full border border-white/30 glass-dark px-9 py-4 text-sm font-semibold text-white transition-colors hover:bg-white hover:text-black"
-                >
-                  <Download className="h-4 w-4" /> Download App
-                </button>
-              </Magnetic>
+              <StoreBadges size="lg" testids={{ ios: "final-app-store-btn", android: "final-play-store-btn" }} />
             </div>
           </Reveal>
         </div>

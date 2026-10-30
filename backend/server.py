@@ -130,7 +130,7 @@ DEFAULT_CONTENT: Dict[str, Any] = {
         {"q": "Does AMASS offer financing?", "a": "Yes — mortgages, BNPL, property financing and insurance through our vetted financial partners."},
     ],
     "sections": {
-        "search": True, "marquee": True, "categories": True, "pillars": True,
+        "marquee": True, "categories": True, "pillars": True,
         "showcase": True, "stats": True, "howItWorks": True, "agents": True,
         "constructionPros": True, "homeMarketplace": True, "mobileApp": True,
         "testimonials": True, "faq": True, "finalCta": True,
