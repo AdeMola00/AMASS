@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 5 validated the portal_proxy.py switch to the REMOTE LIVE AMASS backend (https://property-os-africa.emergent.host/api/portal) in STRICT READ-ONLY mode. Created /app/backend/tests/test_portal_proxy_readonly.py (35 GET-only tests incl. login) -> 35/35 PASSED in 12.17s. Confirmed live stats exactly match expectation: total_properties=55, registered_users=150, registered_agents=27. Proxy gating verified: GET /api/properties unauth -> 401, bad token -> 401, with admin bearer -> 200 live list (55). Local routes stay local: /api/auth/*, /api/admin-users, /api/roles, /api/public/* all 200. Leads CSV export returns text/csv with Content-Disposition attachment. Frontend Playwright (desktop 1920 + mobile 390): admin login works, dashboard shows live stats, and ALL 20 admin pages render live data with NO page/console errors, NO 4xx/5xx API calls, and only GET + the login POST were ever sent (read-only respected; zero writes). Live data visible: Properties 55, Agents 27, Users 150, Marketplace 101 products/6 cats, Tokens 5 bundles/3 plans/8 rewards/100 wallets, Transactions 12, App-config 12 sections, Analytics/Reports KPIs populated. Empty-by-design pages confirmed empty without error: Developers, Property Owners, Media, Notifications, AI history, CMS sections, dashboard activities. Mobile 390px: no horizontal overflow (scrollWidth=390), drawer menu + bottom tabbar navigation both work. Auth hardening: bcrypt hashes are $2b$, login sets HttpOnly+Secure+SameSite=None cookie, seed_admin is idempotent (inserts only if missing). HOWEVER found 1 CRITICAL security hole in portal_proxy.py and 2 security concerns (CORS + no brute-force lockout).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "/api/media/file/..%2f..%2f<module>", "issue": "AUTH BYPASS: portal_proxy.register() skips _authorize() for any path whose first two segments are media/file. Using URL-encoded path traversal (e.g. GET /api/media/file/..%2f..%2fproperties or ..%2f..%2fagents) bypasses the local JWT/RBAC check entirely and the request is forwarded to the live production backend with the X-AMASS-Portal-Key. Starlette does NOT normalize %2f, so parts[0] stays 'media', auth is skipped, and the remote server normalizes the traversal and returns the real live list. Confirmed: both /properties and /agents returned HTTP 200 with full live data WITHOUT any auth token. This exposes the customer's live production data to any anonymous internet user.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "CORS (server.py add_middleware)", "issue": "CORS_ORIGINS defaults to '*' while allow_credentials=True. OPTIONS preflight reflects an arbitrary Origin (tested https://evil.com) back with access-control-allow-credentials: true, allowing any website to make credentialed cross-site requests. '*' + credentials is an invalid/insecure combo; set explicit allowed origins."},
+      {"endpoint": "/api/auth/login", "issue": "No brute-force lockout. 7 consecutive failed logins all returned 401 with no 429/lockout/backoff. Playbook expects lockout after 5 failures. (Tested only against a non-existent account to avoid locking the real admin.)"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Analytics vs Dashboard", "issues": ["Cosmetic data-source divergence: Dashboard 'Total Properties'=55 (dashboard/stats from remote) but Analytics 'Total Listings'=55 and 'Approved'=50 while Dashboard 'Pending Approvals'=6 — numbers come from two different remote aggregates and may look inconsistent to users (e.g. est. token revenue=2,000, active plans=1 on Analytics). Not an error, just noting live aggregates differ by endpoint."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_portal_proxy_readonly.py",
+    "/app/test_reports/pytest/pytest_portal_iter5.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Fix auth bypass in portal_proxy.py. The media/file public exception must reject path traversal. Suggest: after computing sub, reject if '%2f', '%2F', '..' present, or decode+normalize the path BEFORE the parts[0] check, or only allow the exception when the path matches exactly /api/media/file/<single-token>. Re-run test_portal_proxy_readonly.py + a new bypass regression test after fixing.",
+    "Set explicit CORS_ORIGINS (frontend preview origin + production) in backend/.env instead of '*', since allow_credentials=True.",
+    "Add brute-force lockout / rate limiting on /api/auth/login (playbook requires lockout after 5 fails)."
+  ],
+  "critical_code_review_comments": [
+    "portal_proxy.py: the `if not (parts[0]=='media' and parts[1]=='file')` guard that skips authorization is the root cause of the traversal auth-bypass; path must be normalized/validated before this check.",
+    "portal_proxy.py _forward: forwards raw request path `sub` to the remote without sanitizing traversal sequences — relies on the remote to normalize, which is exactly what enables the bypass to return arbitrary modules.",
+    "portal_proxy.py: a single module-level httpx.AsyncClient is created but server.py shutdown handler calls `client.close()` on the Mongo client, not the httpx client — the httpx proxy client is never closed (minor resource leak).",
+    "CORS middleware is added AFTER portal_proxy.register() and app.include_router — ordering is fine functionally, but '*'+credentials remains insecure."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_portal_proxy_readonly.py",
+    "/app/test_reports/iteration_5.json"
+  ],
+  "success_rate": {"backend": "100% functional (35/35 read-only tests pass; live data correct); security: 1 critical bypass found", "frontend": "100% (all 20 pages render live data, desktop + mobile, read-only respected)"},
+  "test_credentials": "admin@amass.africa / ya0y9os77F@c8TXXh5@A (super_admin); finance@amass.africa / Amass@2026 (403 on gated modules, RBAC verified)",
+  "seed_data_creation": "None. Strictly read-only against live backend. Zero write requests sent (verified via request interception: only GET + one auth/login POST).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The dashboard is now wired to the REMOTE live backend via portal_proxy.py. DO NOT create/edit/delete anything (real production data). Functional migration is fully working. The one must-fix is the media/file path-traversal auth bypass (GET /api/media/file/..%2f..%2fproperties returns live data with no token). Re-run /app/backend/tests/test_portal_proxy_readonly.py (use `pytest -n 0` since pytest.ini forces xdist loadscope). After the bypass fix, add a regression assert that /api/media/file/..%2f..%2fproperties returns 401.",
+  "rca of the issue": "AUTH BYPASS RCA: portal_proxy.register() intentionally skips local JWT/RBAC authorization for public media files matching parts[0]=='media' && parts[1]=='file'. Starlette/FastAPI does not percent-decode %2f in request.url.path, so a crafted path /api/media/file/..%2f..%2fproperties keeps parts[0]=='media' (auth skipped) while the raw `sub` string ('media/file/..%2f..%2fproperties') is forwarded to the remote AMASS backend, which URL-normalizes the traversal to /properties and returns live data. The plain (non-encoded) /api/media/file/../../properties is normalized by Starlette to /api/properties BEFORE routing, so it correctly hits the authorized branch and returns 401 — proving it is specifically the %2f encoding that defeats the guard. Reproduction: curl 'https://amass-control.preview.emergentagent.com/api/media/file/..%2f..%2fproperties' -> 200 live JSON (no auth). Mitigation: normalize/decode and reject '..' and '%2f'/'%2F' in the proxied sub before the media/file exception, or restrict the public exception to a strict single-segment media id pattern."
+}

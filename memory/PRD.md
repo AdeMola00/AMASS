@@ -58,6 +58,14 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Unlocked modules now built: developers, property_owners, transactions, payments. Placeholders remaining: construction, home-marketplace (dedicated), subscriptions (billing engine), messages.
 - Verified via API + screenshots. **Note**: Paystack is in TEST mode (test secret key). Token-bundle success does not auto-credit wallets yet (no verified user↔email mapping) — add on webhook once end-user auth lands.
 
+
+## Updated (2026-10-30) — Dashboard switched to live AMASS backend
+- User request: "Connect this dashboard to our backend at https://property-os-africa.emergent.host/api/portal ... send it as the HTTP header X-AMASS-Portal-Key on every request ... switch it to call those /api/portal endpoints instead so it reads the same live data."
+- `backend/portal_proxy.py` middleware: every /api/* request except auth, public, admin-users, roles is checked against the local JWT + RBAC, then forwarded to AMASS_PORTAL_BASE_URL with X-AMASS-Portal-Key (key lives only in backend .env).
+- Local still: admin login, admin users, roles, /api/public/* (landing/app feeds still read the local DB).
+- Path traversal hardening (encoded ../ blocked with 400). Read-only test iteration_5: 35/35 API, 20/20 pages live.
+- Open (pre-existing): CORS_ORIGINS='*' with credentials; no login brute-force lockout.
+
 ## Architecture note (extensibility)
 - New modules live in `/app/backend/modules_ext.py` registering on the shared `api` router — future modules (vehicles, auctions, tokenization, AI valuation, multi-country) follow the same additive pattern. Tech debt: extract a `routers/` package + `deps.py` as this grows.
 

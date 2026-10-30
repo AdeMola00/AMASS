@@ -1,4 +1,5 @@
 import os
+from urllib.parse import unquote
 import httpx
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse, Response
@@ -55,11 +56,16 @@ def register(app):
         path = request.url.path
         if not path.startswith("/api/") or request.method == "OPTIONS":
             return await call_next(request)
+        raw = request.scope.get("raw_path", b"").decode("latin-1")
+        decoded = unquote(unquote(raw))
+        if ".." in decoded or "\\" in decoded or "%" in decoded.split("?")[0]:
+            return JSONResponse({"detail": "Invalid path"}, status_code=400)
         sub = path[len("/api/"):].strip("/")
         parts = sub.split("/") if sub else [""]
         if parts[0] in ("",) + LOCAL_PREFIXES:
             return await call_next(request)
-        if not (parts[0] == "media" and len(parts) > 1 and parts[1] == "file"):
+        is_media_file = request.method == "GET" and parts[0] == "media" and len(parts) > 2 and parts[1] == "file"
+        if not is_media_file:
             try:
                 await _authorize(request, parts)
             except HTTPException as e:
