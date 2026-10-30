@@ -1,0 +1,20 @@
+{
+  "summary": "Backend + frontend testing for AMASS landing refresh (fixa_provider lead form, dual applications, FIXA section, pillars, hero legend, footer legal/contact dialogs, mobile). Backend: 16/16 pytest cases pass including new fixa_provider lead creation, become_agent regression, invalid form_type -> 400, admin stats/filter/CMS/reset. Frontend: all requested data-testids present and functional; no console errors; mobile 390px has no horizontal overflow; theme toggle works; both application dialogs show the approval chip; legal and contact dialogs open from footer.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "No rate limiting on public /api/leads /api/newsletter — spam vector; add throttling or captcha.",
+    "VALID_FORMS is a flat set; consider mapping form_type to allowed required-field validators (e.g. require name for applications, phone optional, etc.) for stronger server-side validation.",
+    "CORS allow_origins defaults to '*' with allow_credentials=True — browsers will reject credentialed requests. Acceptable for key-based machine traffic but worth documenting."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% (all requested flows)"},
+  "test_credentials": "ADMIN_API_KEY read from /app/backend/.env",
+  "seed_data_creation": "A few TEST_ leads (fixa_provider, become_agent, contact) and newsletter signups created during tests. Content was reset via /api/admin/content/reset after CMS tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend fixa_provider path verified end-to-end (POST->admin list). Frontend uses Lenis + framer-motion whileInView — remember to scroll elements into view before clicking (we did this for fixa-section, agents-cta, footer links). Logo at /amass-logo.png, FIXA PRO at /fixa-pro.png. Legal dialog is a single component reused for Privacy/Terms with data-testid=legal-dialog.",
+  "rca of the issue": "N/A — no issues found."
+}

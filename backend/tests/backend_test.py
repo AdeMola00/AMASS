@@ -65,6 +65,40 @@ def test_admin_stats():
     assert isinstance(d["recent"], list)
 
 
+# ---------- fixa_provider & become_agent leads ----------
+def test_create_lead_fixa_provider():
+    email = f"fx_{uuid.uuid4().hex[:8]}@example.com"
+    r = requests.post(f"{API}/leads", json={
+        "form_type": "fixa_provider", "name": "TEST_Fixa", "email": email,
+        "message": "I want to join FIXA"
+    }, timeout=15)
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["form_type"] == "fixa_provider"
+    assert d["email"] == email
+    assert d["status"] == "new"
+    # Verify in admin list
+    r2 = requests.get(f"{API}/admin/leads?form_type=fixa_provider", headers=HDR, timeout=15)
+    assert r2.status_code == 200
+    assert any(l["id"] == d["id"] for l in r2.json())
+
+
+def test_create_lead_become_agent():
+    email = f"ag_{uuid.uuid4().hex[:8]}@example.com"
+    r = requests.post(f"{API}/leads", json={
+        "form_type": "become_agent", "name": "TEST_Agent", "email": email,
+    }, timeout=15)
+    assert r.status_code == 201
+    assert r.json()["form_type"] == "become_agent"
+
+
+def test_create_lead_invalid_form_type_400():
+    r = requests.post(f"{API}/leads", json={
+        "form_type": "bogus_form", "email": "x@example.com"
+    }, timeout=15)
+    assert r.status_code == 400
+
+
 # ---------- Leads create + filter + patch ----------
 @pytest.fixture(scope="module")
 def created_lead():
