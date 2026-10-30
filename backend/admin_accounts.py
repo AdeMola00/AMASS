@@ -94,8 +94,12 @@ def register_admin_accounts_routes(db, require_admin) -> APIRouter:
     @router.post("/portal-connection/key", status_code=201)
     async def portal_key_create(body: Optional[dict] = None, admin: dict = Depends(require_admin)):
         from portal_keys import create_key
+        from public_url import public_api_base
 
-        return await create_key(db, admin, (body or {}).get("label"))
+        base = public_api_base()
+        # `api_base` tells the admin which backend this key belongs to — a key minted on the preview
+        # API is unknown to the live API (separate databases) and vice-versa.
+        return {**(await create_key(db, admin, (body or {}).get("label"))), "api_base": f"{base}/api/portal" if base else None}
 
     @router.delete("/portal-connection/key")
     async def portal_key_revoke(admin: dict = Depends(require_admin)):

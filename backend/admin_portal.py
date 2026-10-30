@@ -202,7 +202,15 @@ def register_admin_portal_routes(db: AsyncIOMotorDatabase, admin_emails: set[str
 
         raw = request.headers.get("x-amass-portal-key") or (creds.credentials if creds and creds.credentials.startswith(PREFIX) else None)
         if raw:
-            acc = await authenticate_key(db, raw, actor=request.headers.get("x-amass-portal-actor"))
+            try:
+                acc = await authenticate_key(db, raw, actor=request.headers.get("x-amass-portal-actor"))
+            except HTTPException as e:
+                if e.status_code != 401:
+                    raise
+                # Name the API that rejected the key: the usual cause is a key generated against a different
+                # environment (preview vs live — separate databases), which this makes obvious in the portal.
+                host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "this API").split(",")[0].strip()
+                raise HTTPException(401, f"Invalid or revoked Admin Portal key — no active key matches on {host}. Generate the key in the AMASS app that is connected to this same API, then paste it into the portal.")
             acc["permissions"] = default_permissions("super_admin")
             return acc
         # 2) Scoped staff token issued by /auth/login

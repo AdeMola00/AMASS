@@ -95,16 +95,31 @@ export default function AdminPortalConnectionScreen() {
   }
 
   const connected = !!data?.key;
+  const apiHost = data?.api_base ? data.api_base.replace(/^https?:\/\//, "").split("/")[0] : null;
+  const isPreview = !!apiHost && /preview\.emergentagent\.com$/i.test(apiHost);
 
   return (
     <Screen testID="admin-portal-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title="Admin Portal connection" subtitle="amass-control.emergent.host" />
+      <ScreenHeader title="Admin Portal connection" subtitle={apiHost ? `Keys for ${apiHost}` : "amass-control.emergent.host"} />
       <ScrollView contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: insets.bottom + 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.text} />} showsVerticalScrollIndicator={false}>
         {!data ? (
           <SkeletonRows rows={5} />
         ) : (
           <>
+            {isPreview ? (
+              <Card tone="soft" testID="admin-portal-env-warning">
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+                  <Ionicons name="warning" size={18} color={colors.warning} style={{ marginTop: 1 }} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <AppText variant="bodyMedium">You&apos;re on the preview backend</AppText>
+                    <AppText variant="caption" tone="secondary">
+                      Keys generated here only work for {apiHost}. Your live app uses a separate database, so to connect the Admin Portal to the live app, open the live app (from the deployment panel) and generate the key there.
+                    </AppText>
+                  </View>
+                </View>
+              </Card>
+            ) : null}
             <Card elevation="xs" testID="admin-portal-status">
               <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                 <View style={[styles.icon, { backgroundColor: connected ? colors.successSoft : colors.surfaceAlt }]}>
@@ -144,7 +159,7 @@ export default function AdminPortalConnectionScreen() {
                     <Button label="I've saved it" variant="ghost" size="sm" onPress={() => setFreshKey(null)} testID="admin-portal-key-dismiss" />
                   </View>
                   <AppText variant="micro" tone="tertiary">
-                    In the Admin Portal, paste it as the AMASS app key. Requests then carry X-AMASS-Portal-Key (or Authorization: Bearer). Add X-AMASS-Portal-Actor: Name &lt;email&gt; so the audit log names the staff member.
+                    {apiHost ? `Works only with the API at ${apiHost}. ` : ""}In the Admin Portal, paste it as the AMASS app key. Requests then carry X-AMASS-Portal-Key (or Authorization: Bearer). Add X-AMASS-Portal-Actor: Name &lt;email&gt; so the audit log names the staff member.
                   </AppText>
                 </View>
               </Card>
