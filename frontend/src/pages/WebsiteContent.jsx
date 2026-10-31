@@ -85,7 +85,7 @@ export default function WebsiteContent() {
           <h1 className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-2"><PenLine className="h-6 w-6 text-primary" /> Website Content</h1>
           <p className="text-muted-foreground text-sm mt-1">Edit your live AMASS landing page text and sections.{data.updated_at && ` Last saved ${new Date(data.updated_at).toLocaleString()}.`}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <a href="https://discover-properties-1.emergent.host" target="_blank" rel="noreferrer">
             <Button variant="outline" data-testid="website-open-site-button"><ExternalLink className="h-4 w-4 mr-2" /> Open website</Button>
           </a>

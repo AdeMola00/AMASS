@@ -124,7 +124,7 @@ export default function WebsiteLeads() {
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (error) return <Card className="p-8 text-center text-sm text-destructive" data-testid="website-leads-error">{error}</Card>;
 
-  const counts = STATUSES.reduce((a, s) => ({ ...a, [s]: leads.filter((l) => l.status === s).length }), {});
+  const counts = STATUSES.reduce((a, s) => ({ ...a, [s]: leads.filter((l) => l.form_type !== "newsletter" && l.status === s).length }), {});
 
   return (
     <div className="space-y-6" data-testid="website-leads-page">

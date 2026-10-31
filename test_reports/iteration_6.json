@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 6 tested the AMASS website integration (/api/website/*) against the LIVE site https://discover-properties-1.emergent.host. Backend: new /app/backend/tests/test_website_ext.py, 13/13 passed. Covered: 401 without JWT on stats/leads/newsletter/content/PATCH, 403 for the finance role on content, live stats (16 total, 4 newsletter), leads 16 and newsletter 4, invalid status returns 400, unknown lead returns 404, the TEST lead status round trip (contacted then new) and a content PUT round trip. Frontend desktop: on Website Leads the stat cards show 16/16/0/4, the Leads tab shows 12 rows, search for TEST_agent_ui returns 1 row, the Contact filter returns 4 and the Closed filter shows the empty state. On the Newsletter tab, 4 rows appear. Changing the TEST lead's status from the UI showed the toast 'Marked Contacted on the website', the stat updated and the live API returned contacted. It was then set back to new, also verified. Website Content: all 7 tabs render. Discard resets edits and disables Save again. Appending ' TEST' to the hero overline and saving showed the toast, the API returned the new text and the live website showed it. It was reverted and confirmed gone on the live site. Turning the marquee toggle off and saving set sections.marquee=false and made the live page shorter (12576 to 12434px); it was turned back on and saved. Key leak: the AMASS_WEBSITE_API_KEY value appears in no browser request or response (URLs, headers, JSON/JS bodies), not in bundle.js and not in frontend/src. The browser only talked to the preview host. Mobile 390px: Website Leads has no overflow. Website Content DOES overflow (scrollWidth 464). Regression: Dashboard, Leads and Properties load with no 4xx/5xx or page errors (read only). Final state: live content matches /app/memory/website_content_backup.json exactly (excluding updated_at) and every lead is still 'new'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "remote /admin/stats (passed through by /api/website/stats)", "issue": "by_status from the live website returns {closed:0,new:0,contacted:0} even though all 16 leads are status 'new'. This is a bug on the website side. The UI is not affected because it counts statuses itself from /leads."},
+      {"endpoint": "website_ext.py", "issue": "WEBSITE_BASE URL is hardcoded instead of read from env (env-var guideline)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "WebsiteContent header action buttons", "issue": "On mobile (390px) the page scrolls sideways (scrollWidth 464px) and 'Save to website' is cut off past the right edge. The button row `<div className=\"flex gap-2\">` cannot wrap. Fix: add flex-wrap (or w-full sm:w-auto) to that div.", "selector": "[data-testid='website-content-save-button']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Website Leads", "issues": ["The 'New' stat (16) counts newsletter sign-ups but the Leads tab shows 12 leads, which can confuse. Consider counting statuses from non-newsletter leads only.", "On mobile the leads table scrolls sideways inside its card (this is OK). The Form and Status columns are off-screen at first."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_website_ext.py", "/app/test_reports/pytest/pytest_website_iter6.xml"],
+  "action_items": [
+    "Fix the mobile overflow on /admin/website-content: make the header button container wrap (flex-wrap) so 'Save to website' stays visible at 390px.",
+    "Optional: move WEBSITE_BASE into backend/.env.",
+    "Optional: compute the Website Leads 'New'/'Contacted' stats from non-newsletter leads, or label them clearly."
+  ],
+  "critical_code_review_comments": [
+    "website_ext.py: the httpx AsyncClient is never closed on shutdown (minor leak, same as portal_proxy).",
+    "website_ext.py PUT /website/content accepts any Dict and forwards it as-is. One bad payload could wipe live content. Consider checking that the top-level keys (hero, sections, etc.) are present before forwarding.",
+    "WebsiteLeads.jsx: the Leads tab count uses leads.length - newsletter.length. That assumes /admin/leads always includes the newsletter rows (true today)."
+  ],
+  "updated_files": ["/app/backend/tests/test_website_ext.py", "/app/test_reports/iteration_6.json"],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "~95% (all flows work; 1 mobile overflow on Website Content)"},
+  "test_credentials": "admin@amass.africa / ya0y9os77F@c8TXXh5@A; finance@amass.africa / Amass@2026",
+  "seed_data_creation": "None. No leads were created. Every live change was reverted: the TEST lead is back to 'new', the hero overline is back to its original text and marquee is back on. Content matches the backup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with `pytest tests/test_website_ext.py -n 0` from /app/backend (export REACT_APP_BACKEND_URL). These tests write to the LIVE site, but only the TEST lead 8c46581b... and the hero overline, and both are restored in finally blocks. On the public site the hero overline is CSS-uppercased, so compare text case-insensitively. Backup: /app/memory/website_content_backup.json."
+}

@@ -66,6 +66,14 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Path traversal hardening (encoded ../ blocked with 400). Read-only test iteration_5: 35/35 API, 20/20 pages live.
 - Open (pre-existing): CORS_ORIGINS='*' with credentials; no login brute-force lockout.
 
+## Updated (2026-10-31) — Connected to the AMASS website
+- User request: "Also connect this dashboard to my AMASS website at https://discover-properties-1.emergent.host/api. Send the key I give you as the header X-API-Key on every request, and keep it server-side ... Add screens to read leads and newsletter sign-ups, change a lead's status, and edit the landing page text and sections."
+- `backend/website_ext.py`: /api/website/stats|leads|newsletter (leads view), PATCH /api/website/leads/{id} (leads edit, new/contacted/closed), GET/PUT /api/website/content (cms view/edit). Key AMASS_WEBSITE_API_KEY stays server-side.
+- New screens: Website Leads (/admin/website-leads) and Website Content (/admin/website-content, all text tabs + show/hide sections).
+- Tested against the live site (iteration_6): 13/13 API, all UI flows; every test edit reverted. Content backup: /app/memory/website_content_backup.json.
+- Note: the website's own /admin/stats by_status returns all zeros (website-side bug); the dashboard counts statuses itself.
+
+
 ## Architecture note (extensibility)
 - New modules live in `/app/backend/modules_ext.py` registering on the shared `api` router — future modules (vehicles, auctions, tokenization, AI valuation, multi-country) follow the same additive pattern. Tech debt: extract a `routers/` package + `deps.py` as this grows.
 
