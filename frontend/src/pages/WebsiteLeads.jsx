@@ -210,8 +210,8 @@ export default function WebsiteLeads() {
   const { markSeen } = useLeadAlerts();
   const [templates, setTemplates] = useState([]);
   const loadTemplates = () => api.get("/website/reply-templates").then((r) => setTemplates(r.data)).catch(() => {});
-  const [replyTimes, setReplyTimes] = useState({});
-  const loadReplyTimes = () => api.get("/website/reply-times").then((r) => setReplyTimes(r.data.replies)).catch(() => {});
+  const [replyTimes, setReplyTimes] = useState(null);
+  const loadReplyTimes = () => api.get("/website/reply-times").then((r) => setReplyTimes(r.data.replies)).catch(() => setReplyTimes(null));
   useEffect(() => { loadTemplates(); loadReplyTimes(); }, []);
 
   useEffect(() => { markSeen().then((v) => v && setNewSince((p) => (p && p < v ? p : v))).catch(() => {}); }, [markSeen]);

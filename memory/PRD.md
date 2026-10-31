@@ -88,6 +88,14 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Tested iteration_8 (16/16 API, all UI flows). Real digest delivered to hello@amass.africa.
 
 
+## Updated (2026-10-31d) — Reply Tracking + Weekly Lead Trends
+- User request: "Reply Tracking: Show in the digest and on each lead how long it took the team to reply, so slow responses stand out. Weekly Lead Trends: Add a Monday email comparing this week's website leads with last week's, by form type."
+- Choices: slow = more than 24h; Monday 8:00 am Lagos to hello@amass.africa, last full Mon–Sun week vs the week before.
+- Backend (digest_ext.py): /api/website/reply-times, reply-times section in daily digest, weekly trends email + POST /api/cron/weekly-trends + /api/website/weekly-trends/send-now. crons.yml adds weekly-lead-trends "0 8 * * 1" Africa/Lagos.
+- Frontend: Response column on Website Leads (Replied in X / Waiting X, red when >24h), weekly send-now button + schedule text.
+- Tested iteration_9 (14/14 API + UI). Reply times count emails sent from the dashboard only.
+
+
 
 
 ## Architecture note (extensibility)

@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 9: Reply Tracking and Weekly Lead Trends. Backend: new tests/test_reply_tracking_weekly.py, 14/14 passed. reply-times returns 401 without auth and 403 for finance. For admin it returns {slow_hours:24, replies:{}}. After inserting 2 TEST reply docs (+2h and +30h), it returned count 2 and first set to the earliest. Weekly cron: 401 with no Bearer and with a wrong Bearer. A valid Bearer with an existing X-Webhook-Id returns 202 {accepted:true, duplicate:true}; I used a pre-inserted TEST run so no email went out. A non-object body returns 400. crons.yml has weekly-lead-trends '0 8 * * 1' Africa/Lagos and daily-lead-digest. Finance gets 403 on weekly send-now and an unauthenticated call gets 401. Unit tests on _week_stats/_weekly_html use synthetic leads at the Mon-Sun Lagos boundaries (Sun 23:59 counted, next Mon 00:00 excluded). by_type is correct and newsletter is left out of avg_reply. The html has up/down arrows, '+50%', Total, avg first reply boxes and the empty-state text. Unit tests on _tracking/_digest_html: overdue holds only new non-newsletter leads waiting >24h without a reply, avg_7d/slow_7d are correct, the 'Reply times' section renders, names are HTML-escaped, and the 'replied in 30h' suffix shows. I also ran full build_and_send_digest and build_and_send_weekly against live data with send_email captured (no email sent) and restored meta afterwards. Digest: 0 new, 16 pending, 12 overdue, avg '-'. Weekly: 'Week of 19 Oct - 25 Oct 2026', 0 vs 0. Frontend: the Leads table has a Response column and Newsletter has none. TEST lead with a +2h reply shows 'Replied in 2h' (text-emerald-600). With +30h it shows 'Replied in 30h · slow' (text-destructive). The other new leads show 'Waiting 98d · overdue' in red. Setting the TEST_sort1 lead to Contacted shows '—', and restoring it to New brings back the Waiting text. Header shows both buttons and both schedule texts. Clicking 'Email weekly trends now' once sent a REAL email to hello@amass.africa (email_id 01a19090-...). The toast read 'Weekly trends sent to hello@amass.africa: 0 last week vs 0 the week before' and the text updated to '· last sent ...'. A second click gave the 429 toast 'A weekly trends email was just sent. Please wait a couple of minutes.' Regression: the reply dialog opens with Earlier replies history, a template fills the message, and Cancel closes it (no reply sent). Status change and restore work. Website Content loads. The digest send-now button is visible but I did NOT click it, to avoid extra mail; digest content was checked through the captured build.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "digest email (_tracking_html)", "issue": "The overdue list stops at 10 rows ([:10]) but the box says 'Waiting over 24h: 12'. No 'and N more' line is shown (the lead list has one)."},
+      {"endpoint": "digest email", "issue": "'Still need a reply' (16) counts newsletter sign-ups but 'Waiting over 24h' (12) leaves them out. Two numbers in the same email that don't match may confuse readers."},
+      {"endpoint": "POST /api/website/*/send-now (_send_now)", "issue": "The 2-minute rate limit is check-then-send and not atomic. Two concurrent requests can both send. In the UI this is softened because the button is disabled while sending."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Response column", "issue": "If GET /website/reply-times fails, the error is swallowed and replyTimes stays {}. Replied leads then wrongly show 'Waiting Xd · overdue'. Minor, since the endpoint works.", "affected_selectors": ["[data-testid^='website-lead-response-']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_reply_tracking_weekly.py", "/app/backend/tests/run_build_capture.py", "/app/test_reports/pytest/pytest_iter9.xml"],
+  "action_items": [
+    "Optional: add an 'and N more' line to the digest overdue list when there are more than 10",
+    "Optional: leave newsletter out of the digest 'Still need a reply' count, or label it clearly",
+    "Optional: make the send-now rate limit atomic (e.g. find_one_and_update on a lock field before sending)"
+  ],
+  "critical_code_review_comments": [
+    "_first_replies uses $min on ISO strings. This is only correct while every sent_at uses the same format (+00:00, microseconds). Keep the writer consistent.",
+    "The amber 'Waiting Xh' state (<24h) could not be shown with live data because every lead is about 98 days old. It was checked by code review only (text-amber-600 branch).",
+    "Writing files under /app/backend/tests triggers a WatchFiles backend reload. This is harmless but worth knowing."
+  ],
+  "updated_files": ["/app/backend/tests/test_reply_tracking_weekly.py", "/app/backend/tests/run_build_capture.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Temporary TEST_ reply docs in website_lead_replies and a TEST_ cron_runs doc, all deleted (website_lead_replies count 0, cron_runs count 0). Lead 0d183a92 was set to contacted and then restored to new. All 16 leads are status new.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=<url> python -m pytest tests/test_reply_tracking_weekly.py -n 0. This sends no email; the cron 202 check uses the duplicate branch. tests/run_build_capture.py builds both emails from live data with send_email monkeypatched and restores meta. One real weekly email was sent to hello@amass.africa at 06:06 UTC via the UI. Login testids: login-email, login-password, login-submit. Website leads route: /admin/website-leads."
+}

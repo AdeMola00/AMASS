@@ -134,11 +134,13 @@ def _tracking_html(t: dict) -> str:
         f'<span style="color:#888;font-size:12px">{escape(_label(l.get("form_type")).title())}</span></td>'
         f'<td style="padding:6px 0;border-top:1px solid #eee;text-align:right;color:#E11414;font-weight:bold">waiting {_fmt_hours(l["waited"])}</td></tr>'
         for l in t["overdue"][:10])
+    more = (f'<p style="color:#888;font-size:12px">and {len(t["overdue"]) - 10} more waiting in the dashboard.</p>'
+            if len(t["overdue"]) > 10 else "")
     return (f'<h3 style="margin:24px 0 10px;font-size:16px">Reply times</h3>'
             + _box_row(_box("Avg first reply (last 7 days)", _fmt_hours(t["avg_7d"]), (t["avg_7d"] or 0) > SLOW_HOURS),
-                       _box(f"Waiting over {SLOW_HOURS}h", len(t["overdue"]), bool(t["overdue"])))
+                       _box(f"Leads waiting over {SLOW_HOURS}h (not newsletter)", len(t["overdue"]), bool(t["overdue"])))
             + f'<p style="font-size:13px;color:#666;margin:0 0 10px">{t["replies_7d"]} replies sent in the last 7 days, {t["slow_7d"]} took over {SLOW_HOURS}h.</p>'
-            + (f'<table role="presentation" width="100%">{rows}</table>' if rows else ""))
+            + (f'<table role="presentation" width="100%">{rows}</table>{more}' if rows else ""))
 
 
 def _digest_html(day_label: str, yesterday: list, pending: int, tracking: dict, first: dict) -> str:
