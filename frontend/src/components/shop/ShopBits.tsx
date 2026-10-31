@@ -189,7 +189,7 @@ export function DealBanner({ b, onDismiss }: { b: ShopBanner; onDismiss?: () => 
         <AppText variant="bodySm" color={fg} style={{ opacity: 0.92 }} numberOfLines={4}>
           {b.body}
         </AppText>
-        <PressableScale onPress={() => router.push(b.route as any)} style={[styles.bannerBtn, { backgroundColor: yellow ? SHOP.ink : SHOP.white }]} accessibilityRole="button" accessibilityLabel={b.cta} testID={`shop-banner-cta-${b.key}`}>
+        <PressableScale onPress={() => (/^https?:\/\//i.test(b.route) ? WebBrowser.openBrowserAsync(b.route) : router.push(b.route as any))} style={[styles.bannerBtn, { backgroundColor: yellow ? SHOP.ink : SHOP.white }]} accessibilityRole="button" accessibilityLabel={b.cta} testID={`shop-banner-cta-${b.key}`}>
           <AppText variant="caption" color={yellow ? SHOP.white : SHOP.ink} style={{ fontFamily: shopFont.bold }}>
             {b.cta}
           </AppText>

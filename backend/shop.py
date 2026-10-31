@@ -93,6 +93,29 @@ def product_public(p: dict, retailer: Optional[dict]) -> dict:
     return out
 
 
+def banner_public(b: dict) -> dict:
+    """Admin-managed Market banner (`shop_banners`) in the shape the app's DealBanner renders."""
+    return {"key": f"admin-{b['id']}", "title": b["title"], "body": b.get("body") or "", "cta": b.get("cta") or "Open", "route": b.get("route") or "/shop/category/all", "tone": b.get("tone") or "info", "image": b.get("image")}
+
+
+def banner_is_live(b: dict, at: Optional[datetime] = None) -> bool:
+    """Active, not archived, and inside its optional schedule window."""
+    if not b.get("active") or b.get("archived_at"):
+        return False
+    t = at or now()
+
+    def aware(d: Optional[datetime]) -> Optional[datetime]:  # Mongo hands back naive UTC datetimes
+        return d.replace(tzinfo=timezone.utc) if d is not None and d.tzinfo is None else d
+
+    s, e = aware(b.get("starts_at")), aware(b.get("ends_at"))
+    return not (s and s > t) and not (e and e < t)
+
+
+async def active_admin_banners(db) -> list[dict]:
+    rows = await db.shop_banners.find({"active": True, "archived_at": None}, {"_id": 0}).sort([("order", 1), ("created_at", -1)]).to_list(20)
+    return [banner_public(b) for b in rows if banner_is_live(b)]
+
+
 # ─────────────────────────── models ───────────────────────────
 class BasketAddIn(BaseModel):
     product_id: str
@@ -127,6 +150,16 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
     async def _retailers(published_only: bool = True) -> list[dict]:
         q = {"published": True} if published_only else {}
         return await db.shop_retailers.find(q, {"_id": 0}).sort([("sponsored", -1), ("product_count", -1), ("name", 1)]).to_list(200)
+
+    async def _live(extra: Optional[dict] = None) -> dict:
+        """Products shoppers may see: published, and their brand is published too (a hidden brand hides its catalogue)."""
+        hidden = [r["id"] async for r in db.shop_retailers.find({"published": {"$ne": True}}, {"_id": 0, "id": 1})]
+        q: dict = {"published": True}
+        if hidden:
+            q["retailer_id"] = {"$nin": hidden}
+        if extra:
+            q.update(extra)
+        return q
 
     async def _retailer_by_slug_or_id(key: str) -> dict:
         r = await db.shop_retailers.find_one({"$or": [{"slug": key}, {"id": key}], "published": True}, {"_id": 0})
@@ -228,7 +261,7 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
     async def shop_home(user: Optional[dict] = Depends(optional_user)):
         retailers = await _retailers()
         rby = {r["id"]: r for r in retailers}
-        products = await db.shop_products.find({"published": True}, {"_id": 0}).to_list(2000)
+        products = await db.shop_products.find(await _live(), {"_id": 0}).to_list(2000)
         state = await _user_state(user, [p["id"] for p in products])
 
         cat_counts = {c["key"]: 0 for c in CATEGORIES}
@@ -267,7 +300,7 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
         ]
         sections = [s for s in sections if (s.get("products") or s.get("retailers"))]
 
-        banners = []
+        banners = await active_admin_banners(db)  # Admin Portal banners first (ordered), then the automatic ones
         if deals:
             top = max(deals, key=lambda p: ((p["promo"].get("previous_price") or 0) - (p["price"].get("amount") or 0)))
             banners.append({"key": "deals", "title": f"{len(deals)} verified price drops in Lagos", "body": "Reductions listed by the retailers themselves. Terms and the verification date are on every item.", "cta": "See deals", "route": "/shop/category/all?deals=1", "tone": "warning", "image": (top.get("images") or [None])[0]})
@@ -354,7 +387,7 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
         if retailer:
             retailer_id = (await _retailer_by_slug_or_id(retailer))["id"]
         query = _product_query(category if category and category != "all" else None, q, retailer_id, deals, in_stock, brand)
-        products = await db.shop_products.find(query, {"_id": 0}).to_list(limit)
+        products = await db.shop_products.find(await _live(query), {"_id": 0}).to_list(limit)
         retailers = await _retailers()
         rby = {r["id"]: r for r in retailers}
         state = await _user_state(user, [p["id"] for p in products])
@@ -365,7 +398,7 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
 
     @router.get("/products/{product_id}")
     async def product_detail(product_id: str, user: Optional[dict] = Depends(optional_user)):
-        p = await db.shop_products.find_one({"id": product_id, "published": True}, {"_id": 0})
+        p = await db.shop_products.find_one(await _live({"id": product_id}), {"_id": 0})
         ensure(p is not None, 404, "Product not found")
         r = await db.shop_retailers.find_one({"id": p["retailer_id"]}, {"_id": 0})
         state = await _user_state(user, [p["id"]])
@@ -383,7 +416,7 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
                 colls = await db.shared_collections.find({"id": {"$in": [i["collection_id"] for i in in_lists]}}, {"_id": 0, "id": 1, "name": 1, "emoji": 1, "member_ids": 1}).to_list(50)
                 d["in_lists"] = [{"id": c["id"], "name": c["name"], "emoji": c.get("emoji"), "shared": len(c.get("member_ids", [])) > 1} for c in colls]
         d.setdefault("in_lists", [])
-        similar = await db.shop_products.find({"published": True, "id": {"$ne": product_id}, "$or": [{"subcategory": p.get("subcategory")}, {"category": p["category"], "retailer_id": p["retailer_id"]}]}, {"_id": 0}).to_list(40)
+        similar = await db.shop_products.find(await _live({"id": {"$ne": product_id}, "$or": [{"subcategory": p.get("subcategory")}, {"category": p["category"], "retailer_id": p["retailer_id"]}]}), {"_id": 0}).to_list(40)
         retailers = await _retailers(); rby = {x["id"]: x for x in retailers}
         sstate = await _user_state(user, [s["id"] for s in similar])
         d["similar"] = _decorate(_sort(similar, "relevance")[:8], rby, sstate)
@@ -395,7 +428,7 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
         retailers = await _retailers(); rby = {r["id"]: r for r in retailers}
         needle = q.strip().lower()
         stores = [retailer_public(r) for r in retailers if needle in r["name"].lower() or any(needle in b.lower() for b in r.get("brands") or [])]
-        products = await db.shop_products.find(_product_query(None, q, None, False, False, None), {"_id": 0}).to_list(120)
+        products = await db.shop_products.find(await _live(_product_query(None, q, None, False, False, None)), {"_id": 0}).to_list(120)
         state = await _user_state(user, [p["id"] for p in products])
         brands = sorted({p["brand"] for p in products if p.get("brand") and needle in p["brand"].lower()})
         cats = [c for c in CATEGORIES if needle in c["label"].lower()]
@@ -448,7 +481,7 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
         saves = await db.shop_saves.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
         pids = [s["target_id"] for s in saves if s["kind"] == "product"]
         sids = [s["target_id"] for s in saves if s["kind"] == "store"]
-        products = await db.shop_products.find({"id": {"$in": pids}, "published": True}, {"_id": 0}).to_list(len(pids)) if pids else []
+        products = await db.shop_products.find(await _live({"id": {"$in": pids}}), {"_id": 0}).to_list(len(pids)) if pids else []
         retailers = await _retailers(); rby = {r["id"]: r for r in retailers}
         state = await _user_state(user, pids)
         order = {pid: i for i, pid in enumerate(pids)}
@@ -514,7 +547,7 @@ def register_shop_routes(db, get_current_user, bearer, decode_user_id):
 
     @router.post("/basket/items")
     async def add_to_basket(data: BasketAddIn, user: dict = Depends(get_current_user)):
-        p = await db.shop_products.find_one({"id": data.product_id, "published": True}, {"_id": 0})
+        p = await db.shop_products.find_one(await _live({"id": data.product_id}), {"_id": 0})
         ensure(p is not None, 404, "Product not found")
         ensure(p["stock"].get("status") != "out_of_stock", 409, "This item is out of stock at the retailer")
         key = {"user_id": user["id"], "retailer_id": p["retailer_id"]}
@@ -584,3 +617,5 @@ async def ensure_shop_indexes(db) -> None:
     await db.shop_saves.create_index([("kind", 1), ("target_id", 1)])
     await db.shop_baskets.create_index([("user_id", 1), ("retailer_id", 1)], unique=True)
     await db.shop_handoffs.create_index([("retailer_id", 1), ("created_at", -1)])
+    await db.shop_banners.create_index("id", unique=True)
+    await db.shop_banners.create_index([("active", 1), ("order", 1)])

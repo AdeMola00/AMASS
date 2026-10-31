@@ -153,6 +153,63 @@ class ResolveIn(BaseModel):
     note: Optional[str] = Field(None, max_length=400)
 
 
+# ─── Moderation (shared by the in-app admin routes and the Admin Portal) ─────
+async def moderation_reports(db, status: str = "OPEN", limit: int = 100) -> dict:
+    q = {} if status == "ALL" else {"status": status}
+    rows = await db.marketplace_reports.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    ids = list({r["item_id"] for r in rows})
+    items = await db.marketplace.find({"id": {"$in": ids}}, _ITEM_PREVIEW).to_list(len(ids)) if ids else []
+    by_id = {i["id"]: i for i in items}
+    for r in rows:
+        r["item"] = by_id.get(r["item_id"])
+    open_total = await db.marketplace_reports.count_documents({"status": "OPEN"})
+    return {"items": rows, "count": len(rows), "open_total": open_total}
+
+
+async def moderate_listing(db, item_id: str, action: str, *, notify: bool = True, strict: bool = True) -> dict:
+    """pause / restore / remove a Declutter listing (remove = hidden for good from the app, record kept).
+    `strict=False` (report resolution) tolerates a listing that no longer exists."""
+    now = _now_iso()
+    item_update: dict = {}
+    if action == "remove_listing":
+        item_update = {"status": "removed", "removed_at": now, "removed_by": "admin"}
+    elif action == "pause_listing":
+        item_update = {"status": "paused", "paused_reason": "admin"}
+    elif action == "restore_listing":
+        item_update = {"status": "active", "paused_reason": None}
+    if not item_update:
+        return {}
+    item_update["updated_at"] = now
+    it = await db.marketplace.find_one_and_update({"id": item_id}, {"$set": item_update}, projection={"_id": 0, "id": 1, "seller_id": 1, "name": 1}, return_document=True)
+    if not it:
+        if strict:
+            raise HTTPException(404, "Listing not found")
+        return {}
+    if action == "remove_listing":
+        await db.marketplace_saves.delete_many({"item_id": item_id})
+    if notify and action in ("remove_listing", "pause_listing"):
+        await _notify(db, it.get("seller_id"), "MARKET_MODERATION",
+                      "Your listing was " + ("removed" if action == "remove_listing" else "paused"),
+                      "An AMASS moderator reviewed reports on this listing. Contact support if you think this is a mistake.",
+                      {"item_id": item_id})
+    return it
+
+
+async def resolve_report(db, report_id: str, admin_user: dict, action: str, note: Optional[str] = None) -> dict:
+    rep = await db.marketplace_reports.find_one({"id": report_id}, {"_id": 0})
+    if not rep:
+        raise HTTPException(404, "Report not found")
+    now = _now_iso()
+    await moderate_listing(db, rep["item_id"], action, strict=False)
+    # Resolving one report closes every open report on the same item with the same outcome.
+    await db.marketplace_reports.update_many(
+        {"item_id": rep["item_id"], "status": "OPEN"},
+        {"$set": {"status": "RESOLVED", "resolution": action, "resolution_note": (note or "").strip() or None,
+                  "resolved_by": admin_user["id"], "resolved_at": now, "updated_at": now}},
+    )
+    return {"ok": True, "action": action}
+
+
 def register_marketplace_v2_routes(db, get_current_user, require_admin):
     router = APIRouter(prefix="/api/marketplace")
 
@@ -527,47 +584,12 @@ def register_marketplace_v2_routes(db, get_current_user, require_admin):
 
     @router.get("/admin/reports")
     async def admin_reports(status: str = Query("OPEN"), limit: int = Query(100, ge=1, le=300), _: dict = Depends(require_admin)):
-        q = {} if status == "ALL" else {"status": status}
-        rows = await db.marketplace_reports.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
-        ids = list({r["item_id"] for r in rows})
-        items = await db.marketplace.find({"id": {"$in": ids}}, _ITEM_PREVIEW).to_list(len(ids)) if ids else []
-        by_id = {i["id"]: i for i in items}
-        for r in rows:
-            r["item"] = by_id.get(r["item_id"])
-        open_total = await db.marketplace_reports.count_documents({"status": "OPEN"})
-        return {"items": rows, "count": len(rows), "open_total": open_total}
+        return await moderation_reports(db, status, limit)
 
 
     @router.post("/admin/reports/{report_id}/resolve")
     async def admin_resolve_report(report_id: str, data: ResolveIn, admin: dict = Depends(require_admin)):
-        rep = await db.marketplace_reports.find_one({"id": report_id}, {"_id": 0})
-        if not rep:
-            raise HTTPException(404, "Report not found")
-        now = _now_iso()
-        item_update: dict = {}
-        if data.action == "remove_listing":
-            item_update = {"status": "removed", "removed_at": now, "removed_by": "admin"}
-        elif data.action == "pause_listing":
-            item_update = {"status": "paused", "paused_reason": "admin"}
-        elif data.action == "restore_listing":
-            item_update = {"status": "active", "paused_reason": None}
-        if item_update:
-            item_update["updated_at"] = now
-            await db.marketplace.update_one({"id": rep["item_id"]}, {"$set": item_update})
-            if data.action == "remove_listing":
-                await db.marketplace_saves.delete_many({"item_id": rep["item_id"]})
-        # Resolving one report closes every open report on the same item with the same outcome.
-        await db.marketplace_reports.update_many(
-            {"item_id": rep["item_id"], "status": "OPEN"},
-            {"$set": {"status": "RESOLVED", "resolution": data.action, "resolution_note": (data.note or "").strip() or None,
-                      "resolved_by": admin["id"], "resolved_at": now, "updated_at": now}},
-        )
-        if data.action in ("remove_listing", "pause_listing"):
-            await _notify(db, rep.get("seller_id"), "MARKET_MODERATION",
-                          "Your listing was " + ("removed" if data.action == "remove_listing" else "paused"),
-                          "An AMASS moderator reviewed reports on this listing. Contact support if you think this is a mistake.",
-                          {"item_id": rep["item_id"]})
-        return {"ok": True, "action": data.action}
+        return await resolve_report(db, report_id, admin, data.action, data.note)
 
     # ─── Seller profile ────────────────────────────────────────
     @router.get("/sellers/{seller_id}")

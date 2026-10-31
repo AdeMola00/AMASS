@@ -60,8 +60,9 @@ class TestShopHome:
         assert isinstance(data["categories"], list) and len(data["categories"]) == 6
         assert {c["key"] for c in data["categories"]} == {"furniture", "electronics", "appliances", "home_decor", "kitchen", "lighting"}
         assert isinstance(data["filters"], list) and len(data["filters"]) > 0
-        assert data["retailer_total"] == 7, f"expected 7 retailers, got {data['retailer_total']}"
-        assert len(data["retailers"]) == 7
+        # 7 seeded retailers; admins can add brands (in-app or via the Admin Portal), so never fewer than 7
+        assert data["retailer_total"] >= 7, f"expected at least 7 retailers, got {data['retailer_total']}"
+        assert len(data["retailers"]) == data["retailer_total"]
         assert isinstance(data["banners"], list) and len(data["banners"]) >= 1
         # sections
         keys = {s["key"] for s in data["sections"]}
@@ -75,7 +76,7 @@ class TestRetailersList:
         r = requests.get(f"{API}/shop/retailers")
         assert r.status_code == 200
         d = r.json()
-        assert d["total"] == 7
+        assert d["total"] >= 7  # seeded retailers + any admin-added brands
 
     def test_filter_furniture(self):
         r = requests.get(f"{API}/shop/retailers?category=furniture")

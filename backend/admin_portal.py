@@ -42,7 +42,7 @@ logger = logging.getLogger("amass.portal")
 # ─── RBAC ────────────────────────────────────────────────────────────────────
 MODULES = [
     "dashboard", "leads", "cms", "analytics", "reports", "properties", "property_verification", "agents", "users",
-    "property_owners", "developers", "construction_marketplace", "home_marketplace", "marketplace", "app_config",
+    "property_owners", "developers", "construction_marketplace", "home_marketplace", "marketplace", "brands", "app_config",
     "tokens", "media", "transactions", "payments", "subscriptions", "messages", "notifications", "roles",
     "ai_management", "settings",
 ]
@@ -83,12 +83,12 @@ def default_permissions(role: str) -> dict:
         p["settings"] = _perm(True, True, True, False)
         return p
     grants: dict[str, dict[str, dict]] = {
-        "content_manager": {"cms": _all(), "media": _all(), "marketplace": _all(), "notifications": _all(), "app_config": _perm(True, False, True), "properties": _perm(True), "analytics": _perm(True)},
+        "content_manager": {"cms": _all(), "media": _all(), "marketplace": _all(), "brands": _all(), "notifications": _all(), "app_config": _perm(True, False, True), "properties": _perm(True), "analytics": _perm(True)},
         "property_manager": {"properties": _all(), "property_verification": _all(), "property_owners": _all(), "developers": _all(), "agents": _perm(True), "leads": _perm(True, False, True), "analytics": _perm(True), "reports": _perm(True)},
         "agent_manager": {"agents": _all(), "leads": _perm(True, False, True, True), "properties": _perm(True), "property_verification": _perm(True), "users": _perm(True), "analytics": _perm(True)},
         "customer_support": {"users": _perm(True, False, True), "leads": _perm(True, False, True), "agents": _perm(True), "properties": _perm(True), "transactions": _perm(True), "payments": _perm(True), "subscriptions": _perm(True), "notifications": _perm(True), "messages": _perm(True, True, True)},
         "finance": {"transactions": _all(), "payments": _all(), "subscriptions": _all(), "tokens": _all(), "reports": _all(), "analytics": _perm(True), "users": _perm(True)},
-        "marketing": {"leads": _perm(True, True, True), "cms": _perm(True, True, True), "notifications": _all(), "marketplace": _perm(True, True, True), "analytics": _perm(True), "reports": _all(), "media": _all()},
+        "marketing": {"leads": _perm(True, True, True), "cms": _perm(True, True, True), "notifications": _all(), "marketplace": _perm(True, True, True), "brands": _perm(True, True, True), "analytics": _perm(True), "reports": _all(), "media": _all()},
     }
     for m, v in grants.get(role, {}).items():
         p[m] = v
@@ -179,7 +179,10 @@ def register_admin_portal_routes(db: AsyncIOMotorDatabase, admin_emails: set[str
         if role == "super_admin":
             return default_permissions("super_admin")
         doc = await db.admin_roles.find_one({"name": role}, {"_id": 0, "permissions": 1})
-        return (doc or {}).get("permissions") or default_permissions(role)
+        stored = (doc or {}).get("permissions") or {}
+        # Modules added after a role was saved (e.g. `brands`) fall back to the role's defaults;
+        # anything an admin edited in the Roles page is kept as-is.
+        return {**default_permissions(role), **stored}
 
     # ─── accounts ───
     def _public(acc: dict) -> dict:
@@ -294,7 +297,7 @@ def register_admin_portal_routes(db: AsyncIOMotorDatabase, admin_emails: set[str
         counts["super_admin"] += await db.users.count_documents({"is_admin": True})
         order = list(ROLE_LABELS)
         docs.sort(key=lambda d: order.index(d["name"]) if d["name"] in order else 99)
-        return {"roles": [{"name": d["name"], "label": d.get("label") or d["name"], "description": d.get("description", ""), "permissions": d["permissions"] if d["name"] != "super_admin" else default_permissions("super_admin"), "user_count": counts.get(d["name"], 0)} for d in docs], "modules": MODULES, "actions": ACTIONS}
+        return {"roles": [{"name": d["name"], "label": d.get("label") or d["name"], "description": d.get("description", ""), "permissions": {**default_permissions(d["name"]), **(d.get("permissions") or {})} if d["name"] != "super_admin" else default_permissions("super_admin"), "user_count": counts.get(d["name"], 0)} for d in docs], "modules": MODULES, "actions": ACTIONS}
 
     @router.put("/roles/{name}")
     async def put_role(name: str, body: RolePermsIn, acc: dict = Depends(require("roles", "edit"))):
@@ -811,4 +814,7 @@ def register_admin_portal_routes(db: AsyncIOMotorDatabase, admin_emails: set[str
     from admin_portal_commerce import register_commerce_routes
 
     router.include_router(register_commerce_routes(db, require, audit))
+    from admin_portal_market import register_market_routes
+
+    router.include_router(register_market_routes(db, require, audit))
     return router

@@ -1,0 +1,40 @@
+{
+  "summary": "Backend-only review of /api/portal/market/* (Admin Portal → Market). New suite tests/test_portal_market_review.py: 27/27 pass. It covers the role matrix, real staff logins (customer_support gets 403 on brands, fixa and declutter; marketing can view but gets 403 on brand delete), brands (CRUD, 409 on duplicates, filters, featured, logo upload (415 for text), hide/restore with public 404/200), brand logins (portal + in-app admin give the same result), products/offers/images (public-files URLs fetch 200), banners (schedule, preview matches /shop/home, archive/restore, https route), FIXA (provider counts match the in-app admin; a real pending provider was approved → verified, suspended, reinstated, then put back to pending), Declutter (pause/restore/remove, 404, reports, in-app admin reports), audit trail and regression checks. The existing test_portal_market.py still passes 17/17. An edge-case probe found 6 behaviour issues (below). No 5xx errors.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "DELETE /api/portal/market/brands/{id} (hide brand)", "issue": "When a brand is hidden, its published products stay visible to the public. GET /api/shop/products/{pid} returns 200, and the products still appear in /api/shop/search and /api/shop/products?category=. Only the retailer endpoints return 404. So a 'removed' brand's products can still be browsed (and probably added to the basket). shop.py product queries filter on product.published only, never on whether the retailer is published (e.g. shop.py:254, :409, :474).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/portal/market/banners/{id}/restore", "issue": "Archiving sets active=false (admin_portal_market.py:646), but restore only clears archived_at (line 654). A restored banner comes back with active=false and live=false, so it does not reappear on /api/shop/home until someone PATCHes active=true. 'Restore' should bring the banner back live, or the API should clearly flag that it is inactive."},
+      {"endpoint": "POST/PATCH /api/portal/market/banners", "issue": "The route field is not validated. 'javascript:alert(1)' and 'not a route' are accepted with 201. The app passes any non-http route to router.push (frontend/src/components/shop/ShopBits.tsx:192). Only '/…' in-app paths or https:// should be allowed."},
+      {"endpoint": "POST /market/upload, /market/products/{pid}/images, /market/brands/{id}/logo", "issue": "The image type is checked only from the Content-Type header the client sends. Non-image bytes labelled image/png are accepted (201) and stored as a PUBLIC file. Check the file's magic bytes (or open it with PIL) before storing."},
+      {"endpoint": "POST /api/portal/market/banners", "issue": "A banner whose ends_at is already in the past is accepted (201, live=false). It should be rejected with 400, the same way past offer end dates are."},
+      {"endpoint": "PATCH /api/portal/market/brands/{id} {published:false}", "issue": "Unpublishing via PATCH does not set hidden_at or hidden_by. The DELETE route does, so the audit fields are inconsistent."},
+      {"endpoint": "GET /api/portal/market/offers?status=live", "issue": "Offers on hidden (unpublished) products are listed as 'live'. The overview offers count correctly counts only published products, so the two disagree."},
+      {"endpoint": "DELETE /api/portal/market/products/{pid}/images?url=", "issue": "Returns 200 when the URL is not on the product, with no error and no indication that nothing was removed. Low priority."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [], "react_native_issues": []},
+  "test_report_links": ["/app/backend/tests/test_portal_market_review.py", "/app/backend/tests/helper_portal_market_probe.py", "/app/test_reports/pytest/portal_market_review.xml"],
+  "action_items": [
+    "HIGH: when a brand is hidden, hide its products from the public shop. Either filter shop product queries by published retailers, or cascade published=false to the products on hide and back on restore.",
+    "Banner restore: set active=true on restore (or document it and return a hint).",
+    "Validate the banner route: must start with '/' or https://.",
+    "Validate uploaded image bytes (magic bytes or PIL), not just the Content-Type header.",
+    "Reject banners created or patched with ends_at already in the past (optional).",
+    "In PATCH brand, set hidden_at when published=false; exclude unpublished products from /market/offers?status=live (optional)."
+  ],
+  "critical_code_review_comments": [
+    "admin_portal_market.py is 780 lines, over the 700-line guideline. Consider splitting it into brands/products/banners/moderation modules.",
+    "Portal FIXA approve/suspend/reinstate and Declutter moderate call the same functions as the in-app admin (fixa.approve_provider, marketplace_v2.moderate_listing), so the two stay in step. Good.",
+    "PATCH /market/declutter/listings/{id} calls moderate_listing without checking the listing's category, so a FIXA 'services' listing id can be paused or removed through the Declutter route. Same 'marketplace' permission, so low risk.",
+    "Uploaded test images remain in object storage (no delete API). Harmless but not cleaned up."
+  ],
+  "updated_files": ["/app/backend/tests/test_portal_market_review.py (new)", "/app/backend/tests/helper_portal_market_probe.py (new)"],
+  "success_rate": {"backend": "100% of requested flows (27/27 plus 17/17 existing); 7 edge-case issues found by the probe (1 high, 6 minor)", "frontend": "N/A (not requested)"},
+  "seed_data_creation": "None kept. All TEST_ brands, products, accounts, banners, the listing, staff users and portal_media rows were deleted (verified 0 left over). The real pending FIXA provider that was approved/suspended/reinstated was restored to its original document (pending count back to 2). Note: the approval may have sent the provider a notification. Generating portal keys rotated the demo portal key, as expected.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use test_portal_market_review.py plus test_portal_market.py. /portal/roles returns {roles:[{name,permissions}],modules,actions}. demo login returns 'token'. FIXA mutation test snapshots and restores the pending provider. Run helper_portal_market_probe.py to recheck the edge cases (it prints observed behaviour rather than asserting).",
+  "rca_of_issue": "Hidden brand products still public: shop.py queries shop_products only by product.published, and hide_brand updates shop_retailers only. Repro: create brand + product → DELETE /portal/market/brands/{id} → GET /api/shop/products/{pid} returns 200. Banner restore: archive_banner sets active False, restore_banner doesn't reset it."
+}

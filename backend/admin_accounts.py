@@ -86,8 +86,8 @@ def register_admin_accounts_routes(db, require_admin) -> APIRouter:
             "staff_accounts": staff,
             "builtin_admins": await db.users.count_documents({"is_admin": True}),
             "last_portal_activity": last,
-            "managed": ["Dashboard", "Leads", "Properties", "Property verification", "Agents", "Users", "Marketplace (brand products)", "App configuration", "Token economy", "Transactions", "Payments (verify)", "Notifications (broadcasts)", "Analytics", "Reports", "Roles & permissions", "Settings (team)", "Media uploads"],
-            "in_app_only": ["FIXA provider applications & reports", "Agency teams", "Brands & brand logins", "KYC / identity documents", "Duplicate & passport review", "Zone pricing & monetization", "Email designs", "Feature flags detail"],
+            "managed": ["Dashboard", "Leads", "Properties", "Property verification", "Agents", "Users", "Market → Brands (brands, logins, products, offers, images)", "Market banners & featured placement", "FIXA provider applications & reports", "Declutter listings & reports", "App configuration", "Token economy", "Transactions", "Payments (verify)", "Notifications (broadcasts)", "Analytics", "Reports", "Roles & permissions", "Settings (team)", "Media uploads"],
+            "in_app_only": ["Agency teams", "KYC / identity documents", "Duplicate & passport review", "Zone pricing & monetization", "Email designs", "Feature flags detail"],
             "not_managed": ["Landing-page CMS", "Developers", "Property owners", "Construction / Home marketplaces", "AI insights", "Messages", "Subscriptions page"],
         }
 

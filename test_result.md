@@ -1239,3 +1239,19 @@ agent_communication:
       testIDs submit-walkthrough-*) + Review row, payload `walkthrough_video_url`.
       Already verified by main: map pin badge renders on web, locked teaser renders for a non-owner, owner Replace → paste YouTube →
       Save → poster updates.
+
+  - agent: "main"
+    message: |
+      Iteration 96 (to run) — Admin Portal ↔ Market tab. New `backend/admin_portal_market.py` mounted at /api/portal/market/*
+      (portal key `X-AMASS-Portal-Key` or staff login). New permission module `brands` (Content Manager all, Marketing v/c/e,
+      Admin/Super all; stored roles get defaults for missing modules). Brands CRUD (hide/restore, featured, logo upload),
+      brand logins (invite/resend/disable/delete — shared code with /api/admin/brands via brands.create_brand_account /
+      resend_brand_link), products (create with offer, patch, hide/restore, featured, image append/remove), offers
+      (PUT/DELETE …/offer with validation; raising price past previous_price clears promo), banners (shop_banners →
+      merged first into /api/shop/home banners when active & in schedule; archive/restore), /market/upload, FIXA moderation
+      (fixa.py actions lifted to module level: approve_provider/reject_provider/suspend_provider/reinstate_provider/
+      resolve_report — in-app /api/admin/fixa delegates to them), Declutter (marketplace_v2.moderate_listing /
+      resolve_report / moderation_reports). Doc: docs/admin_portal_market_api.md; `GET /api/portal/market/schema`.
+      Frontend: shop DealBanner opens https routes in the in-app browser. tests/test_portal_market.py 17/17 by main;
+      regression suites (fixa, brands/roles, shop, marketplace) 102 pass. tests/test_shop.py retailer count relaxed to ≥7
+      (admin-added brands exist in the DB).

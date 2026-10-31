@@ -151,6 +151,92 @@ def _brand_admin_view(r: dict, accounts: list[dict]) -> dict:
     return {"id": r["id"], "slug": r.get("slug"), "name": r["name"], "tagline": r.get("tagline"), "logo_url": logo_url(r), "accent": r.get("accent"), "categories": r.get("categories") or [], "website": r.get("website"), "phone": r.get("phone"), "whatsapp": r.get("whatsapp"), "email": r.get("email"), "published": bool(r.get("published")), "sponsored": bool(r.get("sponsored")), "managed": bool(r.get("managed")), "product_count": r.get("product_count", 0), "in_stock_count": r.get("in_stock_count", 0), "created_at": r.get("created_at"), "accounts": [_account_public(a) for a in accounts]}
 
 
+def brand_promo(previous_price: Optional[int], label: Optional[str], price: int, *, by: str = "the brand") -> Optional[dict]:
+    """A reduction is only a deal when the previous price is really higher than the current one."""
+    if previous_price and previous_price > price:
+        return {"label": label or "Reduced price", "previous_price": previous_price, "expires_at": None, "terms": f"Price set by {by} on {now().date().isoformat()}", "source_url": None, "verified_at": now().date().isoformat()}
+    return None
+
+
+# ─── invite / set-password links (email) — shared by the in-app admin and the Admin Portal ───
+async def send_brand_link(db, acc: dict, brand_name: str, kind: str) -> Optional[str]:
+    """Issue a single-use set-password token, email it and return an error string (None on success)."""
+    from auth_security import send_email
+    from email_theme import button, p, render_email
+    from public_url import public_api_base
+
+    token = secrets.token_urlsafe(32)
+    t = now()
+    await db.brand_accounts.update_one({"id": acc["id"]}, {"$set": {"invite": {"token_hash": _token_hash(token), "kind": kind, "sent_at": t, "expires_at": t + timedelta(hours=INVITE_TTL_HOURS)}}, "$unset": {"invite_error": ""}})
+    link = f"{public_api_base()}/brand/set-password?token={token}"
+    first = (acc.get("name") or "there").split(" ")[0]
+    if kind == "invite":
+        subject = f"You're invited to manage {brand_name} on AMASS"
+        html = render_email(
+            title=f"Welcome to the AMASS Brand portal", kicker="Brand partner", hero="city", greeting=f"Hi {first},",
+            preheader=f"Set up your {brand_name} brand login and start adding products to Market → Brands.",
+            body_html=p(f"An AMASS admin has set up <strong>{brand_name}</strong> under Market → Brands and made you a brand manager.")
+            + p("Tap the button to choose your own password. You'll then be able to add and update your products, photos, prices and stock — everything shoppers see in the AMASS app.")
+            + button("Set my password", link)
+            + p(f"This link is single-use and expires in {INVITE_TTL_HOURS} hours. If it has expired, ask your AMASS contact to send a new invite.", muted=True, size=13),
+            note="The Brand portal is separate from an AMASS member account — sign in at the Brand sign in screen with this email.",
+        )
+    else:
+        subject = f"Set a new password for your {brand_name} brand login"
+        html = render_email(
+            title="Set a new password", kicker="Brand portal · Account security", hero="night", greeting=f"Hi {first},",
+            preheader=f"Choose a new password for your {brand_name} brand login on AMASS.",
+            body_html=p(f"Someone asked to set a new password for the <strong>{brand_name}</strong> brand login on AMASS.")
+            + button("Choose a new password", link)
+            + p(f"The link works once and expires in {INVITE_TTL_HOURS} hours. If you didn't ask for this, you can ignore this email — your password won't change.", muted=True, size=13),
+            note="For your security, AMASS will never ask you to share your password by reply.",
+        )
+    try:
+        await send_email(to=acc["email"], subject=subject, html=html)
+        return None
+    except HTTPException as e:
+        err = str(e.detail)
+        if "can't receive email" in err:
+            err = f"{acc['email']} can't receive email right now — share the link with them instead."
+        await db.brand_accounts.update_one({"id": acc["id"]}, {"$set": {"invite_error": err, "invite.fallback_link": link}})
+        logger.warning("brand %s email to %s failed: %s", kind, acc["email"], err)
+        return err
+
+
+def invite_result(fresh: dict, err: Optional[str]) -> dict:
+    """When the email couldn't be delivered, hand the admin the link once so they can pass it on (WhatsApp etc.)."""
+    out = {**_account_public(fresh), "email_sent": err is None, "email_error": err}
+    if err:
+        out["invite_link"] = (fresh.get("invite") or {}).get("fallback_link")
+    return out
+
+
+async def create_brand_account(db, brand_id: str, name: str, email: str, actor_id: str) -> dict:
+    """Create a brand login and email the invite — 404 unknown brand, 409 email already has a login."""
+    r = await db.shop_retailers.find_one({"id": brand_id}, {"_id": 0, "name": 1})
+    if not r:
+        raise HTTPException(404, "Brand not found")
+    email = norm_email(email)
+    if await db.brand_accounts.find_one({"email": email}):
+        raise HTTPException(409, "That email already has a brand login")
+    doc = {"id": str(uuid.uuid4()), "brand_id": brand_id, "name": name.strip(), "email": email, "password_hash": None, "disabled": False, "created_by": actor_id, "created_at": now()}
+    await db.brand_accounts.insert_one({**doc})
+    err = await send_brand_link(db, doc, r["name"], "invite")
+    fresh = await db.brand_accounts.find_one({"id": doc["id"]}, {"_id": 0})
+    return {**invite_result(fresh, err), "brand_name": r["name"]}
+
+
+async def resend_brand_link(db, brand_id: str, account_id: str) -> dict:
+    acc = await db.brand_accounts.find_one({"id": account_id, "brand_id": brand_id}, {"_id": 0})
+    if not acc:
+        raise HTTPException(404, "Brand login not found")
+    r = await db.shop_retailers.find_one({"id": brand_id}, {"_id": 0, "name": 1})
+    kind = "reset" if acc.get("password_hash") else "invite"
+    err = await send_brand_link(db, acc, (r or {}).get("name") or "your brand", kind)
+    fresh = await db.brand_accounts.find_one({"id": account_id}, {"_id": 0})
+    return {**invite_result(fresh, err), "kind": kind}
+
+
 def register_brand_routes(db, require_admin) -> tuple[APIRouter, APIRouter]:
     admin = APIRouter(prefix="/api/admin/brands", tags=["brands-admin"])
     brand = APIRouter(prefix="/api/brand", tags=["brand-portal"])
@@ -190,90 +276,23 @@ def register_brand_routes(db, require_admin) -> tuple[APIRouter, APIRouter]:
         r = await db.shop_retailers.find_one_and_update({"id": brand_id}, {"$set": sets}, projection={"_id": 0}, return_document=True)
         if not r:
             raise HTTPException(404, "Brand not found")
-        if "published" in sets and not sets["published"]:
-            pass  # products stay but the retailer is hidden from the Market; brand logins keep working
+        # Hiding a brand hides its whole catalogue from shoppers (shop.py `_live`); products and brand logins are kept.
         await _log(admin_user["id"], f"updated brand {r['name']}", brand_id, fields=list(sets))
         accounts = await db.brand_accounts.find({"brand_id": brand_id}, {"_id": 0}).to_list(50)
         return _brand_admin_view(r, accounts)
 
-    # ─── invite / set-password links (email) ───
-    async def _send_link(acc: dict, brand_name: str, kind: str) -> Optional[str]:
-        """Issue a single-use set-password token, email it and return an error string (None on success)."""
-        from auth_security import send_email
-        from email_theme import button, p, render_email
-        from public_url import public_api_base
-
-        token = secrets.token_urlsafe(32)
-        t = now()
-        await db.brand_accounts.update_one({"id": acc["id"]}, {"$set": {"invite": {"token_hash": _token_hash(token), "kind": kind, "sent_at": t, "expires_at": t + timedelta(hours=INVITE_TTL_HOURS)}}, "$unset": {"invite_error": ""}})
-        link = f"{public_api_base()}/brand/set-password?token={token}"
-        first = (acc.get("name") or "there").split(" ")[0]
-        if kind == "invite":
-            subject = f"You're invited to manage {brand_name} on AMASS"
-            html = render_email(
-                title=f"Welcome to the AMASS Brand portal", kicker="Brand partner", hero="city", greeting=f"Hi {first},",
-                preheader=f"Set up your {brand_name} brand login and start adding products to Market → Brands.",
-                body_html=p(f"An AMASS admin has set up <strong>{brand_name}</strong> under Market → Brands and made you a brand manager.")
-                + p("Tap the button to choose your own password. You'll then be able to add and update your products, photos, prices and stock — everything shoppers see in the AMASS app.")
-                + button("Set my password", link)
-                + p(f"This link is single-use and expires in {INVITE_TTL_HOURS} hours. If it has expired, ask your AMASS contact to send a new invite.", muted=True, size=13),
-                note="The Brand portal is separate from an AMASS member account — sign in at the Brand sign in screen with this email.",
-            )
-        else:
-            subject = f"Set a new password for your {brand_name} brand login"
-            html = render_email(
-                title="Set a new password", kicker="Brand portal · Account security", hero="night", greeting=f"Hi {first},",
-                preheader=f"Choose a new password for your {brand_name} brand login on AMASS.",
-                body_html=p(f"Someone asked to set a new password for the <strong>{brand_name}</strong> brand login on AMASS.")
-                + button("Choose a new password", link)
-                + p(f"The link works once and expires in {INVITE_TTL_HOURS} hours. If you didn't ask for this, you can ignore this email — your password won't change.", muted=True, size=13),
-                note="For your security, AMASS will never ask you to share your password by reply.",
-            )
-        try:
-            await send_email(to=acc["email"], subject=subject, html=html)
-            return None
-        except HTTPException as e:
-            err = str(e.detail)
-            if "can't receive email" in err:
-                err = f"{acc['email']} can't receive email right now — share the link with them instead."
-            await db.brand_accounts.update_one({"id": acc["id"]}, {"$set": {"invite_error": err, "invite.fallback_link": link}})
-            logger.warning("brand %s email to %s failed: %s", kind, acc["email"], err)
-            return err
-
-    def _invite_result(fresh: dict, err: Optional[str]) -> dict:
-        """When the email couldn't be delivered, hand the admin the link once so they can pass it on (WhatsApp etc.)."""
-        out = {**_account_public(fresh), "email_sent": err is None, "email_error": err}
-        if err:
-            out["invite_link"] = (fresh.get("invite") or {}).get("fallback_link")
-        return out
-
-    # ─── ADMIN: brand logins ───
+    # ─── ADMIN: brand logins (logic shared with the Admin Portal — see create_brand_account / resend_brand_link) ───
     @admin.post("/{brand_id}/accounts", status_code=201)
     async def create_account(brand_id: str, body: BrandAccountIn, admin_user: dict = Depends(require_admin)):
-        r = await db.shop_retailers.find_one({"id": brand_id}, {"_id": 0, "name": 1})
-        if not r:
-            raise HTTPException(404, "Brand not found")
-        email = norm_email(body.email)
-        if await db.brand_accounts.find_one({"email": email}):
-            raise HTTPException(409, "That email already has a brand login")
-        doc = {"id": str(uuid.uuid4()), "brand_id": brand_id, "name": body.name.strip(), "email": email, "password_hash": None, "disabled": False, "created_by": admin_user["id"], "created_at": now()}
-        await db.brand_accounts.insert_one({**doc})
-        err = await _send_link(doc, r["name"], "invite")
-        await _log(admin_user["id"], f"invited {email} to manage {r['name']}", doc["id"], email_sent=err is None)
-        fresh = await db.brand_accounts.find_one({"id": doc["id"]}, {"_id": 0})
-        return _invite_result(fresh, err)
+        out = await create_brand_account(db, brand_id, body.name, str(body.email), admin_user["id"])
+        await _log(admin_user["id"], f"invited {out['email']} to manage {out.pop('brand_name')}", out["id"], email_sent=out["email_sent"])
+        return out
 
     @admin.post("/{brand_id}/accounts/{account_id}/invite")
     async def resend_invite(brand_id: str, account_id: str, admin_user: dict = Depends(require_admin)):
-        acc = await db.brand_accounts.find_one({"id": account_id, "brand_id": brand_id}, {"_id": 0})
-        if not acc:
-            raise HTTPException(404, "Brand login not found")
-        r = await db.shop_retailers.find_one({"id": brand_id}, {"_id": 0, "name": 1})
-        kind = "reset" if acc.get("password_hash") else "invite"
-        err = await _send_link(acc, (r or {}).get("name") or "your brand", kind)
-        await _log(admin_user["id"], f"re-sent a {kind} link to {acc['email']}", account_id, email_sent=err is None)
-        fresh = await db.brand_accounts.find_one({"id": account_id}, {"_id": 0})
-        return _invite_result(fresh, err)
+        out = await resend_brand_link(db, brand_id, account_id)
+        await _log(admin_user["id"], f"re-sent a {out.pop('kind')} link to {out['email']}", account_id, email_sent=out["email_sent"])
+        return out
 
     @admin.patch("/{brand_id}/accounts/{account_id}")
     async def toggle_account(brand_id: str, account_id: str, body: dict, admin_user: dict = Depends(require_admin)):
@@ -336,7 +355,7 @@ def register_brand_routes(db, require_admin) -> tuple[APIRouter, APIRouter]:
             last = (acc.get("invite") or {}).get("sent_at")
             if not last or (now() - _aware(last)).total_seconds() >= INVITE_RESEND_SECONDS:
                 r = await db.shop_retailers.find_one({"id": acc["brand_id"]}, {"_id": 0, "name": 1})
-                await _send_link(acc, (r or {}).get("name") or "your brand", "reset" if acc.get("password_hash") else "invite")
+                await send_brand_link(db, acc, (r or {}).get("name") or "your brand", "reset" if acc.get("password_hash") else "invite")
         return {"ok": True, "message": GENERIC_FORGOT_MSG}
 
     async def _account_for_token(token: str) -> dict:
@@ -398,11 +417,6 @@ def register_brand_routes(db, require_admin) -> tuple[APIRouter, APIRouter]:
         return _me({"account": ctx["account"], "brand": r})
 
     # ─── BRAND PORTAL: products (scoped to own brand) ───
-    def _promo(previous_price: Optional[int], label: Optional[str], price: int) -> Optional[dict]:
-        if previous_price and previous_price > price:
-            return {"label": label or "Reduced price", "previous_price": previous_price, "expires_at": None, "terms": f"Price set by the brand on {now().date().isoformat()}", "source_url": None, "verified_at": now().date().isoformat()}
-        return None
-
     def _brand_row(p: dict) -> dict:
         row = product_row(p)
         row.update({"name": p.get("name"), "category": p.get("category"), "published": bool(p.get("published")), "promo": p.get("promo"), "views": p.get("views", 0), "saves": p.get("saves", 0), "basket_adds": p.get("basket_adds", 0)})
@@ -421,7 +435,7 @@ def register_brand_routes(db, require_admin) -> tuple[APIRouter, APIRouter]:
         if body.category not in CATEGORY_KEYS:
             raise HTTPException(400, "Pick one of the Market categories")
         doc = new_product_doc(ctx["brand"], name=body.name, description=body.description, category=body.category, price=body.price, images=body.images, stock_status=body.stock_status, featured=False, published=body.published, source="brand_portal")
-        doc["promo"] = _promo(body.promo_previous_price, body.promo_label, body.price)
+        doc["promo"] = brand_promo(body.promo_previous_price, body.promo_label, body.price)
         doc["created_by_account"] = ctx["account"]["id"]
         await db.shop_products.insert_one({**doc})
         await recount_retailer(db, ctx["brand"]["id"])
@@ -456,7 +470,7 @@ def register_brand_routes(db, require_admin) -> tuple[APIRouter, APIRouter]:
         if body.clear_promo:
             sets["promo"] = None
         elif body.promo_previous_price is not None:
-            sets["promo"] = _promo(body.promo_previous_price, body.promo_label, int(body.price if body.price is not None else (p.get("price") or {}).get("amount") or 0))
+            sets["promo"] = brand_promo(body.promo_previous_price, body.promo_label, int(body.price if body.price is not None else (p.get("price") or {}).get("amount") or 0))
         p = await db.shop_products.find_one_and_update({"id": pid}, {"$set": sets}, projection={"_id": 0}, return_document=True)
         await recount_retailer(db, ctx["brand"]["id"])
         await _log(ctx["account"]["id"], f"updated product “{p.get('name')}”", pid)

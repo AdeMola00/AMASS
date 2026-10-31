@@ -156,6 +156,110 @@ def visible_query(extra: Optional[dict] = None) -> dict:
     return q
 
 
+# ─── Moderation (shared by the in-app admin routes and the Admin Portal) ─────
+async def notify_user(db, user_id: Optional[str], kind: str, title: str, body: str, meta: dict, action_url: str, *, push: bool = True) -> None:
+    if not user_id:
+        return
+    from notification_center import emit
+
+    try:
+        await emit(db, user_id, kind, title, body, meta, action_url=action_url, push=push)
+    except Exception as e:  # noqa: BLE001 — never block the action
+        logger.warning("fixa notification failed: %s", e)
+
+
+async def provider_stats(db, provider_item_id: str) -> dict:
+    done = await db.fixa_bookings.count_documents({"item_id": provider_item_id, "status": "completed"})
+    pending = await db.fixa_bookings.count_documents({"item_id": provider_item_id, "status": "pending"})
+    upcoming = await db.fixa_bookings.count_documents({"item_id": provider_item_id, "status": "confirmed"})
+    open_reports = await db.fixa_reports.count_documents({"provider_item_id": provider_item_id, "status": "open"})
+    return {"jobs_completed": done, "pending_requests": pending, "upcoming": upcoming, "open_reports": open_reports}
+
+
+async def moderation_overview(db) -> dict:
+    return {
+        "pending": await db.marketplace.count_documents({"category": "services", "fixa_status": "pending"}),
+        "verified": await db.marketplace.count_documents(visible_query()),
+        "hidden": await db.marketplace.count_documents({"category": "services", "fixa_status": {"$in": ["hidden", "suspended"]}}),
+        "open_reports": await db.fixa_reports.count_documents({"status": "open"}),
+    }
+
+
+async def moderation_applications(db, status: str = "pending") -> list[dict]:
+    q: dict[str, Any] = {"category": "services"}
+    if status == "all":
+        q["fixa_status"] = {"$exists": True}
+    else:
+        q["fixa_status"] = status
+    rows = await db.marketplace.find(q, {"_id": 0}).sort("applied_at", -1).to_list(300)
+    out = []
+    for d in rows:
+        u = await db.users.find_one({"id": d.get("seller_id")}, {"_id": 0, "id": 1, "full_name": 1, "email": 1, "phone": 1, "identity_verified": 1}) if d.get("seller_id") else None
+        out.append({**provider_full(d), "applied_at": d.get("applied_at"), "verified_at": d.get("verified_at"), "rejection_reason": d.get("rejection_reason"), "hidden_reason": d.get("hidden_reason"), "user": u, "stats": await provider_stats(db, d["id"])})
+    return out
+
+
+async def _set_status(db, provider_id: str, status: str, admin_user: dict, extra: Optional[dict] = None) -> dict:
+    d = await db.marketplace.find_one({"id": provider_id, "category": "services"}, {"_id": 0})
+    if not d:
+        raise HTTPException(404, "Provider not found")
+    upd = {"fixa_status": status, "updated_at": _iso(_now()), **(extra or {})}
+    await db.marketplace.update_one({"id": provider_id}, {"$set": upd})
+    await db.fixa_admin_log.insert_one({"id": str(uuid.uuid4()), "provider_item_id": provider_id, "status": status, "by": admin_user["id"], "at": _iso(_now()), **(extra or {})})
+    return d
+
+
+async def approve_provider(db, provider_id: str, admin_user: dict, note: str = "") -> dict:
+    cur = await db.marketplace.find_one({"id": provider_id, "category": "services"}, {"_id": 0, "fixa_badges": 1, "provider_jobs_completed": 1, "rating": 1})
+    if not cur:
+        raise HTTPException(404, "Provider not found")
+    badges = auto_badges([b for b in (cur.get("fixa_badges") or []) if b != "AMASS Verified"] + ["AMASS Verified"], int(cur.get("provider_jobs_completed") or 0), cur.get("rating"))
+    d = await _set_status(db, provider_id, "verified", admin_user, {"is_fixa_verified": True, "verified_at": _iso(_now()), "verified_by": admin_user["id"], "rejection_reason": None, "fixa_badges": badges})
+    await notify_user(db, d.get("seller_id"), "FIXA_VERIFIED", "You're FIXA verified 🎉", f"Your {d.get('subcategory')} profile is live. Homeowners can now find and book you." + (f" Note from admin: {note.strip()}" if note and note.strip() else ""), {"provider_item_id": provider_id}, "/fixa/provider")
+    return {"ok": True, "status": "verified"}
+
+
+async def reject_provider(db, provider_id: str, admin_user: dict, note: str = "") -> dict:
+    note = (note or "").strip()
+    d = await _set_status(db, provider_id, "rejected", admin_user, {"is_fixa_verified": False, "rejection_reason": note or None})
+    await notify_user(db, d.get("seller_id"), "FIXA_REJECTED", "FIXA application not approved", (note or "We couldn't verify your profile this time.") + " You can update your details and apply again.", {"provider_item_id": provider_id}, "/fixa/provider")
+    return {"ok": True, "status": "rejected"}
+
+
+async def suspend_provider(db, provider_id: str, admin_user: dict, note: str = "") -> dict:
+    note = (note or "").strip()
+    d = await _set_status(db, provider_id, "suspended", admin_user, {"hidden_reason": note or "Suspended by AMASS Admin", "hidden_at": _iso(_now())})
+    await notify_user(db, d.get("seller_id"), "FIXA_SUSPENDED", "FIXA profile suspended", note or "Your profile was suspended by AMASS Admin.", {"provider_item_id": provider_id}, "/fixa/provider")
+    return {"ok": True, "status": "suspended"}
+
+
+async def reinstate_provider(db, provider_id: str, admin_user: dict) -> dict:
+    d = await _set_status(db, provider_id, "verified", admin_user, {"is_fixa_verified": True, "hidden_reason": None, "hidden_at": None})
+    await db.fixa_reports.update_many({"provider_item_id": provider_id, "status": "open"}, {"$set": {"status": "resolved", "resolved_at": _iso(_now()), "resolved_by": admin_user["id"], "resolution": "Provider reinstated"}})
+    await notify_user(db, d.get("seller_id"), "FIXA_REINSTATED", "Your FIXA profile is live again", "AMASS Admin reviewed the reports and reinstated your profile.", {"provider_item_id": provider_id}, "/fixa/provider")
+    return {"ok": True, "status": "verified"}
+
+
+async def moderation_reports(db, status: str = "open") -> list[dict]:
+    q: dict[str, Any] = {} if status == "all" else {"status": status}
+    rows = await db.fixa_reports.find(q, {"_id": 0}).sort("created_at", -1).to_list(300)
+    for r in rows:
+        p = await db.marketplace.find_one({"id": r["provider_item_id"]}, {"_id": 0, "fixa_status": 1, "is_fixa_verified": 1})
+        r["provider_status"] = (p or {}).get("fixa_status") or ("verified" if (p or {}).get("is_fixa_verified") else "listed")
+    return rows
+
+
+async def resolve_report(db, report_id: str, admin_user: dict, outcome: str, note: Optional[str] = None, reinstate: bool = False) -> dict:
+    r = await db.fixa_reports.find_one({"id": report_id}, {"_id": 0})
+    if not r:
+        raise HTTPException(404, "Report not found")
+    await db.fixa_reports.update_one({"id": report_id}, {"$set": {"status": outcome, "resolved_at": _iso(_now()), "resolved_by": admin_user["id"], "resolution": (note or "").strip() or None}})
+    if reinstate:
+        await reinstate_provider(db, r["provider_item_id"], admin_user)
+    await notify_user(db, r["reporter_id"], "FIXA_REPORT_RESOLVED", "Thanks for your report", "AMASS Admin reviewed your report" + (f": {note.strip()}" if note else "."), {"report_id": report_id}, "/fixa", push=False)
+    return {"ok": True, "status": outcome}
+
+
 # ─── Router ──────────────────────────────────────────────────────────────────
 def register_fixa_routes(db: AsyncIOMotorDatabase, get_current_user, require_admin, admin_emails: set[str]) -> tuple[APIRouter, APIRouter]:
     router = APIRouter(prefix="/api/fixa", tags=["fixa"])
@@ -166,14 +270,7 @@ def register_fixa_routes(db: AsyncIOMotorDatabase, get_current_user, require_adm
         return [r["id"] for r in rows]
 
     async def _tell(user_id: Optional[str], kind: str, title: str, body: str, meta: dict, action_url: str, *, push: bool = True):
-        if not user_id:
-            return
-        from notification_center import emit
-
-        try:
-            await emit(db, user_id, kind, title, body, meta, action_url=action_url, push=push)
-        except Exception as e:  # noqa: BLE001 — never block the action
-            logger.warning("fixa notification failed: %s", e)
+        await notify_user(db, user_id, kind, title, body, meta, action_url, push=push)
 
     async def _tell_admins(kind: str, title: str, body: str, meta: dict, action_url: str):
         for aid in await _admin_ids():
@@ -187,11 +284,7 @@ def register_fixa_routes(db: AsyncIOMotorDatabase, get_current_user, require_adm
         return [{"rating": r["rating"], "review": r.get("review"), "by": (r.get("customer_name") or "Customer").split(" ")[0], "at": r.get("completed_at"), "trade": r.get("trade")} for r in rows]
 
     async def _stats(provider_item_id: str) -> dict:
-        done = await db.fixa_bookings.count_documents({"item_id": provider_item_id, "status": "completed"})
-        pending = await db.fixa_bookings.count_documents({"item_id": provider_item_id, "status": "pending"})
-        upcoming = await db.fixa_bookings.count_documents({"item_id": provider_item_id, "status": "confirmed"})
-        open_reports = await db.fixa_reports.count_documents({"provider_item_id": provider_item_id, "status": "open"})
-        return {"jobs_completed": done, "pending_requests": pending, "upcoming": upcoming, "open_reports": open_reports}
+        return await provider_stats(db, provider_item_id)
 
     # ── Browse (free) ────────────────────────────────────────────────────────
     @router.get("/categories")
@@ -420,86 +513,37 @@ def register_fixa_routes(db: AsyncIOMotorDatabase, get_current_user, require_adm
     # ── Admin ────────────────────────────────────────────────────────────────
     @admin.get("/overview")
     async def overview(_admin=Depends(require_admin)):
-        return {
-            "pending": await db.marketplace.count_documents({"category": "services", "fixa_status": "pending"}),
-            "verified": await db.marketplace.count_documents(visible_query()),
-            "hidden": await db.marketplace.count_documents({"category": "services", "fixa_status": {"$in": ["hidden", "suspended"]}}),
-            "open_reports": await db.fixa_reports.count_documents({"status": "open"}),
-        }
+        return await moderation_overview(db)
 
     @admin.get("/applications")
     async def applications(status: str = Query("pending"), _admin=Depends(require_admin)):
-        q: dict[str, Any] = {"category": "services"}
-        if status == "all":
-            q["fixa_status"] = {"$exists": True}
-        else:
-            q["fixa_status"] = status
-        rows = await db.marketplace.find(q, {"_id": 0}).sort("applied_at", -1).to_list(300)
-        out = []
-        for d in rows:
-            u = await db.users.find_one({"id": d.get("seller_id")}, {"_id": 0, "id": 1, "full_name": 1, "email": 1, "phone": 1, "identity_verified": 1}) if d.get("seller_id") else None
-            out.append({**provider_full(d), "applied_at": d.get("applied_at"), "verified_at": d.get("verified_at"), "rejection_reason": d.get("rejection_reason"), "hidden_reason": d.get("hidden_reason"), "user": u, "stats": await _stats(d["id"])})
+        out = await moderation_applications(db, status)
         return {"items": out, "count": len(out)}
-
-    async def _set_status(provider_id: str, status: str, admin_user: dict, extra: Optional[dict] = None) -> dict:
-        d = await db.marketplace.find_one({"id": provider_id, "category": "services"}, {"_id": 0})
-        if not d:
-            raise HTTPException(404, "Provider not found")
-        upd = {"fixa_status": status, "updated_at": _iso(_now()), **(extra or {})}
-        await db.marketplace.update_one({"id": provider_id}, {"$set": upd})
-        await db.fixa_admin_log.insert_one({"id": str(uuid.uuid4()), "provider_item_id": provider_id, "status": status, "by": admin_user["id"], "at": _iso(_now()), **(extra or {})})
-        return d
 
     @admin.post("/applications/{provider_id}/approve")
     async def approve(provider_id: str, body: AdminNoteIn | None = None, admin_user: dict = Depends(require_admin)):
-        cur = await db.marketplace.find_one({"id": provider_id, "category": "services"}, {"_id": 0, "fixa_badges": 1, "provider_jobs_completed": 1, "rating": 1})
-        if not cur:
-            raise HTTPException(404, "Provider not found")
-        badges = auto_badges([b for b in (cur.get("fixa_badges") or []) if b != "AMASS Verified"] + ["AMASS Verified"], int(cur.get("provider_jobs_completed") or 0), cur.get("rating"))
-        d = await _set_status(provider_id, "verified", admin_user, {"is_fixa_verified": True, "verified_at": _iso(_now()), "verified_by": admin_user["id"], "rejection_reason": None, "fixa_badges": badges})
-        await _tell(d.get("seller_id"), "FIXA_VERIFIED", "You're FIXA verified 🎉", f"Your {d.get('subcategory')} profile is live. Homeowners can now find and book you." + (f" Note from admin: {body.note.strip()}" if body and body.note else ""), {"provider_item_id": provider_id}, "/fixa/provider")
-        return {"ok": True, "status": "verified"}
+        return await approve_provider(db, provider_id, admin_user, (body.note if body else "") or "")
 
     @admin.post("/applications/{provider_id}/reject")
     async def reject(provider_id: str, body: AdminNoteIn | None = None, admin_user: dict = Depends(require_admin)):
-        note = (body.note or "").strip() if body else ""
-        d = await _set_status(provider_id, "rejected", admin_user, {"is_fixa_verified": False, "rejection_reason": note or None})
-        await _tell(d.get("seller_id"), "FIXA_REJECTED", "FIXA application not approved", (note or "We couldn't verify your profile this time.") + " You can update your details and apply again.", {"provider_item_id": provider_id}, "/fixa/provider")
-        return {"ok": True, "status": "rejected"}
+        return await reject_provider(db, provider_id, admin_user, (body.note if body else "") or "")
 
     @admin.post("/providers/{provider_id}/suspend")
     async def suspend(provider_id: str, body: AdminNoteIn | None = None, admin_user: dict = Depends(require_admin)):
-        note = (body.note or "").strip() if body else ""
-        d = await _set_status(provider_id, "suspended", admin_user, {"hidden_reason": note or "Suspended by AMASS Admin", "hidden_at": _iso(_now())})
-        await _tell(d.get("seller_id"), "FIXA_SUSPENDED", "FIXA profile suspended", note or "Your profile was suspended by AMASS Admin.", {"provider_item_id": provider_id}, "/fixa/provider")
-        return {"ok": True, "status": "suspended"}
+        return await suspend_provider(db, provider_id, admin_user, (body.note if body else "") or "")
 
     @admin.post("/providers/{provider_id}/reinstate")
     async def reinstate(provider_id: str, admin_user: dict = Depends(require_admin)):
-        d = await _set_status(provider_id, "verified", admin_user, {"is_fixa_verified": True, "hidden_reason": None, "hidden_at": None})
-        await db.fixa_reports.update_many({"provider_item_id": provider_id, "status": "open"}, {"$set": {"status": "resolved", "resolved_at": _iso(_now()), "resolved_by": admin_user["id"], "resolution": "Provider reinstated"}})
-        await _tell(d.get("seller_id"), "FIXA_REINSTATED", "Your FIXA profile is live again", "AMASS Admin reviewed the reports and reinstated your profile.", {"provider_item_id": provider_id}, "/fixa/provider")
-        return {"ok": True, "status": "verified"}
+        return await reinstate_provider(db, provider_id, admin_user)
 
     @admin.get("/reports")
     async def reports(status: str = Query("open"), _admin=Depends(require_admin)):
-        q: dict[str, Any] = {} if status == "all" else {"status": status}
-        rows = await db.fixa_reports.find(q, {"_id": 0}).sort("created_at", -1).to_list(300)
-        for r in rows:
-            p = await db.marketplace.find_one({"id": r["provider_item_id"]}, {"_id": 0, "fixa_status": 1, "is_fixa_verified": 1})
-            r["provider_status"] = (p or {}).get("fixa_status") or ("verified" if (p or {}).get("is_fixa_verified") else "listed")
+        rows = await moderation_reports(db, status)
         return {"items": rows, "count": len(rows)}
 
     @admin.post("/reports/{report_id}/resolve")
     async def resolve(report_id: str, body: ResolveIn, admin_user: dict = Depends(require_admin)):
-        r = await db.fixa_reports.find_one({"id": report_id}, {"_id": 0})
-        if not r:
-            raise HTTPException(404, "Report not found")
-        await db.fixa_reports.update_one({"id": report_id}, {"$set": {"status": body.outcome, "resolved_at": _iso(_now()), "resolved_by": admin_user["id"], "resolution": (body.note or "").strip() or None}})
-        if body.reinstate:
-            await reinstate(r["provider_item_id"], admin_user)
-        await _tell(r["reporter_id"], "FIXA_REPORT_RESOLVED", "Thanks for your report", "AMASS Admin reviewed your report" + (f": {body.note.strip()}" if body.note else "."), {"report_id": report_id}, "/fixa", push=False)
-        return {"ok": True, "status": body.outcome}
+        return await resolve_report(db, report_id, admin_user, body.outcome, body.note, body.reinstate)
 
     return router, admin
 
