@@ -66,7 +66,7 @@ function FilterSelect({ value, onChange, all, options, testid }) {
   );
 }
 
-const money = (p) => (p >= 1000000 ? `₦${(p / 1e6).toLocaleString()}M` : `₦${(p || 0).toLocaleString()}`);
+const money = (p) => (!p ? "Price on request" : p >= 1000000 ? `₦${(p / 1e6).toLocaleString()}M` : `₦${p.toLocaleString()}`);
 
 function CategoriesTab({ canEdit }) {
   const [rows, setRows] = useState([]);
@@ -245,12 +245,12 @@ export default function Marketplace() {
         <p className="text-muted-foreground text-sm mt-1">Manage categories, products, promotions and pricing — live in the app.</p>
       </div>
       <Tabs defaultValue="categories">
-        <TabsList>
+        <div className="overflow-x-auto amass-scroll pb-1"><TabsList className="inline-flex flex-nowrap">
           <TabsTrigger value="categories" data-testid="mp-tab-categories"><Tag className="h-4 w-4 mr-1.5" /> Categories</TabsTrigger>
           <TabsTrigger value="products" data-testid="mp-tab-products"><ShoppingBag className="h-4 w-4 mr-1.5" /> Products</TabsTrigger>
           <TabsTrigger value="promotions" data-testid="mp-tab-promotions"><Megaphone className="h-4 w-4 mr-1.5" /> Promotions</TabsTrigger>
           <TabsTrigger value="pricing" data-testid="mp-tab-pricing"><Star className="h-4 w-4 mr-1.5" /> Pricing</TabsTrigger>
-        </TabsList>
+        </TabsList></div>
         <TabsContent value="categories" className="mt-4"><CategoriesTab canEdit={canEdit} /></TabsContent>
         <TabsContent value="products" className="mt-4"><ProductsTab canEdit={canEdit} /></TabsContent>
         <TabsContent value="promotions" className="mt-4">

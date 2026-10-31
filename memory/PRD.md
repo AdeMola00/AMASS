@@ -95,6 +95,13 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Frontend: Response column on Website Leads (Replied in X / Waiting X, red when >24h), weekly send-now button + schedule text.
 - Tested iteration_9 (14/14 API + UI). Reply times count emails sent from the dashboard only.
 
+## Updated (2026-10-31e) — Slow Reply Alerts + live Marketplace fields
+- User request: "Slow Reply Alerts: Show a warning in the dashboard when a lead has waited more than 24 hours without a reply. Update Amass Admin to support all Market changes and use the new portal endpoints provided by the main Amass app. Verify the integration against live data... Don't alter or delete live data during testing."
+- User skipped listing new endpoints/app URL; default = support visible portal product changes (seller, retailer_id, stock_status, updated_at; 101 live products, 6 retailers).
+- Backend: GET /api/website/leads/overdue. Frontend: SlowReplyBanner (Dashboard + Website Leads), overdue sidebar badge + mobile dot, "Overdue (over 24h)" filter (?filter=overdue). Marketplace Products: summary cards, seller/stock/updated columns, search + category/seller/stock filters, paging, "Price on request" for 0.
+- Tested read-only iteration_10 (11/11 API, UI 100%). Portal ignores product query filters, so filtering is client-side.
+
+
 
 
 

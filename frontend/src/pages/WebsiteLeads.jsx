@@ -289,7 +289,7 @@ export default function WebsiteLeads() {
                 </SelectContent>
               </Select>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="w-full sm:w-40" data-testid="website-leads-status-filter"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-48" data-testid="website-leads-status-filter"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   {STATUSES.map((s) => <SelectItem key={s} value={s}>{humanize(s)}</SelectItem>)}

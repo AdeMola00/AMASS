@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 10 (strictly READ-ONLY on live data): Slow Reply Alerts and the Marketplace live portal fields. Backend: new tests/test_slow_reply_marketplace.py, 11/11 passed. GET /api/website/leads/overdue returns 401 without auth. With auth it returns {slow_hours:24, count:12, oldest_hours:~2352, ids:[12]}, and every id is a non-newsletter lead with status 'new'. GET /api/marketplace/products (proxied to the portal) returns 101 products: 6 retailers, 42 in_stock, 9 out_of_stock, 50 unknown, Fouani Store 25. It returns 401 without auth. Categories returns 6 (Furniture, Electronics, Appliances, Home décor, Kitchen, Lighting). Promotions returns []. Regression endpoints (dashboard/stats, reply-times, digest, auth/me) all return 200, and login sets an httpOnly access_token cookie. Frontend: the Dashboard banner reads '12 website leads have waited over 24 hours without a reply / The oldest has been waiting 98 days'. The sidebar website-leads-overdue-badge shows 12 (no unseen leads) and is hidden on the active page. View overdue leads goes to /admin/website-leads?filter=overdue, where the status filter is 'Overdue (over 24h)' and lists 12 rows, all 'Waiting 98d · overdue'. After resetting to All statuses, the banner View button sets the overdue filter again. Mobile 390px: mobile-unseen-leads-dot is shown, the banner stacks (full-width button, no overflow on the dashboard), and the drawer shows the overdue badge 12. Marketplace summary cards are 101/6/42/9/50, matching the API exactly. Rows show the seller, stock badge and Updated date, and in-stock badges read 'In stock · N'. Paging works: 'Showing 25 of 101', then 50 after Show more. Filters: Fouani=25, Fouani+Out of stock=3, Out of stock=9, In stock=42, Unknown=50, Electronics=13, search 'pointek'=12, a nonsense search shows the empty state. The Categories tab shows 6 and Promotions shows 'Nothing yet.' Properties and Website Leads pages load. No data was modified.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Marketplace at 390px", "issues": ["Page overflows horizontally (scrollWidth 454 > 390) because the Tabs list (Categories/Products/Promotions/Pricing) is wider than the viewport. Pricing is cut off. Make TabsList overflow-x-auto or wrap."]},
+      {"screen": "Website Leads status filter (desktop)", "issues": ["The w-40 select truncates the 'Overdue (over 24h)' label to 'Overdue (over 24h'. Widen it to about w-48."]},
+      {"screen": "Marketplace products", "issues": ["Some live Furniture House products show the price as '₦0'. Consider showing 'Price on request' when the price is 0 (this is a data issue from the portal)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_slow_reply_marketplace.py", "/app/test_reports/pytest/iteration_10.xml"],
+  "action_items": [
+    "Minor: fix horizontal overflow of the Marketplace TabsList on mobile",
+    "Minor: widen the website-leads-status-filter trigger so 'Overdue (over 24h)' is not truncated",
+    "Optional: show 'Price on request' for products priced 0"
+  ],
+  "critical_code_review_comments": [
+    "overdue_leads calls the portal's /admin/leads on every poll (every 2 min per open admin tab). Fine for now, but consider a short cache.",
+    "On Website Leads, overdue IDs come from context polled every 2 min, so the overdue filter can lag briefly after a reply or status change. refreshOverdue is called after actions, which reduces this."
+  ],
+  "updated_files": ["/app/backend/tests/test_slow_reply_marketplace.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% functional (3 minor design notes)"},
+  "seed_data_creation": "None. All checks were read-only.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=<url> python -m pytest tests/test_slow_reply_marketplace.py -n 0 -s. It is read-only and asserts live counts (101 products, 6 retailers, 42/9/50 stock, Fouani 25, 6 categories). These numbers may drift as live data changes. Overdue count was 12 at test time. Testids: slow-reply-banner(-view/-count), website-leads-overdue-badge, mobile-unseen-leads-dot, mp-summary-*, mp-filter-*, mp-products-count/more."
+}
