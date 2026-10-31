@@ -38,9 +38,11 @@ export function LeadAlertsProvider({ children }) {
     try {
       const { data } = await api.get("/website/leads/unseen");
       if (lastCount.current !== null && data.count > lastCount.current) {
-        const who = data.latest[0]?.name || data.latest[0]?.email || "Someone";
+        const first = data.latest[0] || {};
+        const who = first.name || first.email || "Someone";
+        const what = first.form_type === "newsletter" ? "New newsletter sign-up" : "New website lead";
         playChime();
-        toast.success(`New website lead from ${who}`, {
+        toast.success(`${what} from ${who}`, {
           action: { label: "View", onClick: () => navigate("/admin/website-leads") },
         });
       }

@@ -4,7 +4,7 @@ from html import escape
 from typing import Any, Dict
 import httpx
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from server import api, db, require, log_activity, now_iso, new_id
 from email_service import send_email, EMAIL_FROM_NAME
@@ -22,6 +22,13 @@ class WebsiteLeadStatus(BaseModel):
 
 class WebsiteLeadReply(BaseModel):
     message: str = Field(min_length=1, max_length=5000)
+
+    @field_validator("message")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Message cannot be empty")
+        return v.strip()
 
 
 REPLIES_PER_HOUR = 30
@@ -126,8 +133,11 @@ async def website_lead_reply(lead_id: str, body: WebsiteLeadReply, user: dict = 
     await db.website_lead_replies.insert_one(dict(record))
     status = lead.get("status")
     if status == "new":
-        await _call("PATCH", f"/admin/leads/{lead_id}", {"status": "contacted"})
-        status = "contacted"
+        try:
+            await _call("PATCH", f"/admin/leads/{lead_id}", {"status": "contacted"})
+            status = "contacted"
+        except HTTPException:
+            pass
     await log_activity("Replied to website lead", "website_lead", user, lead["email"])
     return {"reply": record, "status": status}
 

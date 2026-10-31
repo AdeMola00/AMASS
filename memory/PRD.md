@@ -73,6 +73,14 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Tested against the live site (iteration_6): 13/13 API, all UI flows; every test edit reverted. Content backup: /app/memory/website_content_backup.json.
 - Note: the website's own /admin/stats by_status returns all zeros (website-side bug); the dashboard counts statuses itself.
 
+## Updated (2026-10-31b) — New Lead Alerts + Lead Email Replies
+- User request: "New Lead Alerts: Show a badge and sound in the dashboard when a new website lead arrives. Lead Email Replies: Let admins reply to a website lead by email straight from the Website Leads screen."
+- Choices: Emergent managed email (Resend); replies Reply-To hello@amass.africa; lead auto-marked Contacted after reply; alerts per admin (unseen since their last visit).
+- Backend: /api/website/leads/unseen, /mark-seen (per-admin `website_leads_seen_at`), /leads/{id}/reply (server-side recipient + template, 30/hour/admin, safety gate), /leads/{id}/replies (local `website_lead_replies`). `backend/email_service.py`.
+- Frontend: LeadAlertsContext (30s polling, chime + toast), sidebar badge, mobile menu dot, new-lead dots, Reply dialog with history.
+- Tested iteration_7 (11/11 API, UI flows); follow-up fixes: history reset, blank message 422, reply succeeds even if status update fails, newsletter toast label.
+
+
 
 ## Architecture note (extensibility)
 - New modules live in `/app/backend/modules_ext.py` registering on the shared `api` router — future modules (vehicles, auctions, tokenization, AI valuation, multi-country) follow the same additive pattern. Tech debt: extract a `routers/` package + `deps.py` as this grows.

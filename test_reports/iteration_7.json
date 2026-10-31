@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 7: New Lead Alerts (unseen badge, sound and toast) and Lead Email Replies. Backend: new tests/test_website_alerts_reply.py, 11/11 passed. Covered: unseen/mark-seen return 401 without auth and 403 for finance. unseen count = 14, matching live leads after the old seen time. latest is capped at 5 with only safe fields. mark-seen returns previous_seen_at and resets the count. Counts are per admin: super mark-seen did not clear support@'s count. Reply validation: 401 / 404 / 422 (empty, missing, over 5001 chars) / 400 'Reply blocked for safety' for 'send your password'. Replies endpoint returns 401 without auth. One real reply: to and subject are set by the server, and injected to/subject fields were ignored. Status went new -> contacted on the live site, the history was saved without _id, and it was reverted to new. Frontend: sidebar badge shows 14. The mobile hamburger dot is visible. Opening Website Leads clears the badge, and it stays cleared after returning to the Dashboard. A BUG was found and fixed: the red new-dots never showed (0) because React StrictMode calls mark-seen twice and the 2nd response ('just now') overwrote newSince. After the fix there are 11 dots, including the TEST lead. Polling: with seen_at reset in Mongo while on /admin, the toast 'New website lead from nltest@example.com' with a View button appeared within the poll window. The badge came back (14). View navigated to Website Leads. There were no console errors and no AudioContext warnings. Reply UI: the dialog shows the 'To TEST_agent_ui@example.com · their answer goes to hello@amass.africa' text. Send is disabled when the box is empty or whitespace. Sending showed the success toast and closed the dialog, the status became Contacted (stat updated to 1), the live API returned contacted and the history shows both replies. Status was reverted to new from the UI and verified on the live site. Regression: search, Closed filter (empty state), Newsletter tab (4 rows), Website Content and Dashboard all OK. No mobile overflow on Website Leads. Exactly 2 real emails were sent, both to the TEST lead. Cleanup done: TEST lead is 'new', website_lead_replies has 0 docs, super admin seen_at is set to now, and support@'s seen_at was unset (it was absent before).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/website/leads/{id}/reply", "issue": "A whitespace-only message ('   ') passes min_length=1, then is stripped to empty, so a real email with an empty body would be sent. The UI blocks it but the API does not. Strip before validating (Pydantic validator) and return 422. Not exercised, to avoid sending a real email."},
+      {"endpoint": "GET /api/website/leads/unseen", "issue": "Newsletter sign-ups are counted as 'leads'. The badge showed 14 but only 11 dots appear on the Leads tab, and the toast said 'New website lead from nltest@example.com' (a newsletter row). Decide whether to exclude form_type=='newsletter' or label it."},
+      {"endpoint": "POST /api/website/leads/{id}/reply", "issue": "If the live-site PATCH to 'contacted' fails after the email is sent, the endpoint returns 502 even though the email went out and the record was saved. The UI then shows an error and the admin may resend. Wrap the PATCH in try/except and return status unchanged."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "WebsiteLeads new-since dots", "issue": "FIXED by testing agent. markSeen() ran twice (StrictMode double effect), and the second previous_seen_at (now) replaced the first, so no new-dots ever rendered. It now keeps the oldest value. Main agent should still consider a useRef guard so mark-seen is only POSTed once.", "selector": "[data-testid^='website-lead-new-dot-']", "priority": "HIGH"},
+      {"component": "ReplyDialog history", "issue": "History is not cleared when the dialog opens for a different lead. For ~1s the previous lead's 'Earlier replies' show under the new lead (reproduced: history count 1 right away, then 0 after 2s). Add setHistory([]) next to setMessage('') in the useEffect.", "selector": "[data-testid='website-reply-history']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_website_alerts_reply.py", "/app/test_reports/pytest/pytest_alerts_iter7.xml"],
+  "action_items": [
+    "ReplyDialog: reset history (setHistory([])) when the lead changes.",
+    "Backend reply: reject whitespace-only messages with 422 (strip before min_length).",
+    "Decide whether newsletter sign-ups should count toward the unseen badge and toast. Either exclude form_type 'newsletter' or word the toast as 'New website submission'.",
+    "Optional: guard mark-seen with a ref so it is POSTed once per visit (my fix keeps the oldest value, which works but still makes 2 calls in dev).",
+    "Optional: don't return 502 from reply when only the post-send status PATCH fails."
+  ],
+  "critical_code_review_comments": [
+    "WebsiteLeads.jsx compares created_at > newSince as strings. This works for the current ISO formats ('+00:00' and fractional seconds), but would break if the site ever sends 'Z' timestamps. The backend uses datetime parsing, so the two can disagree.",
+    "LeadAlertsContext: playChime creates an AudioContext without a user gesture. Chrome may keep it suspended, so no sound plays until the user interacts. No errors were seen. Consider calling ctx.resume() or creating one shared context on first click.",
+    "website_ext.py unseen fetches the whole /admin/leads list from the live site on every 30s poll per admin tab. Fine now (16 rows) but consider a short cache.",
+    "WEBSITE_BASE and EMAIL_BASE_URL are still hardcoded instead of read from env."
+  ],
+  "updated_files": ["/app/frontend/src/pages/WebsiteLeads.jsx", "/app/backend/tests/test_website_alerts_reply.py", "/app/test_reports/iteration_7.json"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "~92% (all flows pass after the new-dot fix; 1 stale-history UI bug remains)"},
+  "test_credentials": "admin@amass.africa / ya0y9os77F@c8TXXh5@A; support@amass.africa / Amass@2026 (has leads view, used for the per-admin test); finance@amass.africa / Amass@2026 (403 check)",
+  "seed_data_creation": "None. Two real reply emails went to TEST_agent_ui@example.com (email ids 01a1907d..., 01a1907f...). Both website_lead_replies records were deleted. The TEST lead is back to 'new'. Super admin website_leads_seen_at is set to now.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... pytest tests/test_website_alerts_reply.py -n 0. TestReplySend sends 1 REAL email to the TEST lead and reverts its status in finally. Afterwards delete website_lead_replies docs and reset seen_at. To simulate unseen leads, set admin_users.website_leads_seen_at to '2026-07-25T07:00:00+00:00' (the live leads are dated Jul 25 2026, 07:02+). Toast test: run a background bash `sleep 45; mongosh ... updateOne(...)` while the browser sits on /admin and polls for up to 90s."
+}

@@ -58,6 +58,7 @@ function ReplyDialog({ lead, onClose, onSent }) {
   useEffect(() => {
     if (!lead) { return; }
     setMessage("");
+    setHistory([]);
     api.get(`/website/leads/${lead.id}/replies`).then((r) => setHistory(r.data)).catch(() => setHistory([]));
   }, [lead]);
   const send = async () => {
@@ -171,7 +172,7 @@ export default function WebsiteLeads() {
   const [newSince, setNewSince] = useState(null);
   const { markSeen } = useLeadAlerts();
 
-  useEffect(() => { markSeen().then(setNewSince).catch(() => {}); }, [markSeen]);
+  useEffect(() => { markSeen().then((v) => v && setNewSince((p) => (p && p < v ? p : v))).catch(() => {}); }, [markSeen]);
 
   const onSent = (lead, next) => {
     const upd = (arr) => arr.map((x) => (x.id === lead.id ? { ...x, status: next } : x));
