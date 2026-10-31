@@ -102,6 +102,13 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Tested read-only iteration_10 (11/11 API, UI 100%). Portal ignores product query filters, so filtering is client-side.
 
 
+## Updated (2026-10-31f) — Portal endpoint coverage + Retailer pages
+- User request: "App Endpoint List: Share the main AMASS app's new portal endpoints so the admin supports every new market feature. Retailer Pages: Show a page per retailer with their products, stock levels and out-of-stock alerts." Endpoint list supplied by user (auth/me, dashboard/*, properties*, platform-users, agents, leads*, transactions, payments/verify, tokens/*, marketplace/*, notifications, app-config, roles, admin-users, analytics/overview, reports/*, media*). Choice: alerts on retailer pages + Dashboard banner.
+- All listed endpoints already proxied; roles/admin-users intentionally local (dashboard sign-in). UI catch-ups: property status badges (available/premium/coming_soon/verified), agent Legacy + verification level, transaction provider, lead name/date fallbacks for partner leads with no contact info, unlocked Properties/Verification/Agents/Users in sidebar.
+- New Retailers list (/admin/retailers) + detail (/admin/retailers/:rid) grouped by retailer_id from live products; out-of-stock alert; Dashboard out-of-stock banner.
+- Tested read-only iteration_11 (38/38 API). Portal-side note: /reports/summary total_leads (7) ≠ /dashboard/stats (24).
+
+
 
 
 

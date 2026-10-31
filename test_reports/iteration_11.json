@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 11 (strictly READ-ONLY, GET only): full portal endpoint coverage and the Retailers feature. Backend: new tests/test_portal_endpoints_retailers.py, 38/38 passed. All 25 listed GET endpoints return 200 through the proxy (including the CSV exports leads-export/csv and reports/export, which are text/csv), and so do the local /roles and /admin-users. Unauthenticated GETs return 401. The counts are exact: properties 55, agents 27, platform-users 150, leads 24, transactions 12. GET /payments/verify/nonexistent returns 404 'Unknown payment reference'. Grouping /marketplace/products by retailer_id gives 6 retailers: Pointek 12 products/6 in stock/6 out/0 unknown, Fouani 25/22/3/0, BoConcept 23/0/0/23, Furniture House 17/0/0/17, SLOT 14/14/0/0, Lagom 10/0/0/10. RBAC: the finance role gets 403 on properties, agents, roles and admin-users, and 200 on transactions. Frontend (desktop): the Dashboard shows the slow-reply banner and an oos-banner reading '9 marketplace products are out of stock / At Fouani Store (3), Pointek (6)'. oos-banner-view goes to /admin/retailers. The Lead Sources pie renders 4 sectors. Properties, Property Verification, Agents and Users have no lock icon. There are 6 retailer cards sorted Pointek (6 out), Fouani (3 out), then the rest by product count, and their numbers match the API exactly. Pointek detail: stats 12/6/6/0, an alert with 6 items, 12 rows with the 6 out-of-stock rows first, and all images load. The back button works, an unknown id shows retailer-not-found, and SLOT has no alert. Every page in the sweep loaded with no 4xx/5xx and no page errors: Properties 55 rows (coloured badges for available, premium, sold, coming soon and verified, with 'Coming Soon' spaced), Property Verification 3, Agents 27 (22 Legacy badges, 27 level lines), Users 150, Leads 24, Transactions 12 (11 via Paystack, 1 via Flutterwave), and Payments, Tokens, Marketplace, Notifications, App Config, Analytics, Reports, Media, Roles and Settings all load. Mobile 390px: the Dashboard and retailer detail have no overflow. The Retailers list overflowed (420px), which I fixed. No live data was modified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/reports/summary (portal)", "issue": "totals.total_leads = 7, but /dashboard/stats total_leads = 24 and /leads returns 24. The two portal endpoints count leads differently, so the Reports and Dashboard pages show different 'Total leads' numbers. Clarify or align this on the portal side, or label it."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Lead Management table and detail dialog (Leads.jsx lines 145, 149, 166, 206)", "issue": "All 17 live 'partner' (FIXA) leads have name, email, phone and created_at = null. The Name and Contact cells render empty and the Date shows '1/1/1970' (new Date(null)). Show a fallback such as the message or 'FIXA provider' for the name, '—' for the contact, and '—' when created_at is null.", "selector": "tbody tr", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Retailers list at 390px", "issues": ["FIXED by the testing agent: the page overflowed horizontally (scrollWidth 420) because the grid had no mobile column template, so the implicit auto track grew to the nowrap category text. Added grid-cols-1 and block min-w-0 on the card Link. Width is now 390, and desktop still shows 3 columns."]},
+      {"screen": "Transactions", "issues": ["The subtitle says 'processed through the platform (Paystack)', but one transaction is via Flutterwave. Consider generic wording."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_portal_endpoints_retailers.py", "/app/test_reports/pytest/iteration_11.xml"],
+  "action_items": [
+    "Leads.jsx: handle null name, email and created_at for partner leads (no 1/1/1970 dates and no blank names)",
+    "Optional: reconcile reports/summary total_leads (7) with dashboard total_leads (24), or explain the difference in the UI",
+    "Optional: make the Transactions subtitle provider-neutral"
+  ],
+  "critical_code_review_comments": [
+    "portal_proxy: GET /api/media/file/* skips auth by design (public media). This is fine for images, but make sure the portal never serves private documents (for example property verification docs) under that path.",
+    "Retailers.jsx and OutOfStockBanner each call useMarketplaceProducts, which fetches the full product list on every mount (Dashboard plus Retailers). This is acceptable at 101 products. Consider caching or a shared context if the catalogue grows.",
+    "Retailers detail sort only ranks out_of_stock < unknown < in_stock. There is no secondary sort (for example by title), so the order within a group follows the API order. That is fine but not deterministic."
+  ],
+  "updated_files": ["/app/frontend/src/pages/Retailers.jsx", "/app/backend/tests/test_portal_endpoints_retailers.py"],
+  "success_rate": {"backend": "100%", "frontend": "95%"},
+  "seed_data_creation": "None. Read-only testing.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All data is live via the portal proxy, so stay read-only. Retailer ids: Pointek 093959d7-964c-55e0-8083-23cf97d6cf2e, Fouani e465cc38-968d-5268-ba1a-cca78aa18b80, SLOT cacd84a1-1ed8-5aed-9f11-d6ca3b49829e. Run pytest with -n 0 for serial runs with prints (pytest.ini forces xdist). Do NOT click prop-status-* selects (they change live status). Brute-force lockout and bcrypt checks were covered in earlier iterations and were not re-run, to avoid locking the live admin."
+}

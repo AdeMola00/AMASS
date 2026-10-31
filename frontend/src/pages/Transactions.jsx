@@ -34,7 +34,7 @@ export default function Transactions() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight">Transactions</h1>
-          <p className="text-muted-foreground text-sm mt-1">All payments processed through the platform (Paystack).</p>
+          <p className="text-muted-foreground text-sm mt-1">All payments processed through the platform, by Paystack or Flutterwave.</p>
         </div>
         <Button variant="outline" onClick={load} data-testid="txn-refresh"><RefreshCw className="h-4 w-4 mr-2" /> Refresh</Button>
       </div>

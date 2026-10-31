@@ -21,7 +21,7 @@ function Stat({ label, value, red, testid }) {
 function RetailerCard({ r }) {
   const oos = r.out_of_stock.length;
   return (
-    <Link to={`/admin/retailers/${encodeURIComponent(r.id)}`} data-testid={`retailer-card-${r.id}`}>
+    <Link to={`/admin/retailers/${encodeURIComponent(r.id)}`} className="block min-w-0" data-testid={`retailer-card-${r.id}`}>
       <Card className="p-5 h-full hover:border-primary/40 hover:shadow-md transition-[border-color,box-shadow]">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -56,7 +56,7 @@ function RetailerList({ retailers }) {
         <p className="text-muted-foreground text-sm mt-1">Live from the AMASS app marketplace: {retailers.length} retailers, {totalOos} products out of stock.</p>
       </div>
       {retailers.length === 0 && <Card className="p-10 text-center text-sm text-muted-foreground" data-testid="retailers-empty">No retailers yet.</Card>}
-      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">{sorted.map((r) => <RetailerCard key={r.id} r={r} />)}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">{sorted.map((r) => <RetailerCard key={r.id} r={r} />)}</div>
     </div>
   );
 }

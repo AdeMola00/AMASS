@@ -33,6 +33,9 @@ const STATUS_STYLES = {
   Closed: "bg-muted text-muted-foreground border-border",
 };
 
+const leadName = (l) => l.name || (l.message ? l.message.slice(0, 40) : "Unnamed lead");
+const leadDate = (d, long) => (d ? (long ? new Date(d).toLocaleString() : new Date(d).toLocaleDateString()) : "—");
+
 export default function Leads() {
   const { can } = useAuth();
   const [leads, setLeads] = useState([]);
@@ -142,11 +145,11 @@ export default function Leads() {
               {!loading && leads.map((l) => (
                 <TableRow key={l.id} data-testid={`lead-row-${l.id}`} className="hover:bg-muted/40">
                   <TableCell>
-                    <div className="font-medium">{l.name}</div>
+                    <div className="font-medium">{leadName(l)}</div>
                     <div className="text-xs text-muted-foreground md:hidden">{TYPE_LABELS[l.type]}</div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{TYPE_LABELS[l.type]}</TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{l.email}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{l.email || "—"}</TableCell>
                   <TableCell>
                     {canEdit ? (
                       <Select value={l.status} onValueChange={(v) => updateStatus(l.id, v)}>
@@ -163,7 +166,7 @@ export default function Leads() {
                       <Badge variant="outline" className={STATUS_STYLES[l.status]}>{l.status}</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{new Date(l.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{leadDate(l.created_at)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button size="icon" variant="ghost" onClick={() => setSelected(l)} data-testid={`lead-view-${l.id}`}>
@@ -202,11 +205,11 @@ export default function Leads() {
           {selected && (
             <>
               <DialogHeader>
-                <DialogTitle className="font-heading">{selected.name}</DialogTitle>
-                <DialogDescription>{TYPE_LABELS[selected.type]} · {new Date(selected.created_at).toLocaleString()}</DialogDescription>
+                <DialogTitle className="font-heading">{leadName(selected)}</DialogTitle>
+                <DialogDescription>{TYPE_LABELS[selected.type]} · {leadDate(selected.created_at, true)}</DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /> {selected.email}</div>
+                <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /> {selected.email || "No email given"}</div>
                 {selected.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /> {selected.phone}</div>}
                 <div>
                   <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Message</div>
