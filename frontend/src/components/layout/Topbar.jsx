@@ -20,6 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ALL_ITEMS, findNavItem } from "@/config/nav";
 import api from "@/lib/api";
 import { ROLE_LABELS } from "@/config/roles";
+import { useLeadAlerts } from "@/context/LeadAlertsContext";
 
 function Breadcrumbs() {
   const location = useLocation();
@@ -120,14 +121,16 @@ export default function Topbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { unseen } = useLeadAlerts();
   const initials = (user?.name || "A").split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-card/95 backdrop-blur border-b border-border flex items-center gap-3 px-4">
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="lg:hidden" data-testid="mobile-menu-button">
+          <Button variant="ghost" size="icon" className="lg:hidden relative" data-testid="mobile-menu-button">
             <Menu className="h-5 w-5" />
+            {unseen > 0 && <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-card animate-pulse" data-testid="mobile-unseen-leads-dot" />}
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-64">

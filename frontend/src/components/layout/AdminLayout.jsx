@@ -6,6 +6,7 @@ import { findNavItem } from "@/config/nav";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Lock } from "lucide-react";
+import { LeadAlertsProvider } from "@/context/LeadAlertsContext";
 
 function Guarded({ children }) {
   const location = useLocation();
@@ -31,6 +32,7 @@ function Guarded({ children }) {
 
 export default function AdminLayout() {
   return (
+    <LeadAlertsProvider>
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
@@ -41,5 +43,6 @@ export default function AdminLayout() {
       </div>
       <MobileTabBar />
     </div>
+    </LeadAlertsProvider>
   );
 }

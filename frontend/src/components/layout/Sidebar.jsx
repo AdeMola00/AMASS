@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { AmassPin } from "@/components/Logo";
 import { Lock } from "lucide-react";
+import { useLeadAlerts } from "@/context/LeadAlertsContext";
 
 function BrandMark() {
   return (
@@ -21,6 +22,7 @@ function BrandMark() {
 
 export function SidebarContent({ onNavigate }) {
   const { can } = useAuth();
+  const { unseen } = useLeadAlerts();
   const location = useLocation();
 
   return (
@@ -55,6 +57,11 @@ export function SidebarContent({ onNavigate }) {
                     >
                       <Icon className={cn("h-4 w-4 shrink-0", active && "text-primary")} />
                       <span className="truncate flex-1">{item.label}</span>
+                      {item.key === "website_leads" && unseen > 0 && !active && (
+                        <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center animate-pulse" data-testid="website-leads-unseen-badge">
+                          {unseen > 99 ? "99+" : unseen}
+                        </span>
+                      )}
                       {active && (
                         <motion.div layoutId="nav-dot" className="h-1.5 w-1.5 rounded-full bg-primary" />
                       )}

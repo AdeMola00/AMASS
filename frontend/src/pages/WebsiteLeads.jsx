@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useLeadAlerts } from "@/context/LeadAlertsContext";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, Globe, Mail } from "lucide-react";
+import { Loader2, Search, Globe, Mail, Reply, Send } from "lucide-react";
 
 const STATUSES = ["new", "contacted", "closed"];
 const STATUS_STYLES = {
@@ -47,7 +51,60 @@ function StatusSelect({ lead, canEdit, onChange }) {
   );
 }
 
-function LeadsTable({ rows, canEdit, onStatus, showType = true, testid }) {
+function ReplyDialog({ lead, onClose, onSent }) {
+  const [message, setMessage] = useState("");
+  const [history, setHistory] = useState([]);
+  const [sending, setSending] = useState(false);
+  useEffect(() => {
+    if (!lead) { return; }
+    setMessage("");
+    api.get(`/website/leads/${lead.id}/replies`).then((r) => setHistory(r.data)).catch(() => setHistory([]));
+  }, [lead]);
+  const send = async () => {
+    setSending(true);
+    try {
+      const { data } = await api.post(`/website/leads/${lead.id}/reply`, { message });
+      toast.success(`Reply sent to ${lead.email}`);
+      onSent(lead, data.status);
+      onClose();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail));
+    } finally { setSending(false); }
+  };
+  return (
+    <Dialog open={!!lead} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="website-reply-dialog">
+        <DialogHeader>
+          <DialogTitle>Reply to {lead?.name || lead?.email}</DialogTitle>
+          <DialogDescription data-testid="website-reply-to">
+            To {lead?.email} · their answer goes to hello@amass.africa
+          </DialogDescription>
+        </DialogHeader>
+        {lead?.message && <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">They wrote:</span> {lead.message}</div>}
+        <Textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={5000} placeholder="Write your reply…" className="min-h-[140px]" data-testid="website-reply-message" />
+        {history.length > 0 && (
+          <div className="space-y-2" data-testid="website-reply-history">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Earlier replies</div>
+            {history.map((h) => (
+              <div key={h.id} className="rounded-lg border border-border p-3 text-sm">
+                <div className="text-xs text-muted-foreground mb-1">{h.admin_name} · {fmtDate(h.sent_at)}</div>
+                <div className="whitespace-pre-wrap">{h.message}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} data-testid="website-reply-cancel">Cancel</Button>
+          <Button onClick={send} disabled={!message.trim() || sending} data-testid="website-reply-send">
+            {sending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />} Send reply
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LeadsTable({ rows, canEdit, onStatus, onReply, newSince, showType = true, testid }) {
   if (!rows.length) return <div className="py-14 text-center text-sm text-muted-foreground" data-testid={`${testid}-empty`}>Nothing here yet.</div>;
   return (
     <div className="overflow-x-auto amass-scroll" data-testid={testid}>
@@ -59,19 +116,28 @@ function LeadsTable({ rows, canEdit, onStatus, showType = true, testid }) {
             <th className="py-3 px-3 hidden md:table-cell">Message</th>
             <th className="py-3 px-3">Received</th>
             <th className="py-3 px-3">Status</th>
+            {canEdit && <th className="py-3 px-3" />}
           </tr>
         </thead>
         <tbody>
           {rows.map((l) => (
             <tr key={l.id} className="border-b border-border/60 hover:bg-muted/30 transition-colors" data-testid={`website-lead-row-${l.id}`}>
               <td className="py-3 px-3">
-                <div className="font-medium">{l.name || "—"}</div>
+                <div className="font-medium flex items-center gap-1.5">
+                  {newSince && l.created_at > newSince && <span className="h-2 w-2 rounded-full bg-primary shrink-0" title="New since your last visit" data-testid={`website-lead-new-dot-${l.id}`} />}
+                  {l.name || "—"}
+                </div>
                 <div className="text-xs text-muted-foreground">{l.email}{l.phone ? ` · ${l.phone}` : ""}</div>
               </td>
               {showType && <td className="py-3 px-3"><Badge variant="secondary">{humanize(l.form_type)}</Badge></td>}
               <td className="py-3 px-3 hidden md:table-cell max-w-xs truncate text-muted-foreground">{l.message || "—"}</td>
               <td className="py-3 px-3 whitespace-nowrap text-xs text-muted-foreground">{fmtDate(l.created_at)}</td>
               <td className="py-3 px-3"><StatusSelect lead={l} canEdit={canEdit} onChange={onStatus} /></td>
+              {canEdit && (
+                <td className="py-3 px-3">
+                  {l.email && <Button size="sm" variant="outline" onClick={() => onReply(l)} data-testid={`website-lead-reply-${l.id}`}><Reply className="h-3.5 w-3.5 mr-1.5" /> Reply</Button>}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -101,6 +167,16 @@ export default function WebsiteLeads() {
   const [q, setQ] = useState("");
   const [type, setType] = useState("all");
   const [status, setStatus] = useState("all");
+  const [replyTo, setReplyTo] = useState(null);
+  const [newSince, setNewSince] = useState(null);
+  const { markSeen } = useLeadAlerts();
+
+  useEffect(() => { markSeen().then(setNewSince).catch(() => {}); }, [markSeen]);
+
+  const onSent = (lead, next) => {
+    const upd = (arr) => arr.map((x) => (x.id === lead.id ? { ...x, status: next } : x));
+    setState((p) => ({ ...p, leads: upd(p.leads), newsletter: upd(p.newsletter) }));
+  };
 
   const onStatus = async (lead, next) => {
     try {
@@ -165,15 +241,16 @@ export default function WebsiteLeads() {
                 </SelectContent>
               </Select>
             </div>
-            <LeadsTable rows={filtered} canEdit={canEdit} onStatus={onStatus} testid="website-leads-table" />
+            <LeadsTable rows={filtered} canEdit={canEdit} onStatus={onStatus} onReply={setReplyTo} newSince={newSince} testid="website-leads-table" />
           </Card>
         </TabsContent>
         <TabsContent value="newsletter" className="mt-4">
           <Card className="p-4">
-            <LeadsTable rows={newsletter} canEdit={canEdit} onStatus={onStatus} showType={false} testid="website-newsletter-table" />
+            <LeadsTable rows={newsletter} canEdit={canEdit} onStatus={onStatus} onReply={setReplyTo} newSince={newSince} showType={false} testid="website-newsletter-table" />
           </Card>
         </TabsContent>
       </Tabs>
+      <ReplyDialog lead={replyTo} onClose={() => setReplyTo(null)} onSent={onSent} />
     </div>
   );
 }
