@@ -7,3 +7,11 @@ crons:
     endpoint: "{{BASE_URL}}/api/cron/lead-digest"
     method: POST
     enabled: true
+  - name: weekly-lead-trends
+    description: "Emails hello@amass.africa last week's website leads vs the week before, Mondays 8am Lagos"
+    cron: "0 8 * * 1"
+    timezone: "Africa/Lagos"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    endpoint: "{{BASE_URL}}/api/cron/weekly-trends"
+    method: POST
+    enabled: true

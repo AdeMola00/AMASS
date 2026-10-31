@@ -120,7 +120,27 @@ function ReplyDialog({ lead, templates, onClose, onSent }) {
   );
 }
 
-function LeadsTable({ rows, canEdit, onStatus, onReply, newSince, showType = true, testid }) {
+const SLOW_HOURS = 24;
+const hoursBetween = (a, b) => Math.max(0, (new Date(b) - new Date(a)) / 36e5);
+const fmtHours = (h) => (h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 48 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`);
+
+function ResponseCell({ lead, reply }) {
+  if (reply) {
+    const h = hoursBetween(lead.created_at, reply.first);
+    const slow = h > SLOW_HOURS;
+    return <span className={`text-xs font-medium ${slow ? "text-destructive" : "text-emerald-600"}`} data-testid={`website-lead-response-${lead.id}`}>Replied in {fmtHours(h)}{slow ? " · slow" : ""}</span>;
+  }
+  if (lead.status !== "new") return <span className="text-xs text-muted-foreground" data-testid={`website-lead-response-${lead.id}`}>—</span>;
+  const h = hoursBetween(lead.created_at, new Date());
+  const late = h > SLOW_HOURS;
+  return (
+    <span className={`text-xs font-medium ${late ? "text-destructive" : "text-amber-600"}`} data-testid={`website-lead-response-${lead.id}`}>
+      Waiting {fmtHours(h)}{late ? " · overdue" : ""}
+    </span>
+  );
+}
+
+function LeadsTable({ rows, canEdit, onStatus, onReply, newSince, replyTimes, showType = true, testid }) {
   if (!rows.length) return <div className="py-14 text-center text-sm text-muted-foreground" data-testid={`${testid}-empty`}>Nothing here yet.</div>;
   return (
     <div className="overflow-x-auto amass-scroll" data-testid={testid}>
@@ -132,6 +152,7 @@ function LeadsTable({ rows, canEdit, onStatus, onReply, newSince, showType = tru
             <th className="py-3 px-3 hidden md:table-cell">Message</th>
             <th className="py-3 px-3">Received</th>
             <th className="py-3 px-3">Status</th>
+            {replyTimes && <th className="py-3 px-3">Response</th>}
             {canEdit && <th className="py-3 px-3" />}
           </tr>
         </thead>
@@ -149,6 +170,7 @@ function LeadsTable({ rows, canEdit, onStatus, onReply, newSince, showType = tru
               <td className="py-3 px-3 hidden md:table-cell max-w-xs truncate text-muted-foreground">{l.message || "—"}</td>
               <td className="py-3 px-3 whitespace-nowrap text-xs text-muted-foreground">{fmtDate(l.created_at)}</td>
               <td className="py-3 px-3"><StatusSelect lead={l} canEdit={canEdit} onChange={onStatus} /></td>
+              {replyTimes && <td className="py-3 px-3 whitespace-nowrap"><ResponseCell lead={l} reply={replyTimes[l.id]} /></td>}
               {canEdit && (
                 <td className="py-3 px-3">
                   {l.email && <Button size="sm" variant="outline" onClick={() => onReply(l)} data-testid={`website-lead-reply-${l.id}`}><Reply className="h-3.5 w-3.5 mr-1.5" /> Reply</Button>}
@@ -188,13 +210,16 @@ export default function WebsiteLeads() {
   const { markSeen } = useLeadAlerts();
   const [templates, setTemplates] = useState([]);
   const loadTemplates = () => api.get("/website/reply-templates").then((r) => setTemplates(r.data)).catch(() => {});
-  useEffect(() => { loadTemplates(); }, []);
+  const [replyTimes, setReplyTimes] = useState({});
+  const loadReplyTimes = () => api.get("/website/reply-times").then((r) => setReplyTimes(r.data.replies)).catch(() => {});
+  useEffect(() => { loadTemplates(); loadReplyTimes(); }, []);
 
   useEffect(() => { markSeen().then((v) => v && setNewSince((p) => (p && p < v ? p : v))).catch(() => {}); }, [markSeen]);
 
   const onSent = (lead, next) => {
     const upd = (arr) => arr.map((x) => (x.id === lead.id ? { ...x, status: next } : x));
     setState((p) => ({ ...p, leads: upd(p.leads), newsletter: upd(p.newsletter) }));
+    loadReplyTimes();
   };
 
   const onStatus = async (lead, next) => {
@@ -264,7 +289,7 @@ export default function WebsiteLeads() {
                 </SelectContent>
               </Select>
             </div>
-            <LeadsTable rows={filtered} canEdit={canEdit} onStatus={onStatus} onReply={setReplyTo} newSince={newSince} testid="website-leads-table" />
+            <LeadsTable rows={filtered} canEdit={canEdit} onStatus={onStatus} onReply={setReplyTo} newSince={newSince} replyTimes={replyTimes} testid="website-leads-table" />
           </Card>
         </TabsContent>
         <TabsContent value="newsletter" className="mt-4">
