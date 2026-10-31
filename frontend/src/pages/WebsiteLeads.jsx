@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { SlowReplyBanner } from "@/components/website/SlowReplyBanner";
 import api, { formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLeadAlerts } from "@/context/LeadAlertsContext";
@@ -204,10 +206,12 @@ export default function WebsiteLeads() {
   const [{ stats, leads, newsletter, loading, error }, setState] = useWebsiteData();
   const [q, setQ] = useState("");
   const [type, setType] = useState("all");
-  const [status, setStatus] = useState("all");
+  const [params] = useSearchParams();
+  const [status, setStatus] = useState(params.get("filter") === "overdue" ? "overdue" : "all");
   const [replyTo, setReplyTo] = useState(null);
   const [newSince, setNewSince] = useState(null);
-  const { markSeen } = useLeadAlerts();
+  const { markSeen, overdue, refreshOverdue } = useLeadAlerts();
+  const overdueIds = useMemo(() => new Set(overdue?.ids || []), [overdue]);
   const [templates, setTemplates] = useState([]);
   const loadTemplates = () => api.get("/website/reply-templates").then((r) => setTemplates(r.data)).catch(() => {});
   const [replyTimes, setReplyTimes] = useState(null);
@@ -220,6 +224,7 @@ export default function WebsiteLeads() {
     const upd = (arr) => arr.map((x) => (x.id === lead.id ? { ...x, status: next } : x));
     setState((p) => ({ ...p, leads: upd(p.leads), newsletter: upd(p.newsletter) }));
     loadReplyTimes();
+    refreshOverdue();
   };
 
   const onStatus = async (lead, next) => {
@@ -228,6 +233,7 @@ export default function WebsiteLeads() {
       const upd = (arr) => arr.map((x) => (x.id === lead.id ? { ...x, status: next } : x));
       setState((p) => ({ ...p, leads: upd(p.leads), newsletter: upd(p.newsletter) }));
       toast.success(`Marked ${humanize(next)} on the website`);
+      refreshOverdue();
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail));
     }
@@ -237,7 +243,7 @@ export default function WebsiteLeads() {
   const filtered = useMemo(() => leads.filter((l) =>
     l.form_type !== "newsletter" &&
     (type === "all" || l.form_type === type) &&
-    (status === "all" || l.status === status) &&
+    (status === "all" || (status === "overdue" ? overdueIds.has(l.id) : l.status === status)) &&
     (!q || `${l.name || ""} ${l.email || ""} ${l.phone || ""}`.toLowerCase().includes(q.toLowerCase()))
   ), [leads, q, type, status]);
 
@@ -261,6 +267,7 @@ export default function WebsiteLeads() {
         <StatCard label="Contacted" value={counts.contacted} testid="website-stat-contacted" />
         <StatCard label="Newsletter" value={newsletter.length} testid="website-stat-newsletter" />
       </div>
+      <SlowReplyBanner onView={() => setStatus("overdue")} />
       <Tabs defaultValue="leads">
         <TabsList>
           <TabsTrigger value="leads" data-testid="website-tab-leads">Leads ({leads.length - newsletter.length})</TabsTrigger>
@@ -286,6 +293,7 @@ export default function WebsiteLeads() {
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   {STATUSES.map((s) => <SelectItem key={s} value={s}>{humanize(s)}</SelectItem>)}
+                  <SelectItem value="overdue" data-testid="website-leads-filter-overdue">Overdue (over 24h)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

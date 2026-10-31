@@ -14,6 +14,7 @@ import {
   AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
+import { SlowReplyBanner } from "@/components/website/SlowReplyBanner";
 
 const STAT_META = [
   { key: "total_leads", label: "Total Leads", icon: Inbox, accent: "primary" },
@@ -102,6 +103,8 @@ export default function Dashboard() {
         </h1>
         <p className="text-muted-foreground text-sm mt-1">Here is what's happening across AMASS today.</p>
       </div>
+
+      <SlowReplyBanner />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">

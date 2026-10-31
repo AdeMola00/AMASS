@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 const POLL_MS = 30000;
-const LeadAlertsContext = createContext({ unseen: 0, markSeen: async () => null });
+const LeadAlertsContext = createContext({ unseen: 0, overdue: null, markSeen: async () => null });
 
 function playChime() {
   try {
@@ -32,7 +32,15 @@ export function LeadAlertsProvider({ children }) {
   const navigate = useNavigate();
   const enabled = can("leads", "view");
   const [unseen, setUnseen] = useState(0);
+  const [overdue, setOverdue] = useState(null);
   const lastCount = useRef(null);
+
+  const checkOverdue = useCallback(async () => {
+    try {
+      const { data } = await api.get("/website/leads/overdue");
+      setOverdue(data);
+    } catch { /* keep last known */ }
+  }, []);
 
   const check = useCallback(async () => {
     try {
@@ -54,9 +62,11 @@ export function LeadAlertsProvider({ children }) {
   useEffect(() => {
     if (!enabled) { return undefined; }
     check();
+    checkOverdue();
     const id = setInterval(check, POLL_MS);
-    return () => clearInterval(id);
-  }, [enabled, check]);
+    const id2 = setInterval(checkOverdue, POLL_MS * 4);
+    return () => { clearInterval(id); clearInterval(id2); };
+  }, [enabled, check, checkOverdue]);
 
   const markSeen = useCallback(async () => {
     const { data } = await api.post("/website/leads/mark-seen");
@@ -65,7 +75,7 @@ export function LeadAlertsProvider({ children }) {
     return data.previous_seen_at;
   }, []);
 
-  return <LeadAlertsContext.Provider value={{ unseen, markSeen }}>{children}</LeadAlertsContext.Provider>;
+  return <LeadAlertsContext.Provider value={{ unseen, overdue, refreshOverdue: checkOverdue, markSeen }}>{children}</LeadAlertsContext.Provider>;
 }
 
 export const useLeadAlerts = () => useContext(LeadAlertsContext);

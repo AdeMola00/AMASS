@@ -22,7 +22,7 @@ function BrandMark() {
 
 export function SidebarContent({ onNavigate }) {
   const { can } = useAuth();
-  const { unseen } = useLeadAlerts();
+  const { unseen, overdue } = useLeadAlerts();
   const location = useLocation();
 
   return (
@@ -57,6 +57,11 @@ export function SidebarContent({ onNavigate }) {
                     >
                       <Icon className={cn("h-4 w-4 shrink-0", active && "text-primary")} />
                       <span className="truncate flex-1">{item.label}</span>
+                      {item.key === "website_leads" && !active && unseen === 0 && overdue?.count > 0 && (
+                        <span className="min-w-5 h-5 px-1.5 rounded-full bg-destructive/15 text-destructive text-[10px] font-bold flex items-center justify-center" title={`${overdue.count} leads waiting over ${overdue.slow_hours}h`} data-testid="website-leads-overdue-badge">
+                          {overdue.count > 99 ? "99+" : overdue.count}
+                        </span>
+                      )}
                       {item.key === "website_leads" && unseen > 0 && !active && (
                         <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center animate-pulse" data-testid="website-leads-unseen-badge">
                           {unseen > 99 ? "99+" : unseen}

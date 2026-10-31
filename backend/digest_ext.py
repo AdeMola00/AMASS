@@ -302,6 +302,15 @@ async def reply_times(user: dict = Depends(require("leads"))):
     return {"slow_hours": SLOW_HOURS, "replies": first}
 
 
+@api.get("/website/leads/overdue")
+async def overdue_leads(user: dict = Depends(require("leads"))):
+    leads = await _call("GET", "/admin/leads")
+    overdue = _tracking(leads, await _first_replies())["overdue"]
+    return {"slow_hours": SLOW_HOURS, "count": len(overdue),
+            "oldest_hours": overdue[0]["waited"] if overdue else None,
+            "ids": [l["id"] for l in overdue]}
+
+
 @api.get("/website/digest")
 async def digest_status(user: dict = Depends(require("leads"))):
     last = await db.meta.find_one({"key": "last_lead_digest"}, {"_id": 0})

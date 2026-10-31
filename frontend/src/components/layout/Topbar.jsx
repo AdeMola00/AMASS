@@ -121,7 +121,7 @@ export default function Topbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { unseen } = useLeadAlerts();
+  const { unseen, overdue } = useLeadAlerts();
   const initials = (user?.name || "A").split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 
   return (
@@ -130,7 +130,7 @@ export default function Topbar() {
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" className="lg:hidden relative" data-testid="mobile-menu-button">
             <Menu className="h-5 w-5" />
-            {unseen > 0 && <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-card animate-pulse" data-testid="mobile-unseen-leads-dot" />}
+            {(unseen > 0 || overdue?.count > 0) && <span className={`absolute top-1 right-1 h-2.5 w-2.5 rounded-full ring-2 ring-card ${unseen > 0 ? "bg-primary animate-pulse" : "bg-destructive"}`} data-testid="mobile-unseen-leads-dot" />}
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-64">
