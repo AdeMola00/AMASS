@@ -80,6 +80,14 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Frontend: LeadAlertsContext (30s polling, chime + toast), sidebar badge, mobile menu dot, new-lead dots, Reply dialog with history.
 - Tested iteration_7 (11/11 API, UI flows); follow-up fixes: history reset, blank message 422, reply succeeds even if status update fails, newsletter toast label.
 
+## Updated (2026-10-31c) — Reply Templates + Daily Lead Digest
+- User request: "Reply Templates: Add ready-made reply templates for agent sign-ups, demo bookings and property listings so admins can respond quickly. Daily Lead Digest: Send hello@amass.africa a morning email summarizing yesterday's website leads and how many still need a reply."
+- Choices: 8:00 am Lagos; templates ready-made + editable; "need a reply" = all leads still New.
+- `backend/digest_ext.py`: templates CRUD (/api/website/reply-templates, 3 seeded defaults), digest build/send, cron endpoint POST /api/cron/lead-digest (Bearer WEBHOOK_CRON_SECRET, idempotent, background), /api/website/digest + /send-now (2-min limit). `.emergent/crons.yml` daily-lead-digest "0 8 * * *" Africa/Lagos.
+- Frontend: Templates tab + template picker in Reply dialog (suggested by form type), "Email digest now" + schedule text on Website Leads.
+- Tested iteration_8 (16/16 API, all UI flows). Real digest delivered to hello@amass.africa.
+
+
 
 
 ## Architecture note (extensibility)

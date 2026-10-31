@@ -7,7 +7,7 @@ from html import escape
 from typing import List
 from zoneinfo import ZoneInfo
 from fastapi import Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from server import api, db, require, log_activity, now_iso, new_id
 from website_ext import _call, _ts, _label
@@ -36,13 +36,21 @@ class TemplateInput(BaseModel):
     form_types: List[str] = []
     body: str = Field(min_length=1, max_length=5000)
 
+    @field_validator("name", "body")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Cannot be empty")
+        return v.strip()
+
 
 async def _seed_templates():
-    if await db.meta.find_one({"key": "reply_templates_seeded"}):
+    res = await db.meta.update_one({"key": "reply_templates_seeded"},
+                                   {"$setOnInsert": {"key": "reply_templates_seeded", "at": now_iso()}}, upsert=True)
+    if res.upserted_id is None:
         return
     await db.website_reply_templates.insert_many(
         [{"id": new_id(), **t, "builtin": True, "created_at": now_iso()} for t in DEFAULT_TEMPLATES])
-    await db.meta.insert_one({"key": "reply_templates_seeded", "at": now_iso()})
 
 
 @api.get("/website/reply-templates")

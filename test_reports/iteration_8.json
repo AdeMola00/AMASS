@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 8: Reply Templates and Daily Lead Digest. Backend: new tests/test_templates_digest.py, 16/16 passed. The first GET (4 concurrent calls) seeded exactly 3 builtin defaults with the right form_types and no _id. Template CRUD works: create, list, update and GET-verify, delete, then a second delete gives 404. Unknown PUT gives 404. 422 for an empty name, an empty body, an 81-char name and a missing name. Finance gets 403 on POST/PUT/DELETE, on send-now and also on GET. Unauthenticated calls get 401. Cron: 401 with no Bearer and with a wrong Bearer. A valid Bearer returns 202 {accepted:true} in 0.12s. A duplicate X-Webhook-Id returns duplicate:true. A non-object body returns 400. crons.yml has '0 8 * * *' Africa/Lagos. IMPORTANT FINDING: the background digest from my cron call (run TEST_run_00659409...) SENT successfully to hello@amass.africa (email_id 01a19087-9689..., 0 new yesterday, 16 pending, status done). The log at 05:54 still showed undeliverable_recipient, so the mailbox started accepting mail between 05:54 and 05:56. Because of this, the expected 'can't receive email' toast could NOT be reproduced. Instead, clicking 'Email digest now' within 2 min showed the 429 toast 'A digest was just sent. Please wait a couple of minutes.', which correctly shows the rate limit works after a real send. Frontend: the schedule text reads 'Daily digest to hello@amass.africa, 8:00 am Lagos time · last sent 10/31/2026, 5:56:07 AM'. The Reply dialog on the TEST agent lead lists 'Agent sign-up · suggested' first, then Demo booking and Property listing. Picking a template fills the message box, the text is editable, and Send stays enabled (NOT clicked). On the Templates tab, 3 cards are shown and New template opens the editor. Save is disabled while the form is empty. Creating TEST_ui_tpl (Contact) worked and the tab count went to 4. Edit opened prefilled and renamed it to TEST_ui_tpl_edited. Delete (window.confirm) removed it and the count went back to 3. Regression: the leads list (12 rows, stats 16/12/0/4) and Website Content load. The only console error was the expected 429.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST/PUT /api/website/reply-templates", "issue": "A whitespace-only name/body ('   ') is accepted (200), because min_length runs before any strip. The UI blocks it with trim(), but the API does not. Strip in a validator and return 422."},
+      {"endpoint": "GET /api/website/reply-templates (_seed_templates)", "issue": "The seed check (find meta, then insert_many, then insert meta) is not atomic. Two concurrent first calls (for example React StrictMode double-mount) could insert 6 defaults. It did not happen in my 4-way concurrent test, but use an upsert on the meta key (or a unique index) to guard it."},
+      {"endpoint": "GET /api/website/reply-templates", "issue": "Requires leads view, so finance gets 403. That is fine, just confirming it is intended."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_templates_digest.py", "/app/test_reports/pytest/pytest_iter8.xml"],
+  "action_items": [
+    "Be aware that hello@amass.africa now ACCEPTS mail. One real digest was delivered at 05:56:07 UTC by my cron test. The undeliverable toast path could not be retested live. The code path (422 with the clear message) was reviewed and looks correct.",
+    "Reject whitespace-only template name/body on the backend (422).",
+    "Make template seeding atomic (upsert meta key / unique index)."
+  ],
+  "critical_code_review_comments": [
+    "Cron failures are only logged and stored on cron_runs.status='failed'. Nothing in the UI shows that the 8am digest failed. Consider showing the last failed run in digest-schedule-text.",
+    "send-now rate limit is based only on last successful send, so repeated failing clicks each hit the email API (acceptable, as designed).",
+    "_run_digest via asyncio.create_task has no reference kept; task could be GC'd in rare cases—store in a set."
+  ],
+  "updated_files": ["/app/backend/tests/test_templates_digest.py", "/app/test_reports/iteration_8.json"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% (all requested flows; the undeliverable toast was not reproducible because the mailbox now works)"},
+  "test_credentials": "admin@amass.africa / ya0y9os77F@c8TXXh5@A; finance@amass.africa / Amass@2026",
+  "seed_data_creation": "The 3 default templates were seeded by the first GET, which was the intended behaviour. The TEST_ templates I created were deleted, so 3 remain. My cron_runs doc (TEST_run_*) was deleted and cron_runs is empty. meta.last_lead_digest was left in place because it records the real send. No lead changes and no reply emails. One digest email went to hello@amass.africa.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=<url> WEBHOOK_CRON_SECRET=<from backend/.env> python -m pytest tests/test_templates_digest.py -n 0. NOTE: test_valid_and_duplicate triggers a REAL digest send to hello@amass.africa, which is deliverable as of 05:56 UTC. Delete cron_runs where run_id ^TEST_ afterwards. Login testids: login-email, login-password, login-submit."
+}
