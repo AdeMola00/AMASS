@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Inbox, LayoutTemplate, Building2, UserCog, Users, KeyRound,
   Hammer, Store, MessageSquare, Bell, BarChart3, FileText, ShieldCheck,
   Settings, Sparkles, Wallet, CreditCard, Repeat, BadgeCheck, Briefcase,
-  ShoppingBag, SlidersHorizontal, Coins, Image,
+  ShoppingBag, SlidersHorizontal, Coins, Image, Globe, PenLine,
 } from "lucide-react";
 
 // module keys MUST match backend MODULES
@@ -18,6 +18,8 @@ export const NAV_GROUPS = [
     items: [
       { key: "leads", label: "Lead Management", path: "/admin/leads", icon: Inbox, module: "leads", built: true },
       { key: "cms", label: "Landing Page CMS", path: "/admin/cms", icon: LayoutTemplate, module: "cms", built: true },
+      { key: "website_leads", label: "Website Leads", path: "/admin/website-leads", icon: Globe, module: "leads", built: true },
+      { key: "website_content", label: "Website Content", path: "/admin/website-content", icon: PenLine, module: "cms", built: true },
       { key: "analytics", label: "Analytics", path: "/admin/analytics", icon: BarChart3, module: "analytics", built: true },
       { key: "reports", label: "Reports", path: "/admin/reports", icon: FileText, module: "reports", built: true },
     ],

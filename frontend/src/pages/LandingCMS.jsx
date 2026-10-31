@@ -34,7 +34,7 @@ function FieldEditor({ path, value, onChange, disabled }) {
   );
 }
 
-function ArrayEditor({ path, items, onChange, onArrayAdd, onArrayRemove, disabled }) {
+export function ArrayEditor({ path, items, onChange, onArrayAdd, onArrayRemove, disabled }) {
   return (
     <div className="space-y-3">
       {items.map((item, idx) => (
@@ -62,7 +62,7 @@ function ArrayEditor({ path, items, onChange, onArrayAdd, onArrayRemove, disable
   );
 }
 
-function ObjectEditor({ data, onChange, onArrayAdd, onArrayRemove, disabled }) {
+export function ObjectEditor({ data, onChange, onArrayAdd, onArrayRemove, disabled }) {
   const entries = Object.entries(data || {});
   const scalars = entries.filter(([, v]) => !(v && typeof v === "object"));
   const arrays = entries.filter(([, v]) => v && typeof v === "object");

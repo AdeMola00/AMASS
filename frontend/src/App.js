@@ -9,6 +9,8 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Leads from "@/pages/Leads";
 import LandingCMS from "@/pages/LandingCMS";
+import WebsiteLeads from "@/pages/WebsiteLeads";
+import WebsiteContent from "@/pages/WebsiteContent";
 import RolesPermissions from "@/pages/RolesPermissions";
 import Settings from "@/pages/Settings";
 import Properties from "@/pages/Properties";
@@ -49,6 +51,8 @@ function App() {
                 <Route index element={<Dashboard />} />
                 <Route path="leads" element={<Leads />} />
                 <Route path="cms" element={<LandingCMS />} />
+                <Route path="website-leads" element={<WebsiteLeads />} />
+                <Route path="website-content" element={<WebsiteContent />} />
                 <Route path="properties" element={<Properties />} />
                 <Route path="property-verification" element={<PropertyVerification />} />
                 <Route path="agents" element={<Agents />} />
