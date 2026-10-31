@@ -15,6 +15,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { SlowReplyBanner } from "@/components/website/SlowReplyBanner";
+import { OutOfStockBanner } from "@/components/marketplace/OutOfStockBanner";
 
 const STAT_META = [
   { key: "total_leads", label: "Total Leads", icon: Inbox, accent: "primary" },
@@ -77,7 +78,7 @@ function QuickActions() {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const [stats, setStats] = useState(null);
   const [trend, setTrend] = useState([]);
   const [sources, setSources] = useState([]);
@@ -105,6 +106,7 @@ export default function Dashboard() {
       </div>
 
       <SlowReplyBanner />
+      <OutOfStockBanner enabled={can("marketplace", "view")} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">

@@ -54,7 +54,7 @@ export default function Transactions() {
             {!loading && rows.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-16 text-muted-foreground"><Wallet className="h-8 w-8 mx-auto mb-2 opacity-40" /> No transactions yet.</TableCell></TableRow>}
             {!loading && rows.map((t) => (
               <TableRow key={t.id} data-testid={`txn-row-${t.id}`}>
-                <TableCell className="font-mono text-xs">{t.reference}</TableCell>
+                <TableCell className="font-mono text-xs">{t.reference}{t.provider && <div className="font-sans text-[11px] text-muted-foreground capitalize mt-0.5" data-testid={`txn-provider-${t.id}`}>via {t.provider}</div>}</TableCell>
                 <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{t.email}</TableCell>
                 <TableCell className="text-sm">{t.item_name}<div className="text-xs text-muted-foreground capitalize">{t.purpose?.replace("_", " ")}</div></TableCell>
                 <TableCell className="font-medium">₦{(t.amount || 0).toLocaleString()}</TableCell>

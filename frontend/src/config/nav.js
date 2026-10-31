@@ -27,10 +27,10 @@ export const NAV_GROUPS = [
   {
     label: "Marketplace",
     items: [
-      { key: "properties", label: "Properties", path: "/admin/properties", icon: Building2, module: "properties" },
-      { key: "property_verification", label: "Property Verification", path: "/admin/property-verification", icon: BadgeCheck, module: "property_verification" },
-      { key: "agents", label: "Agents", path: "/admin/agents", icon: UserCog, module: "agents" },
-      { key: "users", label: "Users", path: "/admin/users", icon: Users, module: "users" },
+      { key: "properties", label: "Properties", path: "/admin/properties", icon: Building2, module: "properties", built: true },
+      { key: "property_verification", label: "Property Verification", path: "/admin/property-verification", icon: BadgeCheck, module: "property_verification", built: true },
+      { key: "agents", label: "Agents", path: "/admin/agents", icon: UserCog, module: "agents", built: true },
+      { key: "users", label: "Users", path: "/admin/users", icon: Users, module: "users", built: true },
       { key: "property_owners", label: "Property Owners", path: "/admin/property-owners", icon: KeyRound, module: "property_owners", built: true },
       { key: "developers", label: "Developers", path: "/admin/developers", icon: Briefcase, module: "developers", built: true },
       { key: "construction_marketplace", label: "Construction Marketplace", path: "/admin/construction", icon: Hammer, module: "construction_marketplace" },
@@ -41,6 +41,7 @@ export const NAV_GROUPS = [
     label: "Platform",
     items: [
       { key: "marketplace", label: "Marketplace", path: "/admin/marketplace", icon: ShoppingBag, module: "marketplace", built: true },
+      { key: "retailers", label: "Retailers", path: "/admin/retailers", icon: Store, module: "marketplace", built: true },
       { key: "app_config", label: "App Configuration", path: "/admin/app-config", icon: SlidersHorizontal, module: "app_config", built: true },
       { key: "tokens", label: "Token Economy", path: "/admin/tokens", icon: Coins, module: "tokens", built: true },
       { key: "media", label: "Media Library", path: "/admin/media", icon: Image, module: "media", built: true },

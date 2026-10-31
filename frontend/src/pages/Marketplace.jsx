@@ -16,15 +16,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ImageUploader, mediaUrl } from "@/components/ImageUploader";
 import { Plus, Trash2, Loader2, Star, Megaphone, Tag, ShoppingBag, Search, Store, PackageCheck, PackageX, PackageSearch } from "lucide-react";
 
-const STOCK = {
+export const STOCK = {
   in_stock: { label: "In stock", cls: "text-emerald-600 border-emerald-500/30 bg-emerald-500/5" },
   out_of_stock: { label: "Out of stock", cls: "text-destructive border-destructive/30 bg-destructive/5" },
   unknown: { label: "Unknown", cls: "text-muted-foreground" },
 };
 const PAGE = 25;
-const shortDate = (d) => (d ? new Date(d.endsWith("Z") || d.includes("+") ? d : `${d}Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—");
+export const shortDate = (d) => (d ? new Date(d.endsWith("Z") || d.includes("+") ? d : `${d}Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—");
 
-function StockBadge({ p }) {
+export function StockBadge({ p }) {
   const s = STOCK[p.stock_status] || STOCK.unknown;
   return (
     <Badge variant="outline" className={s.cls} data-testid={`product-stock-${p.id}`}>
@@ -66,7 +66,7 @@ function FilterSelect({ value, onChange, all, options, testid }) {
   );
 }
 
-const money = (p) => (!p ? "Price on request" : p >= 1000000 ? `₦${(p / 1e6).toLocaleString()}M` : `₦${p.toLocaleString()}`);
+export const money = (p) => (!p ? "Price on request" : p >= 1000000 ? `₦${(p / 1e6).toLocaleString()}M` : `₦${p.toLocaleString()}`);
 
 function CategoriesTab({ canEdit }) {
   const [rows, setRows] = useState([]);

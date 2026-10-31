@@ -11,6 +11,7 @@ import Leads from "@/pages/Leads";
 import LandingCMS from "@/pages/LandingCMS";
 import WebsiteLeads from "@/pages/WebsiteLeads";
 import WebsiteContent from "@/pages/WebsiteContent";
+import Retailers from "@/pages/Retailers";
 import RolesPermissions from "@/pages/RolesPermissions";
 import Settings from "@/pages/Settings";
 import Properties from "@/pages/Properties";
@@ -53,6 +54,8 @@ function App() {
                 <Route path="cms" element={<LandingCMS />} />
                 <Route path="website-leads" element={<WebsiteLeads />} />
                 <Route path="website-content" element={<WebsiteContent />} />
+                <Route path="retailers" element={<Retailers />} />
+                <Route path="retailers/:rid" element={<Retailers />} />
                 <Route path="properties" element={<Properties />} />
                 <Route path="property-verification" element={<PropertyVerification />} />
                 <Route path="agents" element={<Agents />} />

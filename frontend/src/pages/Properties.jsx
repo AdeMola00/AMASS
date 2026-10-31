@@ -22,6 +22,10 @@ const STATUS_STYLES = {
   pending: "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] border-[hsl(var(--gold))]/30",
   rejected: "bg-destructive/12 text-destructive border-destructive/25",
   sold: "bg-muted text-muted-foreground border-border",
+  available: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 border-emerald-500/25",
+  verified: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 border-emerald-500/25",
+  premium: "bg-primary/10 text-primary border-primary/25",
+  coming_soon: "bg-[hsl(var(--gold))]/15 text-[hsl(var(--gold))] border-[hsl(var(--gold))]/30",
 };
 
 function money(p, c) {
@@ -166,10 +170,10 @@ export default function Properties() {
                   <TableCell>
                     {canEdit ? (
                       <Select value={r.status} onValueChange={(v) => setStatus(r.id, v)}>
-                        <SelectTrigger className="h-7 w-28 text-xs" data-testid={`prop-status-${r.id}`}><Badge variant="outline" className={`capitalize ${STATUS_STYLES[r.status]}`}>{r.status}</Badge></SelectTrigger>
+                        <SelectTrigger className="h-7 w-28 text-xs" data-testid={`prop-status-${r.id}`}><Badge variant="outline" className={`capitalize ${STATUS_STYLES[r.status]}`}>{r.status?.replace("_", " ")}</Badge></SelectTrigger>
                         <SelectContent>{meta.statuses.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
                       </Select>
-                    ) : <Badge variant="outline" className={`capitalize ${STATUS_STYLES[r.status]}`}>{r.status}</Badge>}
+                    ) : <Badge variant="outline" className={`capitalize ${STATUS_STYLES[r.status]}`}>{r.status?.replace("_", " ")}</Badge>}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     {r.verified ? <Badge variant="outline" className="bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 gap-1"><CheckCircle2 className="h-3 w-3" /> Verified</Badge>

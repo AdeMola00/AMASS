@@ -122,6 +122,8 @@ export default function Agents() {
                   <TableCell>
                     {r.verified ? <Badge variant="outline" className="bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 gap-1"><CheckCircle2 className="h-3 w-3" /> Verified</Badge>
                                 : <Badge variant="outline" className="text-muted-foreground">Unverified</Badge>}
+                    {(r.legacy || r.status === "legacy") && <Badge variant="outline" className="ml-1 text-[hsl(var(--gold))] border-[hsl(var(--gold))]/30" data-testid={`agent-legacy-${r.id}`}>Legacy</Badge>}
+                    {r.verification_level && <div className="text-[11px] text-muted-foreground mt-1 capitalize" data-testid={`agent-level-${r.id}`}>Level: {String(r.verification_level).replace(/_/g, " ")}</div>}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
