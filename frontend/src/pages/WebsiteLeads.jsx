@@ -11,7 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, Globe, Mail, Reply, Send } from "lucide-react";
+import { Loader2, Search, Globe, Mail, Reply, Send, FileText } from "lucide-react";
+import { TemplatesManager, fillTemplate } from "@/components/website/ReplyTemplates";
+import { DigestButton } from "@/components/website/DigestButton";
 
 const STATUSES = ["new", "contacted", "closed"];
 const STATUS_STYLES = {
@@ -51,7 +53,8 @@ function StatusSelect({ lead, canEdit, onChange }) {
   );
 }
 
-function ReplyDialog({ lead, onClose, onSent }) {
+function ReplyDialog({ lead, templates, onClose, onSent }) {
+  const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState([]);
   const [sending, setSending] = useState(false);
@@ -82,6 +85,18 @@ function ReplyDialog({ lead, onClose, onSent }) {
           </DialogDescription>
         </DialogHeader>
         {lead?.message && <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">They wrote:</span> {lead.message}</div>}
+        {templates.length > 0 && (
+          <Select value="" onValueChange={(id) => { const t = templates.find((x) => x.id === id); if (t) setMessage(fillTemplate(t.body, lead, user?.name)); }}>
+            <SelectTrigger data-testid="website-reply-template-select"><FileText className="h-4 w-4 mr-2 text-primary" /><SelectValue placeholder="Start from a template" /></SelectTrigger>
+            <SelectContent>
+              {[...templates].sort((a, b) => Number(b.form_types.includes(lead?.form_type)) - Number(a.form_types.includes(lead?.form_type))).map((t) => (
+                <SelectItem key={t.id} value={t.id} data-testid={`website-reply-template-option-${t.id}`}>
+                  {t.name}{t.form_types.includes(lead?.form_type) ? " · suggested" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={5000} placeholder="Write your reply…" className="min-h-[140px]" data-testid="website-reply-message" />
         {history.length > 0 && (
           <div className="space-y-2" data-testid="website-reply-history">
@@ -171,6 +186,9 @@ export default function WebsiteLeads() {
   const [replyTo, setReplyTo] = useState(null);
   const [newSince, setNewSince] = useState(null);
   const { markSeen } = useLeadAlerts();
+  const [templates, setTemplates] = useState([]);
+  const loadTemplates = () => api.get("/website/reply-templates").then((r) => setTemplates(r.data)).catch(() => {});
+  useEffect(() => { loadTemplates(); }, []);
 
   useEffect(() => { markSeen().then((v) => v && setNewSince((p) => (p && p < v ? p : v))).catch(() => {}); }, [markSeen]);
 
@@ -205,9 +223,12 @@ export default function WebsiteLeads() {
 
   return (
     <div className="space-y-6" data-testid="website-leads-page">
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-2"><Globe className="h-6 w-6 text-primary" /> Website Leads</h1>
-        <p className="text-muted-foreground text-sm mt-1">Live from your AMASS website. Status changes save straight to the site.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-2"><Globe className="h-6 w-6 text-primary" /> Website Leads</h1>
+          <p className="text-muted-foreground text-sm mt-1">Live from your AMASS website. Status changes save straight to the site.</p>
+        </div>
+        <DigestButton canEdit={canEdit} />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Total submissions" value={stats?.total_leads} testid="website-stat-total" />
@@ -219,6 +240,7 @@ export default function WebsiteLeads() {
         <TabsList>
           <TabsTrigger value="leads" data-testid="website-tab-leads">Leads ({leads.length - newsletter.length})</TabsTrigger>
           <TabsTrigger value="newsletter" data-testid="website-tab-newsletter"><Mail className="h-3.5 w-3.5 mr-1.5" /> Newsletter ({newsletter.length})</TabsTrigger>
+          <TabsTrigger value="templates" data-testid="website-tab-templates"><FileText className="h-3.5 w-3.5 mr-1.5" /> Templates ({templates.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="leads" className="mt-4">
           <Card className="p-4 space-y-4">
@@ -250,8 +272,11 @@ export default function WebsiteLeads() {
             <LeadsTable rows={newsletter} canEdit={canEdit} onStatus={onStatus} onReply={setReplyTo} newSince={newSince} showType={false} testid="website-newsletter-table" />
           </Card>
         </TabsContent>
+        <TabsContent value="templates" className="mt-4">
+          <TemplatesManager templates={templates} canEdit={canEdit} onChanged={loadTemplates} />
+        </TabsContent>
       </Tabs>
-      <ReplyDialog lead={replyTo} onClose={() => setReplyTo(null)} onSent={onSent} />
+      <ReplyDialog lead={replyTo} templates={templates} onClose={() => setReplyTo(null)} onSent={onSent} />
     </div>
   );
 }
