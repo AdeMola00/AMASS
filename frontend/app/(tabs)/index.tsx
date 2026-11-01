@@ -989,19 +989,29 @@ export default function HomeMap() {
             </AppText>
           </View>
         ) : gated ? (
-          <Reanimated.View entering={reduce ? FadeIn.duration(120) : FadeInDown.duration(260)} style={[styles.gateCard, shadows.lg, { backgroundColor: colors.bgElevated, borderColor: isDark ? colors.border : "transparent" }]} testID="map-gate">
-            <View style={styles.gateHead}>
-              <View style={[styles.gateIcon, { backgroundColor: colors.massSoft }]}>
-                <TokenIcon size={24} />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <AppText variant="title">Add MASS to see homes on the map</AppText>
-                <AppText variant="caption" tone="secondary">
-                  {`${mapTime?.hours_charged ? "Your map time has run out and your wallet is empty." : "Your wallet is empty."} Homes show for ${mapTime?.hourly_cost ?? 1} MASS per hour — only while you're browsing. Unlocking a home's address, photos and agent is separate.`}
-                </AppText>
-              </View>
+          <Reanimated.View entering={reduce ? FadeIn.duration(120) : FadeInDown.duration(260)} style={[styles.gateCard, shadows.lg, { backgroundColor: colors.bgElevated, borderColor: isDark ? colors.border : "transparent", maxWidth: Math.min(screenW - space[3] * 2, 440) }]} testID="map-gate" accessibilityLiveRegion="polite">
+            {/* Official AMASS lockup — proportions come from the artwork; it sits on a light disc so the glossy ink wordmark reads in dark mode too */}
+            <View style={[styles.gateLogo, { backgroundColor: isDark ? colors.surfaceInverse : colors.surfaceAlt }]}>
+              <AmassLogo size={Math.round(Math.min(Math.max(screenW * 0.13, 44), 60))} showWordmark testID="map-gate-logo" />
             </View>
-            <Button label="Get MASS" variant="premium" size="md" fullWidth iconLeft="add" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="map-gate-get-mass" />
+            <View style={styles.gateCopy}>
+              <AppText variant="h3" align="center" testID="map-gate-title">
+                Add MASS to see homes on the map
+              </AppText>
+              <AppText variant="bodySm" tone="secondary" align="center">
+                {mapTime?.hours_charged ? "Your map time has run out and your wallet is empty." : "Your wallet is empty — top up to light up the map."}
+              </AppText>
+            </View>
+            <View style={[styles.gateChip, { backgroundColor: colors.massSoft }]} testID="map-gate-rate">
+              <TokenIcon size={16} />
+              <AppText variant="caption" weight="bold" tone="mass">
+                {`${mapTime?.hourly_cost ?? 1} MASS per hour · only while you browse`}
+              </AppText>
+            </View>
+            <Button label="Get MASS" variant="premium" size="lg" fullWidth iconLeft="add" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="map-gate-get-mass" />
+            <AppText variant="micro" tone="tertiary" align="center">
+              Unlocking a home&apos;s address, photos and agent is separate.
+            </AppText>
           </Reanimated.View>
         ) : !loadError && visiblePins.length > 0 ? (
           <Pressable
@@ -1065,9 +1075,10 @@ const styles = StyleSheet.create({
   greetRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   greetPill: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 14, height: 48, borderRadius: radii.pill },
   timeChip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, height: 44, borderRadius: radii.pill },
-  gateCard: { alignSelf: "stretch", padding: space[4], gap: 14, borderRadius: radii.xl, borderWidth: StyleSheet.hairlineWidth },
-  gateHead: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  gateIcon: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
+  gateCard: { alignSelf: "center", width: "100%", alignItems: "center", paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[4], gap: space[3], borderRadius: radii.xl, borderWidth: StyleSheet.hairlineWidth },
+  gateLogo: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: radii.lg, alignItems: "center", justifyContent: "center" },
+  gateCopy: { alignItems: "center", gap: 6, paddingHorizontal: space[2] },
+  gateChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.pill },
   compassWrap: { position: "absolute", right: space[3], zIndex: 3 },
   rightActions: { position: "absolute", right: space[3], gap: 10, zIndex: 3 },
   actionBtn: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
