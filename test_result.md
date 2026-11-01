@@ -1255,3 +1255,15 @@ agent_communication:
       Frontend: shop DealBanner opens https routes in the in-app browser. tests/test_portal_market.py 17/17 by main;
       regression suites (fixa, brands/roles, shop, marketplace) 102 pass. tests/test_shop.py retailer count relaxed to ≥7
       (admin-added brands exist in the DB).
+
+  - agent: "main"
+    message: |
+      Iteration 97 (to run, frontend focus) — Add MASS notice v2 on the Find Home map (app/(tabs)/index.tsx, gated state = 0 MASS):
+      (1) plain animated gold coin (src/components/GoldCoin.tsx, reanimated rotateY + light sweep, still under reduce-motion; testID map-gate-coin)
+      replaces the logo; (2) Empty-wallet teaser: backend /api/map/markers with access=false now returns `teaser` (≤6 ghost homes: lat/lng
+      fuzzed ~400 m, listing_type, rounded price_band — no ids) + `teaser_count` (≤99); the map renders them as blurred non-interactive
+      GhostPins (src/components/map/GhostPin.tsx, testID ghost-pin-{i}) and auto-positions the view so they sit in the strip between the top
+      chrome and the notice (gate card measured via onLayout); notice copy says "N homes are waiting behind this notice…" (testID map-gate-body);
+      (3) Welcome-bonus nudge for users with phone_verified=false (testID map-gate-nudge) → /earn?task=phone_verify opens the phone-verify
+      sheet automatically (app/earn.tsx deep link). Zero-MASS login: gate-preview@amass-qa.africa / GatePreview2026! (wallet zeroed).
+      Backend: tests/test_map_teaser.py 3/3. Paying users unaffected (no teaser fields, real markers).

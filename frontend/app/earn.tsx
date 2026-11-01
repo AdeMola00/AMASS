@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, RefreshControl, Share } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter, Stack } from "expo-router";
+import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
@@ -45,6 +45,7 @@ const TASK_HINT: Record<string, string> = {
 
 export default function EarnScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ task?: string }>();
   const { colors, isDark } = useTheme();
   const toast = useToast();
   const confetti = useCelebrate();
@@ -85,6 +86,15 @@ export default function EarnScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Deep link from the map's Add MASS notice: /earn?task=phone_verify opens the verification sheet straight away.
+  const openedTaskRef = useRef(false);
+  useEffect(() => {
+    if (openedTaskRef.current || loading || params.task !== "phone_verify") return;
+    openedTaskRef.current = true;
+    const t = tasks.find((x) => x.id === "phone_verify");
+    if (t && !t.completed) setPhoneModal(true);
+  }, [params.task, loading, tasks]);
 
   const onRefresh = async () => {
     setRefreshing(true);

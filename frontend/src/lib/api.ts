@@ -1215,7 +1215,7 @@ export const api = {
           .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
           .join("&")
       : "";
-    return req<{ markers: MapMarker[]; count: number; approx_radius_m: number; access: boolean; map_time: MapTime }>(`/map/markers${qs}`);
+    return req<{ markers: MapMarker[]; count: number; approx_radius_m: number; access: boolean; map_time: MapTime; teaser?: { lat: number; lng: number; listing_type: string; price_band: string }[]; teaser_count?: number }>(`/map/markers${qs}`);
   },
   /** Map time — 1 MASS buys 60 min on the Find Home map. Heartbeat once a minute while the tab is in front. */
   mapTimeTick: () => req<MapTime>("/map/time/tick", { method: "POST" }),

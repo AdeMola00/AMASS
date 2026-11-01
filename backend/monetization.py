@@ -996,8 +996,6 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
         # Map time: 0 MASS → no markers; otherwise this call is a heartbeat on the metered hour (1 MASS / hour).
         from map_time import MapTimeMeter
         map_time = await MapTimeMeter(db).tick(user, heartbeat=True)
-        if not map_time["access"]:
-            return {"markers": [], "count": 0, "approx_radius_m": 150, "access": False, "map_time": map_time}
         query: dict = {"status": {"$nin": ["sold", "removed", "withdrawn", "unavailable"]}}
         if listing_type:
             query["listing_type"] = {"$in": ["sale", "buy"]} if listing_type in ("sale", "buy") else listing_type
@@ -1020,6 +1018,10 @@ def register_monetization_routes(db: AsyncIOMotorDatabase, get_current_user, req
         if None not in (min_lat, max_lat, min_lng, max_lng):
             query["latitude"] = {"$gte": min_lat, "$lte": max_lat}
             query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
+        if not map_time["access"]:
+            # Empty wallet: no homes — but a handful of ghost pins so a new user sees what MASS unlocks.
+            # No ids, positions fuzzed further than the paid approximate pin, prices rounded to a band.
+            return {"markers": [], "count": 0, "approx_radius_m": 150, "access": False, "map_time": map_time, **(await _teaser(db, query))}
         docs = await db.properties.find(query, {"_id": 0, "id": 1, "title": 1, "listing_type": 1, "property_type": 1, "latitude": 1, "longitude": 1, "agent_id": 1, "verified": 1, "promotion": 1,
                                                "price": 1, "image": 1, "images": 1, "bedrooms": 1, "bathrooms": 1, "size_sqm": 1, "city": 1, "state": 1, "location": 1, "status": 1, "is_amass_exclusive": 1, "documents_verified": 1,
                                                "ai_valuation": 1, "investment_score": 1, "amenities": 1, "year_built": 1, "parking": 1, "views_count": 1, "walkthrough_video.url": 1}).limit(min(limit, 500)).to_list(500)
@@ -1296,6 +1298,35 @@ def _parse_date(s: Optional[str], end_of_day: bool = False) -> Optional[datetime
     if end_of_day and len(s) <= 10:
         d = d + timedelta(days=1) - timedelta(microseconds=1)
     return d
+
+
+async def _teaser(db, query: dict, limit: int = 6) -> dict:
+    """Ghost pins for the empty-wallet map: ≤ `limit` homes matching the same filters, positions blurred to ~400 m,
+    prices rounded to a band, no ids — enough to show "homes are here", nothing that is paid for."""
+    total = await db.properties.count_documents(query)
+    q = query if "latitude" in query else {**query, "latitude": {"$ne": None}, "longitude": {"$ne": None}}
+    docs = await db.properties.find(q, {"_id": 0, "id": 1, "latitude": 1, "longitude": 1, "price": 1, "listing_type": 1}).sort("verified", -1).limit(limit).to_list(limit)
+    out = []
+    for d in docs:
+        if d.get("latitude") is None or d.get("longitude") is None:
+            continue
+        lat, lng = _jitter(f"teaser:{d['id']}", float(d["latitude"]), float(d["longitude"]), radius_m=400.0)
+        lt = d.get("listing_type") or "sale"
+        out.append({"lat": round(lat, 5), "lng": round(lng, 5), "listing_type": "sale" if lt == "buy" else lt, "price_band": _price_band(d.get("price") or 0)})
+    return {"teaser": out, "teaser_count": min(total, 99)}
+
+
+def _price_band(price: float) -> str:
+    """₦ figure rounded so it hints at the bracket without being the listing price (₦48.5M → ₦50M, ₦3.2M → ₦3M)."""
+    p = float(price or 0)
+    if p >= 1_000_000_000:
+        return f"₦{round(p / 1_000_000_000, 1):g}B"
+    if p >= 1_000_000:
+        step = 10 if p >= 100_000_000 else 5 if p >= 20_000_000 else 1
+        return f"₦{int(round(p / 1_000_000 / step) * step)}M"
+    if p >= 1_000:
+        return f"₦{int(round(p / 1_000 / 50) * 50)}k"
+    return "₦—"
 
 
 def _jitter(seed: str, lat: float, lng: float, radius_m: float = 150.0) -> tuple[float, float]:

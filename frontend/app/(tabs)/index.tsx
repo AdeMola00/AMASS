@@ -30,6 +30,8 @@ import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
 import { AmassLogo } from "@/src/components/AmassLogo";
 import { TokenIcon } from "@/src/components/TokenIcon";
+import { GoldCoin } from "@/src/components/GoldCoin";
+import { GhostPin, type TeaserPin } from "@/src/components/map/GhostPin";
 import { ClusterPin, PIN_H, PIN_HALF_W, PricePin, clusterSize, pinHalfWidth } from "@/src/components/map/PricePin";
 import { PREVIEW_CARD_H, PreviewCard } from "@/src/components/map/PreviewCard";
 import { INTENTS, IntentSheet, type Intent } from "@/src/components/map/IntentSheet";
@@ -95,6 +97,9 @@ export default function HomeMap() {
   const [query, setQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [pins, setPins] = useState<Pin[]>([]);
+  /** Empty-wallet teaser: a few blurred ghost pins (no ids, fuzzed positions, price bands) behind the Add MASS notice. */
+  const [teaser, setTeaser] = useState<TeaserPin[]>([]);
+  const [teaserCount, setTeaserCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [region, setRegion] = useState<Region>(BOOTSTRAP_REGION);
@@ -234,6 +239,8 @@ export default function HomeMap() {
    *  `bandFracs` → [top, bottom] as fractions of the map height where a pin's COORDINATE can sit with its
    *  label (which hangs `PIN_H` above it) fully visible. */
   const { height: screenH, width: screenW } = useWindowDimensions();
+  /** Short phones (≈640 pt and under): a tighter notice so the Buy / Rent / Lease row and a strip of ghost pins stay visible. */
+  const compactGate = screenH < 700;
   const tabBarH = useTabBarOffset();
   const searchTop = insets.top + 6;
   const chromeBottom = searchTop + 60 + 10 + 50; // search bar + gap + segment
@@ -274,6 +281,26 @@ export default function HomeMap() {
 
   /** Fly to the results when none sit in the clear band (search / filter changes). Results can span
    *  cities (Lagos · Abuja · PH) — we fit the city nearest the viewer, never the whole country. */
+  /** Ghost pins live in the strip between the top chrome and the Add MASS notice — move the view so a few show there. */
+  const [gateH, setGateH] = useState(0);
+  const ghostsFittedRef = useRef<TeaserPin[] | null>(null);
+  useEffect(() => {
+    if (!gated || !teaser.length || !gateH || ghostsFittedRef.current === teaser) return;
+    ghostsFittedRef.current = teaser;
+    const topFrac = (chromeBottom + PIN_H) / screenH;
+    const bottomFrac = (screenH - (tabBarH + 12 + gateH + 8)) / screenH;
+    const bandH = Math.max(bottomFrac - topFrac, 0.1);
+    const lats = teaser.map((g) => g.lat), lngs = teaser.map((g) => g.lng);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const aspect = screenW / screenH;
+    const latDelta = Math.min(Math.max(((maxLat - minLat) * 1.2) / bandH, (maxLng - minLng) * 1.3 / aspect, 0.012), 40);
+    const next: Region = { latitude: (minLat + maxLat) / 2 + latDelta * ((topFrac + bottomFrac) / 2 - 0.5), longitude: (minLng + maxLng) / 2, latitudeDelta: latDelta, longitudeDelta: latDelta * aspect };
+    initialRegionRef.current = next;
+    programmaticUntilRef.current = Date.now() + 900;
+    setRegion(next);
+    mapRef.current?.animateToRegion(next, reduce ? 0 : 600);
+  }, [gated, teaser, gateH, chromeBottom, tabBarH, screenW, screenH, reduce]);
+
   const fitToPins = useCallback(
     (list: Pin[]) => {
       const r = regionRef.current;
@@ -353,8 +380,24 @@ export default function HomeMap() {
         if (res.access === false) {
           setPins([]);
           setShowSearchArea(false);
+          let ghosts = res.teaser ?? [];
+          let ghostCount = res.teaser_count ?? ghosts.length;
+          if (!opts?.area && ghosts.length) {
+            // Prefer homes inside the current view so the ghost pins sit behind the notice; otherwise bring the view to them.
+            try {
+              const r = regionRef.current;
+              const local = await api.mapMarkers({ ...params, min_lat: r.latitude - r.latitudeDelta * 0.8, max_lat: r.latitude + r.latitudeDelta * 0.8, min_lng: r.longitude - r.longitudeDelta * 0.8, max_lng: r.longitude + r.longitudeDelta * 0.8 });
+              if (local.teaser?.length) {
+                ghosts = local.teaser;
+                ghostCount = local.teaser_count ?? ghosts.length;
+              }
+            } catch {}
+          }
+          setTeaser(ghosts);
+          setTeaserCount(ghostCount);
           return;
         }
+        setTeaser([]);
         const mapped = res.markers.map(toPin);
         setPins(mapped);
         setShowSearchArea(false);
@@ -759,6 +802,13 @@ export default function HomeMap() {
             </Marker>
           );
         })}
+        {gated
+          ? teaser.map((g, i) => (
+              <Marker key={`ghost-${i}`} coordinate={{ latitude: g.lat, longitude: g.lng }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false} zIndex={1}>
+                <GhostPin pin={g} testID={`ghost-pin-${i}`} />
+              </Marker>
+            ))
+          : null}
       </MapView>
 
       {/* Top chrome: search + filters · Buy / Rent / Lease */}
@@ -883,8 +933,13 @@ export default function HomeMap() {
 
       <View style={[styles.rightActions, { top: chromeBottom + 70 }]} pointerEvents="box-none">
         <ActionBtn icon="locate" onPress={recenter} testID="fab-locate" label="Center map on my location" highlight={locationPermission === "granted"} />
-        <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" label="Zoom in" />
-        <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" label="Zoom out" />
+        {/* Zoom is pointless on the teaser map and the notice would hide the buttons anyway */}
+        {gated ? null : (
+          <>
+            <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" label="Zoom in" />
+            <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" label="Zoom out" />
+          </>
+        )}
       </View>
 
       {/* Centered status: error / empty (the 0-MASS gate lives in the bottom band, where the homes would be) */}
@@ -989,29 +1044,43 @@ export default function HomeMap() {
             </AppText>
           </View>
         ) : gated ? (
-          <Reanimated.View entering={reduce ? FadeIn.duration(120) : FadeInDown.duration(260)} style={[styles.gateCard, shadows.lg, { backgroundColor: colors.bgElevated, borderColor: isDark ? colors.border : "transparent", maxWidth: Math.min(screenW - space[3] * 2, 440) }]} testID="map-gate" accessibilityLiveRegion="polite">
-            {/* Official AMASS lockup — proportions come from the artwork; it sits on a light disc so the glossy ink wordmark reads in dark mode too */}
-            <View style={[styles.gateLogo, { backgroundColor: isDark ? colors.surfaceInverse : colors.surfaceAlt }]}>
-              <AmassLogo size={Math.round(Math.min(Math.max(screenW * 0.13, 44), 60))} showWordmark testID="map-gate-logo" />
-            </View>
+          <Reanimated.View entering={reduce ? FadeIn.duration(120) : FadeInDown.duration(260)} style={[styles.gateCard, shadows.lg, compactGate && styles.gateCardCompact, { backgroundColor: colors.bgElevated, borderColor: isDark ? colors.border : "transparent", maxWidth: Math.min(screenW - space[3] * 2, 440) }]} testID="map-gate" accessibilityLiveRegion="polite" onLayout={(e) => setGateH(Math.round(e.nativeEvent.layout.height))}>
+            {/* Plain animated gold coin — the MASS currency, no inscription */}
+            <GoldCoin size={compactGate ? 44 : Math.round(Math.min(Math.max(screenW * 0.17, 60), 76))} animated={!reduce} testID="map-gate-coin" />
             <View style={styles.gateCopy}>
-              <AppText variant="h3" align="center" testID="map-gate-title">
+              <AppText variant={compactGate ? "title" : "h3"} align="center" testID="map-gate-title">
                 Add MASS to see homes on the map
               </AppText>
-              <AppText variant="bodySm" tone="secondary" align="center">
-                {mapTime?.hours_charged ? "Your map time has run out and your wallet is empty." : "Your wallet is empty — top up to light up the map."}
+              <AppText variant={compactGate ? "caption" : "bodySm"} tone="secondary" align="center" testID="map-gate-body">
+                {teaserCount > 0
+                  ? `${teaserCount}${teaserCount >= 99 ? "+" : ""} ${teaserCount === 1 ? "home is" : "homes are"} waiting behind this notice.${compactGate ? "" : mapTime?.hours_charged ? " Your map time has run out and your wallet is empty." : " Your wallet is empty — top up to light them up."}`
+                  : mapTime?.hours_charged
+                    ? "Your map time has run out and your wallet is empty."
+                    : "Your wallet is empty — top up to light up the map."}
               </AppText>
             </View>
             <View style={[styles.gateChip, { backgroundColor: colors.massSoft }]} testID="map-gate-rate">
               <TokenIcon size={16} />
               <AppText variant="caption" weight="bold" tone="mass">
-                {`${mapTime?.hourly_cost ?? 1} MASS per hour · only while you browse`}
+                {compactGate ? `${mapTime?.hourly_cost ?? 1} MASS/hour · only while you browse` : `${mapTime?.hourly_cost ?? 1} MASS per hour · only while you browse`}
               </AppText>
             </View>
-            <Button label="Get MASS" variant="premium" size="lg" fullWidth iconLeft="add" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="map-gate-get-mass" />
-            <AppText variant="micro" tone="tertiary" align="center">
-              Unlocking a home&apos;s address, photos and agent is separate.
-            </AppText>
+            <Button label="Get MASS" variant="mass" size={compactGate ? "md" : "lg"} fullWidth iconLeft="add" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="map-gate-get-mass" />
+            {user && !user.phone_verified ? (
+              // Welcome bonus — first-timers can start browsing for free by verifying their number (one-time earn task).
+              <Pressable onPress={() => router.push({ pathname: "/earn", params: { task: "phone_verify" } } as any)} style={[styles.gateNudge, { backgroundColor: colors.successSoft }]} accessibilityRole="button" accessibilityLabel="Verify your phone number and earn free MASS" testID="map-gate-nudge">
+                <Ionicons name="gift-outline" size={16} color={colors.success} />
+                <AppText variant="caption" weight="semibold" color={colors.success} style={{ flex: 1 }}>
+                  {compactGate ? "New here? Verify your phone for free MASS." : "New here? Verify your phone number and get free MASS to start browsing."}
+                </AppText>
+                <Ionicons name="chevron-forward" size={14} color={colors.success} />
+              </Pressable>
+            ) : null}
+            {compactGate ? null : (
+              <AppText variant="micro" tone="tertiary" align="center">
+                Unlocking a home&apos;s address, photos and agent is separate.
+              </AppText>
+            )}
           </Reanimated.View>
         ) : !loadError && visiblePins.length > 0 ? (
           <Pressable
@@ -1076,7 +1145,8 @@ const styles = StyleSheet.create({
   greetPill: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 14, height: 48, borderRadius: radii.pill },
   timeChip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, height: 44, borderRadius: radii.pill },
   gateCard: { alignSelf: "center", width: "100%", alignItems: "center", paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[4], gap: space[3], borderRadius: radii.xl, borderWidth: StyleSheet.hairlineWidth },
-  gateLogo: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: radii.lg, alignItems: "center", justifyContent: "center" },
+  gateCardCompact: { paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: space[3], gap: 8 },
+  gateNudge: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radii.md, minHeight: 44 },
   gateCopy: { alignItems: "center", gap: 6, paddingHorizontal: space[2] },
   gateChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.pill },
   compassWrap: { position: "absolute", right: space[3], zIndex: 3 },

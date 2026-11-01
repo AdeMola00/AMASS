@@ -1,0 +1,55 @@
+{
+  "summary": "Tested the redesigned empty-wallet map notice (Add MASS gate + gold coin + ghost pins + phone-verify nudge) on the backend and the web preview (390x844, 360x640, 768x1024). Backend: 6/6 pass (test_map_teaser.py 3/3 plus a new extra file 3/3). Frontend at 390x844: everything works. All map-gate testIDs render with the right copy. The coin has no letter. There are 6 ghost pins, all above the card; clicking one does nothing (no preview card, no navigation). No real pins show. Get MASS opens /buy-tokens?currency=MASS and Back returns to the gate. The nudge opens /earn?task=phone_verify with phone-verify-sheet open and a +234 input; the sheet closes and Earn stays usable. Buy/Rent/Lease/All keep the gate and refresh the ghosts (6/6/2/6), with no console errors. Regression for the demo user passes: no gate, ghosts or nudge; 3 real pins; tapping a pin opens preview-card. Responsive: 768x1024 passes (centred, 440 px wide, ghosts above the card, no tab-bar overlap). 360x640 FAILS: the card is 502 px tall and covers the Buy/Rent/Lease segment, all 3 map buttons and part of the search bar. Ghost pins end up hidden under the card, and the segments can't be tapped.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/map/markers (access:false)", "issue": "teaser[].listing_type returns the raw DB value 'buy' for sale homes (listing_type=sale filter), not 'sale'. GhostPin falls back to the sale colour, so nothing breaks visually, but the value is inconsistent with the filter."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Map gate card on small phones (360x640)", "issue": "Gate card height is 502 px; its top sits at y=42, under the search bar. It covers intent-segment, intent-seg-*, fab-locate, fab-zoom-in and fab-zoom-out. elementFromPoint on intent-seg-rent returns map-gate, and a normal click times out, so users can't switch Buy/Rent/Lease. Ghost pins (y 41-131) render under the card / search bar, so none show above it, which fails the requirement. Fix: cap the card height to the free band (screenH - chromeBottom - tabBarH). On short screens use a compact layout: smaller coin (or hide it), drop the footnote, shorten the body text, or make it a ScrollView.", "testID": "map-gate", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Find Home (gated) 390x844", "issues": [
+        "fab-zoom-in (y 254-302) is half hidden behind the gate card (top y=279), and fab-zoom-out is fully behind it. Hide the zoom buttons while gated, or move them up.",
+        "Ghost pins pile on top of each other (Buy and All: 4-5 pills overlap in one cluster around x 56-250, y 146-262), so they read as a blur rather than separate homes. Consider spacing them out on screen or jittering them a little.",
+        "The count in the body changes in confusing ways: 'All' shows 16-20 homes while 'Buy' alone shows 29, because the count comes from the viewport (local bounds) query and each segment re-fits the view to a different area."
+      ]},
+      {"screen": "Find Home (gated) 768x1024", "issues": [
+        "After a reload, the auto-fit zooms out to continent scale (North Atlantic visible) and the body says '61 homes'. The local query apparently returned nothing, so the unbounded multi-city teaser got fitted. Consider limiting the fit to the nearest city cluster, like fitToPins does.",
+        "The 'Good morning, Gate' greeting chip covers the ghost pins at the top left."
+      ]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_map_teaser.py",
+    "/app/backend/tests/test_iter97_map_teaser_extra.py",
+    "/app/test_reports/pytest/pytest_iter97.xml",
+    "/app/test_reports/iter97_gate_390.png",
+    "/app/test_reports/iter97_v360.png",
+    "/app/test_reports/iter97_v768.png",
+    "/app/test_reports/iter97_demo_preview.png"
+  ],
+  "action_items": [
+    "HIGH: Make the map-gate card fit short screens (360x640). Today it covers the search bar edge, the Buy/Rent/Lease segment and the FABs, so segments can't be tapped and the ghost pins are hidden. Cap the height to the free band and use a compact variant (smaller coin, no footnote, shorter copy, or a scroll view).",
+    "MEDIUM: While gated, hide or move fab-zoom-in and fab-zoom-out so the gate card doesn't partly cover them (390x844).",
+    "LOW: Spread overlapping ghost pins apart; keep the ghost fit to a single city cluster (768x1024 zoomed out to continent scale); make the teaser_count meaning consistent across segments.",
+    "LOW: Normalise teaser listing_type 'buy' to 'sale' in _teaser (monetization.py:1314)."
+  ],
+  "critical_code_review_comments": [
+    "app/(tabs)/index.tsx is 1155 lines, well above the 700-line limit. Extract the gate card (MapGate) and the ghost-fit logic into their own files.",
+    "The ghost-fit effect (index.tsx:285-300) works out bottomFrac from gateH but never checks that the band is big enough. When gateH is larger than the free band, bandH is clamped to 0.1 and the pins land under the chrome. That is the root cause of the 360x640 failure.",
+    "The gated load() makes two /map/markers calls per refresh: the unbounded call plus a local-bounds call. Each one is also a map-time heartbeat; harmless when access is false, but worth noting.",
+    "No deprecated Expo packages (expo-av, expo-barcode-scanner, expo-background-fetch) in package.json."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter97_map_teaser_extra.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "~88% (7/8 scenarios; 360x640 responsive fails)"},
+  "seed_data_creation": "None. The gate-preview wallet was already at 0 MASS, and phone verification was not completed.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Gate user gate-preview@amass-qa.africa has 0 MASS and phone_verified false. Tap 'Just browsing' after login. Segment testIDs: intent-seg-buy|rent|lease|all. FABs: fab-locate, fab-zoom-in, fab-zoom-out. Retest 360x640 with elementFromPoint on intent-seg-rent and check ghost pins sit above map-gate.",
+  "rca_of_issue": "360x640: the gate card's natural height (~502 px: coin 61 + title 2 lines + body 3 lines + chip 2 lines + button + nudge 3 lines + footnote) is more than the space between the top chrome (~126 px) and the tab bar (~556 px). The card has no maxHeight or compact mode, so it grows upward over the chrome. The ghost-fit effect then clamps bandH to 0.1, which puts the pins at the very top, under the card and search bar."
+}
