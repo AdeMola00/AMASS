@@ -36,9 +36,11 @@ type RainApi = {
   rain: (opts?: MoneyRainOptions) => boolean;
   /** Plays once per device for the key (persisted) — for states a screen shows every time, e.g. "approved". */
   rainOncePersisted: (variant: MoneyRainVariant, key: string) => Promise<boolean>;
+  /** Epoch ms when the current rain (if any) will have cleared — lets a follow-up moment wait its turn. */
+  rainClearsAt: () => number;
 };
 
-const noop: RainApi = { rain: () => false, rainOncePersisted: async () => false };
+const noop: RainApi = { rain: () => false, rainOncePersisted: async () => false, rainClearsAt: () => 0 };
 const Ctx = createContext<RainApi>(noop);
 
 /** count = falling items (≈ bundleShare of them are thick bundles, the rest single notes). */
@@ -90,7 +92,8 @@ export function MoneyRainProvider({ children }: { children: React.ReactNode }) {
   );
 
   const done = useCallback((id: number) => setActive((a) => (a?.id === id ? null : a)), []);
-  const api = useMemo(() => ({ rain, rainOncePersisted }), [rain, rainOncePersisted]);
+  const rainClearsAt = useCallback(() => busyUntil.current, []);
+  const api = useMemo(() => ({ rain, rainOncePersisted, rainClearsAt }), [rain, rainOncePersisted, rainClearsAt]);
 
   // iOS: a full-window overlay paints above native Modal sheets (success sheets, unlock dialog) and still lets
   // touches through. Android / web: in-tree overlay — above bottom sheets, below a native Modal if one is open.

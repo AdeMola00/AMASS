@@ -171,9 +171,11 @@ export function TokenPurchaseScreen({ config }: { config: TokenPurchaseConfig })
   const finish = () => {
     setCredited(null);
     if (config.onSuccessRoute) {
-      // Pop back to the screen that sent us here (no duplicate in history) and hand it the
+      // Sent here from the home map: just pop back — the tab underneath is still mounted and picks the
+      // top-up straight away. Anywhere else: pop to the sender (no duplicate in history) and hand it the
       // `unlock` param so it re-opens the confirmation.
-      router.dismissTo({ pathname: config.onSuccessRoute.pathname as any, params: config.onSuccessRoute.params ?? {} } as any);
+      if (config.onSuccessRoute.pathname === "/" && router.canGoBack()) router.back();
+      else router.dismissTo({ pathname: config.onSuccessRoute.pathname as any, params: config.onSuccessRoute.params ?? {} } as any);
     } else {
       router.replace("/wallet");
     }

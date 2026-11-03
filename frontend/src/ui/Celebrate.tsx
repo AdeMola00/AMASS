@@ -16,6 +16,8 @@ import type { IconName } from "./icons";
 
 export type CelebrateOptions = {
   title?: string;
+  /** One short supporting line under the title (the burst holds a little longer so it can be read). */
+  body?: string;
   icon?: IconName;
   tone?: "success" | "mass" | "fix" | "brand" | "premium";
   /** Skip the confetti pieces (keep the check + title) — used when a money rain already fills the screen. */
@@ -46,7 +48,7 @@ export function useCelebrate() {
 const PIECES = 18;
 const DURATION = 1500;
 
-function Burst({ title, icon = "checkmark", tone = "success", confetti = true, onDone }: CelebrateOptions & { onDone: () => void }) {
+function Burst({ title, body, icon = "checkmark", tone = "success", confetti = true, onDone }: CelebrateOptions & { onDone: () => void }) {
   const { colors } = useTheme();
   const { width, height } = useWindowDimensions();
   const reduce = useReducedMotion();
@@ -77,9 +79,9 @@ function Burst({ title, icon = "checkmark", tone = "success", confetti = true, o
   useEffect(() => {
     badge.value = withSequence(withSpring(1.15, motion.springPop), withSpring(1, motion.spring));
     progress.value = withTiming(1, { duration: reduce ? 400 : DURATION, easing: Easing.out(Easing.cubic) });
-    const t = setTimeout(onDone, reduce ? 900 : DURATION + 300);
+    const t = setTimeout(onDone, reduce ? 900 : DURATION + (body ? 1100 : 300));
     return () => clearTimeout(t);
-  }, [badge, progress, reduce, onDone]);
+  }, [badge, progress, reduce, onDone, body]);
 
   const badgeStyle = useAnimatedStyle(() => ({
     transform: [{ scale: badge.value }],
@@ -94,10 +96,15 @@ function Burst({ title, icon = "checkmark", tone = "success", confetti = true, o
           <Ionicons name={icon} size={44} color={onTone} />
         </Animated.View>
         {title ? (
-          <Animated.View entering={FadeIn.delay(120).duration(200)} exiting={FadeOut.duration(150)} style={[styles.titleWrap, { backgroundColor: colors.surfaceInverse }]}>
+          <Animated.View entering={FadeIn.delay(120).duration(200)} exiting={FadeOut.duration(150)} style={[styles.titleWrap, body ? styles.titleWrapWithBody : null, { backgroundColor: colors.surfaceInverse }]} testID="celebration-title">
             <AppText variant="h3" color={colors.textInverse} align="center">
               {title}
             </AppText>
+            {body ? (
+              <AppText variant="caption" color={colors.textInverse} align="center" style={styles.body} testID="celebration-body">
+                {body}
+              </AppText>
+            ) : null}
           </Animated.View>
         ) : null}
       </View>
@@ -126,5 +133,7 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", justifyContent: "center", gap: 14 },
   badge: { width: 92, height: 92, borderRadius: 46, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 8 },
   titleWrap: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999 },
+  titleWrapWithBody: { paddingHorizontal: 22, paddingVertical: 14, borderRadius: 22, maxWidth: 320, gap: 4 },
+  body: { opacity: 0.8 },
   piece: { position: "absolute", top: 0, left: 0 },
 });

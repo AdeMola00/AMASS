@@ -39,6 +39,7 @@ ALLOWED = {
     "question_asked", "question_answered", "report_submitted", "neighbours_open",
     "social_open", "social_scope", "social_alerts_open", "social_alert_follow", "social_alert_unfollow",
     "shop_open", "shop_store_view", "shop_product_view", "shop_add_to_basket", "shop_retailer_handoff", "shop_search",
+    "map_time_charged", "map_time_exhausted", "map_homes_unlocked",
 }
 VIA = ("direct", "friend", "collection", "estate", "recommendation", "share", "search")
 

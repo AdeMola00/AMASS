@@ -24,7 +24,7 @@ import { useWallet } from "@/src/contexts/wallet";
 import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Button, ILLUSTRATIONS, UnlockDialog, useMoneyRain, useReducedMotion, useToast } from "@/src/ui";
+import { AppText, Button, ILLUSTRATIONS, UnlockDialog, useCelebrate, useMoneyRain, useReducedMotion, useToast } from "@/src/ui";
 import type { IconName } from "@/src/ui";
 import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
@@ -43,6 +43,9 @@ import { getRecentlyViewedIds } from "@/src/lib/recently-viewed";
 
 const LAST_REGION_KEY = "amass_map_last_region";
 const INTENT_KEY = "amass_intent_v1";
+/** Set when Get MASS is tapped from the empty-wallet notice; the next load that finds homes celebrates them (survives a remount). */
+const GATE_PENDING_KEY = "amass_map_gate_pending_v1";
+const GATE_PENDING_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
 // Lekki Phase 1 — Nigeria's most active market. Delta ~0.014 ≈ zoom 15.
 const DEFAULT_MARKET_REGION: Region = { latitude: 6.4494, longitude: 3.4739, latitudeDelta: 0.014, longitudeDelta: 0.014 };
@@ -65,7 +68,8 @@ const intentFromFilters = (f: FilterState): Intent | null => (f.listingType === 
 export default function HomeMap() {
   const { colors, shadows, isDark } = useTheme();
   const toast = useToast();
-  const { rain } = useMoneyRain();
+  const { rain, rainClearsAt } = useMoneyRain();
+  const celebrate = useCelebrate();
   const { user } = useAuth();
   const reduce = useReducedMotion();
   const firstName = (user?.full_name || "").trim().split(" ")[0] || "there";
@@ -86,6 +90,22 @@ export default function HomeMap() {
   const mapTimeRef = useRef<MapTime | null>(null);
   mapTimeRef.current = mapTime;
   const gated = !!mapTime && !mapTime.access;
+  /** True when the wallet was empty and a top-up is expected (Get MASS tapped, or the meter just flipped back on) —
+   *  the next markers load celebrates the homes lighting up. Mirrored in storage so it survives a screen remount. */
+  const unlockPendingRef = useRef(false);
+  const clearUnlockPending = useCallback(() => {
+    unlockPendingRef.current = false;
+    storage.removeItem(GATE_PENDING_KEY);
+  }, []);
+  /** Get MASS from the map → come back here after the purchase (the success sheet's Continue pops back to this tab).
+   *  Leaving from the empty-wallet notice arms the "homes unlocked" moment for the return. */
+  const goGetMass = useCallback(() => {
+    if (mapTimeRef.current && !mapTimeRef.current.access) {
+      unlockPendingRef.current = true;
+      storage.setItem(GATE_PENDING_KEY, Date.now());
+    }
+    router.push({ pathname: "/buy-tokens", params: { currency: "MASS", returnTo: "/" } } as any);
+  }, [router]);
 
   const mapRef = useRef<MapView>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
@@ -164,13 +184,18 @@ export default function HomeMap() {
   );
 
   // Remembered intent (Buy / Rent / Lease) → filter before the first load; first visit → ask.
+  // Also pick up a pending "Get MASS" trip (the purchase flow may have remounted this screen).
   useEffect(() => {
-    storage
-      .getItem<Intent | null>(INTENT_KEY, null)
-      .then((saved) => {
+    Promise.all([
+      storage.getItem<Intent | null>(INTENT_KEY, null).then((saved) => {
         if (saved === "buy" || saved === "rent" || saved === "lease") setFilters((f) => ({ ...f, listingType: saved }));
         else if (saved !== "all") setTimeout(() => { if (!handoffRef.current) setIntentSheet(true); }, reduce ? 400 : 1400);
-      })
+      }),
+      storage.getItem<number | null>(GATE_PENDING_KEY, null).then((at) => {
+        if (typeof at === "number" && Date.now() - at < GATE_PENDING_MAX_AGE_MS) unlockPendingRef.current = true;
+        else if (at != null) storage.removeItem(GATE_PENDING_KEY);
+      }),
+    ])
       .catch(() => {})
       .finally(() => setIntentReady(true));
   }, [reduce]);
@@ -290,7 +315,11 @@ export default function HomeMap() {
     const topFrac = (chromeBottom + PIN_H) / screenH;
     const bottomFrac = (screenH - (tabBarH + 12 + gateH + 8)) / screenH;
     const bandH = Math.max(bottomFrac - topFrac, 0.1);
-    const lats = teaser.map((g) => g.lat), lngs = teaser.map((g) => g.lng);
+    // Ghosts can span cities (Lagos · Abuja · PH) — fit the cluster nearest the viewer, never the whole country.
+    const r = regionRef.current;
+    const anchor = teaser.reduce((best, g) => (Math.hypot(g.lat - r.latitude, g.lng - r.longitude) < Math.hypot(best.lat - r.latitude, best.lng - r.longitude) ? g : best), teaser[0]);
+    const group = teaser.filter((g) => Math.abs(g.lat - anchor.lat) < 0.6 && Math.abs(g.lng - anchor.lng) < 0.6);
+    const lats = group.map((g) => g.lat), lngs = group.map((g) => g.lng);
     const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
     const aspect = screenW / screenH;
     const latDelta = Math.min(Math.max(((maxLat - minLat) * 1.2) / bandH, (maxLng - minLng) * 1.3 / aspect, 0.012), 40);
@@ -327,26 +356,58 @@ export default function HomeMap() {
     (mt: MapTime) => {
       const prev = mapTimeRef.current;
       setMapTime(mt);
+      // Wallet was empty, now it isn't: the homes are about to light up — hold the generic charge toast and let
+      // the markers load celebrate instead (it knows how many homes appeared).
+      if (!!prev && !prev.access && mt.access) unlockPendingRef.current = true;
+      const justUnlocked = mt.access && unlockPendingRef.current;
       if (mt.charged_now) {
         refreshWallet().catch(() => {});
         track("map_time_charged", { hour: mt.hours_charged, cost: mt.hourly_cost });
-        rain({ variant: "subtle", key: `maptime:${mt.hours_charged}` });
-        toast.show({
-          kind: "success",
-          title: mt.hours_charged <= 1 ? `Map time started · ${mt.hourly_cost} MASS` : `Another hour on the map · ${mt.hourly_cost} MASS`,
-          body: mt.hours_charged <= 1 ? "Homes show for 60 minutes on the map. The next hour is only charged while you're still browsing." : `${mt.balance} MASS left in your wallet.`,
-        });
+        if (!justUnlocked) {
+          rain({ variant: "subtle", key: `maptime:${mt.hours_charged}` });
+          toast.show({
+            kind: "success",
+            title: mt.hours_charged <= 1 ? `Map time started · ${mt.hourly_cost} MASS` : `Another hour on the map · ${mt.hourly_cost} MASS`,
+            body: mt.hours_charged <= 1 ? "Homes show for 60 minutes on the map. The next hour is only charged while you're still browsing." : `${mt.balance} MASS left in your wallet.`,
+          });
+        }
       }
       if (!mt.access) {
         setPins([]);
         setActiveId(null);
         if (prev?.access) {
           track("map_time_exhausted", { hours: mt.hours_charged });
-          toast.show({ kind: "info", title: "Out of MASS — homes hidden", body: "Top up to keep browsing the map.", actionLabel: "Get MASS", onAction: () => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any) });
+          toast.show({ kind: "info", title: "Out of MASS — homes hidden", body: "Top up to keep browsing the map.", actionLabel: "Get MASS", onAction: goGetMass });
         }
       }
     },
-    [refreshWallet, rain, toast, router]
+    [refreshWallet, rain, toast, goGetMass]
+  );
+
+  /** The homes just came back after a top-up: a short burst over the map, then the pins stay. Waits for the
+   *  purchase's money rain (if it is still falling) so the two moments don't pile up. */
+  const celebrateUnlock = useCallback(
+    (count: number, mt: MapTime | null) => {
+      clearUnlockPending();
+      const cost = mt?.hourly_cost ?? 0;
+      track("map_homes_unlocked", { homes: count, hour: mt?.hours_charged ?? 0, cost });
+      if (count > 0) {
+        const burst = () =>
+          celebrate({
+            tone: "mass",
+            icon: "home",
+            title: "Homes unlocked!",
+            body: `${count >= 400 ? "400+" : count} ${count === 1 ? "home is" : "homes are"} now live across the map${cost ? ` · ${cost} MASS buys 60 minutes` : ""}`,
+          });
+        const wait = rainClearsAt() - Date.now();
+        if (wait > 0) setTimeout(burst, Math.min(wait, 3200));
+        else burst();
+      } else {
+        // Nothing matches the current filters here — still worth saying the map is live again.
+        toast.show({ kind: "success", title: cost ? `Map time started · ${cost} MASS` : "You're back on the map", body: "Widen the filters or move the map to see homes." });
+      }
+    },
+    [celebrate, toast, clearUnlockPending, rainClearsAt]
   );
 
   // Markers: authenticated, lean teaser tier (cover · price · specs · city). Address + agent stay gated.
@@ -401,7 +462,10 @@ export default function HomeMap() {
         const mapped = res.markers.map(toPin);
         setPins(mapped);
         setShowSearchArea(false);
-        if (opts?.fit) fitToPins(mapped);
+        // A top-up just landed: bring the homes into view (if the teaser left them off-screen) and celebrate.
+        const celebrating = unlockPendingRef.current;
+        if (opts?.fit || celebrating) fitToPins(mapped);
+        if (celebrating) celebrateUnlock(mapped.length, res.map_time ?? mapTimeRef.current);
         if (!opts?.silent && !reduce) {
           // Pins pop in; keep marker views live just long enough for the spring, then freeze them (perf).
           setSettling(true);
@@ -416,7 +480,7 @@ export default function HomeMap() {
         setLoading(false);
       }
     },
-    [filters, searchTerm, fitToPins, reduce, applyMapTime]
+    [filters, searchTerm, fitToPins, reduce, applyMapTime, celebrateUnlock]
   );
 
   // Map-time heartbeat: once a minute while this tab is in front AND the app is active. Leaving the tab or
@@ -435,7 +499,8 @@ export default function HomeMap() {
           const mt = await api.mapTimeTick();
           if (stopped) return;
           applyMapTime(mt);
-          if (mt.access && before && !before.access) loadRef.current({ silent: true });
+          // Homes are back after a top-up: reload them and bring them into view if the teaser left them off-screen.
+          if (mt.access && before && !before.access) loadRef.current({ silent: true, fit: true });
         } catch {}
       };
       const start = () => {
@@ -559,7 +624,7 @@ export default function HomeMap() {
       return;
     }
     if (noMass) {
-      toast.show({ kind: "info", title: "Get MASS to unlock details", body: "The map is free — the address, photos and agent need MASS tokens.", actionLabel: "Get MASS", onAction: () => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any) });
+      toast.show({ kind: "info", title: "Get MASS to unlock details", body: "The map is free — the address, photos and agent need MASS tokens.", actionLabel: "Get MASS", onAction: goGetMass });
       return;
     }
     track("paid_action_start", { property_id: p.id, arrived_via: via });
@@ -1065,7 +1130,7 @@ export default function HomeMap() {
                 {compactGate ? `${mapTime?.hourly_cost ?? 1} MASS/hour · only while you browse` : `${mapTime?.hourly_cost ?? 1} MASS per hour · only while you browse`}
               </AppText>
             </View>
-            <Button label="Get MASS" variant="mass" size={compactGate ? "md" : "lg"} fullWidth iconLeft="add" onPress={() => router.push({ pathname: "/buy-tokens", params: { currency: "MASS" } } as any)} testID="map-gate-get-mass" />
+            <Button label="Get MASS" variant="mass" size={compactGate ? "md" : "lg"} fullWidth iconLeft="add" onPress={goGetMass} testID="map-gate-get-mass" />
             {user && !user.phone_verified ? (
               // Welcome bonus — first-timers can start browsing for free by verifying their number (one-time earn task).
               <Pressable onPress={() => router.push({ pathname: "/earn", params: { task: "phone_verify" } } as any)} style={[styles.gateNudge, { backgroundColor: colors.successSoft }]} accessibilityRole="button" accessibilityLabel="Verify your phone number and earn free MASS" testID="map-gate-nudge">
