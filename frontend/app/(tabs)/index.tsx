@@ -32,6 +32,8 @@ import { AmassLogo } from "@/src/components/AmassLogo";
 import { TokenIcon } from "@/src/components/TokenIcon";
 import { GoldCoin } from "@/src/components/GoldCoin";
 import { GhostPin, type TeaserPin } from "@/src/components/map/GhostPin";
+import { PinTapHint } from "@/src/components/map/PinTapHint";
+import { LastHourBanner, minutesLeft } from "@/src/components/map/LastHourBanner";
 import { ClusterPin, PIN_H, PIN_HALF_W, PricePin, clusterSize, pinHalfWidth } from "@/src/components/map/PricePin";
 import { PREVIEW_CARD_H, PreviewCard } from "@/src/components/map/PreviewCard";
 import { INTENTS, IntentSheet, type Intent } from "@/src/components/map/IntentSheet";
@@ -46,6 +48,15 @@ const INTENT_KEY = "amass_intent_v1";
 /** Set when Get MASS is tapped from the empty-wallet notice; the next load that finds homes celebrates them (survives a remount). */
 const GATE_PENDING_KEY = "amass_map_gate_pending_v1";
 const GATE_PENDING_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+/** One-time "tap a pin" coach mark, shown after the first homes-unlocked moment. */
+const PIN_HINT_KEY = "amass_pin_hint_seen_v1";
+const PIN_HINT_MS = 15_000;
+/** Bubble + ring the coach mark draws above its pin — the pin needs this much clear band above it and this much room each side. */
+const PIN_HINT_H = 150;
+const PIN_HINT_W = 292;
+/** Width of the right-hand FAB column (locate / zoom) + its margin — the bubble must stay left of it. */
+const FAB_COLUMN_W = 68;
+const LAST_HOUR_DISMISSED_KEY = "amass_map_last_hour_dismissed_v1";
 
 // Lekki Phase 1 — Nigeria's most active market. Delta ~0.014 ≈ zoom 15.
 const DEFAULT_MARKET_REGION: Region = { latitude: 6.4494, longitude: 3.4739, latitudeDelta: 0.014, longitudeDelta: 0.014 };
@@ -90,6 +101,28 @@ export default function HomeMap() {
   const mapTimeRef = useRef<MapTime | null>(null);
   mapTimeRef.current = mapTime;
   const gated = !!mapTime && !mapTime.access;
+  /** This paid hour is the last the wallet can afford — surfaced gently so browsing never just stops. */
+  const lastHour = !!mapTime && mapTime.access && mapTime.metered && mapTime.remaining_seconds != null && mapTime.balance < mapTime.hourly_cost;
+  const [lastHourDismissedFor, setLastHourDismissedFor] = useState<number | null>(null);
+  useEffect(() => {
+    storage.getItem<number | null>(LAST_HOUR_DISMISSED_KEY, null).then((h) => { if (typeof h === "number") setLastHourDismissedFor(h); }).catch(() => {});
+  }, []);
+  const dismissLastHour = useCallback((hour: number) => {
+    setLastHourDismissedFor(hour);
+    storage.setItem(LAST_HOUR_DISMISSED_KEY, hour);
+  }, []);
+  const showLastHour = lastHour && lastHourDismissedFor !== mapTime!.hours_charged;
+  /** "Tap a pin" coach mark: the pin it points at (null = hidden). */
+  const [hintPin, setHintPin] = useState<Pin | null>(null);
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideHint = useCallback(() => {
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    hintTimerRef.current = null;
+    setHintPin(null);
+  }, []);
+  useEffect(() => () => { if (hintTimerRef.current) clearTimeout(hintTimerRef.current); }, []);
+  /** Filled in below once the clusters are known; the unlock celebration calls it after the burst. */
+  const showPinHintRef = useRef<(attempt?: number) => void>(() => {});
   /** True when the wallet was empty and a top-up is expected (Get MASS tapped, or the meter just flipped back on) —
    *  the next markers load celebrates the homes lighting up. Mirrored in storage so it survives a screen remount. */
   const unlockPendingRef = useRef(false);
@@ -399,9 +432,10 @@ export default function HomeMap() {
             title: "Homes unlocked!",
             body: `${count >= 400 ? "400+" : count} ${count === 1 ? "home is" : "homes are"} now live across the map${cost ? ` · ${cost} MASS buys 60 minutes` : ""}`,
           });
-        const wait = rainClearsAt() - Date.now();
-        if (wait > 0) setTimeout(burst, Math.min(wait, 3200));
-        else burst();
+        const wait = Math.min(Math.max(rainClearsAt() - Date.now(), 0), 3200);
+        setTimeout(burst, wait);
+        // Once the burst has cleared, show first-timers how to open a home.
+        setTimeout(() => showPinHintRef.current(), wait + 2700);
       } else {
         // Nothing matches the current filters here — still worth saying the map is live again.
         toast.show({ kind: "success", title: cost ? `Map time started · ${cost} MASS` : "You're back on the map", body: "Widen the filters or move the map to see homes." });
@@ -608,6 +642,64 @@ export default function HomeMap() {
   }, [clusters, region, clearBand, project, screenW, activeId]);
   const activePin = useMemo(() => (activeId ? pins.find((p) => p.id === activeId) ?? null : null), [pins, activeId]);
 
+  /** First homes after a top-up: point at one real pin and say "tap it" — once per device. Prefers a single pin
+   *  near the middle of the clear band; if everything is still clustered, opens the nearest cluster first. */
+  const clustersRef = useRef(clusters);
+  clustersRef.current = clusters;
+  /** Narrow phones get a narrower bubble so it clears the FAB column. */
+  const hintW = Math.min(PIN_HINT_W, screenW - 2 * FAB_COLUMN_W);
+  const clusterIndexRef = useRef(clusterIndex);
+  clusterIndexRef.current = clusterIndex;
+  const showPinHint = useCallback(
+    async (attempt = 0) => {
+      if (mapTimeRef.current && !mapTimeRef.current.access) return;
+      if (attempt === 0 && (await storage.getItem<number | null>(PIN_HINT_KEY, null))) return;
+      const r = regionRef.current;
+      const band = clearBand(false);
+      // The bubble is centred on its pin; keep that centre where the bubble clears both edges and the FAB column.
+      const hintX = Math.min(screenW / 2, screenW - FAB_COLUMN_W - hintW / 2);
+      const cx = hintX;
+      const cy = (band.top + PIN_HINT_H + band.bottom - 24) / 2;
+      const dist = (lat: number, lng: number) => {
+        const { x, y } = project(lat, lng, r);
+        return Math.hypot(x - cx, y - cy);
+      };
+      const singles = clustersRef.current.filter((c: any) => !c.properties?.cluster).map((c: any) => c.properties.property as Pin);
+      if (!singles.length) {
+        const nearest = clustersRef.current.filter((c: any) => c.properties?.cluster).sort((a: any, b: any) => dist(a.geometry.coordinates[1], a.geometry.coordinates[0]) - dist(b.geometry.coordinates[1], b.geometry.coordinates[0]))[0];
+        if (!nearest || attempt > 0 || !clusterIndexRef.current) return;
+        const [lng, lat] = nearest.geometry.coordinates as [number, number];
+        const lngDelta = 360 / Math.pow(2, Math.max(expandCluster(clusterIndexRef.current, (nearest.properties as any).cluster_id), 8));
+        const latDelta = lngDelta / (screenW / screenH);
+        programmaticUntilRef.current = Date.now() + 900;
+        const next: Region = { latitude: lat + latDelta * (cy / screenH - 0.5), longitude: lng, latitudeDelta: latDelta, longitudeDelta: lngDelta };
+        setRegion(next);
+        mapRef.current?.animateToRegion(next, reduce ? 0 : 400);
+        setTimeout(() => showPinHint(1), reduce ? 150 : 700);
+        return;
+      }
+      const best = singles.reduce((a, p) => (dist(p.lat, p.lng) < dist(a.lat, a.lng) ? p : a), singles[0]);
+      const { x, y } = project(best.lat, best.lng, r);
+      const halfW = hintW / 2;
+      if (y < band.top + PIN_HINT_H || y > band.bottom - 24 || x < halfW + 8 || x > screenW - FAB_COLUMN_W - halfW) {
+        // Glide so the pin (and the bubble above it) sit fully inside the clear band and left of the FAB column.
+        const next: Region = { ...r, latitude: best.lat + r.latitudeDelta * (cy / screenH - 0.5), longitude: best.lng + r.longitudeDelta * ((screenW / 2 - hintX) / screenW) };
+        programmaticUntilRef.current = Date.now() + 700;
+        mapRef.current?.animateToRegion(next, reduce ? 0 : 400);
+      }
+      storage.setItem(PIN_HINT_KEY, Date.now());
+      setHintPin(best);
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = setTimeout(() => setHintPin(null), PIN_HINT_MS);
+    },
+    [clearBand, project, screenW, screenH, reduce, hintW]
+  );
+  showPinHintRef.current = showPinHint;
+  // The hint only makes sense while its pin is drawn and the map is live.
+  useEffect(() => {
+    if (hintPin && (gated || !pins.some((p) => p.id === hintPin.id))) hideHint();
+  }, [hintPin, gated, pins, hideHint]);
+
   const openPin = (p: Pin) => {
     const via = pinVia(p);
     openedRef.current = p.id;
@@ -634,6 +726,7 @@ export default function HomeMap() {
   /** Tap a price → select it and, when its label would sit under the preview card or the top chrome, glide it into the clear area. */
   const onMarkerPress = (p: Pin) => {
     markerPressAtRef.current = Date.now();
+    hideHint();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     // Money rain exactly once per selection — re-tapping the open pin, panning or zooming never replays it.
     if (activeId !== p.id) rain({ variant: "brief", key: `pin:${p.id}` });
@@ -874,6 +967,12 @@ export default function HomeMap() {
               </Marker>
             ))
           : null}
+        {hintPin && !gated ? (
+          // Rides with the map above its pin; tapping it is tapping the pin. Animated, so it tracks view changes (one marker, ≤15 s).
+          <Marker key={`hint-${hintPin.id}`} coordinate={{ latitude: hintPin.lat, longitude: hintPin.lng }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges zIndex={30} onPress={() => onMarkerPress(hintPin)} accessibilityLabel="Tap a pin to preview the home">
+            <PinTapHint width={hintW} reduceMotion={reduce} testID="pin-tap-hint" />
+          </Marker>
+        ) : null}
       </MapView>
 
       {/* Top chrome: search + filters · Buy / Rent / Lease */}
@@ -955,20 +1054,36 @@ export default function HomeMap() {
         </View>
 
         <View style={styles.greetRow} pointerEvents="box-none">
-          {mapTime?.access && mapTime.metered && mapTime.remaining_seconds != null ? (
+          {showLastHour && mapTime && !(greet && user) ? (
+            <LastHourBanner
+              remainingSeconds={mapTime.remaining_seconds ?? 0}
+              hourlyCost={mapTime.hourly_cost}
+              onTopUp={goGetMass}
+              onDismiss={() => {
+                Haptics.selectionAsync().catch(() => {});
+                dismissLastHour(mapTime.hours_charged);
+              }}
+              reduceMotion={reduce}
+            />
+          ) : mapTime?.access && mapTime.metered && mapTime.remaining_seconds != null ? (
             <Pressable
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
-                toast.info("Map time", `${mapTime.hourly_cost} MASS buys 60 minutes on the map — the clock only runs while you're here. ${mapTime.balance} MASS in your wallet.`);
+                toast.info(
+                  lastHour ? "Last hour on the map" : "Map time",
+                  lastHour
+                    ? `${minutesLeft(mapTime.remaining_seconds ?? 0)} min left. Your wallet has ${mapTime.balance} MASS — the next hour costs ${mapTime.hourly_cost}. Top up any time to keep browsing.`
+                    : `${mapTime.hourly_cost} MASS buys 60 minutes on the map — the clock only runs while you're here. ${mapTime.balance} MASS in your wallet.`
+                );
               }}
-              style={[styles.timeChip, shadows.md, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.94)" }]}
+              style={[styles.timeChip, shadows.md, lastHour && { borderWidth: 1, borderColor: colors.warning }, { backgroundColor: lastHour ? colors.warningSoft : isDark ? colors.glass : "rgba(255,255,255,0.94)" }]}
               accessibilityRole="button"
-              accessibilityLabel={`Map time: ${Math.max(1, Math.ceil(mapTime.remaining_seconds / 60))} minutes left this hour. ${mapTime.hourly_cost} MASS per hour.`}
-              testID="map-time-chip"
+              accessibilityLabel={`Map time: ${minutesLeft(mapTime.remaining_seconds)} minutes left this hour. ${mapTime.hourly_cost} MASS per hour.${lastHour ? " This is your last hour — your wallet can't cover the next one." : ""}`}
+              testID={lastHour ? "map-time-chip-last-hour" : "map-time-chip"}
             >
-              <Ionicons name="time-outline" size={14} color={colors.massText} />
+              <Ionicons name={lastHour ? "hourglass-outline" : "time-outline"} size={14} color={colors.massText} />
               <AppText variant="micro" color={colors.massText} tabular style={{ fontFamily: "PlusJakartaSans-700" }}>
-                {Math.max(1, Math.ceil(mapTime.remaining_seconds / 60))} min
+                {minutesLeft(mapTime.remaining_seconds)} min{lastHour ? " · last hour" : ""}
               </AppText>
             </Pressable>
           ) : null}

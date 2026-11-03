@@ -73,7 +73,7 @@ export function MoneyRainProvider({ children }: { children: React.ReactNode }) {
       played.current.set(opts.key, now);
       if (played.current.size > 300) played.current.delete(played.current.keys().next().value as string);
     }
-    busyUntil.current = now + VARIANTS[variant].duration + 300;
+    busyUntil.current = now + VARIANTS[variant].duration + VARIANTS[variant].spread + 300;
     setActive({ id: now, variant });
     return true;
   }, []);

@@ -1267,3 +1267,21 @@ agent_communication:
       (3) Welcome-bonus nudge for users with phone_verified=false (testID map-gate-nudge) → /earn?task=phone_verify opens the phone-verify
       sheet automatically (app/earn.tsx deep link). Zero-MASS login: gate-preview@amass-qa.africa / GatePreview2026! (wallet zeroed).
       Backend: tests/test_map_teaser.py 3/3. Paying users unaffected (no teaser fields, real markers).
+
+  - agent: "main"
+    message: |
+      Iteration 98 (to run, frontend focus) — Find Home map after a MASS top-up (app/(tabs)/index.tsx):
+      (1) "Homes unlocked" celebration: gate user taps map-gate-get-mass → /buy-tokens?currency=MASS&returnTo=/ → mock purchase →
+      purchase-success-continue pops BACK to the still-mounted map (no remount) → focus heartbeat flips access → pins reload + fit →
+      celebration-overlay with celebration-title "Homes unlocked!" + celebration-body "N homes are now live across the map · 1 MASS buys 60 minutes"
+      (waits for the purchase money rain to clear first; the generic "Map time started" toast is suppressed in this case).
+      (2) First-unlock coach mark: ~2.7 s after the burst a `pin-tap-hint` Marker (bubble "Tap any pin to preview it" + pulsing ring) points at
+      a real pin; once per device (storage amass_pin_hint_seen_v1); auto-hides after 15 s; tapping the bubble (`pin-tap-hint-bubble`) or any pin
+      opens that pin's preview card and hides the hint. If everything is clustered it zooms into the nearest cluster first.
+      (3) Last-hour heads-up: when mapTime.access && balance < hourly_cost, the time chip becomes `map-time-chip-last-hour` ("N min · last hour",
+      amber) and, after the greeting fades (~6.5 s), `map-last-hour-banner` replaces the chip in that row (title "Last hour on the map" or
+      "Map time ends in N min" when ≤10 min; `map-last-hour-topup` → buy-tokens; `map-last-hour-dismiss` hides it for this hour, chip returns).
+      QA account: gate-preview@amass-qa.africa / GatePreview2026!. Reset to gated: `python3 /app/backend/scripts/reset_gate_user.py`.
+      Force last-hour state: set wallets.balance=0 and map_time.used_seconds = paid_seconds - 25*60 for that user (see iteration notes).
+      Paying user (demo@amass.africa) must see none of the above. Backend: analytics ALLOWED gained map_time_charged / map_time_exhausted /
+      map_homes_unlocked. Main agent already verified every flow above on the web preview at 390×844 and 360×640.

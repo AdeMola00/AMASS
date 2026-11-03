@@ -1,0 +1,40 @@
+{
+  "summary": "Iter 98: celebration after top-up, first-time pin-tap hint and last-hour banner. All 5 requested flows pass at 390x844 (FLOW 2 auto-hide and the banner/FAB boxes also checked at 360x640). FLOW 1: the return from Buy MASS reuses the existing map screen (no home-greeting, POST /map/time/tick then GET /map/markers). The 'Homes unlocked!' overlay shows 0.36 s after Continue with body '61 homes are now live across the map · 1 MASS buys 60 minutes'. No 'Map time started' toast, gate gone, chip shows '60 min'. pin-tap-hint appears about 3.3-3.7 s after Continue, above a real price pin. Tapping the bubble hides the hint and opens the preview card ('Unlock · 10 MASS'). FLOW 2: with amass_pin_hint_seen_v1 set, the celebration plays again and the hint does not appear. In a fresh session the hint hides by itself after 15.1 s. FLOW 3: leaving with browser back keeps map-gate and 6 ghost pins, with no celebration. FLOW 4: amber chip '25 min · last hour', then the banner at about 7.4 s with the exact copy. Banner bottom is at y=195 and fab-locate top at y=196 at both 390 and 360 widths, so they do not overlap. Top up opens /buy-tokens?currency=MASS&returnTo=%2F, back keeps the banner, Dismiss shows the chip again, and tapping the chip shows the explanation toast. At 5 min the banner reads 'Map time ends in 5 min' / 'Top up to keep browsing without a break.'. Extra check: buying from the last-hour banner switches back to the normal chip with no celebration. FLOW 5 (demo): normal '50 min' chip, none of the new UI, and tapping a pin opens the preview card. Backend: 9/9 pass. No deprecated Expo packages found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PinTapHint vs right FAB column", "issue": "At 360x640 the 292px-wide hint bubble (x 41-318, y 248-306) overlaps fab-zoom-in (x 300-348, y 254-302). The FAB draws on top and covers the end of 'See the address, photos and agent'. At 390x844 there is a small 3x10px overlap with fab-zoom-out. The placement in showPinHint only checks x against PIN_HINT_HALF_W and the screen edges, not the FAB column.", "testID": "pin-tap-hint-bubble", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Homes-unlocked celebration waiting for MoneyRain", "issue": "The celebration still overlaps the purchase money rain: bills are falling at the bottom in the celebration screenshots at 390 and 360. The cause is in src/ui/MoneyRain.tsx: busyUntil = now + duration + 300 (3.1 s for 'celebrate'), but the Rain overlay stays up for duration + spread + 200 (4.3 s). So rainClearsAt() is about 1.2 s too early and the celebration fires 0.36 s after Continue.", "affected_testIDs": ["celebration-overlay"]}
+    ],
+    "design_issues": [
+      {"screen": "Find Home - last-hour banner", "issues": [
+        "At 360px width the banner subtitle is cut off: '25 min left · wallet can't cover the next hour (1 …' hides the MASS cost. Consider shorter copy (e.g. '25 min left · next hour 1 MASS') or allowing 3 lines.",
+        "The map-last-hour-dismiss target is 28x28. hitSlop does not enlarge it on web; native is fine with hitSlop=8.",
+        "Amber chip text rgb(201,158,14) on warningSoft is about 2.7:1 contrast at micro size, below WCAG AA 4.5:1. Consider a darker amber (#8A6A00-ish) for the text.",
+        "Dismissing the banner only lasts for the current screen. After a reload it comes back about 12 s later. Acceptable if intended, but it is not truly once per hour."
+      ]},
+      {"screen": "Find Home - counts", "issues": ["The gate says '43 homes are waiting behind this notice', but after top-up the celebration says '61 homes are now live across the map'. The two numbers differ, which may confuse users."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter98_unlock_analytics.py", "/app/backend/tests/set_last_hour_state.py", "/app/test_reports/pytest/pytest_iter98.xml"],
+  "action_items": [
+    "MEDIUM: Keep PinTapHint clear of the right FAB column (x >= screenW-60, y chromeBottom+70 to +222). Either cap the bubble width at screenW - 2*60 when the bubble would reach FAB rows, or move it horizontally or vertically. Reproduce at 360x640.",
+    "LOW: MoneyRain rainClearsAt should include spread (busyUntil = now + duration + spread + 200) so the homes-unlocked celebration starts after the purchase rain has finished.",
+    "LOW: Last-hour banner subtitle is cut off at 360px. Shorten the copy so the MASS cost stays visible.",
+    "LOW: Darken the amber text on the last-hour chip for contrast, and make the dismiss X at least 44px on web."
+  ],
+  "critical_code_review_comments": [
+    "index.tsx is 1330 lines, well over the 700-line guideline. Extract the gate/unlock/hint/last-hour logic into a hook (e.g. useMapMeterMoments).",
+    "showPinHint (index.tsx:669-673) glides with animateToRegion but does not call setRegion, unlike the cluster branch. This works on the web stand-in; check on native that the hint and pin stay aligned after the glide.",
+    "test_map_teaser.py depends on the gate user being at 0 MASS. Run scripts/reset_gate_user.py first, otherwise 3 tests fail."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter98_unlock_analytics.py (new)", "/app/backend/tests/set_last_hour_state.py (new QA helper)"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% of requested flows pass; 1 medium overlap and minor polish issues"},
+  "seed_data_creation": "No new seed data. The gate-preview user's wallet and map_time were changed during testing and reset at the end with scripts/reset_gate_user.py (balance 0, used = paid).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use /login, not /. On the success sheet, Continue is only clickable after the sheet slides in: wait about 2.5 s or click it from JS. The mock checkout opens a popup (use context.expect_page). For last-hour state run python3 backend/tests/set_last_hour_state.py <minutes>. After a reload the banner takes about 12 s to show (bundle load + 6.5 s greeting). Always run scripts/reset_gate_user.py before pytest test_map_teaser.py and after testing."
+}
