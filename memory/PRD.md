@@ -123,6 +123,12 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Frontend: BackInStockNote on Dashboard; Feature in app = PATCH /api/marketplace/products/{id}/flags {featured:true} through the portal proxy (live app change).
 - Tested iteration_13 (UI 100%, with PATCH mocked so no live writes); follow-up fixes: dismissing re-surfaced older events, mobile layout.
 
+## Updated (2026-11-05c) — New AMASS logo
+- User request: "Change AMASS LOGO everywhere on the App to the one attached." (Glossy AMASS House Pin Logo.png)
+- Assets in frontend/public: amass-logo(.png/-dark), amass-mark(-dark), amass-wordmark(-dark), favicon.ico, logo192/512, apple-touch-icon. Dark variants turn the black house/lettering white.
+- Logo.jsx now uses the image artwork (follows the theme); used in Sidebar (also the mobile drawer), Login (both panels), and browser tab icons.
+
+
 
 
 

@@ -1,32 +1,40 @@
 import { cn } from "@/lib/utils";
 
-// AMASS location-pin mark — vivid red teardrop with a hollow center, matching the brand logo.
-export function AmassPin({ className }) {
+const SRC = {
+  mark: ["/amass-mark.png", "/amass-mark-dark.png"],
+  wordmark: ["/amass-wordmark.png", "/amass-wordmark-dark.png"],
+  full: ["/amass-logo.png", "/amass-logo-dark.png"],
+};
+
+// Official AMASS logo artwork; `onDark` forces the light-on-dark version, otherwise it follows the theme.
+function BrandImage({ kind, className, onDark, testid }) {
+  const [light, dark] = SRC[kind];
+  if (onDark) return <img src={dark} alt="AMASS" className={cn("object-contain", className)} data-testid={testid} />;
   return (
-    <svg viewBox="0 0 48 60" className={className} fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <defs>
-        <radialGradient id="amassPinGrad" cx="38%" cy="30%" r="80%">
-          <stop offset="0%" stopColor="#FF5A5A" />
-          <stop offset="45%" stopColor="#F01414" />
-          <stop offset="100%" stopColor="#B00000" />
-        </radialGradient>
-      </defs>
-      <path
-        d="M24 2C13 2 4 10.7 4 21.4 4 35 24 58 24 58s20-23 20-36.6C44 10.7 35 2 24 2z"
-        fill="url(#amassPinGrad)"
-      />
-      <circle cx="24" cy="21" r="8.4" fill="#fff" />
-    </svg>
+    <>
+      <img src={light} alt="AMASS" className={cn("object-contain dark:hidden", className)} data-testid={testid} />
+      <img src={dark} alt="AMASS" className={cn("object-contain hidden dark:block", className)} />
+    </>
   );
 }
 
-export function Logo({ withWordmark = true, className, textClass, pinClass }) {
+export function AmassPin({ className, onDark }) {
+  return <BrandImage kind="mark" className={cn("w-auto", className)} onDark={onDark} />;
+}
+
+export function AmassWordmark({ className, onDark }) {
+  return <BrandImage kind="wordmark" className={cn("w-auto", className)} onDark={onDark} />;
+}
+
+export function AmassLogoFull({ className, onDark, testid }) {
+  return <BrandImage kind="full" className={cn("w-auto", className)} onDark={onDark} testid={testid} />;
+}
+
+export function Logo({ withWordmark = true, className, pinClass, onDark }) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <AmassPin className={cn("h-8 w-8 drop-shadow-sm", pinClass)} />
-      {withWordmark && (
-        <span className={cn("font-heading font-extrabold tracking-tight text-lg", textClass)}>AMASS</span>
-      )}
+      <AmassPin className={cn("h-8", pinClass)} onDark={onDark} />
+      {withWordmark && <AmassWordmark className="h-4" onDark={onDark} />}
     </div>
   );
 }

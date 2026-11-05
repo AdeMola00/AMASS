@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
-import { AmassPin } from "@/components/Logo";
+import { AmassLogoFull } from "@/components/Logo";
 
 export default function Login() {
   const { login } = useAuth();
@@ -36,9 +36,8 @@ export default function Login() {
           style={{ backgroundImage: "url(https://images.pexels.com/photos/27741697/pexels-photo-27741697.jpeg?auto=compress&cs=tinysrgb&w=2400)", backgroundSize: "cover", backgroundPosition: "center" }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d]/75 to-[#0d0d0d]/30" />
-        <div className="relative flex items-center gap-2.5">
-          <AmassPin className="h-9 w-9 drop-shadow" />
-          <span className="font-heading font-extrabold tracking-tight text-lg">AMASS</span>
+        <div className="relative">
+          <AmassLogoFull onDark className="h-24" testid="login-brand-logo" />
         </div>
         <div className="relative">
           <h1 className="font-heading text-4xl font-extrabold tracking-tight leading-tight">
@@ -59,9 +58,8 @@ export default function Login() {
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
           className="w-full max-w-sm"
         >
-          <div className="lg:hidden flex items-center gap-2.5 mb-8">
-            <AmassPin className="h-8 w-8" />
-            <span className="font-heading font-extrabold tracking-tight">AMASS Admin</span>
+          <div className="lg:hidden mb-8">
+            <AmassLogoFull className="h-20" testid="login-mobile-logo" />
           </div>
           <h2 className="font-heading text-2xl font-bold tracking-tight">Welcome back</h2>
           <p className="text-muted-foreground text-sm mt-1">Sign in to your admin account to continue.</p>
