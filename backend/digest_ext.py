@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from server import api, db, require, log_activity, now_iso, new_id
 from website_ext import _call, _ts, _label
-from email_service import send_email, EMAIL_FROM_NAME
+from email_service import send_email, EMAIL_FROM_NAME, email_logo
 
 logger = logging.getLogger("amass")
 CRON_SECRET = os.environ["WEBHOOK_CRON_SECRET"]
@@ -157,7 +157,7 @@ def _digest_html(day_label: str, yesterday: list, pending: int, tracking: dict, 
         f'{" · replied in " + _fmt_hours(_hours(l.get("created_at"), first[l["id"]]["first"])) if l["id"] in first else ""}</span></td></tr>' for l in yesterday[:25])
     more = f'<p style="color:#888;font-size:12px">and {len(yesterday) - 25} more in the dashboard.</p>' if len(yesterday) > 25 else ""
     return (f'<table role="presentation" width="100%"><tr><td style="padding:24px;font-family:Arial,sans-serif;color:#1a1a1a;font-size:15px">'
-            f'<h2 style="margin:0 0 4px;color:#E11414">Daily website leads</h2>'
+            f'{email_logo()}<h2 style="margin:0 0 4px;color:#E11414">Daily website leads</h2>'
             f'<p style="margin:0 0 20px;color:#666">{escape(day_label)}</p>'
             f'<table role="presentation" width="100%" style="margin-bottom:20px"><tr>'
             f'<td style="background:#f6f6f6;padding:16px;border-radius:8px"><div style="font-size:12px;color:#666">New yesterday</div><div style="font-size:28px;font-weight:bold">{len(yesterday)}</div></td>'
@@ -223,7 +223,7 @@ def _weekly_html(label: str, cur: dict, prev: dict) -> str:
     total = (f'<tr><td {cell}><strong>Total</strong></td><td {cell} align="right">{prev["total"]}</td>'
              f'<td {cell} align="right"><strong>{cur["total"]}</strong></td><td {cell} align="right">{_change(cur["total"], prev["total"])}</td></tr>')
     return (f'<table role="presentation" width="100%"><tr><td style="padding:24px;font-family:Arial,sans-serif;color:#1a1a1a;font-size:15px">'
-            f'<h2 style="margin:0 0 4px;color:#E11414">Weekly website lead trends</h2>'
+            f'{email_logo()}<h2 style="margin:0 0 4px;color:#E11414">Weekly website lead trends</h2>'
             f'<p style="margin:0 0 20px;color:#666">{escape(label)}</p>'
             + _box_row(_box("Leads last week", cur["total"]), _box("Week before", prev["total"]))
             + (f'<table role="presentation" width="100%" style="font-size:14px;margin:12px 0 20px">{head}{rows}{total}</table>' if types

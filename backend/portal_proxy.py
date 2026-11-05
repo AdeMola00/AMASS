@@ -5,6 +5,7 @@ from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse, Response
 
 from server import get_current_user, effective_permissions
+from email_service import remember_public_base
 
 PORTAL_BASE = os.environ["AMASS_PORTAL_BASE_URL"].rstrip("/")
 PORTAL_KEY = os.environ["AMASS_PORTAL_KEY"]
@@ -56,6 +57,7 @@ def register(app):
         path = request.url.path
         if not path.startswith("/api/") or request.method == "OPTIONS":
             return await call_next(request)
+        remember_public_base(request.headers.get("x-forwarded-host") or request.headers.get("host"))
         raw = request.scope.get("raw_path", b"").decode("latin-1")
         decoded = unquote(unquote(raw))
         if ".." in decoded or "\\" in decoded or "%" in decoded.split("?")[0]:

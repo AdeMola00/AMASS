@@ -129,6 +129,12 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Logo.jsx now uses the image artwork (follows the theme); used in Sidebar (also the mobile drawer), Login (both panels), and browser tab icons.
 
 
+## Updated (2026-11-05d) — Branded emails
+- User request: "Branded Emails: Put the new AMASS logo at the top of reply, digest and restock reminder emails"
+- frontend/public/amass-email-logo.png (320px, white background). email_service.email_logo() adds it at the top of the lead reply, daily digest, weekly trends and restock reminder emails. The image address is taken from the domain the admin is being used on (remember_public_base in the portal_proxy middleware), so it points at the live domain once published.
+- Verified: logo URL serves 200 image/png; digest, weekly and restock emails sent to delivered@resend.dev with the logo.
+
+
 
 
 

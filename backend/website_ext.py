@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from server import api, db, require, log_activity, now_iso, new_id
-from email_service import send_email, EMAIL_FROM_NAME
+from email_service import send_email, EMAIL_FROM_NAME, email_logo
 
 WEBSITE_BASE = "https://discover-properties-1.emergent.host/api"
 WEBSITE_KEY = os.environ["AMASS_WEBSITE_API_KEY"]
@@ -117,7 +117,7 @@ async def website_lead_reply(lead_id: str, body: WebsiteLeadReply, user: dict = 
     subject = f"Re: your {EMAIL_FROM_NAME} {_label(lead.get('form_type'))} request"
     html = (f'<table role="presentation" width="100%"><tr><td style="padding:24px;font-family:Arial,sans-serif;'
             f'color:#1a1a1a;font-size:15px;line-height:1.6">'
-            f'<p>{greeting}</p><p>{text}</p>'
+            f'{email_logo()}<p>{greeting}</p><p>{text}</p>'
             f'<p>Best regards,<br>{escape(user.get("name") or "The team")}<br>{escape(EMAIL_FROM_NAME)}</p>'
             f'<p style="font-size:12px;color:#888;border-top:1px solid #eee;padding-top:12px">'
             f'You are receiving this because you contacted {escape(EMAIL_FROM_NAME)} through our website. '

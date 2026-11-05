@@ -9,7 +9,7 @@ from pydantic import BaseModel, EmailStr, Field
 from server import api, app, db, require, log_activity, now_iso, new_id
 from portal_proxy import PORTAL_BASE, PORTAL_KEY
 from digest_ext import JOBS, LAGOS, _accept_cron, _ts
-from email_service import send_email, EMAIL_FROM_NAME, EMAIL_REPLY_TO
+from email_service import send_email, EMAIL_FROM_NAME, EMAIL_REPLY_TO, email_logo
 
 logger = logging.getLogger("amass")
 client = httpx.AsyncClient(timeout=60.0)
@@ -73,7 +73,7 @@ def _reminder_html(name: str, items: list) -> str:
                    for i in items)
     contact = f" or write to {escape(EMAIL_REPLY_TO)}" if EMAIL_REPLY_TO else ""
     return (f'<table role="presentation" width="100%"><tr><td style="padding:24px;font-family:Arial,sans-serif;color:#1a1a1a;font-size:15px;line-height:1.5">'
-            f'<h2 style="margin:0 0 4px;color:#E11414">Restock reminder</h2>'
+            f'{email_logo()}<h2 style="margin:0 0 4px;color:#E11414">Restock reminder</h2>'
             f'<p>Hello {escape(name)} team,</p>'
             f'<p>These {len(items)} {"product is" if len(items) == 1 else "products are"} showing as out of stock on the {escape(EMAIL_FROM_NAME)} marketplace. '
             f'Customers can\'t buy them until they\'re back in stock.</p>'

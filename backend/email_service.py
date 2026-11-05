@@ -13,6 +13,21 @@ EMAIL_BASE_URL = "https://integrations.emergentagent.com"
 EMAIL_KEY = os.environ["EMERGENT_EMAIL_KEY"]
 EMAIL_FROM_NAME = os.environ["EMAIL_FROM_NAME"]
 EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO")
+PUBLIC_BASE = {"url": None}
+
+
+def remember_public_base(host: str | None) -> None:
+    if host:
+        host = host.split(",")[0].strip().split(":")[0]
+    if host and re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", host.lower()) and "localhost" not in host:
+        PUBLIC_BASE["url"] = f"https://{host.lower()}"
+
+
+def email_logo() -> str:
+    if not PUBLIC_BASE["url"]:
+        return ""
+    return (f'<div style="margin:0 0 20px"><img src="{PUBLIC_BASE["url"]}/amass-email-logo.png" width="120" '
+            f'alt="{EMAIL_FROM_NAME}" style="display:block;width:120px;height:auto;border:0"></div>')
 
 _SHORTENERS = ("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "goo.gl", "rebrand.ly")
 _CRED_ASK = ("reply with your password", "reply with the code", "send your password", "cvv",
