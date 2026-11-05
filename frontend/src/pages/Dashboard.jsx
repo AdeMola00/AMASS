@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { SlowReplyBanner } from "@/components/website/SlowReplyBanner";
 import { OutOfStockBanner } from "@/components/marketplace/OutOfStockBanner";
+import { BackInStockNote } from "@/components/marketplace/BackInStockNote";
 
 const STAT_META = [
   { key: "total_leads", label: "Total Leads", icon: Inbox, accent: "primary" },
@@ -107,6 +108,7 @@ export default function Dashboard() {
 
       <SlowReplyBanner />
       <OutOfStockBanner enabled={can("marketplace", "view")} />
+      <BackInStockNote enabled={can("marketplace", "view")} canEdit={can("marketplace", "edit")} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">

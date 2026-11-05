@@ -186,3 +186,33 @@ async def stock_check_now(user: dict = Depends(require("marketplace", "edit"))):
     if last and _ts(last.get("checked_at")) > datetime.now(LAGOS) - timedelta(minutes=1):
         raise HTTPException(status_code=429, detail="Stock was just checked. Please wait a minute.")
     return await run_stock_check()
+
+
+BACK_IN_STOCK_DAYS = 7
+
+
+@api.get("/retailers/back-in-stock")
+async def back_in_stock(user: dict = Depends(require("marketplace"))):
+    since = (datetime.now(timezone.utc) - timedelta(days=BACK_IN_STOCK_DAYS)).isoformat()
+    events = await db.stock_events.find({"to": "in_stock", "from": {"$ne": "in_stock"}, "at": {"$gt": since},
+                                         "dismissed_at": None}, {"_id": 0}).sort("at", -1).to_list(200)
+    if not events:
+        return {"items": [], "days": BACK_IN_STOCK_DAYS}
+    products = {p["id"]: p for p in await _products()}
+    latest = {}
+    for e in events:
+        p = products.get(e["product_id"])
+        if p and p.get("stock_status") == "in_stock" and e["product_id"] not in latest:
+            latest[e["product_id"]] = {"event_id": e["id"], "product_id": e["product_id"], "title": p.get("title"),
+                                       "seller": p.get("seller"), "retailer_id": e.get("retailer_id"), "at": e["at"],
+                                       "featured": bool(p.get("featured")), "image": (p.get("images") or [None])[0],
+                                       "price": p.get("price")}
+    return {"items": list(latest.values()), "days": BACK_IN_STOCK_DAYS}
+
+
+@api.post("/retailers/back-in-stock/{event_id}/dismiss")
+async def dismiss_back_in_stock(event_id: str, user: dict = Depends(require("marketplace", "edit"))):
+    res = await db.stock_events.update_one({"id": event_id}, {"$set": {"dismissed_at": now_iso(), "dismissed_by": user.get("name")}})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return {"success": True}
