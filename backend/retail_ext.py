@@ -212,7 +212,10 @@ async def back_in_stock(user: dict = Depends(require("marketplace"))):
 
 @api.post("/retailers/back-in-stock/{event_id}/dismiss")
 async def dismiss_back_in_stock(event_id: str, user: dict = Depends(require("marketplace", "edit"))):
-    res = await db.stock_events.update_one({"id": event_id}, {"$set": {"dismissed_at": now_iso(), "dismissed_by": user.get("name")}})
-    if not res.matched_count:
+    ev = await db.stock_events.find_one({"id": event_id, "to": "in_stock"}, {"_id": 0})
+    if not ev:
         raise HTTPException(status_code=404, detail="Note not found")
+    await db.stock_events.update_many({"product_id": ev["product_id"], "to": "in_stock", "dismissed_at": None},
+                                      {"$set": {"dismissed_at": now_iso(), "dismissed_by": user.get("name")}})
+    await log_activity("Dismissed back-in-stock note", "retailer", user, ev.get("title"))
     return {"success": True}

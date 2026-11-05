@@ -116,6 +116,14 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Frontend: Retailer page contact card (save, send now, last sent), stock change history card (check now), "out since" in the out-of-stock alert, contact hint on list cards; breadcrumb fix for detail pages; Lagos-time display.
 - Tested iteration_12 (18/18 API + UI); tester fixed the 429 timezone bug + stale hint; follow-ups: subject grammar, unique indexes, Lagos-time formatting, contrast.
 
+## Updated (2026-11-05b) — Back-in-Stock Alerts
+- User request: "Back-in-Stock Alerts: Show a Dashboard note when a product comes back in stock so the team can feature it in the app. Retailer Emails: Add each retailer's contact email on their page so Monday's restock reminders reach them."
+- Choices: note with a "Feature in app" button; it stays 7 days or until dismissed. Retailer emails skipped by the user (boxes left empty; admins fill them in).
+- Backend: GET /api/retailers/back-in-stock (latest in_stock event per product, last 7 days, still in stock, not dismissed), POST /api/retailers/back-in-stock/{event_id}/dismiss (dismisses all of that product's back-in-stock notes, logged).
+- Frontend: BackInStockNote on Dashboard; Feature in app = PATCH /api/marketplace/products/{id}/flags {featured:true} through the portal proxy (live app change).
+- Tested iteration_13 (UI 100%, with PATCH mocked so no live writes); follow-up fixes: dismissing re-surfaced older events, mobile layout.
+
+
 
 
 

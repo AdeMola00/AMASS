@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 13 covered Back-in-Stock Alerts (backend and UI), a retailer contact regression check, and a Dashboard banner regression check. Backend: new tests/test_back_in_stock.py passes 5 of 6. Passing: unauth gets 401 on GET and on dismiss; finance gets 403 on both, and the event stays undismissed; GET returns {items, days:7} with every expected field (event_id, product_id, title, seller, retailer_id, at, featured, image, price); the event older than 7 days is excluded; the event for an out_of_stock product is excluded; when a product has two events, only the latest one shows; dismissing an unknown id returns 404; dismiss sets dismissed_at and the item disappears. FAILED: after the latest event for a product is dismissed, an older undismissed back-in-stock event for the same product (within 7 days) shows up again. UI (PATCH flags mocked with page.route, so no live portal writes): the note shows '3 products are back in stock'; each row has an image, title, seller link to /admin/retailers/<id>, ₦ price and 'back Nov 5'. Clicking Feature in app sent exactly one PATCH to /api/marketplace/products/1455b3e3.../flags with body {\"featured\":true}, showed the toast 'LG Microwave 42L 1200W (MH8265CIS) is now featured in the app' and swapped the button for the Featured badge. An already-featured product (GET response mocked with featured=true) shows the badge and no button. Dismiss removes rows and the count updates (3 to 2 to '1 product is'). The whole note hides when it is empty and stays hidden after a reload. The seller link navigates correctly. Mobile 390px: scrollWidth is 390, so there is no overflow. Retailer contact on Fouani: delivered@resend.dev saves with the toast 'Contact email saved' and is still there after a reload; clearing it also persists. Regression: slow-reply-banner and oos-banner both show, and the Retailers list and detail pages load.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/retailers/back-in-stock + POST /api/retailers/back-in-stock/{id}/dismiss", "issue": "Dismiss only marks the one event as dismissed. If the product has another undismissed in_stock event within 7 days (for example in->out->in->out->in over the week), the older event takes the newest one's place and the note shows up again after dismissal. Reproduced with TEST_evt_b_new and TEST_evt_b_old: after dismissing b_new, GET returned b_old."},
+      {"endpoint": "POST /api/retailers/back-in-stock/{id}/dismiss", "issue": "Accepts any stock_events id, including in->out events. It does not write to the activity log, unlike other marketplace edits."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard back-in-stock note at 390px", "issues": ["The 'Feature in app' button sits on the same line as the title and squeezes the text to about 80px. Titles cut off to 'LG Porta…', and the seller · price · 'back <date>' line cuts off to 'SLOT · ₦56,1…', so the price and date can't be read on mobile. Put the actions on their own line under the text (flex-wrap or flex-col sm:flex-row), or use an icon-only button on small screens."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_back_in_stock.py", "/app/test_reports/pytest/pytest_back_in_stock.xml"],
+  "action_items": [
+    "Fix the dismiss resurfacing bug. Option 1: in dismiss_back_in_stock, look up the event and update_many all undismissed to='in_stock' events for that product_id with at <= event.at. Option 2: in back_in_stock, use only each product's latest event (including dismissed ones) when deciding what to show.",
+    "Mobile layout: wrap the back-in-stock row actions below the text so the title, price and date are readable at 390px.",
+    "Optional: limit dismiss to back-in-stock events (to='in_stock') and call log_activity."
+  ],
+  "critical_code_review_comments": [
+    "retail_ext.py back_in_stock: the time filter compares ISO strings ('at' > since). This works only while every writer uses datetime.isoformat() with +00:00. A value stored with a 'Z' suffix or a different offset would sort incorrectly. Consider storing datetimes as BSON dates.",
+    "back_in_stock calls the live portal _products() on every Dashboard load whenever any events exist. A portal outage gives a 502, which the note silently swallows. That's acceptable, but consider caching.",
+    "BackInStockNote Item.run calls setBusy('') after dismiss has already removed the item from the list, which is a state update on an unmounted component (harmless).",
+    "Some live portal titles contain mojibake (for example 'LG Portable 5W Bluetooth Speaker –\\u0080\\u0093 Aud 2TBK'). This is portal data, not this app."
+  ],
+  "updated_files": ["/app/backend/tests/test_back_in_stock.py"],
+  "success_rate": {"backend": "83% (5/6)", "frontend": "100% functional (1 minor mobile design issue)"},
+  "seed_data_creation": "Temporary TEST_ stock_events were inserted into local Mongo (TEST_evt_* by the pytest fixture, TEST_ui_1..3 for the UI) and all were deleted afterwards. The Fouani retailer_contacts doc created during the contact test was deleted, so retailer_contacts is empty again, as before. Live portal data was not changed: PATCH flags was only ever mocked.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest tests/test_back_in_stock.py -n 0. Its fixture seeds and cleans up its own TEST_evt_* events from the live in_stock/out_of_stock products. The last test checks the resurfacing bug and should pass once that bug is fixed. No live products are currently featured, so to test the Featured badge, mock the GET /api/retailers/back-in-stock response with route.fetch() and set featured=true. Always mock '**/api/marketplace/products/*/flags'. Fouani is e465cc38-968d-5268-ba1a-cca78aa18b80, SLOT is cacd84a1-...; in_stock products: f6ed9a1d (SLOT), 1455b3e3 and 9ececea7 (Fouani); out_of_stock: d4a6bffb. After login in Playwright, wait until the pathname no longer contains 'login'.",
+  "rca of the issue": "Resurfacing note: GET filters on dismissed_at=None and then picks the first (newest) remaining event for each product. Dismiss sets dismissed_at on only that one event, so on the next GET the next-newest undismissed back-in-stock event for the same product is chosen. To reproduce: insert two out->in events for an in_stock product, 3h ago and 2 days ago; GET returns the 3h-ago event; dismiss it; GET now returns the 2-day-old event. Fix: dismiss every event for that product up to and including the dismissed one, or decide per product before filtering out dismissed events."
+}

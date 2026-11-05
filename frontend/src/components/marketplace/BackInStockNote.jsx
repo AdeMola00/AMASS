@@ -14,14 +14,15 @@ function Item({ it, canEdit, onFeature, onDismiss }) {
   const [busy, setBusy] = useState("");
   const run = async (kind, fn) => { setBusy(kind); await fn(it); setBusy(""); };
   return (
-    <li className="flex items-center gap-3 py-2.5" data-testid={`back-in-stock-item-${it.product_id}`}>
+    <li className="flex flex-wrap sm:flex-nowrap items-center gap-3 py-2.5" data-testid={`back-in-stock-item-${it.product_id}`}>
       {it.image ? <img src={mediaUrl(it.image)} alt="" className="h-10 w-10 rounded object-cover shrink-0" loading="lazy" /> : <div className="h-10 w-10 rounded bg-muted shrink-0" />}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-[calc(100%-3.25rem)] sm:min-w-0">
         <div className="font-medium truncate">{it.title}</div>
         <div className="text-xs text-muted-foreground truncate">
           <Link to={`/admin/retailers/${encodeURIComponent(it.retailer_id)}`} className="hover:underline">{it.seller}</Link> · {money(it.price)} · back {when(it.at)}
         </div>
       </div>
+      <div className="flex items-center gap-1 ml-[3.25rem] sm:ml-0 shrink-0">
       {it.featured ? (
         <Badge variant="outline" className="text-emerald-600 border-emerald-500/30 shrink-0" data-testid={`back-in-stock-featured-${it.product_id}`}><Star className="h-3 w-3 mr-1 fill-current" /> Featured</Badge>
       ) : canEdit && (
@@ -34,6 +35,7 @@ function Item({ it, canEdit, onFeature, onDismiss }) {
           <X className="h-4 w-4" />
         </Button>
       )}
+      </div>
     </li>
   );
 }
