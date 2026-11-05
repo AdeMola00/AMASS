@@ -1104,6 +1104,7 @@ async def root():
 import modules_ext  # noqa: E402  (registers extension routes on `api`)
 import website_ext  # noqa: E402,F401
 import digest_ext  # noqa: E402,F401
+import retail_ext  # noqa: E402,F401
 
 app.include_router(api)
 

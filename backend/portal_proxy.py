@@ -10,7 +10,7 @@ PORTAL_BASE = os.environ["AMASS_PORTAL_BASE_URL"].rstrip("/")
 PORTAL_KEY = os.environ["AMASS_PORTAL_KEY"]
 
 # Kept local: dashboard sign-in, who can log in, and their roles.
-LOCAL_PREFIXES = ("auth", "public", "admin-users", "roles", "website", "cron")
+LOCAL_PREFIXES = ("auth", "public", "admin-users", "roles", "website", "cron", "retailers")
 MODULE_MAP = {
     "ai": "ai_management", "app-config": "app_config", "platform-users": "users",
     "property-owners": "property_owners", "leads-export": "leads",

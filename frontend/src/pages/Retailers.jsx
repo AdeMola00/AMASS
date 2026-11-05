@@ -1,4 +1,8 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { RetailerContact } from "@/components/marketplace/RetailerContact";
+import { StockHistory } from "@/components/marketplace/StockHistory";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +22,14 @@ function Stat({ label, value, red, testid }) {
   );
 }
 
-function RetailerCard({ r }) {
+function useContacts() {
+  const [data, setData] = useState({ contacts: {}, last_reminders: {} });
+  const load = useCallback(() => api.get("/retailers/contacts").then((r) => setData(r.data)).catch(() => {}), []);
+  useEffect(() => { load(); }, [load]);
+  return [data, load];
+}
+
+function RetailerCard({ r, contact }) {
   const oos = r.out_of_stock.length;
   return (
     <Link to={`/admin/retailers/${encodeURIComponent(r.id)}`} className="block min-w-0" data-testid={`retailer-card-${r.id}`}>
@@ -40,13 +51,18 @@ function RetailerCard({ r }) {
           <Stat label="In stock" value={r.in_stock} />
           <Stat label="Unknown" value={r.unknown} />
         </div>
-        <div className="text-xs text-muted-foreground mt-3">Last updated {shortDate(r.updated)}</div>
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mt-3">
+          <span>Last updated {shortDate(r.updated)}</span>
+          <span className={`truncate ${contact?.email ? "" : "text-[hsl(var(--gold))]"}`} data-testid={`retailer-contact-hint-${r.id}`}>
+            {contact?.email ? `Reminders to ${contact.email}` : "No contact email"}
+          </span>
+        </div>
       </Card>
     </Link>
   );
 }
 
-function RetailerList({ retailers }) {
+function RetailerList({ retailers, contacts }) {
   const sorted = [...retailers].sort((a, b) => b.out_of_stock.length - a.out_of_stock.length || b.products.length - a.products.length);
   const totalOos = retailers.reduce((n, r) => n + r.out_of_stock.length, 0);
   return (
@@ -56,12 +72,12 @@ function RetailerList({ retailers }) {
         <p className="text-muted-foreground text-sm mt-1">Live from the AMASS app marketplace: {retailers.length} retailers, {totalOos} products out of stock.</p>
       </div>
       {retailers.length === 0 && <Card className="p-10 text-center text-sm text-muted-foreground" data-testid="retailers-empty">No retailers yet.</Card>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">{sorted.map((r) => <RetailerCard key={r.id} r={r} />)}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">{sorted.map((r) => <RetailerCard key={r.id} r={r} contact={contacts[r.id]} />)}</div>
     </div>
   );
 }
 
-function OutOfStockAlert({ items }) {
+function OutOfStockAlert({ items, state }) {
   if (!items.length) return null;
   return (
     <Card className="p-5 border-destructive/30 bg-destructive/5" role="alert" data-testid="retailer-oos-alert">
@@ -69,7 +85,7 @@ function OutOfStockAlert({ items }) {
       <ul className="mt-3 space-y-1.5 text-sm">
         {items.map((p) => (
           <li key={p.id} className="flex justify-between gap-3" data-testid={`retailer-oos-item-${p.id}`}>
-            <span className="truncate">{p.title}</span><span className="text-muted-foreground whitespace-nowrap">{p.category_name}</span>
+            <span className="truncate">{p.title}</span><span className="text-muted-foreground whitespace-nowrap" data-testid={`retailer-oos-since-${p.id}`}>{state?.[p.id]?.since ? `out since ${shortDate(state[p.id].since)}` : p.category_name}</span>
           </li>
         ))}
       </ul>
@@ -78,6 +94,12 @@ function OutOfStockAlert({ items }) {
 }
 
 function RetailerDetail({ r }) {
+  const { can } = useAuth();
+  const canEdit = can("marketplace", "edit");
+  const [{ contacts, last_reminders: lastReminders }, loadContacts] = useContacts();
+  const [history, setHistory] = useState(null);
+  const loadHistory = useCallback(() => api.get("/retailers/stock-history", { params: { retailer_id: r.id } }).then((res) => setHistory(res.data)).catch(() => {}), [r.id]);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
   const navigate = useNavigate();
   const products = [...r.products].sort((a, b) => ({ out_of_stock: 0, unknown: 1, in_stock: 2 }[a.stock_status] ?? 1) - ({ out_of_stock: 0, unknown: 1, in_stock: 2 }[b.stock_status] ?? 1));
   return (
@@ -93,7 +115,11 @@ function RetailerDetail({ r }) {
         <Stat label="Out of stock" value={r.out_of_stock.length} red={r.out_of_stock.length > 0} testid="retailer-stat-out-of-stock" />
         <Stat label="Stock unknown" value={r.unknown} testid="retailer-stat-unknown" />
       </div>
-      <OutOfStockAlert items={r.out_of_stock} />
+      <OutOfStockAlert items={r.out_of_stock} state={history?.state} />
+      <div className="grid lg:grid-cols-2 gap-4">
+        <RetailerContact retailer={r} canEdit={canEdit} contact={contacts[r.id]} lastReminder={lastReminders[r.id]} onChanged={loadContacts} />
+        <StockHistory history={history} canEdit={canEdit} onChanged={loadHistory} />
+      </div>
       <Card className="overflow-hidden"><div className="overflow-x-auto amass-scroll">
         <Table>
           <TableHeader><TableRow><TableHead>Product</TableHead><TableHead className="hidden md:table-cell">Category</TableHead><TableHead>Price</TableHead><TableHead>Stock</TableHead><TableHead className="hidden lg:table-cell">Updated</TableHead></TableRow></TableHeader>
@@ -118,9 +144,10 @@ export default function Retailers() {
   const { rid } = useParams();
   const { products, loading, error } = useMarketplaceProducts();
   const retailers = useMemo(() => groupRetailers(products), [products]);
+  const [{ contacts }] = useContacts();
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (error) return <Card className="p-8 text-center text-sm text-destructive" data-testid="retailers-error">Couldn't load marketplace products. Please try again.</Card>;
-  if (!rid) return <RetailerList retailers={retailers} />;
+  if (!rid) return <RetailerList retailers={retailers} contacts={contacts} />;
   const r = retailers.find((x) => x.id === decodeURIComponent(rid));
   if (!r) return <Card className="p-8 text-center text-sm text-muted-foreground" data-testid="retailer-not-found">Retailer not found. <Link to="/admin/retailers" className="text-primary underline">See all retailers</Link></Card>;
   return <RetailerDetail r={r} />;
