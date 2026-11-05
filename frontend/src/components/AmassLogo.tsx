@@ -11,14 +11,15 @@ const SIZE_MAP: Record<Size, number> = {
   xl: 112, // splash / onboarding hero
 };
 
-// Intrinsic proportions of the client-supplied artwork (AMASS LOGO 6), measured
-// once by scripts/generate_brand_assets.py so nothing is ever stretched or cropped.
-const EMBLEM_ASPECT = 1.5746; // pin + house (width / height)
-const LOCKUP_ASPECT = 1.2303; // pin + house + AMASS wordmark (width / height)
-const LOCKUP_OVER_EMBLEM = 877 / 637; // lockup height relative to the emblem height
+// Intrinsic proportions of the client-supplied artwork (Jun 2026 master: glossy pin +
+// roof outline + AMASS wordmark), measured by scripts/generate_brand_assets.py so
+// nothing is ever stretched or cropped.
+const EMBLEM_ASPECT = 1.521; // pin + house (width / height)
+const LOCKUP_ASPECT = 1.2374; // pin + house + AMASS wordmark (width / height)
+const LOCKUP_OVER_EMBLEM = 876 / 618; // lockup height relative to the emblem height
 
 // Source of truth: the full lockup and the emblem are both cut from the same
-// master, finished with the brand gradient (brand red → deep crimson, soft gloss).
+// master, used exactly as supplied (the pin's gloss is part of the artwork).
 const EMBLEM_SRC = require("../../assets/images/amass-emblem-glossy.png");
 const LOCKUP_SRC = require("../../assets/images/amass-lockup.png");
 

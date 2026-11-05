@@ -149,35 +149,22 @@ def fit(im: Image.Image, size: int, scale: float, bg=None) -> Image.Image:
 
 # ───────────────────────── AMASS ─────────────────────────
 def build_amass():
+    """Master (Jun 2026): glossy red pin + black roof/chimney/door outline + flat black AMASS wordmark on white.
+
+    The supplied pin is already glossy, so the artwork is used as-is — only the white matte is keyed out
+    (plus the pin hole, which is enclosed by the red ring and therefore not border-connected).
+    """
     rgb = np.array(Image.open(MASTER).convert("RGB"))
     h, w, _ = rgb.shape
     f = rgb.astype(np.int32)
-    dark = (f.max(axis=2) < 110)
-    # The door is a light opening at the base of the (dark) house. It touches the
-    # background along the bottom edge, so protect it from the flood fill: light
-    # pixels in the lower third of the house that have dark wall on both sides.
-    ys = np.where(dark.any(axis=1))[0]
-    house_rows = ys[ys < int(h * 0.70)]  # above the wordmark
-    hb = house_rows.max()
-    protect = np.zeros((h, w), bool)
-    for y in range(int(hb - 0.40 * (hb - house_rows.min())), hb + 1):
-        row = dark[y]
-        xs = np.where(row)[0]
-        if len(xs) < 2:
-            continue
-        L, R = xs.min(), xs.max()
-        light = (f[y, :, :].min(axis=1) > 200)
-        for x in range(L, R):
-            if light[x] and row[max(0, x - 80):x].any() and row[x:x + 80].any():
-                protect[y, x] = True
-    # pin hole → transparent (seed at hole centre = brightest light pixel inside the red ring bbox)
     red = (f[..., 0] > 90) & (f[..., 0] > 1.5 * f[..., 1]) & (f[..., 0] > 1.5 * f[..., 2])
     ry, rx = np.where(red)
-    hole_seed = (int(ry.min() + 0.33 * (ry.max() - ry.min())), int(rx.min() + 0.5 * (rx.max() - rx.min())))
-    rgba = key_out_background(rgb, extra_seeds=[hole_seed], protect=protect)
-    # door: pure white, fully opaque
-    rgba[protect] = (255, 255, 255, 255)
-    rgba = glossy_pin(rgba)
+    # Hole centre: the brightest pixel on the pin's vertical axis within the top half of the red bbox.
+    axis_x = int(rx.min() + 0.5 * (rx.max() - rx.min()))
+    top, mid = int(ry.min()), int(ry.min() + 0.55 * (ry.max() - ry.min()))
+    col = f[top:mid, axis_x, :].min(axis=1)
+    hole_seed = (top + int(np.argmax(col)), axis_x)
+    rgba = key_out_background(rgb, extra_seeds=[hole_seed])
     full = Image.fromarray(rgba, "RGBA")
 
     # split emblem / wordmark at the largest empty row gap
@@ -194,6 +181,7 @@ def build_amass():
 
     lockup.save(os.path.join(IMG, "amass-lockup.png"))
     emblem.save(os.path.join(IMG, "amass-emblem-glossy.png"))
+    emblem.save(os.path.join(IMG, "amass-emblem.png"))
     wordmark.save(os.path.join(IMG, "amass-wordmark.png"))
     fit(emblem, 1024, 0.72, bg=(255, 255, 255)).convert("RGB").save(os.path.join(IMG, "amass-icon-square.png"))
     fit(emblem, 1024, 0.56).save(os.path.join(IMG, "amass-adaptive-foreground.png"))
@@ -203,8 +191,15 @@ def build_amass():
     white = Image.new("RGBA", emblem.size, (255, 255, 255, 0))
     white.putalpha(emblem.split()[3])
     fit(white, 96, 0.86).save(os.path.join(IMG, "notification-icon.png"))
+    # Transactional e-mail header assets (backend/assets/email), 2× for a 118 px-wide <img>.
+    email_dir = os.path.join(HERE, "..", "..", "backend", "assets", "email")
+    if os.path.isdir(email_dir):
+        lw = 320
+        lockup.resize((lw, round(lockup.height * lw / lockup.width)), Image.LANCZOS).save(os.path.join(email_dir, "amass-logo.png"))
+        ww = 240
+        wordmark.resize((ww, round(wordmark.height * ww / wordmark.width)), Image.LANCZOS).save(os.path.join(email_dir, "amass-wordmark.png"))
     print("AMASS lockup", lockup.size, "emblem", emblem.size, "wordmark", wordmark.size)
-    print("  aspect lockup %.4f emblem %.4f wordmark %.4f" % (lockup.width / lockup.height, emblem.width / emblem.height, wordmark.width / wordmark.height))
+    print("  aspect lockup %.4f emblem %.4f wordmark %.4f  lockup/emblem height %.4f" % (lockup.width / lockup.height, emblem.width / emblem.height, wordmark.width / wordmark.height, lockup.height / emblem.height))
 
 
 # ───────────────────────── FIXA ─────────────────────────
