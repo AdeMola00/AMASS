@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail, Save, Send } from "lucide-react";
 
-const when = (d) => (d ? new Date(d).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : null);
+const when = (d) => (d ? new Date(d).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Lagos" }) : null);
 
 export function RetailerContact({ retailer, canEdit, contact, lastReminder, onChanged }) {
   const [email, setEmail] = useState(contact?.email || "");

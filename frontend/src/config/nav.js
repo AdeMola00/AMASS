@@ -73,4 +73,4 @@ export const NAV_GROUPS = [
 ];
 
 export const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
-export const findNavItem = (path) => ALL_ITEMS.find((i) => i.path === path);
+export const findNavItem = (path) => ALL_ITEMS.find((i) => i.path === path) || ALL_ITEMS.find((i) => i.path !== "/admin" && path.startsWith(`${i.path}/`));

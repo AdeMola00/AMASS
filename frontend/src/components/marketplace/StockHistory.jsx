@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { History, Loader2, RefreshCw, ArrowRight } from "lucide-react";
 import { STOCK } from "@/pages/Marketplace";
 
-const when = (d) => (d ? new Date(d).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
+const when = (d) => (d ? new Date(d).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Lagos" }) : "—");
 
 function StatusPill({ s }) {
   const v = STOCK[s] || STOCK.unknown;

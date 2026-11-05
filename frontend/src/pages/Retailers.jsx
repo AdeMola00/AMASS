@@ -53,7 +53,7 @@ function RetailerCard({ r, contact }) {
         </div>
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mt-3">
           <span>Last updated {shortDate(r.updated)}</span>
-          <span className={`truncate ${contact?.email ? "" : "text-[hsl(var(--gold))]"}`} data-testid={`retailer-contact-hint-${r.id}`}>
+          <span className={`truncate ${contact?.email ? "" : "text-amber-700 dark:text-amber-400 font-medium"}`} data-testid={`retailer-contact-hint-${r.id}`}>
             {contact?.email ? `Reminders to ${contact.email}` : "No contact email"}
           </span>
         </div>
@@ -144,7 +144,8 @@ export default function Retailers() {
   const { rid } = useParams();
   const { products, loading, error } = useMarketplaceProducts();
   const retailers = useMemo(() => groupRetailers(products), [products]);
-  const [{ contacts }] = useContacts();
+  const [{ contacts }, reloadContacts] = useContacts();
+  useEffect(() => { if (!rid) reloadContacts(); }, [rid, reloadContacts]);
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (error) return <Card className="p-8 text-center text-sm text-destructive" data-testid="retailers-error">Couldn't load marketplace products. Please try again.</Card>;
   if (!rid) return <RetailerList retailers={retailers} contacts={contacts} />;

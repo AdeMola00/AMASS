@@ -1,18 +1,24 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from html import escape
 from typing import Optional
 import httpx
 from fastapi import Depends, HTTPException, Request, Query
 from pydantic import BaseModel, EmailStr, Field
 
-from server import api, db, require, log_activity, now_iso, new_id
+from server import api, app, db, require, log_activity, now_iso, new_id
 from portal_proxy import PORTAL_BASE, PORTAL_KEY
 from digest_ext import JOBS, LAGOS, _accept_cron, _ts
 from email_service import send_email, EMAIL_FROM_NAME, EMAIL_REPLY_TO
 
 logger = logging.getLogger("amass")
 client = httpx.AsyncClient(timeout=60.0)
+
+
+@app.on_event("startup")
+async def _retail_indexes():
+    await db.stock_state.create_index("product_id", unique=True)
+    await db.retailer_contacts.create_index("retailer_id", unique=True)
 
 
 class ContactInput(BaseModel):
@@ -47,7 +53,7 @@ async def run_stock_check() -> dict:
         prev = known.get(p["id"])
         base = {"product_id": p["id"], "retailer_id": _rid(p), "seller": p.get("seller"), "title": p.get("title")}
         if not prev:
-            await db.stock_state.insert_one({**base, "status": status, "since": now, "checked_at": now})
+            await db.stock_state.update_one({"product_id": p["id"]}, {"$setOnInsert": {**base, "status": status, "since": now, "checked_at": now}}, upsert=True)
             added += 1
         elif prev["status"] != status:
             await db.stock_events.insert_one({"id": new_id(), **base, "from": prev["status"], "to": status, "at": now})
@@ -85,7 +91,8 @@ async def _send_reminder(retailer_id: str, contact: dict, products: list) -> Opt
     state = {s["product_id"]: s for s in await db.stock_state.find({"product_id": {"$in": list(oos_ids)}}, {"_id": 0}).to_list(5000)}
     items = sorted([{"title": next(p["title"] for p in products if p["id"] == pid),
                      "since": state.get(pid, {}).get("since") or now_iso()} for pid in oos_ids], key=lambda i: i["since"])
-    subject = f"{len(items)} of your products are out of stock on {EMAIL_FROM_NAME}"
+    n = len(items)
+    subject = f"{n} of your products {'is' if n == 1 else 'are'} out of stock on {EMAIL_FROM_NAME}"
     email_id = await send_email(to=contact["email"], subject=subject, html=_reminder_html(contact["retailer_name"], items))
     record = {"id": new_id(), "retailer_id": retailer_id, "to": contact["email"], "products": len(items),
               "email_id": email_id, "sent_at": now_iso()}
@@ -150,7 +157,7 @@ async def send_restock_now(body: ReminderInput, user: dict = Depends(require("ma
     contact = await db.retailer_contacts.find_one({"retailer_id": body.retailer_id}, {"_id": 0})
     if not contact or not contact.get("email"):
         raise HTTPException(status_code=400, detail="Add a contact email for this retailer first")
-    recent = await db.restock_reminders.find_one({"retailer_id": body.retailer_id, "sent_at": {"$gt": (datetime.now(LAGOS) - timedelta(minutes=10)).isoformat()}})
+    recent = await db.restock_reminders.find_one({"retailer_id": body.retailer_id, "sent_at": {"$gt": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()}})
     if recent:
         raise HTTPException(status_code=429, detail="A reminder was just sent to this retailer. Please wait 10 minutes.")
     rec = await _send_reminder(body.retailer_id, contact, await _products())

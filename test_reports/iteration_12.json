@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 12: tested Restock Reminders and Stock Change History on the backend and in the UI. Backend: new tests/test_restock_stock_history.py passes 18/18. It covers 401s on all 5 /api/retailers/* endpoints; finance getting 403 on PUT contact, POST reminder and POST stock-check (finance also gets 403 on both GETs because it has no marketplace view permission); 422 for an invalid email; 400 without a contact; 400 for SLOT, which has no out-of-stock products; a null email clearing the contact; the stock-history shape (12 Pointek states, 101 in total); and cron 401s with no Bearer or a wrong one. Manual checks also passed. Change detection: I set the Pointek 'Hisense Washing Machine 10kg' stock_state to in_stock, and the stock-check then returned {products:101, changes:1, new_products:0} with a stock_events doc in_stock->out_of_stock. A repeat stock-check returned 429. Cron stock-check and restock-reminders return 202, and a duplicate X-Webhook-Id returns duplicate:true. The restock-reminders cron ran once with sent:1, while delivered@resend.dev was the only contact. UI: on Pointek detail, stock-history-list and stock-event-<id> render the event, and retailer-oos-since shows 'out since Nov 5, 2026'. Saving delivered@resend.dev makes the send button appear. Sending shows the toast 'Reminder sent to delivered@resend.dev (6 products)' and retailer-last-reminder updates. Clearing the email hides the send button, the send button is disabled while the field is being edited, and SLOT's send button is disabled. An invalid email shows a 422 toast. Mobile 390px: retailer detail and the list are both 390 scrollWidth, with no overflow. Regression: the Dashboard oos-banner ('9 marketplace products are out of stock') and Marketplace load. I found two bugs and fixed both (details in rca).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/retailers/restock-reminder", "issue": "FIXED BY TESTER. The 10-minute 429 never fired. A second reminder sent 10s after the first returned 200 and sent a duplicate email.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "stock_state / retailer_contacts collections", "issue": "No unique index on product_id or retailer_id. If a cron stock-check and a manual one run at the same moment on an empty or new product set, they can insert duplicate stock_state docs."},
+      {"endpoint": "PUT /api/retailers/contact", "issue": "retailer_id is not checked against the live retailers, so a contact can be saved for a retailer that doesn't exist."},
+      {"endpoint": "reminder email subject", "issue": "'1 of your products are out of stock' is ungrammatical when only 1 product is out. The body handles the singular, but the subject does not."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Retailers list RetailerCard", "issue": "FIXED BY TESTER. After you saved a contact on the detail page and clicked Back, the list card still showed 'No contact email' (a stale hint).", "selector": "retailer-contact-hint-<id>", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Retailer detail (deep link)", "issues": ["The breadcrumb or top bar shows 'Dashboard' instead of 'Retailers' when /admin/retailers/<id> is loaded directly.", "Stock history and last-reminder times use the browser's timezone, not Lagos, while the copy says 'Lagos time'. Consider formatting in Africa/Lagos.", "The gold 'No contact email' hint on white has low contrast."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_restock_stock_history.py", "/app/test_reports/pytest/iteration_12_part1.xml"],
+  "action_items": [
+    "Review and keep the tester's fix in retail_ext.py: compute the 429 window with datetime.now(timezone.utc).",
+    "Review and keep the tester's fix in Retailers.jsx: reload contacts when going back to the list.",
+    "Optional: add unique indexes on stock_state.product_id and retailer_contacts.retailer_id.",
+    "Optional: use the singular in the email subject when only 1 product is out.",
+    "Optional: fix the breadcrumb label on retailer detail, and show times in Lagos time."
+  ],
+  "critical_code_review_comments": [
+    "retail_ext.py send_restock_now compared ISO strings with different UTC offsets: stored sent_at is +00:00, while the threshold was datetime.now(LAGOS).isoformat(), which is +01:00. That pushed the threshold 1h into the future, so the check never matched. Comparing strings only works when every value uses the same offset.",
+    "Retailers.jsx is one component instance shared by the retailers and retailers/:rid routes, so its useContacts effect ran only once. It needed a reload when rid changes.",
+    "Weekly cron run_restock_reminders doesn't respect the 10-minute manual cooldown. That is acceptable, but a manual send just before Monday 9am will mean a double email."
+  ],
+  "updated_files": ["/app/backend/retail_ext.py", "/app/frontend/src/pages/Retailers.jsx", "/app/backend/tests/test_restock_stock_history.py"],
+  "success_rate": {"backend": "95% (1 bug, fixed and retested: 429 now returned)", "frontend": "95% (1 stale-hint bug, fixed and retested)"},
+  "seed_data_creation": "None left behind. Cleaned up: 2 retailer_contacts (Pointek, SLOT), 3 restock_reminders, 1 stock_events, the cron_runs TEST_it12_stock and TEST_it12_restock, and meta last_restock_run. Restored stock_state 394e0507 'since' to the original baseline. Final state: contacts 0, reminders 0, events 0, stock_state 101 (9 out of stock), cron_runs 1 (the pre-existing lead-digest run). The activities log entries ('Updated retailer contact' and 'Sent restock reminder') remain. meta.last_stock_check was updated by my checks.",
+  "emails_sent": "3 emails, all to delivered@resend.dev: 1 from the UI, 1 duplicate caused by the 429 bug, and 1 from the cron.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Pointek 093959d7-964c-55e0-8083-23cf97d6cf2e (6 out of stock), SLOT cacd84a1-1ed8-5aed-9f11-d6ca3b49829e (0 out of stock). Run pytest -n 0. Use only delivered@resend.dev. The reminder 429 has no automated test because it needs a real send; verify it manually (send twice and expect 429). In Playwright, wait for the pathname to stop containing 'login' after login; wait_for_url('**/admin**') matches /admin/login immediately."
+}

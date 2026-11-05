@@ -109,6 +109,14 @@ Auth · Dashboard · Landing CMS · Lead Management · RBAC · Foundation module
 - Tested read-only iteration_11 (38/38 API). Portal-side note: /reports/summary total_leads (7) ≠ /dashboard/stats (24).
 
 
+## Updated (2026-11-05) — Restock Reminders + Stock Change History
+- User request: "Restock Reminders: Email each retailer contact a weekly list of their out-of-stock products. Stock Change History: Show when each product went out of stock or came back."
+- Choices: admins add a contact email per retailer page; reminders Monday 9:00 am Lagos; stock checked once a day (7:00 am Lagos).
+- `backend/retail_ext.py` (local Mongo: retailer_contacts, stock_state, stock_events, restock_reminders; unique indexes): /api/retailers/contacts, PUT /contact, POST /restock-reminder (10-min limit), GET /stock-history, POST /stock-check; crons /api/cron/stock-check + /api/cron/restock-reminders. crons.yml: daily-stock-check "0 7 * * *", weekly-restock-reminders "0 9 * * 1" (Africa/Lagos).
+- Frontend: Retailer page contact card (save, send now, last sent), stock change history card (check now), "out since" in the out-of-stock alert, contact hint on list cards; breadcrumb fix for detail pages; Lagos-time display.
+- Tested iteration_12 (18/18 API + UI); tester fixed the 429 timezone bug + stale hint; follow-ups: subject grammar, unique indexes, Lagos-time formatting, contrast.
+
+
 
 
 
