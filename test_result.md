@@ -1351,3 +1351,20 @@ agent_communication:
       list scrolls with the CTA pinned (promote-submit at y≈583–643 on 375×667); wallet-ready gating; tiers fetched once per item; /ads shows
       CANCELLED for cancelled campaigns. pytest tests/test_ads_phase_cde.py + tests/test_consumer_iter102.py → 35 passed.
       Demo user now also owns "Oak bookshelf (demo)" (not promoted) for manage-promote testing.
+
+  - agent: "main"
+    message: |
+      Iteration 103 (to run, BOTH, focused) — (1) My Amass › agent-app-pointer now opens EXPO_PUBLIC_AGENT_APP_URL (new tab on web; URL starts
+      https://app.emergent.sh/share-preview) — no "Coming soon" toast anymore. (2) Campaign results: /marketplace/my-listings rows with a campaign
+      show promo-results-{itemId} ("Promotion · +N views · +M chats · seen by R") → /ads/{adId}; demo's "Grey 3-seater sofa (demo)" has a Basic
+      campaign (currently 0/0/0). Attribution: AdModal CTA → /marketplace/{id}?ad={adId}; starting a chat or sending an offer there calls
+      POST /api/ads/track {event:"chat"} → advertisements.chats +1 (verify via /api/ads/mine). /ads rows now read "Seen by X · +Y views · +Z chats".
+      (3) Declutter intro: Market › Declutter first time per launch → declutter-intro (1 s; 5 declutter-intro-find tiles fly into declutter-intro-box;
+      tap skips; sponsored AdModal held while visible). Brands/FIXA intros unchanged. Login demo@amass.africa / amass2026.
+
+  - agent: "main"
+    message: |
+      Iteration 103 follow-ups applied by main: /api/ads/track hardened for listing/property promotions (404 unknown ad; own_ad / anonymous /
+      duplicate → counted:false), unique-viewer listing views on POST /marketplace/items/{id}/view, plural copy aligned, ad detail copy plain-English,
+      pointer caption shortened ("Opens the AMASS Agent app"), .env comment removed, demo sofa photo fixed, 354 TEST campaigns purged from demo.
+      pytest (ads_phase_cde + iter102 + iter103) 44 passed.

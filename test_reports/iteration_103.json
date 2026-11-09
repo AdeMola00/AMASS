@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 103 tested on the live preview at 390x844. All three new features work end to end: (1) The Agent App row in My Amass opens a new tab at https://app.emergent.sh/share-preview... and no 'Coming soon' toast appears. (2) In My Declutter Listings the sofa row shows the Promoted badge and 'Promotion · +1 view · +1 chat'. Tapping that line opens /ads/{id}. The bookshelf row has no results line. /ads rows read 'Seen by 0 · +1 views · +1 chats' with no CTR/imp/clk. (3) Ad→chat attribution: a TEST_ buyer opening /marketplace/{sofa}?ad={adId} and tapping action-chat fires /ads/track chat, so chats goes 0→1. The control route without ?ad does not track. Tracking a click through the API adds 1 view. (4) Declutter intro: shows within about 16 ms of the first tap and runs about 1.05 s with 5 find tiles, the box, the eyebrow and the headline. It unmounts by itself and the feed is usable afterwards. Tapping it ends it in about 210 ms. Leaving and coming back does not replay it; a reload does. The Brands (about 1.6 s) and FIXA (about 0.8 s) intros still play on first open, and no sponsored AdModal appeared over an intro. No console errors. Backend pytest: 6/9 pass. The 3 failures are hardening gaps in /ads/track, not regressions: unknown ad ids are accepted, chats are not de-duplicated, and the seller's own events are counted. No deprecated Expo packages found (no expo-av, expo-barcode-scanner or expo-background-fetch).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/ads/track", "issue": "No de-duplication. Each tap on the chat button by the same buyer adds 1 to chats, even when the conversation already exists. Verified: the control chat created conversation 416c5d63, then reopening it via ?ad still counted as a new chat. Clicks repeat without limit too, and for CPC/CPM ads each repeat is charged."},
+      {"endpoint": "POST /api/ads/track", "issue": "Returns 200 {ok:true} for an ad_id that does not exist, and writes an ad_feedback row anyway. It accepts anonymous calls for click/chat events. It never checks that the ad's marketplace_item_id matches the listing that was opened. Any client can inflate a campaign's results or drain its budget."},
+      {"endpoint": "POST /api/ads/track", "issue": "The seller's own click/chat events on their own ad are counted, which inflates the '+N views' shown to them."},
+      {"endpoint": "Marketplace item views", "issue": "Nothing ever increments the Declutter item 'views' counter (it is set to 0 at creation in marketplace_v2.py:453). The sofa card reads '0 views · 0 saves' right above 'Promotion · +1 view', and the My Listings 'Views' stat stays 0. This contradicts the new results line. Pre-existing issue, but this feature exposes it."},
+      {"endpoint": "GET /api/ads/mine", "issue": "to_list(200) cap. The demo account has about 200 leftover 'TEST ...' campaigns from earlier test runs. My Listings builds its listing→campaign map from this response, so a heavy seller's older campaigns may drop out."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Ads list vs My Listings copy", "issue": "Plurals disagree: /ads shows '+1 views · +1 chats' while My Listings shows '+1 view · +1 chat'.", "testID": "ad-row-{id}", "priority": "low"},
+      {"component": "Ad detail /ads/{id}", "issue": "Still uses the IMP/CLK/CTR/CPC jargon that was removed from the list. The funnel also shows '30 MASS SPENT / 30 CPC' while total_spent_tokens=0 (it appears to use tokens_paid).", "testID": "my-ads-screen", "priority": "low"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "My Amass > For professionals", "issues": ["At 390 px the agent-app-pointer caption is cut off at 2 lines ('...enquiries and ...'). Shorten it to e.g. 'Manage listings, enquiries & bookings'."]},
+      {"screen": "Declutter demo data", "issues": ["The 'Grey 3-seater sofa (demo)' photo is an office with people at laptops, not a sofa. The MacBook Pro listing reuses the same office photo. Use relevant images."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter103_promo_attribution.py", "/app/test_reports/pytest/iter103.xml", "/app/test_reports/iter103_mylistings.png", "/app/test_reports/iter103_declutter_intro.png", "/app/test_reports/iter103_agent_row.png"],
+  "action_items": [
+    "Harden /api/ads/track: return 404 for unknown ad_id, require auth for click/chat, skip events where user_id == ad.seller_id, count chats once per (ad_id, user_id) or only when a new conversation is created (e.g. return a created flag from chat from-item), and de-duplicate clicks per user per day before charging CPC.",
+    "Optionally check on the server that the ad's marketplace_item_id matches the item being contacted.",
+    "Increment Declutter item views when the item detail is opened, or relabel, so the card's '0 views' doesn't contradict '+N views' from the promotion.",
+    "Pluralise the /ads row copy the same way as My Listings, and consider the same plain-language labels on /ads/{id}.",
+    "Remove the comment line from /app/frontend/.env (the rule is no comments in .env files).",
+    "Replace the sofa demo listing image with a sofa photo."
+  ],
+  "critical_code_review_comments": [
+    "my-listings.tsx is 629 lines, close to the 700-line limit. marketplace.tsx (tabs) is well over 700 lines and should be split.",
+    "The chat attribution is a fire-and-forget call from the client (marketplace/[id].tsx:137), so the result depends entirely on the client. Doing the attribution on the server inside chat from-item (passing ad_id) would be more reliable and would de-duplicate naturally.",
+    "useOnceIntro marks a section as seen before the intro renders. That is correct for once-per-launch, but if the screen unmounts mid-intro the intro is lost. Acceptable."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter103_promo_attribution.py (new)"],
+  "success_rate": {"backend": "67% (6/9; all 3 failures are hardening expectations on /ads/track, core attribution passes)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "Created TEST_probe103@example.com and a pytest TEST_iter103_* user plus their conversations and ad_clicks/ad_feedback rows. All were deleted by id. The sofa campaign counters were restored to clicks=0, chats=0. Demo listings and the campaign were left in place.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Sofa item 30c79164-8c88-467c-bd1d-fff69bf7886e, campaign ad 163d638e-4df8-424f-b915-25073afa82da (Basic, active), bookshelf 1cc6c040-a3bd-4ad5-a136-efc874e72199. The register/login response key is access_token, not token. Conversations use participant_ids. Run pytest with -n 0 because the module fixture is not xdist-safe. Set localStorage amass_market_section='brands' before loading /marketplace to see the Declutter intro on the first Declutter tap."
+}

@@ -1313,10 +1313,19 @@ async def marketplace_item(
 
 @api.post("/marketplace/items/{item_id}/view")
 async def record_marketplace_view(item_id: str, user: dict = Depends(get_current_user)):
-    it = await db.marketplace.find_one({"id": item_id}, {"id": 1, "_id": 0})
+    it = await db.marketplace.find_one({"id": item_id}, {"id": 1, "seller_id": 1, "_id": 0})
     if not it:
         raise HTTPException(404, "Item not found")
     now = datetime.now(timezone.utc)
+    # Listing views the seller sees in My Listings: one per viewer, never the seller's own visits.
+    if it.get("seller_id") != user["id"]:
+        first = await db.marketplace_views.update_one(
+            {"item_id": item_id, "user_id": user["id"]},
+            {"$setOnInsert": {"item_id": item_id, "user_id": user["id"], "first_viewed_at": now}, "$set": {"last_viewed_at": now}},
+            upsert=True,
+        )
+        if first.upserted_id is not None:
+            await db.marketplace.update_one({"id": item_id}, {"$inc": {"views": 1}})
     # Pull existing then re-insert to keep newest-first & dedupe
     await db.users.update_one(
         {"id": user["id"]},

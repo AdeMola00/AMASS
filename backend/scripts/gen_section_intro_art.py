@@ -2,10 +2,11 @@
 
   brands  — colourful, photo-real product shots of new and pre-owned home items (6 squares)
   fixa    — candid snapshots of FIXA pros at work (3 squares)
+  declutter — an open moving box + pre-owned finds (4 squares)
 
 Saved as compact 512 px WebPs under frontend/assets/images/intro/.
 
-Run:  cd /app/backend && python3 scripts/gen_section_intro_art.py [brands|fixa]
+Run:  cd /app/backend && python3 scripts/gen_section_intro_art.py [brands|fixa|declutter]
 """
 import asyncio
 import base64
@@ -46,6 +47,20 @@ FIXA = {
     "pro-painter": SNAPSHOT + " Subject: a painter rolling fresh warm-white paint onto a living-room wall, paint tray and ladder nearby.",
 }
 
+# declutter — pre-owned finds that "fly into the box" + the open moving box they land in.
+# Backgrounds use the Declutter teal so the squares sit naturally on the section gradient (#2DD4BF → #0F766E).
+DECLUTTER = {
+    "box-open": (
+        "Premium product photograph, photo-realistic, ultra sharp, soft studio lighting, square 1:1, "
+        "a single sturdy open cardboard moving box seen from the front and slightly above, all four flaps folded open "
+        "outward, empty inside, centred and filling about 75% of the frame, gentle floor shadow, on a smooth seamless "
+        "deep teal (#0F766E) studio background. No people, no text, no letters, no logos, no tape print, no watermarks."
+    ),
+    "item-bike": PRODUCT.format(bg="soft mint") + " Subject: a pre-owned classic city bicycle in dusty blue with a wicker basket, a few honest scuffs, clean and ready to ride.",
+    "item-guitar": PRODUCT.format(bg="pale teal") + " Subject: a pre-owned acoustic guitar with a warm sunburst finish and light pick-wear around the sound hole, well loved.",
+    "item-fan": PRODUCT.format(bg="light aqua") + " Subject: a pre-owned white pedestal standing fan, slightly used, clean, standing upright.",
+}
+
 
 async def gen(name: str, prompt: str, api_key: str):
     path = os.path.join(OUT, f"{name}.webp")
@@ -75,6 +90,8 @@ async def main(groups):
         jobs.update(BRANDS)
     if "fixa" in groups:
         jobs.update(FIXA)
+    if "declutter" in groups:
+        jobs.update(DECLUTTER)
     # a few at a time — the image model is slow and rate-limited
     items = list(jobs.items())
     for i in range(0, len(items), 3):

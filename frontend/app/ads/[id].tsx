@@ -181,18 +181,18 @@ export default function AdDetailScreen() {
 
         {/* Funnel */}
         <Card elevation="xs" style={{ gap: 14 }}>
-          <AppText variant="h3">Funnel</AppText>
+          <AppText variant="h3">What the promotion brought</AppText>
           <View style={styles.funnelRow}>
-            <FunnelStep label="Imp" value={analytics.funnel.impressions} />
-            <FunnelStep label="Clk" value={analytics.funnel.clicks} accent />
-            <FunnelStep label="Save" value={analytics.funnel.saves} />
-            <FunnelStep label="Chat" value={analytics.funnel.chats} />
-            <FunnelStep label="Call" value={analytics.funnel.calls} />
+            <FunnelStep label="Seen" value={analytics.funnel.impressions} />
+            <FunnelStep label="Opened" value={analytics.funnel.clicks} accent />
+            <FunnelStep label="Saved" value={analytics.funnel.saves} />
+            <FunnelStep label="Chats" value={analytics.funnel.chats} />
+            <FunnelStep label="Calls" value={analytics.funnel.calls} />
           </View>
           <View style={[styles.metricRow, { backgroundColor: colors.surfaceAlt }]}>
-            <Metric label="CTR" value={`${analytics.ctr_percent}%`} />
-            <Metric label="Spent" value={`${analytics.spent_tokens} MASS`} />
-            <Metric label="CPC" value={`${analytics.cost_per_action.cpc_tokens}`} />
+            <Metric label="Open rate" value={`${analytics.ctr_percent}%`} />
+            <Metric label="Paid" value={`${analytics.spent_tokens} MASS`} />
+            <Metric label="Per open" value={`${analytics.cost_per_action.cpc_tokens}`} />
             <Metric label="Per chat" value={`${analytics.cost_per_action.cost_per_chat_tokens}`} />
           </View>
         </Card>

@@ -93,7 +93,7 @@ export default function MyAdsScreen() {
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Badge label={(item.tier ?? "").toUpperCase()} tone={TIER_TONE[item.tier] ?? "inverse"} size="xs" />
                     <AppText variant="micro" tone="tertiary" tabular>
-                      CTR {item.ctr ?? 0}% · {item.impressions ?? 0} imp · {item.clicks ?? 0} clk
+                      Seen by {item.impressions ?? 0} · +{item.clicks ?? 0} view{item.clicks === 1 ? "" : "s"} · +{item.chats ?? 0} chat{item.chats === 1 ? "" : "s"}
                     </AppText>
                   </View>
                   {item.paused_reason && (

@@ -88,10 +88,10 @@ export function AdModal({
       await api.trackAd(ad.id, "click", context);
     } catch {}
     onClose();
-    // Route to underlying item
+    // Route to underlying item — carry the ad id so chats/offers started there count for the campaign
     setTimeout(() => {
       if (ad.marketplace_item_id) {
-        router.push(`/marketplace/${ad.marketplace_item_id}` as any);
+        router.push(`/marketplace/${ad.marketplace_item_id}?ad=${encodeURIComponent(ad.id)}` as any);
       } else if (ad.property_id) {
         router.push(`/property/${ad.property_id}` as any);
       } else {

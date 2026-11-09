@@ -47,7 +47,7 @@ function timeAgo(iso?: string): string {
 const CONDITION_LABEL: Record<string, string> = { new: "New", used: "Used", refurbished: "Refurbished", parts: "For parts" };
 
 export default function ItemDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, ad: adId } = useLocalSearchParams<{ id: string; ad?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
@@ -134,6 +134,7 @@ export default function ItemDetail() {
     setChatBusy(true);
     try {
       const conv = await api.chatStartFromItem(item.id);
+      if (adId) api.trackAd(adId, "chat", "listing").catch(() => {}); // the promotion brought this conversation
       router.push(`/chat/${conv.id}` as any);
     } catch (e: any) {
       toast.error("Couldn't start chat", e?.message ?? "Please try again.");
@@ -379,7 +380,7 @@ export default function ItemDetail() {
         </View>
       )}
 
-      <MakeOfferSheet ref={offerRef} onSent={() => toast.show({ kind: "success", title: "Offer sent", body: "We'll notify you when the seller replies.", actionLabel: "Track offers", onAction: () => router.push("/marketplace/my-listings?tab=sent" as any) })} />
+      <MakeOfferSheet ref={offerRef} onSent={() => { if (adId) api.trackAd(adId, "chat", "listing_offer").catch(() => {}); toast.show({ kind: "success", title: "Offer sent", body: "We'll notify you when the seller replies.", actionLabel: "Track offers", onAction: () => router.push("/marketplace/my-listings?tab=sent" as any) }); }} />
       <ReportSheet visible={reportOpen} itemId={item.id} onClose={() => setReportOpen(false)} />
     </Screen>
   );

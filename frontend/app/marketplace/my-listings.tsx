@@ -47,6 +47,8 @@ function timeAgo(iso?: string) {
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
+const isLiveAd = (a: any) => a?.status === "active" || a?.status === "paused";
+
 function pctOff(amount: number, asking?: number | null) {
   if (!asking || asking <= 0) return null;
   const pct = Math.round(((asking - amount) / asking) * 100);
@@ -71,8 +73,8 @@ export default function MyListingsScreen() {
 
   const [manage, setManage] = useState<MarketplaceItem | null>(null);
   const [promote, setPromote] = useState<MarketplaceItem | null>(null);
-  /** marketplace_item_id → active ad campaign (so a promoted row shows it and can't be promoted twice). */
-  const [activeAds, setActiveAds] = useState<Record<string, any>>({});
+  /** marketplace_item_id → most recent ad campaign (live ones show "Promoted" and block a second campaign; any shows its results). */
+  const [adsByItem, setAdsByItem] = useState<Record<string, any>>({});
   const [edit, setEdit] = useState<MarketplaceItem | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<MarketplaceItem | null>(null);
   const [counter, setCounter] = useState<MarketOffer | null>(null);
@@ -86,8 +88,13 @@ export default function MyListingsScreen() {
       setReceived(r);
       setSent(s);
       const map: Record<string, any> = {};
-      for (const a of ads) if (a.marketplace_item_id && (a.status === "active" || a.status === "paused")) map[a.marketplace_item_id] = a;
-      setActiveAds(map);
+      for (const a of ads) {
+        // /ads/mine is newest-first; a live campaign always wins over an older finished one
+        const cur = map[a.marketplace_item_id];
+        if (!a.marketplace_item_id) continue;
+        if (!cur || (isLiveAd(a) && !isLiveAd(cur))) map[a.marketplace_item_id] = a;
+      }
+      setAdsByItem(map);
     } catch {
       setError(true);
     } finally {
@@ -227,7 +234,7 @@ export default function MyListingsScreen() {
             {items.length === 0 ? (
               <EmptyState icon="storefront-outline" title="Nothing listed yet" body="Declutter your home — snap a photo, set a price and buyers nearby will find it." actionLabel="Sell an item" onAction={() => router.push("/marketplace/sell" as any)} testID="my-listings-empty" />
             ) : (
-              items.map((it) => <ListingRow key={it.id} item={it} promoted={!!activeAds[it.id]} onPress={() => router.push(`/marketplace/${it.id}` as any)} onManage={() => setManage(it)} />)
+              items.map((it) => <ListingRow key={it.id} item={it} ad={adsByItem[it.id]} onPress={() => router.push(`/marketplace/${it.id}` as any)} onManage={() => setManage(it)} onOpenAd={() => router.push(`/ads/${adsByItem[it.id].id}` as any)} />)
             )}
           </>
         ) : tab === "received" ? (
@@ -279,8 +286,8 @@ export default function MyListingsScreen() {
             </View>
             <Button label="View listing" variant="secondary" iconLeft="eye-outline" fullWidth onPress={() => { setManage(null); router.push(`/marketplace/${manage.id}` as any); }} testID="manage-view" />
             {(manage.status ?? "active") === "active" ? (
-              activeAds[manage.id] ? (
-                <Button label="View ad campaign" variant="premium" iconLeft="megaphone" fullWidth onPress={() => { setManage(null); router.push(`/ads/${activeAds[manage.id].id}` as any); }} testID="manage-campaign" />
+              isLiveAd(adsByItem[manage.id]) ? (
+                <Button label="View ad campaign" variant="premium" iconLeft="megaphone" fullWidth onPress={() => { setManage(null); router.push(`/ads/${adsByItem[manage.id].id}` as any); }} testID="manage-campaign" />
               ) : (
                 <Button label="Promote this listing" variant="premium" iconLeft="megaphone" fullWidth onPress={() => { setPromote(manage); setManage(null); }} testID="manage-promote" />
               )
@@ -307,7 +314,7 @@ export default function MyListingsScreen() {
         item={promote}
         onClose={() => setPromote(null)}
         onCreated={(ad) => {
-          if (ad?.marketplace_item_id) setActiveAds((prev) => ({ ...prev, [ad.marketplace_item_id]: ad }));
+          if (ad?.marketplace_item_id) setAdsByItem((prev) => ({ ...prev, [ad.marketplace_item_id]: ad }));
           setPromote(null);
           router.push("/ads" as any);
         }}
@@ -329,10 +336,15 @@ export default function MyListingsScreen() {
   );
 }
 
-function ListingRow({ item, promoted, onPress, onManage }: { item: MarketplaceItem; promoted?: boolean; onPress: () => void; onManage: () => void }) {
+function ListingRow({ item, ad, onPress, onManage, onOpenAd }: { item: MarketplaceItem; ad?: any; onPress: () => void; onManage: () => void; onOpenAd: () => void }) {
   const { colors } = useTheme();
   const status = item.status ?? "active";
   const meta = STATUS_META[status] ?? STATUS_META.active;
+  const promoted = isLiveAd(ad);
+  // What the promotion brought: ad clicks = buyers who opened this listing from the ad; chats = conversations/offers they started there.
+  const extraViews = ad?.clicks ?? 0;
+  const extraChats = ad?.chats ?? 0;
+  const reach = ad?.impressions ?? 0;
   return (
     <Card elevation="xs" testID={`my-listing-${item.id}`}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -366,6 +378,22 @@ function ListingRow({ item, promoted, onPress, onManage }: { item: MarketplaceIt
         </Pressable>
         <IconButton icon="ellipsis-horizontal" label={`Manage ${item.name}`} onPress={onManage} testID={`manage-${item.id}`} />
       </View>
+      {ad ? (
+        <Pressable
+          onPress={onOpenAd}
+          accessibilityRole="button"
+          accessibilityLabel={`Promotion ${promoted ? "running" : "ended"}: ${extraViews} extra views and ${extraChats} chats. Open campaign`}
+          style={({ pressed }) => [styles.promoRow, { backgroundColor: colors.massSoft }, pressed && { opacity: 0.85 }]}
+          testID={`promo-results-${item.id}`}
+        >
+          <Ionicons name="megaphone" size={13} color={colors.massText} />
+          <AppText variant="micro" color={colors.massText} style={{ flex: 1 }} numberOfLines={1} tabular>
+            {promoted ? "Promotion" : "Last promotion"} · +{extraViews} view{extraViews === 1 ? "" : "s"} · +{extraChats} chat{extraChats === 1 ? "" : "s"}
+            {reach ? ` · seen by ${reach}` : ""}
+          </AppText>
+          <Ionicons name="chevron-forward" size={13} color={colors.massText} />
+        </Pressable>
+      ) : null}
     </Card>
   );
 }
@@ -592,6 +620,7 @@ function CounterSheet({ offer, busy, onClose, onSubmit }: { offer: MarketOffer |
 const styles = StyleSheet.create({
   statsRow: { flexDirection: "row", gap: space[3] },
   thumbWrap: { width: 72, height: 72, borderRadius: radii.md, overflow: "hidden" },
+  promoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, paddingHorizontal: 10, height: 30, borderRadius: radii.pill },
   thumbWrapSm: { width: 48, height: 48, borderRadius: radii.sm, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   thumb: { width: "100%", height: "100%" },
   soldTag: { position: "absolute", left: 0, right: 0, bottom: 0, alignItems: "center", paddingVertical: 2 },

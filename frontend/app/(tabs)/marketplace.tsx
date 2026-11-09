@@ -42,6 +42,7 @@ import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 import { ShopHome } from "@/src/components/shop/ShopHome";
 import { BrandsIntro } from "@/src/components/intro/BrandsIntro";
 import { FixaIntro } from "@/src/components/intro/FixaIntro";
+import { DeclutterIntro } from "@/src/components/intro/DeclutterIntro";
 import { useOnceIntro } from "@/src/components/intro/sectionIntro";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { useTheme } from "@/src/theme";
@@ -206,12 +207,13 @@ export default function Marketplace() {
   // Section intros — once per app launch, only after the saved section is known (no Brands flash before FIXA).
   const brandsIntro = useOnceIntro("brands", prefsReady && section === "brands");
   const fixaIntro = useOnceIntro("fixa", prefsReady && section === "fixa");
+  const declutterIntro = useOnceIntro("declutter", prefsReady && section === "declutter");
   // Sponsored interstitials wait until any intro has finished (a Modal would otherwise sit on top of it).
   const { ad, visible: adVisible, dismiss: adDismiss, noteInteraction } = useAdTrigger({
     triggerAfter: 8,
     context: "marketplace_home",
     mountDelayMs: 3000,
-    enabled: !brandsIntro.show && !fixaIntro.show,
+    enabled: !brandsIntro.show && !fixaIntro.show && !declutterIntro.show,
   });
 
   const loadCategories = useCallback(async () => {
@@ -772,6 +774,7 @@ export default function Marketplace() {
       {/* First-open-this-session intros for the Brands shop (1.5 s) and FIXA (1 s) */}
       {brandsIntro.show && <BrandsIntro onDone={brandsIntro.done} />}
       {fixaIntro.show && <FixaIntro onDone={fixaIntro.done} />}
+      {declutterIntro.show && <DeclutterIntro onDone={declutterIntro.done} />}
     </ScreenLift>
   );
 }

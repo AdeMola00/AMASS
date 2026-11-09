@@ -735,11 +735,27 @@ def register_ads_routes(db: AsyncIOMotorDatabase) -> APIRouter:
         creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     ):
         user_id = await _uid(creds)
+        ad = await db.advertisements.find_one({"id": data.ad_id}, {"_id": 0, "id": 1, "seller_id": 1, "marketplace_item_id": 1, "property_id": 1})
+        if not ad:
+            raise HTTPException(404, "Ad not found")
         collection_map = {
             "impression": "ad_impressions",
             "click": "ad_clicks",
         }
         col_name = collection_map.get(data.event, "ad_feedback")
+        ENGAGEMENT = ("click", "save", "chat", "call")
+        # Promotions of a listing/property report "what the promotion brought" to the seller, so those results must come
+        # from real buyers: the seller's own taps never count and engagement needs a signed-in user, once per buyer per ad.
+        # Generic brand/admin ads (no subject) keep raw counting for budget pacing.
+        if ad.get("marketplace_item_id") or ad.get("property_id"):
+            if user_id and user_id == ad.get("seller_id"):
+                return {"ok": True, "counted": False, "reason": "own_ad"}
+            if data.event in ENGAGEMENT:
+                if not user_id:
+                    return {"ok": True, "counted": False, "reason": "anonymous"}
+                seen = await db[col_name].find_one({"ad_id": data.ad_id, "user_id": user_id, "event": data.event}, {"_id": 1})
+                if seen:
+                    return {"ok": True, "counted": False, "reason": "duplicate"}
         await db[col_name].insert_one(
             {
                 "ad_id": data.ad_id,
@@ -774,6 +790,6 @@ def register_ads_routes(db: AsyncIOMotorDatabase) -> APIRouter:
                     )
                     if ad_after:
                         await _maybe_pause_over_budget(db, ad_after)
-        return {"ok": True}
+        return {"ok": True, "counted": True}
 
     return router
