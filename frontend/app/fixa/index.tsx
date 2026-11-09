@@ -8,6 +8,8 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { Appear, AppText, Button, EmptyState, Input, PressableScale, Screen, ScreenHeader, SkeletonRows, Tile, useToast } from "@/src/ui";
 import { ProviderRow, STATUS_META, tradeIcon } from "@/src/components/fixa/FixaBits";
+import { FixaIntro } from "@/src/components/intro/FixaIntro";
+import { useOnceIntro } from "@/src/components/intro/sectionIntro";
 
 /**
  * FIXA directory — free for everyone. Verified pros only (new applicants stay hidden until AMASS Admin approves),
@@ -28,6 +30,7 @@ export default function FixaBrowse() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const fixaIntro = useOnceIntro("fixa", true); // 1 s FIXA moment, first time this session
 
   const load = useCallback(async () => {
     setError(null);
@@ -137,6 +140,7 @@ export default function FixaBrowse() {
           </Appear>
         )}
       />
+      {fixaIntro.show && <FixaIntro onDone={fixaIntro.done} />}
     </Screen>
   );
 }

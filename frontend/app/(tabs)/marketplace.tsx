@@ -40,6 +40,9 @@ import { ScreenLift } from "@/src/ui/Layout";
 import { useAdTrigger } from "@/src/hooks/useAdTrigger";
 import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 import { ShopHome } from "@/src/components/shop/ShopHome";
+import { BrandsIntro } from "@/src/components/intro/BrandsIntro";
+import { FixaIntro } from "@/src/components/intro/FixaIntro";
+import { useOnceIntro } from "@/src/components/intro/sectionIntro";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { useTheme } from "@/src/theme";
 import { gradients } from "@/src/theme/tokens";
@@ -169,12 +172,6 @@ export default function Marketplace() {
   const tileW = Math.floor((Math.min(winW, 720) - spacing.lg * 2 - 8 * 3) / 4);
   const filterRef = useRef<MarketFilterSheetRef>(null);
   const bookingRef = useRef<BookingSheetRef>(null);
-  const { ad, visible: adVisible, dismiss: adDismiss, noteInteraction } = useAdTrigger({
-    triggerAfter: 8,
-    context: "marketplace_home",
-    mountDelayMs: 3000,
-  });
-
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [categories, setCategories] = useState<MarketCategory[]>([]);
@@ -199,6 +196,7 @@ export default function Marketplace() {
   }, [section]);
 
   // Restore prefs
+  const [prefsReady, setPrefsReady] = useState(false);
   useEffect(() => {
     (async () => {
       const v = await storage.getItem<string>(VIEW_KEY, "grid");
@@ -207,8 +205,20 @@ export default function Marketplace() {
       if (c) setCity(c);
       const s = await storage.getItem<string>(SECTION_KEY, "brands");
       if (s === "brands" || s === "fixa" || s === "declutter") setSection(s);
+      setPrefsReady(true);
     })();
   }, []);
+
+  // Section intros — once per app launch, only after the saved section is known (no Brands flash before FIXA).
+  const brandsIntro = useOnceIntro("brands", prefsReady && section === "brands");
+  const fixaIntro = useOnceIntro("fixa", prefsReady && section === "fixa");
+  // Sponsored interstitials wait until any intro has finished (a Modal would otherwise sit on top of it).
+  const { ad, visible: adVisible, dismiss: adDismiss, noteInteraction } = useAdTrigger({
+    triggerAfter: 8,
+    context: "marketplace_home",
+    mountDelayMs: 3000,
+    enabled: !brandsIntro.show && !fixaIntro.show,
+  });
 
   const loadCategories = useCallback(async () => {
     try {
@@ -765,6 +775,10 @@ export default function Marketplace() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* First-open-this-session intros for the Brands shop (1.5 s) and FIXA (1 s) */}
+      {brandsIntro.show && <BrandsIntro onDone={brandsIntro.done} />}
+      {fixaIntro.show && <FixaIntro onDone={fixaIntro.done} />}
     </ScreenLift>
   );
 }

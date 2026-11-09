@@ -1,0 +1,39 @@
+{
+  "summary": "Iter 99: regression run after the Find Home map split (index.tsx 1,345 → 815 lines, plus 7 new modules in src/components/map/) and the new app-open intro. No regressions found. Backend: 9/9 pytest pass (test_map_teaser, test_iter97_map_teaser_extra, test_iter98_unlock_analytics). INTRO: amass-brand-moment shows intro-sky-scene, 5 intro-marker-* and splash-amass-lockup. fixa-brand-moment appears at 3.33 s and the app routes to /onboarding at 4.86 s. brand-skip routes in 0.1 s. No expo-audio console errors on web. PAYING (demo, 375x667): the map loads with pins, map-time-chip shows '49 min', and home-greeting is gone by ~9 s. explore-wider-pill went from '2 homes in view' to '6 homes in view', with clusters. Tapping cluster-299 zoomed in (a 3-cluster became 6 pins). Tapping a pin opens the PreviewCard ('Unlock · 10 MASS') and hides the results pill. preview-save shows the 'Saved' toast; I unsaved again to restore. preview-close and a backdrop tap both close the card. intent-seg-rent/buy/lease/all send GET /api/map/markers with listing_type=rent/sale/lease/(none). Searching 'Abuja' sent q=Abuja after the debounce, and save-search-btn and home-search-clear appeared. Clear reset the query. 'zzzzqqq' shows map-status-empty with map-clear-filters-btn and map-search-wider-btn, and Clear restores the pins. open-filter-sheet opens the FilterSheet. fab-zoom-in/out/locate work (48x48). Zooming out shows search-this-area, and tapping it reloads with min/max lat/lng bounds. GATED (360x640): map-gate shows coin, title, body ('45 homes are waiting…'), rate, get-mass and nudge. 6 ghost pins sit above the card. Zoom FABs are hidden and fab-locate is present. The intent segments are clear of the card and tappable. PURCHASE (375x667): map-gate-get-mass → /buy-tokens?currency=MASS&returnTo=%2F → bundle-explorer → confirm-purchase-btn (mock popup) → purchase-success-continue → back on /. No home-greeting remount. celebration-overlay showed 'Homes unlocked! | 61 homes are now live across the map · 1 MASS buys 60 minutes'. The gate is gone, the chip shows '60 min' and zoom FABs are back. pin-tap-hint appeared about 5 s after Continue. Tapping it hid the hint and opened the preview ('Unlock · 5 MASS'). LAST HOUR: with 25 min, the chip reads map-time-chip-last-hour '25 min · last hour'. The banner appears only after the greeting, with topup and dismiss. Dismiss hides the banner and the chip stays. After a reload it stays dismissed. With 5 min the title reads 'Map time ends in 5 min'. reset_gate_user.py was run before and after.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Find Home (375 wide)", "issues": [
+        "The home-greeting pill runs past the right edge of the screen next to map-time-chip. 'Showing the busiest market near you' is cut off and the pill has no right edge. This existed before the refactor (same greetRow/greetPill styles). Fix: let the greeting flex and shrink with numberOfLines={1}, or a maxWidth of screenW - chipW - 32.",
+        "Some price pins and clusters are drawn under the results pill or the right-hand FAB column, or are cut by the screen edge. Example: after a cluster tap, the ₦145M/₦950M pins sit on the '3 homes in view' pill. inViewCount correctly leaves them out, but they are visually blocked. This existed before the refactor.",
+        "map-status-empty card partly covers fab-zoom-in/fab-zoom-out; their edges peek out behind the card.",
+        "Gated: fab-locate (y 196–244) overlaps the top edge of the map-gate card (y 226) at 360x640. The 6 ghost pins stack heavily on top of each other (they read as about 3 blobs).",
+        "Gated: map-gate-body count changes after an intent round-trip: '45 homes' on first load, '43 homes' after switching Rent → All. The first load uses the local teaser at BOOTSTRAP_REGION, then the ghost-fit flyTo moves the region and later loads count a different bounding box. Small inconsistency."
+      ]},
+      {"screen": "Intro", "issues": ["The brand-skip pill is 36 px tall. hitSlop=12 covers it on native, but the visual target is under 44 px."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_map_teaser.py", "/app/backend/tests/test_iter97_map_teaser_extra.py", "/app/backend/tests/test_iter98_unlock_analytics.py", "/app/test_reports/pytest/iter99.xml"],
+  "action_items": [
+    "Optional (pre-existing): stop the home-greeting pill overflowing at 375 px or narrower: shrink it, or truncate the subtitle with numberOfLines={1}.",
+    "Optional: keep the empty-state card and gate card clear of the FAB column, or raise the FAB zIndex.",
+    "Note for future QA: the web map stand-in (src/lib/map.web.tsx) has NO drag-pan handling and never had any (git history). 'Search this area' can only be triggered on web through fab-zoom-out. The review note saying drag-panning works on the stand-in is wrong. Add a PanResponder there if web pan testing is wanted."
+  ],
+  "critical_code_review_comments": [
+    "The refactor looks behaviour-preserving. Each extracted module (geometry, useMapTimeMeter, usePinHint, MapMarkers, MapTopChrome, MapGateCard, MapChrome) has one clear job. The callbacks between the hook and the screen (loadRef, showPinHintRef, optsRef) avoid stale closures.",
+    "useMapTimeMeter.celebrateUnlock: the setTimeouts for burst and onCelebrated are never cleared on unmount, so they can fire after the screen unmounts. Minor. The same applies to performIntroAnimation's nested setTimeouts in index.tsx (this existed before).",
+    "save-search-btn is shown only when activeFilterCount > 0 or there is a query. The intent (listingType) is left out, but saveCurrentSearch does include listing_type and hasFilters counts the intent. So with only Rent selected, the bookmark is hidden even though it would save something useful. Minor inconsistency.",
+    "zoomBy does not set programmaticUntilRef, so zooming out by 2x shows 'Search this area' and zooming in by 0.5x does not (zoomChange must be > 0.5). This looks intended but is asymmetric.",
+    "Deprecated packages: none (no expo-av, expo-barcode-scanner or expo-background-fetch). The intro sounds use expo-audio and are skipped on web. SafeAreaView comes from react-native-safe-area-context."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100% of requested flows (drag-pan is not possible on the web stand-in; Search-this-area checked via zoom-out instead)"},
+  "seed_data_creation": "No new data. The demo user's preview-save was toggled on and back off. A mock MASS purchase was made for the gate-preview user, then reset with reset_gate_user.py (balance 0).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use /login. Each browser_automation call is a fresh context, so log in every time. On first visit the IntentSheet (intent-sheet) appears; tap intent-all. Pin selector: [data-testid^='pin-'] excluding pin-video/pin-boost/pin-tap. Web map has no drag-pan; use fab-zoom-out to trigger search-this-area. The preview card covers most of a 375x667 screen, so tap the backdrop at about (5,128). Mock checkout opens a popup (context.expect_page). Wait about 2.6 s before clicking purchase-success-continue. Run scripts/reset_gate_user.py before and after the gate flow, and set_last_hour_state.py N for the last-hour state.",
+  "rca_of_issue": ""
+}

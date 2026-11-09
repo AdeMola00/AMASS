@@ -32,20 +32,23 @@ export function useAdTrigger({
   const shownThisSession = useRef(0);
   const shownAdIds = useRef<string[]>([]);
   const fetchInFlight = useRef(false);
+  // Latest `enabled` for checks that run after an await (an intro may have started while the ad was loading).
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
 
   const canShow = useCallback(() => {
-    if (!enabled) return false;
+    if (!enabledRef.current) return false;
     if (shownThisSession.current >= SESSION_MAX_ADS) return false;
     if (Date.now() - lastShownAt.current < MIN_INTERVAL_MS) return false;
     return true;
-  }, [enabled]);
+  }, []);
 
   const fetchAndShow = useCallback(async () => {
     if (!canShow() || fetchInFlight.current) return;
     fetchInFlight.current = true;
     try {
       const r = await api.nextAd(context, shownAdIds.current);
-      if (r.ad) {
+      if (r.ad && enabledRef.current) {
         setAd(r.ad);
         setVisible(true);
         lastShownAt.current = Date.now();

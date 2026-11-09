@@ -7,37 +7,46 @@
  * (metered on the server; 0 MASS → no markers). The tapped home's preview card is all a user sees for free;
  * the listing itself ("+N photos", exact address, agent, description…) opens only after the MASS unlock
  * through `UnlockDialog`. Locked pins sit at an approximate, server-jittered spot.
+ *
+ * This file owns state and orchestration. The pieces live in src/components/map/:
+ *   geometry.ts        regions · projection · "fit into the clear band"
+ *   useMapTimeMeter    metered hour, heartbeat, homes-unlocked celebration, last-hour notice
+ *   usePinHint         one-time "tap a pin" coach mark
+ *   MapMarkers         clusters · price pins · ghost pins · hint marker
+ *   MapTopChrome       search · Buy/Rent/Lease · time chip / banner / greeting
+ *   MapGateCard        empty-wallet notice
+ *   MapChrome          FABs · results pill · status card · notices
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, StyleSheet, Pressable, TextInput, Platform, Linking, Animated, ActivityIndicator, AppState, Image, useWindowDimensions } from "react-native";
-import Reanimated, { FadeIn, FadeInDown, FadeOut, FadeOutUp } from "react-native-reanimated";
-import { MapView, Marker, PROVIDER_DEFAULT, Region, IS_MAP_LIMITED_IN_EXPO_GO } from "@/src/lib/map";
+import { View, StyleSheet, Platform, Animated, useWindowDimensions } from "react-native";
+import { MapView, PROVIDER_DEFAULT, Region, IS_MAP_LIMITED_IN_EXPO_GO } from "@/src/lib/map";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { api, MapTime, UnlockResult } from "@/src/lib/api";
+import { api, UnlockResult } from "@/src/lib/api";
 import { storage } from "@/src/utils/storage";
 import { useAuth } from "@/src/contexts/auth";
 import { useWallet } from "@/src/contexts/wallet";
 import { usePushPrompt } from "@/src/contexts/pushPrompt";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Button, ILLUSTRATIONS, UnlockDialog, useCelebrate, useMoneyRain, useReducedMotion, useToast } from "@/src/ui";
-import type { IconName } from "@/src/ui";
+import { AppText, UnlockDialog, useMoneyRain, useReducedMotion, useToast } from "@/src/ui";
 import { SearchThisArea } from "@/src/components/SearchThisArea";
 import { FilterSheet, FilterSheetRef, FilterState } from "@/src/components/FilterSheet";
-import { AmassLogo } from "@/src/components/AmassLogo";
-import { TokenIcon } from "@/src/components/TokenIcon";
-import { GoldCoin } from "@/src/components/GoldCoin";
-import { GhostPin, type TeaserPin } from "@/src/components/map/GhostPin";
-import { PinTapHint } from "@/src/components/map/PinTapHint";
-import { LastHourBanner, minutesLeft } from "@/src/components/map/LastHourBanner";
-import { ClusterPin, PIN_H, PIN_HALF_W, PricePin, clusterSize, pinHalfWidth } from "@/src/components/map/PricePin";
+import { type TeaserPin } from "@/src/components/map/GhostPin";
+import { PIN_H, clusterSize, pinHalfWidth } from "@/src/components/map/PricePin";
 import { PREVIEW_CARD_H, PreviewCard } from "@/src/components/map/PreviewCard";
 import { INTENTS, IntentSheet, type Intent } from "@/src/components/map/IntentSheet";
-import { KIND_COLORS, hasNudge, nudgeText, pinState, pinVia, toPin, type Pin } from "@/src/components/map/pins";
+import { hasNudge, nudgeText, pinVia, toPin, type Pin } from "@/src/components/map/pins";
+import { MapMarkers } from "@/src/components/map/MapMarkers";
+import { MapTopChrome } from "@/src/components/map/MapTopChrome";
+import { MapGateCard } from "@/src/components/map/MapGateCard";
+import { ExpoGoHint, LocationBlockedBanner, MapControls, MapStatusCard, ResultsPill } from "@/src/components/map/MapChrome";
+import { useMapTimeMeter } from "@/src/components/map/useMapTimeMeter";
+import { usePinHint } from "@/src/components/map/usePinHint";
+import { BOOTSTRAP_REGION, DEFAULT_MARKET_REGION, DEFAULT_PITCH_DEG, NEARBY_DELTA, inRegion, nearestGroup, pinLngFactor, projectPoint, regionForBand, zoomFromDelta } from "@/src/components/map/geometry";
 import { buildIndex, getClusters, expandCluster } from "@/src/lib/mapCluster";
 import { track, trackMarkerImpressions } from "@/src/lib/analytics";
 import { useTabBarOffset } from "@/src/lib/tabBar";
@@ -45,42 +54,14 @@ import { getRecentlyViewedIds } from "@/src/lib/recently-viewed";
 
 const LAST_REGION_KEY = "amass_map_last_region";
 const INTENT_KEY = "amass_intent_v1";
-/** Set when Get MASS is tapped from the empty-wallet notice; the next load that finds homes celebrates them (survives a remount). */
-const GATE_PENDING_KEY = "amass_map_gate_pending_v1";
-const GATE_PENDING_MAX_AGE_MS = 2 * 60 * 60 * 1000;
-/** One-time "tap a pin" coach mark, shown after the first homes-unlocked moment. */
-const PIN_HINT_KEY = "amass_pin_hint_seen_v1";
-const PIN_HINT_MS = 15_000;
-/** Bubble + ring the coach mark draws above its pin — the pin needs this much clear band above it and this much room each side. */
-const PIN_HINT_H = 150;
-const PIN_HINT_W = 292;
-/** Width of the right-hand FAB column (locate / zoom) + its margin — the bubble must stay left of it. */
-const FAB_COLUMN_W = 68;
-const LAST_HOUR_DISMISSED_KEY = "amass_map_last_hour_dismissed_v1";
-
-// Lekki Phase 1 — Nigeria's most active market. Delta ~0.014 ≈ zoom 15.
-const DEFAULT_MARKET_REGION: Region = { latitude: 6.4494, longitude: 3.4739, latitudeDelta: 0.014, longitudeDelta: 0.014 };
-const BOOTSTRAP_REGION: Region = { latitude: 6.4494, longitude: 3.4739, latitudeDelta: 0.06, longitudeDelta: 0.06 };
-/** Nearby-first: ≈2 km across. The user's own streets stay in focus before the city does. */
-const NEARBY_DELTA = 0.018;
-const DEFAULT_PITCH_DEG = 30;
-const zoomFromDelta = (delta: number) => Math.max(0, Math.min(21, Math.log2(360 / Math.max(delta, 0.00005))));
-
-const greeting = () => {
-  const h = new Date().getHours();
-  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-};
-
-const inRegion = (p: Pin, r: Region) => Math.abs(p.lat - r.latitude) <= r.latitudeDelta / 2 && Math.abs(p.lng - r.longitude) <= r.longitudeDelta / 2;
 
 /** Buy / Rent / Lease segment ↔ the listing-type filter. */
 const intentFromFilters = (f: FilterState): Intent | null => (f.listingType === "buy" || f.listingType === "rent" || f.listingType === "lease" ? f.listingType : f.listingType ? null : "all");
 
 export default function HomeMap() {
-  const { colors, shadows, isDark } = useTheme();
+  const { colors } = useTheme();
   const toast = useToast();
-  const { rain, rainClearsAt } = useMoneyRain();
-  const celebrate = useCelebrate();
+  const { rain } = useMoneyRain();
   const { user } = useAuth();
   const reduce = useReducedMotion();
   const firstName = (user?.full_name || "").trim().split(" ")[0] || "there";
@@ -93,52 +74,9 @@ export default function HomeMap() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ ai_filters?: string }>();
-  const { mass, loading: walletLoading, refresh: refreshWallet } = useWallet();
+  const { mass, loading: walletLoading } = useWallet();
   const massBalance = mass?.spendable ?? 0;
   const noMass = !walletLoading && massBalance <= 0;
-  /** Map time (server-metered): 1 MASS per hour on the map; `access` false → no homes until a top-up. */
-  const [mapTime, setMapTime] = useState<MapTime | null>(null);
-  const mapTimeRef = useRef<MapTime | null>(null);
-  mapTimeRef.current = mapTime;
-  const gated = !!mapTime && !mapTime.access;
-  /** This paid hour is the last the wallet can afford — surfaced gently so browsing never just stops. */
-  const lastHour = !!mapTime && mapTime.access && mapTime.metered && mapTime.remaining_seconds != null && mapTime.balance < mapTime.hourly_cost;
-  const [lastHourDismissedFor, setLastHourDismissedFor] = useState<number | null>(null);
-  useEffect(() => {
-    storage.getItem<number | null>(LAST_HOUR_DISMISSED_KEY, null).then((h) => { if (typeof h === "number") setLastHourDismissedFor(h); }).catch(() => {});
-  }, []);
-  const dismissLastHour = useCallback((hour: number) => {
-    setLastHourDismissedFor(hour);
-    storage.setItem(LAST_HOUR_DISMISSED_KEY, hour);
-  }, []);
-  const showLastHour = lastHour && lastHourDismissedFor !== mapTime!.hours_charged;
-  /** "Tap a pin" coach mark: the pin it points at (null = hidden). */
-  const [hintPin, setHintPin] = useState<Pin | null>(null);
-  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hideHint = useCallback(() => {
-    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-    hintTimerRef.current = null;
-    setHintPin(null);
-  }, []);
-  useEffect(() => () => { if (hintTimerRef.current) clearTimeout(hintTimerRef.current); }, []);
-  /** Filled in below once the clusters are known; the unlock celebration calls it after the burst. */
-  const showPinHintRef = useRef<(attempt?: number) => void>(() => {});
-  /** True when the wallet was empty and a top-up is expected (Get MASS tapped, or the meter just flipped back on) —
-   *  the next markers load celebrates the homes lighting up. Mirrored in storage so it survives a screen remount. */
-  const unlockPendingRef = useRef(false);
-  const clearUnlockPending = useCallback(() => {
-    unlockPendingRef.current = false;
-    storage.removeItem(GATE_PENDING_KEY);
-  }, []);
-  /** Get MASS from the map → come back here after the purchase (the success sheet's Continue pops back to this tab).
-   *  Leaving from the empty-wallet notice arms the "homes unlocked" moment for the return. */
-  const goGetMass = useCallback(() => {
-    if (mapTimeRef.current && !mapTimeRef.current.access) {
-      unlockPendingRef.current = true;
-      storage.setItem(GATE_PENDING_KEY, Date.now());
-    }
-    router.push({ pathname: "/buy-tokens", params: { currency: "MASS", returnTo: "/" } } as any);
-  }, [router]);
 
   const mapRef = useRef<MapView>(null);
   const filterSheetRef = useRef<FilterSheetRef>(null);
@@ -178,6 +116,19 @@ export default function HomeMap() {
    *  marker tap — without this guard that map press would close the card the instant it opened. */
   const markerPressAtRef = useRef(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  /** Metered map hour. The hook calls back into this screen's homes state; `loadRef` is wired below. */
+  const loadRef = useRef<(opts?: { fit?: boolean; area?: boolean; silent?: boolean }) => void>(() => {});
+  const showPinHintRef = useRef<() => void>(() => {});
+  const meter = useMapTimeMeter({
+    onHomesHidden: () => {
+      setPins([]);
+      setActiveId(null);
+    },
+    reloadHomes: () => loadRef.current({ silent: true, fit: true }),
+    onCelebrated: () => showPinHintRef.current(),
+  });
+  const { mapTime, mapTimeRef, gated, lastHour, showLastHour, dismissLastHour, goGetMass, applyMapTime, celebrateUnlock, unlockPendingRef, restoreUnlockPending } = meter;
 
   /** Map backdrop tap → deselect. Ignored when it's the echo of a marker tap (iOS) or flagged as one (Android). */
   const onMapPress = (e?: any) => {
@@ -224,14 +175,11 @@ export default function HomeMap() {
         if (saved === "buy" || saved === "rent" || saved === "lease") setFilters((f) => ({ ...f, listingType: saved }));
         else if (saved !== "all") setTimeout(() => { if (!handoffRef.current) setIntentSheet(true); }, reduce ? 400 : 1400);
       }),
-      storage.getItem<number | null>(GATE_PENDING_KEY, null).then((at) => {
-        if (typeof at === "number" && Date.now() - at < GATE_PENDING_MAX_AGE_MS) unlockPendingRef.current = true;
-        else if (at != null) storage.removeItem(GATE_PENDING_KEY);
-      }),
+      restoreUnlockPending(),
     ])
       .catch(() => {})
       .finally(() => setIntentReady(true));
-  }, [reduce]);
+  }, [reduce, restoreUnlockPending]);
 
   const chooseIntent = (i: Intent) => {
     setIntentSheet(false);
@@ -310,36 +258,29 @@ export default function HomeMap() {
     },
     [clearBand, screenH]
   );
-  /** Where a coordinate lands on screen for the given region (linear — exact on the web stand-in, within a few px on device at city zoom). */
-  const project = useCallback(
-    (lat: number, lng: number, r: Region) => ({ x: ((lng - (r.longitude - r.longitudeDelta / 2)) / r.longitudeDelta) * screenW, y: ((r.latitude + r.latitudeDelta / 2 - lat) / r.latitudeDelta) * screenH }),
-    [screenW, screenH]
-  );
+  const project = useCallback((lat: number, lng: number, r: Region) => projectPoint(lat, lng, r, screenW, screenH), [screenW, screenH]);
 
-  /** Region that shows every pin in `group` INSIDE the clear band (vertically) and keeps each label —
-   *  ≈120 px wide, centred on its coordinate — clear of the side edges. Deltas keep the screen's aspect
-   *  ratio so native maps show exactly this region (they'd otherwise widen the shorter axis). */
+  /** Region that shows every pin in `group` inside the clear band with each label clear of the side edges. */
   const regionFor = useCallback(
     (group: Pin[]): Region => {
       const [topFrac, bottomFrac] = bandFracs(false);
-      const lats = group.map((p) => p.lat);
-      const lngs = group.map((p) => p.lng);
-      const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-      const bandH = Math.max(bottomFrac - topFrac, 0.2);
-      const sideFrac = Math.min((PIN_HALF_W + 18) / screenW, 0.3);
-      const aspect = screenW / screenH;
-      const latNeeded = ((maxLat - minLat) * 1.15) / bandH;
-      const lngNeeded = (maxLng - minLng) / (1 - 2 * sideFrac);
-      const latDelta = Math.min(Math.max(latNeeded, lngNeeded / aspect, 0.012), 40);
-      const bandCenter = (topFrac + bottomFrac) / 2;
-      return { latitude: (minLat + maxLat) / 2 + latDelta * (bandCenter - 0.5), longitude: (minLng + maxLng) / 2, latitudeDelta: latDelta, longitudeDelta: latDelta * aspect };
+      return regionForBand(group, { topFrac, bottomFrac, screenW, screenH, latPad: 1.15, lngFactor: pinLngFactor(screenW), minBandH: 0.2 });
     },
     [bandFracs, screenW, screenH]
   );
 
-  /** Fly to the results when none sit in the clear band (search / filter changes). Results can span
-   *  cities (Lagos · Abuja · PH) — we fit the city nearest the viewer, never the whole country. */
-  /** Ghost pins live in the strip between the top chrome and the Add MASS notice — move the view so a few show there. */
+  const flyTo = useCallback(
+    (next: Region, ms: number) => {
+      initialRegionRef.current = next;
+      programmaticUntilRef.current = Date.now() + 900;
+      setRegion(next);
+      mapRef.current?.animateToRegion(next, reduce ? 0 : ms);
+    },
+    [reduce]
+  );
+
+  /** Ghost pins live in the strip between the top chrome and the Add MASS notice — move the view so a few show there
+   *  (the cluster nearest the viewer, never the whole country). */
   const [gateH, setGateH] = useState(0);
   const ghostsFittedRef = useRef<TeaserPin[] | null>(null);
   useEffect(() => {
@@ -347,22 +288,10 @@ export default function HomeMap() {
     ghostsFittedRef.current = teaser;
     const topFrac = (chromeBottom + PIN_H) / screenH;
     const bottomFrac = (screenH - (tabBarH + 12 + gateH + 8)) / screenH;
-    const bandH = Math.max(bottomFrac - topFrac, 0.1);
-    // Ghosts can span cities (Lagos · Abuja · PH) — fit the cluster nearest the viewer, never the whole country.
-    const r = regionRef.current;
-    const anchor = teaser.reduce((best, g) => (Math.hypot(g.lat - r.latitude, g.lng - r.longitude) < Math.hypot(best.lat - r.latitude, best.lng - r.longitude) ? g : best), teaser[0]);
-    const group = teaser.filter((g) => Math.abs(g.lat - anchor.lat) < 0.6 && Math.abs(g.lng - anchor.lng) < 0.6);
-    const lats = group.map((g) => g.lat), lngs = group.map((g) => g.lng);
-    const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-    const aspect = screenW / screenH;
-    const latDelta = Math.min(Math.max(((maxLat - minLat) * 1.2) / bandH, (maxLng - minLng) * 1.3 / aspect, 0.012), 40);
-    const next: Region = { latitude: (minLat + maxLat) / 2 + latDelta * ((topFrac + bottomFrac) / 2 - 0.5), longitude: (minLng + maxLng) / 2, latitudeDelta: latDelta, longitudeDelta: latDelta * aspect };
-    initialRegionRef.current = next;
-    programmaticUntilRef.current = Date.now() + 900;
-    setRegion(next);
-    mapRef.current?.animateToRegion(next, reduce ? 0 : 600);
-  }, [gated, teaser, gateH, chromeBottom, tabBarH, screenW, screenH, reduce]);
+    flyTo(regionForBand(nearestGroup(teaser, regionRef.current), { topFrac, bottomFrac, screenW, screenH, latPad: 1.2, lngFactor: 1.3, minBandH: 0.1 }), 600);
+  }, [gated, teaser, gateH, chromeBottom, tabBarH, screenW, screenH, flyTo]);
 
+  /** Fly to the results when none sit in the clear band (search / filter changes). */
   const fitToPins = useCallback(
     (list: Pin[]) => {
       const r = regionRef.current;
@@ -373,75 +302,9 @@ export default function HomeMap() {
         return yFrac >= topFrac && yFrac <= bottomFrac;
       });
       if (!list.length || visibleNow) return;
-      const anchor = list.reduce((best, p) => (Math.hypot(p.lat - r.latitude, p.lng - r.longitude) < Math.hypot(best.lat - r.latitude, best.lng - r.longitude) ? p : best), list[0]);
-      const next = regionFor(list.filter((p) => Math.abs(p.lat - anchor.lat) < 0.6 && Math.abs(p.lng - anchor.lng) < 0.6));
-      initialRegionRef.current = next;
-      programmaticUntilRef.current = Date.now() + 900;
-      setRegion(next);
-      mapRef.current?.animateToRegion(next, reduce ? 0 : 600);
+      flyTo(regionFor(nearestGroup(list, r)), 600);
     },
-    [reduce, bandFracs, regionFor]
-  );
-
-  /** Apply a meter reading: announce a charge (toast + subtle rain), and when the hour ran out on an empty wallet
-   *  clear the homes and point to Get MASS. The wallet badge refreshes after every charge. */
-  const applyMapTime = useCallback(
-    (mt: MapTime) => {
-      const prev = mapTimeRef.current;
-      setMapTime(mt);
-      // Wallet was empty, now it isn't: the homes are about to light up — hold the generic charge toast and let
-      // the markers load celebrate instead (it knows how many homes appeared).
-      if (!!prev && !prev.access && mt.access) unlockPendingRef.current = true;
-      const justUnlocked = mt.access && unlockPendingRef.current;
-      if (mt.charged_now) {
-        refreshWallet().catch(() => {});
-        track("map_time_charged", { hour: mt.hours_charged, cost: mt.hourly_cost });
-        if (!justUnlocked) {
-          rain({ variant: "subtle", key: `maptime:${mt.hours_charged}` });
-          toast.show({
-            kind: "success",
-            title: mt.hours_charged <= 1 ? `Map time started · ${mt.hourly_cost} MASS` : `Another hour on the map · ${mt.hourly_cost} MASS`,
-            body: mt.hours_charged <= 1 ? "Homes show for 60 minutes on the map. The next hour is only charged while you're still browsing." : `${mt.balance} MASS left in your wallet.`,
-          });
-        }
-      }
-      if (!mt.access) {
-        setPins([]);
-        setActiveId(null);
-        if (prev?.access) {
-          track("map_time_exhausted", { hours: mt.hours_charged });
-          toast.show({ kind: "info", title: "Out of MASS — homes hidden", body: "Top up to keep browsing the map.", actionLabel: "Get MASS", onAction: goGetMass });
-        }
-      }
-    },
-    [refreshWallet, rain, toast, goGetMass]
-  );
-
-  /** The homes just came back after a top-up: a short burst over the map, then the pins stay. Waits for the
-   *  purchase's money rain (if it is still falling) so the two moments don't pile up. */
-  const celebrateUnlock = useCallback(
-    (count: number, mt: MapTime | null) => {
-      clearUnlockPending();
-      const cost = mt?.hourly_cost ?? 0;
-      track("map_homes_unlocked", { homes: count, hour: mt?.hours_charged ?? 0, cost });
-      if (count > 0) {
-        const burst = () =>
-          celebrate({
-            tone: "mass",
-            icon: "home",
-            title: "Homes unlocked!",
-            body: `${count >= 400 ? "400+" : count} ${count === 1 ? "home is" : "homes are"} now live across the map${cost ? ` · ${cost} MASS buys 60 minutes` : ""}`,
-          });
-        const wait = Math.min(Math.max(rainClearsAt() - Date.now(), 0), 3200);
-        setTimeout(burst, wait);
-        // Once the burst has cleared, show first-timers how to open a home.
-        setTimeout(() => showPinHintRef.current(), wait + 2700);
-      } else {
-        // Nothing matches the current filters here — still worth saying the map is live again.
-        toast.show({ kind: "success", title: cost ? `Map time started · ${cost} MASS` : "You're back on the map", body: "Widen the filters or move the map to see homes." });
-      }
-    },
-    [celebrate, toast, clearUnlockPending, rainClearsAt]
+    [bandFracs, regionFor, flyTo]
   );
 
   // Markers: authenticated, lean teaser tier (cover · price · specs · city). Address + agent stay gated.
@@ -514,53 +377,9 @@ export default function HomeMap() {
         setLoading(false);
       }
     },
-    [filters, searchTerm, fitToPins, reduce, applyMapTime, celebrateUnlock]
+    [filters, searchTerm, fitToPins, reduce, applyMapTime, celebrateUnlock, unlockPendingRef, mapTimeRef]
   );
-
-  // Map-time heartbeat: once a minute while this tab is in front AND the app is active. Leaving the tab or
-  // backgrounding the app stops the clock (the server never counts a gap). Coming back with a topped-up wallet
-  // after the homes were hidden → the first heartbeat buys the next hour and the homes reload.
-  const loadRef = useRef(load);
   loadRef.current = load;
-  useFocusEffect(
-    useCallback(() => {
-      let timer: ReturnType<typeof setInterval> | null = null;
-      let stopped = false;
-      const tick = async () => {
-        if (stopped || AppState.currentState !== "active") return;
-        try {
-          const before = mapTimeRef.current;
-          const mt = await api.mapTimeTick();
-          if (stopped) return;
-          applyMapTime(mt);
-          // Homes are back after a top-up: reload them and bring them into view if the teaser left them off-screen.
-          if (mt.access && before && !before.access) loadRef.current({ silent: true, fit: true });
-        } catch {}
-      };
-      const start = () => {
-        if (timer) return;
-        timer = setInterval(tick, 60_000);
-      };
-      const stop = () => {
-        if (timer) clearInterval(timer);
-        timer = null;
-      };
-      // Only heartbeat on our own once the first markers load has reported the meter (it already ticked).
-      if (mapTimeRef.current) tick();
-      start();
-      const sub = AppState.addEventListener("change", (s) => {
-        if (s === "active") {
-          tick();
-          start();
-        } else stop();
-      });
-      return () => {
-        stopped = true;
-        stop();
-        sub.remove();
-      };
-    }, [applyMapTime])
-  );
 
   // First load stays nearby-first; later filter / search changes also fly to the results.
   const firstLoadRef = useRef(true);
@@ -642,63 +461,8 @@ export default function HomeMap() {
   }, [clusters, region, clearBand, project, screenW, activeId]);
   const activePin = useMemo(() => (activeId ? pins.find((p) => p.id === activeId) ?? null : null), [pins, activeId]);
 
-  /** First homes after a top-up: point at one real pin and say "tap it" — once per device. Prefers a single pin
-   *  near the middle of the clear band; if everything is still clustered, opens the nearest cluster first. */
-  const clustersRef = useRef(clusters);
-  clustersRef.current = clusters;
-  /** Narrow phones get a narrower bubble so it clears the FAB column. */
-  const hintW = Math.min(PIN_HINT_W, screenW - 2 * FAB_COLUMN_W);
-  const clusterIndexRef = useRef(clusterIndex);
-  clusterIndexRef.current = clusterIndex;
-  const showPinHint = useCallback(
-    async (attempt = 0) => {
-      if (mapTimeRef.current && !mapTimeRef.current.access) return;
-      if (attempt === 0 && (await storage.getItem<number | null>(PIN_HINT_KEY, null))) return;
-      const r = regionRef.current;
-      const band = clearBand(false);
-      // The bubble is centred on its pin; keep that centre where the bubble clears both edges and the FAB column.
-      const hintX = Math.min(screenW / 2, screenW - FAB_COLUMN_W - hintW / 2);
-      const cx = hintX;
-      const cy = (band.top + PIN_HINT_H + band.bottom - 24) / 2;
-      const dist = (lat: number, lng: number) => {
-        const { x, y } = project(lat, lng, r);
-        return Math.hypot(x - cx, y - cy);
-      };
-      const singles = clustersRef.current.filter((c: any) => !c.properties?.cluster).map((c: any) => c.properties.property as Pin);
-      if (!singles.length) {
-        const nearest = clustersRef.current.filter((c: any) => c.properties?.cluster).sort((a: any, b: any) => dist(a.geometry.coordinates[1], a.geometry.coordinates[0]) - dist(b.geometry.coordinates[1], b.geometry.coordinates[0]))[0];
-        if (!nearest || attempt > 0 || !clusterIndexRef.current) return;
-        const [lng, lat] = nearest.geometry.coordinates as [number, number];
-        const lngDelta = 360 / Math.pow(2, Math.max(expandCluster(clusterIndexRef.current, (nearest.properties as any).cluster_id), 8));
-        const latDelta = lngDelta / (screenW / screenH);
-        programmaticUntilRef.current = Date.now() + 900;
-        const next: Region = { latitude: lat + latDelta * (cy / screenH - 0.5), longitude: lng, latitudeDelta: latDelta, longitudeDelta: lngDelta };
-        setRegion(next);
-        mapRef.current?.animateToRegion(next, reduce ? 0 : 400);
-        setTimeout(() => showPinHint(1), reduce ? 150 : 700);
-        return;
-      }
-      const best = singles.reduce((a, p) => (dist(p.lat, p.lng) < dist(a.lat, a.lng) ? p : a), singles[0]);
-      const { x, y } = project(best.lat, best.lng, r);
-      const halfW = hintW / 2;
-      if (y < band.top + PIN_HINT_H || y > band.bottom - 24 || x < halfW + 8 || x > screenW - FAB_COLUMN_W - halfW) {
-        // Glide so the pin (and the bubble above it) sit fully inside the clear band and left of the FAB column.
-        const next: Region = { ...r, latitude: best.lat + r.latitudeDelta * (cy / screenH - 0.5), longitude: best.lng + r.longitudeDelta * ((screenW / 2 - hintX) / screenW) };
-        programmaticUntilRef.current = Date.now() + 700;
-        mapRef.current?.animateToRegion(next, reduce ? 0 : 400);
-      }
-      storage.setItem(PIN_HINT_KEY, Date.now());
-      setHintPin(best);
-      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-      hintTimerRef.current = setTimeout(() => setHintPin(null), PIN_HINT_MS);
-    },
-    [clearBand, project, screenW, screenH, reduce, hintW]
-  );
+  const { hintPin, hintW, hideHint, showPinHint } = usePinHint({ clusters, clusterIndex, pins, gated, mapAccess: mapTime ? mapTime.access : null, regionRef, mapRef, setRegion, programmaticUntilRef, clearBand, project, screenW, screenH, reduce });
   showPinHintRef.current = showPinHint;
-  // The hint only makes sense while its pin is drawn and the map is live.
-  useEffect(() => {
-    if (hintPin && (gated || !pins.some((p) => p.id === hintPin.id))) hideHint();
-  }, [hintPin, gated, pins, hideHint]);
 
   const openPin = (p: Pin) => {
     const via = pinVia(p);
@@ -743,6 +507,16 @@ export default function HomeMap() {
       programmaticUntilRef.current = Date.now() + 700;
       mapRef.current?.animateToRegion(next, reduce ? 0 : 320);
     }
+  };
+
+  /** Cluster tap → zoom ≈1.5× past the split zoom, centred in the clear band so the children don't land under the chrome. */
+  const onClusterPress = (clusterId: number, lat: number, lng: number) => {
+    const zoom = clusterIndex ? expandCluster(clusterIndex, clusterId) : 14;
+    const lngDelta = 360 / Math.pow(2, Math.max(zoom, 8));
+    const latDelta = lngDelta / (screenW / screenH);
+    const [topFrac, bottomFrac] = bandFracs(false);
+    programmaticUntilRef.current = Date.now() + 600;
+    mapRef.current?.animateToRegion({ latitude: lat + latDelta * ((topFrac + bottomFrac) / 2 - 0.5), longitude: lng, latitudeDelta: latDelta, longitudeDelta: lngDelta }, reduce ? 0 : 380);
   };
 
   const setSaved = (id: string, saved: boolean) =>
@@ -806,14 +580,18 @@ export default function HomeMap() {
     setHeading(0);
   };
 
+  /** Fly somewhere on the user's behalf (locate / explore wider): never a "Search this area" prompt. */
+  const goTo = (next: Region, ms: number) => {
+    initialRegionRef.current = next;
+    programmaticUntilRef.current = Date.now() + 700;
+    setShowSearchArea(false);
+    mapRef.current?.animateToRegion(next, reduce ? 0 : ms);
+  };
+
   const recenter = async () => {
     Haptics.selectionAsync().catch(() => {});
     if (userLocation) {
-      const next = { ...userLocation, latitudeDelta: NEARBY_DELTA, longitudeDelta: NEARBY_DELTA };
-      initialRegionRef.current = next;
-      programmaticUntilRef.current = Date.now() + 700;
-      mapRef.current?.animateToRegion(next, reduce ? 0 : 500);
-      setShowSearchArea(false);
+      goTo({ ...userLocation, latitudeDelta: NEARBY_DELTA, longitudeDelta: NEARBY_DELTA }, 500);
       return;
     }
     if (Platform.OS !== "web") {
@@ -823,18 +601,14 @@ export default function HomeMap() {
         const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
         setUserLocation(coords);
         setLocationPermission("granted");
-        const next = { ...coords, latitudeDelta: NEARBY_DELTA, longitudeDelta: NEARBY_DELTA };
-        initialRegionRef.current = next;
+        initialRegionRef.current = { ...coords, latitudeDelta: NEARBY_DELTA, longitudeDelta: NEARBY_DELTA };
         programmaticUntilRef.current = Date.now() + 700;
-        mapRef.current?.animateToRegion(next, reduce ? 0 : 500);
+        mapRef.current?.animateToRegion(initialRegionRef.current, reduce ? 0 : 500);
         return;
       }
       setLocationPermission(req.canAskAgain ? "denied" : "blocked");
     }
-    initialRegionRef.current = DEFAULT_MARKET_REGION;
-    programmaticUntilRef.current = Date.now() + 700;
-    setShowSearchArea(false);
-    mapRef.current?.animateToRegion(DEFAULT_MARKET_REGION, reduce ? 0 : 500);
+    goTo(DEFAULT_MARKET_REGION, 500);
   };
 
   const zoomBy = (factor: number) => {
@@ -917,250 +691,53 @@ export default function HomeMap() {
         onRegionChangeComplete={onRegionChangeComplete}
         onPress={onMapPress}
       >
-        {clusters.map((c: any) => {
-          if (c.properties?.cluster) {
-            const [lng, lat] = c.geometry.coordinates as [number, number];
-            const count = c.properties.point_count as number;
-            return (
-              <Marker
-                key={`cluster-${c.properties.cluster_id}`}
-                coordinate={{ latitude: lat, longitude: lng }}
-                accessibilityLabel={`${count} homes here. Tap to zoom in.`}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  const zoom = clusterIndex ? expandCluster(clusterIndex, c.properties.cluster_id) : 14;
-                  const lngDelta = 360 / Math.pow(2, Math.max(zoom, 8)); // ≈1.5× past the split zoom — children are clearly apart
-                  const latDelta = lngDelta / (screenW / screenH);
-                  // Centre the split cluster in the clear band so its children don't land under the chrome or the pill.
-                  const [topFrac, bottomFrac] = bandFracs(false);
-                  programmaticUntilRef.current = Date.now() + 600;
-                  mapRef.current?.animateToRegion({ latitude: lat + latDelta * ((topFrac + bottomFrac) / 2 - 0.5), longitude: lng, latitudeDelta: latDelta, longitudeDelta: lngDelta }, reduce ? 0 : 380);
-                }}
-                anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={false}
-              >
-                <ClusterPin count={count} testID={`cluster-${c.properties.cluster_id}`} />
-              </Marker>
-            );
-          }
-          const p = c.properties.property as Pin;
-          const state = pinState(p, { active: p.id === activeId, saved: savedIds.has(p.id), viewed: viewedIds.has(p.id) });
-          return (
-            // Re-keyed on state so the snapshot (tracksViewChanges=false) refreshes when a pin is saved / viewed / unlocked.
-            <Marker
-              key={`${p.id}:${state}`}
-              coordinate={{ latitude: p.lat, longitude: p.lng }}
-              accessibilityLabel={`${p.category === "sale" ? "For sale" : "To rent"} ${p.type ?? "home"}${p.price ? `, ${p.price.toLocaleString()} naira` : ""}. ${state === "unlocked" ? "Unlocked." : state === "saved" ? "Saved." : state === "viewed" ? "Viewed." : ""} ${p.unlocked ? "Tap to preview." : "Approximate location — tap to preview."}`}
-              onPress={() => onMarkerPress(p)}
-              anchor={{ x: 0.5, y: 1 }}
-              tracksViewChanges={settling || state === "selected"}
-              zIndex={state === "selected" ? 20 : p.boosted ? 6 : p.unlocked ? 4 : state === "saved" ? 3 : 2}
-            >
-              <PricePin pin={p} state={state} testID={`pin-${p.id}`} />
-            </Marker>
-          );
-        })}
-        {gated
-          ? teaser.map((g, i) => (
-              <Marker key={`ghost-${i}`} coordinate={{ latitude: g.lat, longitude: g.lng }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false} zIndex={1}>
-                <GhostPin pin={g} testID={`ghost-pin-${i}`} />
-              </Marker>
-            ))
-          : null}
-        {hintPin && !gated ? (
-          // Rides with the map above its pin; tapping it is tapping the pin. Animated, so it tracks view changes (one marker, ≤15 s).
-          <Marker key={`hint-${hintPin.id}`} coordinate={{ latitude: hintPin.lat, longitude: hintPin.lng }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges zIndex={30} onPress={() => onMarkerPress(hintPin)} accessibilityLabel="Tap a pin to preview the home">
-            <PinTapHint width={hintW} reduceMotion={reduce} testID="pin-tap-hint" />
-          </Marker>
-        ) : null}
+        <MapMarkers clusters={clusters} activeId={activeId} savedIds={savedIds} viewedIds={viewedIds} settling={settling} gated={gated} teaser={teaser} hintPin={hintPin} hintW={hintW} reduceMotion={reduce} onMarkerPress={onMarkerPress} onClusterPress={onClusterPress} />
       </MapView>
 
-      {/* Top chrome: search + filters · Buy / Rent / Lease */}
-      <View style={[styles.topOverlay, { top: searchTop }]} pointerEvents="box-none">
-        <View style={[styles.searchBar, shadows.lg, { backgroundColor: isDark ? colors.bgElevated : "#FFFFFF" }]}>
-          <AmassLogo size={26} showWordmark={false} style={{ marginLeft: -2 }} />
-          <TextInput
-            placeholder="Search area, landmark"
-            placeholderTextColor={colors.textSecondary}
-            style={[styles.searchInput, { color: colors.text }, Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null]}
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={commitSearch}
-            returnKeyType="search"
-            accessibilityLabel="Search by city, neighborhood or landmark"
-            testID="home-search-input"
-          />
-          {query.trim() ? (
-            <Pressable
-              onPress={() => {
-                setQuery("");
-                setSearchTerm("");
-              }}
-              style={styles.clearBtn}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              testID="home-search-clear"
-            >
-              <Ionicons name="close-circle" size={20} color={colors.textMuted} />
-            </Pressable>
-          ) : null}
-          {activeFilterCount > 0 || query.trim() ? (
-            <Pressable onPress={saveCurrentSearch} style={[styles.iconBtn, { backgroundColor: colors.surfaceAlt }]} hitSlop={6} accessibilityRole="button" accessibilityLabel="Save this search" testID="save-search-btn">
-              <Ionicons name="bookmark" size={18} color={colors.text} />
-            </Pressable>
-          ) : null}
-          <Pressable onPress={() => router.push("/ai-search")} style={[styles.iconBtn, { backgroundColor: colors.brand }]} testID="home-ai-btn" accessibilityRole="button" accessibilityLabel="AI-powered search">
-            <Ionicons name="sparkles" size={18} color="#fff" />
-          </Pressable>
-          <Pressable onPress={() => filterSheetRef.current?.open()} style={[styles.iconBtn, { backgroundColor: colors.primary }]} testID="open-filter-sheet" accessibilityRole="button" accessibilityLabel={`Open filters${activeFilterCount ? `, ${activeFilterCount} active` : ""}`}>
-            <Ionicons name="options" size={20} color={colors.onPrimary} />
-            {activeFilterCount > 0 ? (
-              <View style={[styles.filterDot, { backgroundColor: colors.brand, borderColor: colors.surface }]}>
-                <AppText variant="micro" color="#fff" tabular>
-                  {activeFilterCount}
-                </AppText>
-              </View>
-            ) : null}
-          </Pressable>
-        </View>
+      <MapTopChrome
+        top={searchTop}
+        query={query}
+        onChangeQuery={setQuery}
+        onSubmitQuery={commitSearch}
+        onClearQuery={() => {
+          setQuery("");
+          setSearchTerm("");
+        }}
+        activeFilterCount={activeFilterCount}
+        onSaveSearch={saveCurrentSearch}
+        onOpenAI={() => router.push("/ai-search")}
+        onOpenFilters={() => filterSheetRef.current?.open()}
+        intent={intent}
+        onChooseIntent={chooseIntent}
+        mapTime={mapTime}
+        lastHour={lastHour}
+        showLastHour={showLastHour}
+        onTopUp={goGetMass}
+        onDismissLastHour={dismissLastHour}
+        greetingName={greet && user ? firstName : null}
+        locationGranted={locationPermission === "granted"}
+        reduceMotion={reduce}
+      />
 
-        <View style={[styles.segment, shadows.md, { backgroundColor: isDark ? colors.bgElevated : "#FFFFFF" }]} accessibilityRole="tablist" testID="intent-segment">
-          {INTENTS.map((it) => {
-            const active = intent === it.key;
-            return (
-              <Pressable
-                key={it.key}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  chooseIntent(it.key);
-                }}
-                style={({ pressed }) => [styles.segItem, active && { backgroundColor: colors.primary }, pressed && !active && { backgroundColor: colors.surfaceAlt }]}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                aria-selected={active}
-                accessibilityLabel={it.label}
-                testID={`intent-seg-${it.key}`}
-              >
-                <View style={styles.segInner}>
-                  {it.key !== "all" ? <View style={[styles.segDot, { backgroundColor: KIND_COLORS[it.key === "buy" ? "sale" : it.key] }]} /> : null}
-                  <AppText color={active ? colors.onPrimary : colors.textSecondary} numberOfLines={1} style={[styles.segText, active && styles.segTextActive]}>
-                    {it.short}
-                  </AppText>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.greetRow} pointerEvents="box-none">
-          {showLastHour && mapTime && !(greet && user) ? (
-            <LastHourBanner
-              remainingSeconds={mapTime.remaining_seconds ?? 0}
-              hourlyCost={mapTime.hourly_cost}
-              onTopUp={goGetMass}
-              onDismiss={() => {
-                Haptics.selectionAsync().catch(() => {});
-                dismissLastHour(mapTime.hours_charged);
-              }}
-              reduceMotion={reduce}
-            />
-          ) : mapTime?.access && mapTime.metered && mapTime.remaining_seconds != null ? (
-            <Pressable
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                toast.info(
-                  lastHour ? "Last hour on the map" : "Map time",
-                  lastHour
-                    ? `${minutesLeft(mapTime.remaining_seconds ?? 0)} min left. Your wallet has ${mapTime.balance} MASS — the next hour costs ${mapTime.hourly_cost}. Top up any time to keep browsing.`
-                    : `${mapTime.hourly_cost} MASS buys 60 minutes on the map — the clock only runs while you're here. ${mapTime.balance} MASS in your wallet.`
-                );
-              }}
-              style={[styles.timeChip, shadows.md, lastHour && { borderWidth: 1, borderColor: colors.warning }, { backgroundColor: lastHour ? colors.warningSoft : isDark ? colors.glass : "rgba(255,255,255,0.94)" }]}
-              accessibilityRole="button"
-              accessibilityLabel={`Map time: ${minutesLeft(mapTime.remaining_seconds)} minutes left this hour. ${mapTime.hourly_cost} MASS per hour.${lastHour ? " This is your last hour — your wallet can't cover the next one." : ""}`}
-              testID={lastHour ? "map-time-chip-last-hour" : "map-time-chip"}
-            >
-              <Ionicons name={lastHour ? "hourglass-outline" : "time-outline"} size={14} color={colors.massText} />
-              <AppText variant="micro" color={colors.massText} tabular style={{ fontFamily: "PlusJakartaSans-700" }}>
-                {minutesLeft(mapTime.remaining_seconds)} min{lastHour ? " · last hour" : ""}
-              </AppText>
-            </Pressable>
-          ) : null}
-          {greet && user ? (
-            <Reanimated.View entering={reduce ? FadeIn.duration(150) : FadeInDown.delay(400).duration(300)} exiting={reduce ? FadeOut.duration(120) : FadeOutUp.duration(250)} pointerEvents="none" testID="home-greeting">
-              <View style={[styles.greetPill, shadows.md, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.94)" }]}>
-                <Image source={ILLUSTRATIONS["mascot-wave"]} style={{ width: 30, height: 30 }} resizeMode="contain" />
-                <View>
-                  <AppText variant="caption" style={{ fontFamily: "PlusJakartaSans-700" }}>
-                    {greeting()}, {firstName} 👋
-                  </AppText>
-                  <AppText variant="micro" tone="tertiary">
-                    {locationPermission === "granted" ? "Showing homes around you" : "Showing the busiest market near you"}
-                  </AppText>
-                </View>
-              </View>
-            </Reanimated.View>
-          ) : null}
-        </View>
-      </View>
-
-      {Math.abs(heading) > 2 ? (
-        <View style={[styles.compassWrap, { top: chromeBottom + 12 }]} pointerEvents="box-none">
-          <ActionBtn icon="compass" onPress={resetNorth} testID="fab-compass" label="Reset map to face north" iconRotation={-heading} />
-        </View>
-      ) : null}
-
-      <View style={[styles.rightActions, { top: chromeBottom + 70 }]} pointerEvents="box-none">
-        <ActionBtn icon="locate" onPress={recenter} testID="fab-locate" label="Center map on my location" highlight={locationPermission === "granted"} />
-        {/* Zoom is pointless on the teaser map and the notice would hide the buttons anyway */}
-        {gated ? null : (
-          <>
-            <ActionBtn icon="add" onPress={() => zoomBy(0.5)} testID="fab-zoom-in" label="Zoom in" />
-            <ActionBtn icon="remove" onPress={() => zoomBy(2)} testID="fab-zoom-out" label="Zoom out" />
-          </>
-        )}
-      </View>
+      <MapControls top={chromeBottom} heading={heading} locationGranted={locationPermission === "granted"} gated={gated} onResetNorth={resetNorth} onRecenter={recenter} onZoomIn={() => zoomBy(0.5)} onZoomOut={() => zoomBy(2)} />
 
       {/* Centered status: error / empty (the 0-MASS gate lives in the bottom band, where the homes would be) */}
       {gated ? null : !loading && (loadError || visiblePins.length === 0) ? (
-        <View style={[styles.mapStatusWrap, { paddingBottom: tabBarH + 40, paddingTop: chromeBottom }]} pointerEvents="box-none">
-          {loadError ? (
-            <View style={[styles.statusCard, shadows.md, { backgroundColor: colors.bgElevated }]} testID="map-status-error">
-              <Ionicons name="cloud-offline-outline" size={22} color={colors.brand} />
-              <AppText variant="title">{loadError}</AppText>
-              <AppText variant="caption" tone="secondary" align="center">
-                Check your connection and try again.
-              </AppText>
-              <Button label="Retry" size="sm" iconLeft="refresh" onPress={() => load()} testID="map-retry-btn" />
-            </View>
-          ) : (
-            <View style={[styles.statusCard, shadows.md, { backgroundColor: colors.bgElevated }]} testID="map-status-empty">
-              <Ionicons name="home-outline" size={22} color={colors.textSecondary} />
-              <AppText variant="title">{intentLabel && intent !== "all" ? `Nothing to ${intentLabel.toLowerCase()} here yet` : "No homes here yet"}</AppText>
-              <AppText variant="caption" tone="secondary" align="center">
-                {hasFilters ? (filters.friendsOnly && pins.length > 0 ? "None of your friends have saved a home here yet." : "Try another area, or clear a filter.") : "Pan or zoom out to explore more of the map."}
-              </AppText>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {hasFilters ? (
-                  <Button
-                    label="Clear filters"
-                    size="sm"
-                    variant="secondary"
-                    iconLeft="close-circle"
-                    onPress={() => {
-                      setFilters({});
-                      setQuery("");
-                      storage.setItem(INTENT_KEY, "all");
-                    }}
-                    testID="map-clear-filters-btn"
-                  />
-                ) : null}
-                <Button label="Search wider" size="sm" iconLeft="expand-outline" onPress={() => load({ fit: true })} testID="map-search-wider-btn" />
-              </View>
-            </View>
-          )}
-        </View>
+        <MapStatusCard
+          paddingTop={chromeBottom}
+          paddingBottom={tabBarH + 40}
+          loadError={loadError}
+          title={intentLabel && intent !== "all" ? `Nothing to ${intentLabel.toLowerCase()} here yet` : "No homes here yet"}
+          body={hasFilters ? (filters.friendsOnly && pins.length > 0 ? "None of your friends have saved a home here yet." : "Try another area, or clear a filter.") : "Pan or zoom out to explore more of the map."}
+          hasFilters={hasFilters}
+          onRetry={() => load()}
+          onClearFilters={() => {
+            setFilters({});
+            setQuery("");
+            storage.setItem(INTENT_KEY, "all");
+          }}
+          onSearchWider={() => load({ fit: true })}
+        />
       ) : null}
 
       {showSearchArea && !loading ? (
@@ -1176,33 +753,10 @@ export default function HomeMap() {
         </View>
       ) : null}
 
-      {IS_MAP_LIMITED_IN_EXPO_GO ? (
-        <View style={[styles.expoGoHint, { top: chromeBottom + 12 }]} pointerEvents="none" testID="expo-go-map-hint">
-          <Ionicons name="information-circle" size={14} color="#fff" />
-          <AppText variant="micro" color="#fff">
-            Satellite imagery activates in the dev / production build.
-          </AppText>
-        </View>
-      ) : null}
+      {IS_MAP_LIMITED_IN_EXPO_GO ? <ExpoGoHint top={chromeBottom + 12} /> : null}
+      {locationPermission === "blocked" ? <LocationBlockedBanner top={chromeBottom + 70} /> : null}
 
-      {locationPermission === "blocked" ? (
-        <View style={[styles.permBanner, shadows.md, { top: chromeBottom + 70, backgroundColor: colors.bgElevated, borderColor: colors.border }]} testID="location-perm-banner">
-          <View style={[styles.permIcon, { backgroundColor: colors.brand }]}>
-            <Ionicons name="location" size={16} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <AppText variant="bodySm" weight="bold">
-              Location access is off
-            </AppText>
-            <AppText variant="caption" tone="secondary">
-              Enable in Settings to see homes near you.
-            </AppText>
-          </View>
-          <Button label="Open Settings" size="sm" variant="secondary" onPress={() => Linking.openSettings()} testID="open-settings-btn" />
-        </View>
-      ) : null}
-
-      {/* Bottom band — above the tab bar: the preview card for the tapped home, or a small results pill */}
+      {/* Bottom band — above the tab bar: the preview card for the tapped home, the Add MASS notice, or the results pill */}
       <View style={[styles.bottomBand, { bottom: tabBarH + 12 }]} pointerEvents="box-none">
         {activePin ? (
           <PreviewCard
@@ -1217,65 +771,21 @@ export default function HomeMap() {
             onClose={() => setActiveId(null)}
           />
         ) : loading ? (
-          <View style={[styles.countPill, shadows.md, { backgroundColor: isDark ? colors.glass : "rgba(255,255,255,0.96)" }]} testID="map-status-loading">
-            <ActivityIndicator size="small" color={colors.text} />
-            <AppText variant="caption" weight="bold">
-              Finding homes…
-            </AppText>
-          </View>
+          <ResultsPill loading inViewCount={0} showExploreWider={false} onExploreWider={exploreWider} />
         ) : gated ? (
-          <Reanimated.View entering={reduce ? FadeIn.duration(120) : FadeInDown.duration(260)} style={[styles.gateCard, shadows.lg, compactGate && styles.gateCardCompact, { backgroundColor: colors.bgElevated, borderColor: isDark ? colors.border : "transparent", maxWidth: Math.min(screenW - space[3] * 2, 440) }]} testID="map-gate" accessibilityLiveRegion="polite" onLayout={(e) => setGateH(Math.round(e.nativeEvent.layout.height))}>
-            {/* Plain animated gold coin — the MASS currency, no inscription */}
-            <GoldCoin size={compactGate ? 44 : Math.round(Math.min(Math.max(screenW * 0.17, 60), 76))} animated={!reduce} testID="map-gate-coin" />
-            <View style={styles.gateCopy}>
-              <AppText variant={compactGate ? "title" : "h3"} align="center" testID="map-gate-title">
-                Add MASS to see homes on the map
-              </AppText>
-              <AppText variant={compactGate ? "caption" : "bodySm"} tone="secondary" align="center" testID="map-gate-body">
-                {teaserCount > 0
-                  ? `${teaserCount}${teaserCount >= 99 ? "+" : ""} ${teaserCount === 1 ? "home is" : "homes are"} waiting behind this notice.${compactGate ? "" : mapTime?.hours_charged ? " Your map time has run out and your wallet is empty." : " Your wallet is empty — top up to light them up."}`
-                  : mapTime?.hours_charged
-                    ? "Your map time has run out and your wallet is empty."
-                    : "Your wallet is empty — top up to light up the map."}
-              </AppText>
-            </View>
-            <View style={[styles.gateChip, { backgroundColor: colors.massSoft }]} testID="map-gate-rate">
-              <TokenIcon size={16} />
-              <AppText variant="caption" weight="bold" tone="mass">
-                {compactGate ? `${mapTime?.hourly_cost ?? 1} MASS/hour · only while you browse` : `${mapTime?.hourly_cost ?? 1} MASS per hour · only while you browse`}
-              </AppText>
-            </View>
-            <Button label="Get MASS" variant="mass" size={compactGate ? "md" : "lg"} fullWidth iconLeft="add" onPress={goGetMass} testID="map-gate-get-mass" />
-            {user && !user.phone_verified ? (
-              // Welcome bonus — first-timers can start browsing for free by verifying their number (one-time earn task).
-              <Pressable onPress={() => router.push({ pathname: "/earn", params: { task: "phone_verify" } } as any)} style={[styles.gateNudge, { backgroundColor: colors.successSoft }]} accessibilityRole="button" accessibilityLabel="Verify your phone number and earn free MASS" testID="map-gate-nudge">
-                <Ionicons name="gift-outline" size={16} color={colors.success} />
-                <AppText variant="caption" weight="semibold" color={colors.success} style={{ flex: 1 }}>
-                  {compactGate ? "New here? Verify your phone for free MASS." : "New here? Verify your phone number and get free MASS to start browsing."}
-                </AppText>
-                <Ionicons name="chevron-forward" size={14} color={colors.success} />
-              </Pressable>
-            ) : null}
-            {compactGate ? null : (
-              <AppText variant="micro" tone="tertiary" align="center">
-                Unlocking a home&apos;s address, photos and agent is separate.
-              </AppText>
-            )}
-          </Reanimated.View>
+          <MapGateCard
+            compact={compactGate}
+            screenW={screenW}
+            teaserCount={teaserCount}
+            mapTime={mapTime}
+            offerPhoneBonus={!!user && !user.phone_verified}
+            reduceMotion={reduce}
+            onGetMass={goGetMass}
+            onVerifyPhone={() => router.push({ pathname: "/earn", params: { task: "phone_verify" } } as any)}
+            onLayout={(e) => setGateH(Math.round(e.nativeEvent.layout.height))}
+          />
         ) : !loadError && visiblePins.length > 0 ? (
-          <Pressable
-            onPress={showExploreWider ? exploreWider : undefined}
-            disabled={!showExploreWider}
-            style={[styles.countPill, shadows.md, { backgroundColor: showExploreWider ? colors.surfaceInverse : isDark ? colors.glass : "rgba(255,255,255,0.96)" }]}
-            accessibilityRole={showExploreWider ? "button" : "text"}
-            accessibilityLabel={showExploreWider ? `${inViewCount} homes in view. Explore a wider area` : `${inViewCount} homes in view`}
-            testID={showExploreWider ? "explore-wider-pill" : "results-count-pill"}
-          >
-            {showExploreWider ? <Ionicons name="expand-outline" size={15} color={colors.textInverse} /> : <Ionicons name="home" size={14} color={colors.brand} />}
-            <AppText variant="caption" color={showExploreWider ? colors.textInverse : colors.text} style={{ fontFamily: "PlusJakartaSans-700" }} tabular>
-              {inViewCount === 0 ? (showExploreWider ? "None in view · Explore wider" : "Move the map to find homes") : `${inViewCount} ${inViewCount === 1 ? "home" : "homes"} in view${showExploreWider ? " · Explore wider" : ""}`}
-            </AppText>
-          </Pressable>
+          <ResultsPill loading={false} inViewCount={inViewCount} showExploreWider={showExploreWider} onExploreWider={exploreWider} />
         ) : null}
       </View>
 
@@ -1297,48 +807,9 @@ export default function HomeMap() {
   );
 }
 
-function ActionBtn({ icon, onPress, testID, highlight = false, label, iconRotation }: { icon: IconName; onPress: () => void; testID?: string; highlight?: boolean; label?: string; iconRotation?: number }) {
-  const { colors, shadows, isDark } = useTheme();
-  return (
-    <Pressable onPress={onPress} style={[styles.actionBtn, shadows.lg, { backgroundColor: highlight ? colors.primary : isDark ? colors.bgElevated : "#FFFFFF" }]} testID={testID} accessibilityRole="button" accessibilityLabel={label} hitSlop={6}>
-      <Ionicons name={icon} size={22} color={highlight ? colors.onPrimary : colors.text} style={iconRotation != null ? { transform: [{ rotate: `${iconRotation}deg` }] } : undefined} />
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  // Everything floating over the map sits above the markers (web paints markers in the map's own layer).
-  topOverlay: { position: "absolute", left: space[3], right: space[3], gap: 10, zIndex: 3 },
-  searchBar: { flexDirection: "row", alignItems: "center", gap: 8, height: 60, paddingHorizontal: 12, borderRadius: radii.lg },
-  searchInput: { flex: 1, minWidth: 0, fontSize: 17, fontFamily: "PlusJakartaSans-600", paddingVertical: 0 },
-  clearBtn: { width: 28, height: 44, alignItems: "center", justifyContent: "center", marginLeft: -6 },
-  iconBtn: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  filterDot: { position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", borderWidth: 2 },
-  segment: { flexDirection: "row", height: 50, padding: 4, borderRadius: radii.lg, gap: 4 },
-  segItem: { flex: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
-  segInner: { flexDirection: "row", alignItems: "center", gap: 6 },
-  segDot: { width: 8, height: 8, borderRadius: 4 },
-  segText: { fontSize: 15.5, lineHeight: 20, letterSpacing: -0.2, fontFamily: "PlusJakartaSans-700" },
-  segTextActive: { fontFamily: "PlusJakartaSans-800" },
-  greetRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  greetPill: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 14, height: 48, borderRadius: radii.pill },
-  timeChip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, height: 44, borderRadius: radii.pill },
-  gateCard: { alignSelf: "center", width: "100%", alignItems: "center", paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[4], gap: space[3], borderRadius: radii.xl, borderWidth: StyleSheet.hairlineWidth },
-  gateCardCompact: { paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: space[3], gap: 8 },
-  gateNudge: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radii.md, minHeight: 44 },
-  gateCopy: { alignItems: "center", gap: 6, paddingHorizontal: space[2] },
-  gateChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.pill },
-  compassWrap: { position: "absolute", right: space[3], zIndex: 3 },
-  rightActions: { position: "absolute", right: space[3], gap: 10, zIndex: 3 },
-  actionBtn: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
-  mapStatusWrap: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", paddingHorizontal: space[6], zIndex: 3 },
-  statusCard: { alignItems: "center", gap: 8, padding: space[5], borderRadius: radii.lg, maxWidth: 320 },
   searchAreaWrap: { position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: 3 },
-  expoGoHint: { position: "absolute", left: space[3], flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(17,17,17,0.72)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill, zIndex: 3 },
-  permBanner: { position: "absolute", left: space[3], right: 72, flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth, zIndex: 3 },
-  permIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   bottomBand: { position: "absolute", left: space[3], right: space[3], alignItems: "center", zIndex: 4 },
-  countPill: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, height: 44, borderRadius: radii.pill },
   nudge: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: radii.sm, marginTop: space[3] },
 });

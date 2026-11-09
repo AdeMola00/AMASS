@@ -1285,3 +1285,27 @@ agent_communication:
       Force last-hour state: set wallets.balance=0 and map_time.used_seconds = paid_seconds - 25*60 for that user (see iteration notes).
       Paying user (demo@amass.africa) must see none of the above. Backend: analytics ALLOWED gained map_time_charged / map_time_exhausted /
       map_homes_unlocked. Main agent already verified every flow above on the web preview at 390×844 and 360×640.
+
+  - agent: "main"
+    message: |
+      Iteration 99 (to run, frontend regression focus) — Find Home map REFACTOR (no intended behaviour change) + app-open intro.
+      app/(tabs)/index.tsx (1,345 → 815 lines) now composes: src/components/map/geometry.ts, useMapTimeMeter.ts (meter/heartbeat/celebration/last-hour),
+      usePinHint.ts (coach mark), MapMarkers.tsx (clusters/pins/ghosts/hint), MapTopChrome.tsx (search · segment · chip/banner/greeting),
+      MapGateCard.tsx (Add MASS notice), MapChrome.tsx (FABs, results pill, status card, Expo Go hint, location banner). All testIDs unchanged.
+      Intro (app/index.tsx + src/components/intro/SkyScene.tsx): AMASS 3 s over sky + Lagos skyline with 5 price markers (intro-marker-*), then FIXA 1.5 s;
+      sounds (useIntroSounds, expo-audio) are native-only — nothing to test on web except no console errors. Main agent smoke-tested gate → buy → celebration → hint → preview.
+
+  - agent: "main"
+    message: |
+      Iteration 100 (to run, frontend focus) — Intros reworked.
+      (1) App-open (app/index.tsx): ONE moment now, 3.0 s AMASS only — the FIXA splash phase is gone (testID fixa-brand-moment no longer exists).
+      The lockup is src/components/intro/DoorLockup.tsx: doorless lockup + `amass-door` (swings ajar via rotateY from ~0.85 s to ~1.85 s) + `amass-door-glow`
+      (golden light fades in behind it). Sound is native-only (expo-audio, intro_door.wav) — nothing to hear on web. Skip (`brand-skip`) still routes immediately;
+      after 3 s it routes to /(tabs) (logged in) or /onboarding.
+      (2) Market tab (app/(tabs)/marketplace.tsx): first time the Brands section is shown in a session → `brands-intro` overlay for 1.5 s (store logos row
+      `brands-intro-stores`, 6 item tiles `brands-intro-items`, then fades); first time the FIXA section is shown → `fixa-intro` for 1.0 s (card `fixa-intro-card`,
+      pros `fixa-intro-pros`). Each plays ONCE per app launch (module-level Set in src/components/intro/sectionIntro.tsx — a full page reload resets it).
+      Tapping the overlay ends it early. The sponsored AdModal is held back while an intro is up (useAdTrigger enabled=false during intros).
+      (3) /fixa route (app/fixa/index.tsx) shows the same `fixa-intro` once per session (shared key "fixa" — if it already played in the Market tab it won't replay).
+      (4) Store graphics are build-time scripts only (scripts/capture_store_screens.py, store_common.py, generate_*.py) — no runtime surface.
+      Login: demo@amass.africa / amass2026. Saved section pref key in localStorage: amass_market_section (JSON string "brands" | "fixa" | "declutter").

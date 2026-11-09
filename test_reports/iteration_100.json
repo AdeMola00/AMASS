@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend-only test of the reworked intros at 390x844, using fresh browser contexts and a DOM timeline sampled every 30-50 ms. 9 of 9 requested flows PASS. App-open intro: splash-screen, amass-brand-moment, amass-door and amass-door-glow show for about 3.1 s. fixa-brand-moment never appeared. Logged in, the app routes to the tabs (home-map-screen); logged out, it routes to /onboarding. brand-skip routes at once. Market > Brands: brands-intro (with brands-intro-stores and brands-intro-items) appears about 1.3 s after load and stays about 1.7 s, then Brands shop content shows. FIXA segment: fixa-intro (card and pros) stays about 1.08 s. Neither intro replays when switching Brands -> FIXA -> Brands -> FIXA. Client-side nav to /fixa after the Market FIXA intro: no replay. Fresh direct /fixa: fixa-intro plays once (about 1.1 s). Tap-to-skip on brands-intro: gone within about 350 ms. amass_market_section='fixa': only fixa-intro shows, with no brands-intro flash. With the real ad API, no AdModal over any intro; the ad showed about 3 s after the intros ended. A forced test (mocked /api/ads/next with a 900 ms delay) found one edge-case race: the AdModal can render on top of fixa-intro (see rca). Regression PASS: map chrome (home-search-input, intent-segment, home-greeting, tab bar) and property 7d769d80 render. No console errors or page errors in any flow. No deprecated packages (expo-audio is used for the intro sound).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Ad suppression during intro (race)", "issue": "useAdTrigger.fetchAndShow checks canShow() only BEFORE awaiting api.nextAd. If the mount-timer request is already in flight when the user taps the FIXA segment, the response arrives while fixa-intro is showing and setVisible(true) puts the AdModal (RN Modal, a portal above zIndex 60) on top of the intro. Reproduced with a mocked /api/ads/next that has a 900 ms delay: ad-skip/'Sponsored' and fixa-intro overlapped for about 325 ms. Reference: /app/frontend/src/hooks/useAdTrigger.ts:43-55", "affected_testIDs": ["fixa-intro", "ad-skip"]}
+    ],
+    "design_issues": [
+      {"screen": "FixaIntro (390 px wide)", "issues": ["The tool ring is wider than the screen: ring = cardW*0.72 = 191 px, so the left and right icons (snow at about x=4 and water at about x=386, each 44 px) are partly cut off at the screen edges. Clamp the ring to (width-56)/2. Reference: /app/frontend/src/components/intro/FixaIntro.tsx:32-33"]},
+      {"screen": "BrandsIntro / FixaIntro", "issues": ["The overlay is rendered inside the Market screen, so the bottom tab bar stays visible and tappable during the intro. This may be intentional; flagged for awareness.", "In the store logo row, the 'Fouani' chip (and the Fouani tile in the Brands shop) shows a 'COLORS' logo. The logo asset or data looks mismatched: /api/shop/assets/logos/fouani.png."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/.screenshots/brands_intro.jpg", "/app/.screenshots/brands_after.jpg", "/app/.screenshots/fixa_intro.jpg", "/app/.screenshots/fixa_route_clientnav.jpg", "/app/.screenshots/splash_mid.jpg", "/app/.screenshots/li_after.jpg", "/app/.screenshots/property.jpg"],
+  "action_items": [
+    "useAdTrigger: keep `enabled` in a ref and check it again after `await api.nextAd(...)` (and in the mount timer callback) before setAd/setVisible. Otherwise an in-flight ad can open over an intro that has just started.",
+    "FixaIntro: limit the ring radius so the 44 px tool discs stay inside the screen on 390 px wide phones (for example, ring = Math.min(cardW*0.72, (width-56)/2)).",
+    "Check the fouani.png shop logo asset; it shows the 'COLORS' brand."
+  ],
+  "critical_code_review_comments": [
+    "sectionIntro.useOnceIntro: the module-level Set works for 'once per launch'. Note that the key is added inside useEffect, so two screens mounting at the same moment with the same key cannot both show it (good).",
+    "marketplace.tsx gates intros on prefsReady, which correctly prevents a brands flash before the FIXA intro (verified).",
+    "useAdTrigger: the mount timer restarts every time `enabled` goes back to true (after each intro), so the ad can appear about 3 s after any intro. This is acceptable."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped as requested)", "frontend": "100% of requested flows (9/9); 1 extra edge-case race found"},
+  "seed_data_creation": "None. The ad-race test used Playwright route interception of /api/ads/next only and wrote nothing to the database.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use fresh browser contexts with add_init_script to set localStorage amass_auth_token (JSON string) and amass_market_section. Sample testIDs every 30-50 ms with an injected setInterval, because the intros are short. The real /api/ads/next has a 5-minute per-user cooldown, so mock it with ctx.route to test ad suppression. Segment testIDs: mkt-tab-brands, mkt-tab-fixa, mkt-tab-declutter.",
+  "rca_of_issue": "Ad over intro: fetchAndShow() checks canShow() (which reads enabled) before the network await. When the intro starts during the await, nothing checks again, so setVisible(true) shows the modal. Steps to reproduce: fresh context on /marketplace, let brands-intro end, wait about 3 s until GET /api/ads/next is sent (delay its response by about 900 ms), then tap mkt-tab-fixa. The ad modal opens over fixa-intro. Fix: an enabledRef that is checked after the await."
+}
