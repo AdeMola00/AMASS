@@ -1,0 +1,187 @@
+{
+  "app_name": "Amass Social (Powered by FIXA)",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A welcoming, tactile, and community-focused feed that seamlessly blends the Amass editorial system with FIXA's vibrant green identity.",
+  "color": {
+    "surface": "#FFFFFF",
+    "onSurface": "#111111",
+    "surfaceSecondary": "#F7F6F3",
+    "onSurfaceSecondary": "#111111",
+    "surfaceTertiary": "#EAE8E3",
+    "onSurfaceTertiary": "#111111",
+    "surfaceInverse": "#111111",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#E11B22",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#2E8B57",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#7ED958",
+    "onBrandSecondary": "#111111",
+    "brandTertiary": "#EAF4ED",
+    "onBrandTertiary": "#1C5E39",
+    "success": "#2E8B57",
+    "onSuccess": "#FFFFFF",
+    "warning": "#F5A623",
+    "onWarning": "#111111",
+    "error": "#E11B22",
+    "onError": "#FFFFFF",
+    "info": "#1C5E39",
+    "onInfo": "#FFFFFF",
+    "border": "#E5E3DE",
+    "borderStrong": "#111111",
+    "divider": "#E5E3DE",
+    "muted": "#5C5C59"
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous padding around content, safe-area respected, bottom CTA sticky with adequate padding.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 10,
+    "md": 14,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Apply to bottom tab bar.",
+      "Apply to floating action button (FAB) over a brandTertiary base.",
+      "Sticky headers when scrolling.",
+      "Bottom-sheet headers."
+    ],
+    "dont's": [
+      "Do not apply to standard cards.",
+      "Do not apply to form inputs.",
+      "Do not apply on top of text."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Social Feed",
+      "purpose": "A hyper-local feed displaying community posts, decluttering items, and neighborly interactions.",
+      "states": {
+        "loading": "Skeleton cards mirroring the post structure.",
+        "empty": "Illustration of a neighborhood with 'No posts yet. Be the first to share!' and a 'Create Post' CTA.",
+        "error": "Message 'Unable to load the neighborhood feed.' with a 'Retry' button."
+      },
+      "layout": "Header with neighborhood switcher dropdown on the left, bell/chat/avatar on the right. Below, a horizontal scroll of 'Get Started' or 'Sponsored' cards. The main feed consists of full-width cards with moderate padding (lg). Post cards start with poster info (avatar, name, location, time), followed by title, description (clamped), a photo gallery pager, a price/free tag in FIXA green, and a bottom action row (Like, Comment, Share, More) using soft-grey or brandTertiary pills. A prominent round FIXA Green FAB is anchored bottom right for 'Create Post'. The existing Amass glass bottom tab bar remains sticky."
+    },
+    {
+      "name": "Post Detail",
+      "purpose": "View full details of a neighbor's post with high-resolution imagery and contact options.",
+      "states": {
+        "loading": "Spinner centered on screen.",
+        "empty": "Not applicable (would be an error if post not found).",
+        "error": "Message 'This post has been removed or is unavailable.' with 'Go Back' button."
+      },
+      "layout": "Full-bleed image gallery at the top with a gradient scrim ensuring the back and share header icons remain readable. Below the images, a card holding the title, Price/Free badge, and condition tag. The poster's profile card follows (avatar, name, neighborhood). The body description is shown in full. A sticky 'Message Poster' CTA pill (FIXA Green) rests at the bottom above the safe area. A comments list occupies the remaining scrollable space beneath the description."
+    },
+    {
+      "name": "Create Post Composer",
+      "purpose": "A seamless, multi-step form to upload photos, set details, and define visibility.",
+      "states": {
+        "loading": "Spinner during image upload or post submission.",
+        "empty": "Default blank state.",
+        "error": "'Failed to publish post' toast/snackbar with retry option."
+      },
+      "layout": "Header with 'Cancel' on the left, 'New Listing' title, and a 'Post' ink pill on the right. Below, a horizontal scrollable strip of photo tiles (first is 'Cover', others are dashed 'Add photos' up to 6). Followed by large, bold inputs for 'What are you sharing?' (Title) and 'Describe it' (Body). A segmented control for 'Free' vs 'Price' (numeric input reveals if Price is selected). A vertically stacked list of selection rows for Category, Condition, Area Visibility, and Contact Preferences, opening bottom sheets when tapped."
+    },
+    {
+      "name": "My Posts",
+      "purpose": "Manage active, paused, and sold/given away listings.",
+      "states": {
+        "loading": "List skeleton.",
+        "empty": "'You haven't posted anything yet.' illustration + Create Post CTA.",
+        "error": "'Unable to load your posts.' + Retry button."
+      },
+      "layout": "Standard list view on surfaceSecondary. Each item is a horizontal card (thumbnail left, title and status right) with a 'Manage' button that opens a bottom sheet offering Edit, Mark Sold, Pause, or Delete actions."
+    },
+    {
+      "name": "Neighbourhood Switcher",
+      "purpose": "Quickly change feed scope between Estate, Area, or City.",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Bottom sheet. Title 'Select Area'. A vertical list of options (e.g., 'Lower Allston (Estate)', 'Allston (Area)', 'Boston (City)') with radio buttons. Active state highlighted in FIXA brandTertiary background with FIXA Green checkmark."
+    }
+  ],
+  "images": {
+    "avatar_1": {
+      "url": "https://images.pexels.com/photos/7562185/pexels-photo-7562185.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Smiling man in yellow shirt"
+    },
+    "avatar_2": {
+      "url": "https://images.pexels.com/photos/3777943/pexels-photo-3777943.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Smiling man in red shirt"
+    },
+    "neighbourhood_avatar": {
+      "url": "https://images.pexels.com/photos/8148350/pexels-photo-8148350.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Aerial view of a neighborhood"
+    },
+    "post_item_sofa": {
+      "url": "https://images.pexels.com/photos/10974994/pexels-photo-10974994.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Vintage sofa in a living room"
+    },
+    "post_item_bike": {
+      "url": "https://images.unsplash.com/photo-1534146789009-76ed5060ec70?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGJpa2V8ZW58MHx8fHwxNzkyNzY1ODI2fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Mountain bike"
+    },
+    "post_item_plant": {
+      "url": "https://images.pexels.com/photos/15419923/pexels-photo-15419923.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Potted indoor plant"
+    }
+  },
+  "haptics": {
+    "events": {
+      "like_post": "light",
+      "create_post_fab": "medium",
+      "submit_post": "success",
+      "open_sheet": "light",
+      "tab_change": "light"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Ensure all primary weights for Plus Jakarta Sans are strictly limited to 400 and 500, per the persona rules.",
+    "Implement the FIXA green palette seamlessly inside the existing Amass framework. Use #2E8B57 for primary interactive elements within the Social feed (like the Post CTA and FAB).",
+    "Ensure 'Free' and price tags utilize the brandTertiary background (#EAF4ED) and onBrandTertiary text (#1C5E39) to stand out while remaining accessible.",
+    "Maintain the safe area views perfectly, especially with the sticky bottom 'Message Poster' CTA in the Post Detail screen.",
+    "Apply gradient scrims (transparent to #111111) over all image headers where text or back/share icons overlay the image to guarantee WCAG compliance.",
+    "Integrate the Social section as a replacement for the Discover section in the main bottom navigation bar.",
+    "Implement the photo gallery in Create Post with a horizontal ScrollView, indicating 'Cover' on the first item."
+  ]
+}

@@ -1,108 +1,2666 @@
-import asyncio
-from contextlib import suppress
-from fastapi import FastAPI, APIRouter, Query
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import ASCENDING, DESCENDING, IndexModel
+"""AMASS - Africa's Property Operating System — Backend API"""
 import os
-import logging
-from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List
+import re
+import asyncio
 import uuid
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import List, Optional, Literal, AsyncGenerator
 
+import bcrypt
+import jwt
+from dotenv import load_dotenv
 
+# CRITICAL: load .env BEFORE importing token module (which reads JWT_SECRET at import time)
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, EmailStr, Field
 
-# One entry per collection: every field a route filters, sorts or dedupes on. Add the index in the same edit as the query.
-INDEXES: dict[str, list[IndexModel]] = {
-    "status_checks": [
-        IndexModel([("id", ASCENDING)], name="id", unique=True),
-        IndexModel([("timestamp", DESCENDING)], name="timestamp_desc"),
-    ],
+from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
+
+from marketplace_seed import VENDORS, COLLECTIONS, MARKET_ITEMS
+from marketplace_c2c_seed import C2C_ITEMS as C2C_MARKET_ITEMS
+from fixa_seed import FIXA_PROVIDERS
+from tokens import register_token_routes, compute_token_cost, has_unlocked, is_free_amass_sale, WalletService
+from earn_and_tools import register_earn_routes, register_agent_tool_routes
+from promotions import register_promotion_routes, find_promoted_first, annotate_promotion
+from ads import register_ads_routes
+from marketplace_v2 import register_marketplace_v2_routes
+
+# ─── Config ───────────────────────────────────────────────
+MONGO_URL = os.environ["MONGO_URL"]
+DB_NAME = os.environ["DB_NAME"]
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET or len(JWT_SECRET) < 24:
+    raise RuntimeError(
+        "JWT_SECRET is missing or too weak. Set a strong JWT_SECRET "
+        "(>=24 chars) in backend/.env before starting the API."
+    )
+JWT_ALG = "HS256"
+JWT_EXPIRES_DAYS = 30
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+
+# Admin allow-list — comma-separated emails allowed to run privileged ops
+# (seeding, referral qualify/payout, etc.). Fallback keeps the demo account
+# admin so the pre-configured demo flow keeps working.
+ADMIN_EMAILS = {
+    e.strip().lower()
+    for e in os.environ.get("ADMIN_EMAILS", "demo@amass.africa,admin@amass.africa").split(",")
+    if e.strip()
 }
 
+# ─── DB ───────────────────────────────────────────────────
+client = AsyncIOMotorClient(MONGO_URL)
+db = client[DB_NAME]
 
-async def ensure_indexes() -> None:
-    for collection, models in INDEXES.items():
-        for model in models:  # one at a time so a bad spec skips only itself
-            try:
-                await db[collection].create_indexes([model])
-            except Exception as exc:  # never block boot on an index; the log line names what to fix
-                logging.getLogger(__name__).error("ensure_indexes(%s.%s): %s", collection, model.document["name"], exc)
+# ─── App ──────────────────────────────────────────────────
+app = FastAPI(title="AMASS API")
+api = APIRouter(prefix="/api")
+bearer = HTTPBearer(auto_error=False)
 
-# Create the main app without a prefix
-app = FastAPI()
 
-# Probe endpoint for the deployer and pod health checks: root-level (not /api), no DB call.
-@app.get("/health", include_in_schema=False)
-@app.head("/health", include_in_schema=False)
-async def health():
+# ─── Health Check Endpoints (Kubernetes Ingress) ──────────
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Kubernetes liveness/readiness probes."""
     return {"status": "ok"}
 
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+
+@app.get("/api/health")
+def api_health_check():
+    """Health check endpoint accessible via /api ingress path."""
+    return {"status": "ok"}
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("amass")
 
 
-# Define Models
-class StatusCheck(BaseModel):
+# ─── Models ───────────────────────────────────────────────
+class UserOut(BaseModel):
+    id: str
+    email: Optional[str] = None  # phone-only accounts have no email
+    full_name: str
+    phone: Optional[str] = None
+    phone_verified: bool = False
+    avatar_url: Optional[str] = None
+    city: Optional[str] = None
+    bio: Optional[str] = None
+    is_agent: bool = False
+    is_admin: bool = False
+    referral_code: Optional[str] = None
+    identity_verified: bool = False
+    created_at: datetime
+
+
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    full_name: str
+    phone: Optional[str] = None
+
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+
+class Property(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    title: str
+    description: str
+    price: int  # Naira
+    currency: str = "NGN"
+    listing_type: Literal["buy", "rent", "lease", "shortlet"]
+    property_type: Literal["duplex", "apartment", "bungalow", "land", "commercial", "penthouse", "terrace"]
+    bedrooms: int
+    bathrooms: int
+    size_sqm: int
+    location: str
+    city: str
+    state: str
+    country: str = "Nigeria"
+    latitude: float
+    longitude: float
+    images: List[str] = []
+    amenities: List[str] = []
+    # Walkthrough video (Redfin-style camera badge) — see walkthrough_video.py for the shape
+    walkthrough_video: Optional[dict] = None
+    status: Literal["available", "coming_soon", "verified", "premium", "sold"] = "available"
+    verified: bool = False
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = None
+    agent_avatar: Optional[str] = None
+    year_built: Optional[int] = None
+    parking: Optional[int] = None
+    investment_score: Optional[int] = None  # 0-100
+    ai_valuation: Optional[int] = None
+    # Trust & authority — first-class metadata
+    listing_source: Literal[
+        "owner_listed", "mandated", "independent", "pending"
+    ] = "pending"
+    mandate: Optional[dict] = None  # {owner_name, owner_phone, mandate_type, mandate_expiry, docs[]}
+    # Token economy — Category 1 = AMASS Exclusive (free), Category 2 = token-gated
+    is_amass_exclusive: bool = False
+    token_cost: Optional[int] = None  # override; else computed from category
+    # Sharing analytics (Phase 3)
+    share_count: Optional[int] = 0
+    share_by_channel: dict = Field(default_factory=dict)
+    views_count: Optional[int] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
+class MarketplaceItem(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    category: str  # relaxed — supports c2c cats: vehicles, motorcycles, phones, electronics, furniture, appliances, fashion, tools, equipment, business, services, home, construction, real_estate
+    subcategory: str
+    name: str
+    description: str
+    price: int
+    original_price: Optional[int] = None
+    currency: str = "NGN"
+    image: str
+    images: List[str] = []
+    vendor: str
+    vendor_id: Optional[str] = None
+    rating: float = 4.5
+    reviews: int = 0
+    location: Optional[str] = None
+    city: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    verified: bool = False
+    delivery: bool = True
+    delivery_days: int = 3
+    brand: Optional[str] = None
+    condition: Literal["new", "used", "refurbished", "for_parts"] = "new"
+    stock: int = 25
+    specs: dict = Field(default_factory=dict)
+    tags: List[str] = []
+    popular: bool = False
+    on_sale: bool = False
+    # ─── Classifieds (OfferUp / Letgo style) ────────────────
+    posted_at: Optional[str] = None  # ISO string; falls back to created_at
+    views: int = 0
+    saves: int = 0
+    is_boosted: bool = False
+    is_featured: bool = False
+    negotiable: bool = True
+    contact_prefs: List[str] = Field(default_factory=lambda: ["chat", "call", "whatsapp"])  # subset of chat/call/whatsapp
+    # Seller (C2C / B2C dealer / B2C brand)
+    seller_id: Optional[str] = None
+    seller_name: Optional[str] = None
+    seller_avatar: Optional[str] = None
+    seller_phone: Optional[str] = None
+    seller_whatsapp: Optional[str] = None
+    seller_type: Literal["individual", "dealer", "brand"] = "individual"
+    seller_verified: bool = False
+    seller_rating: float = 4.7
+    seller_reviews: int = 0
+    seller_joined_year: int = 2024
+    seller_response_time_hours: int = 2
+    seller_response_rate: int = 92  # percent
+    seller_bio: Optional[str] = None
+    # ─── FIXA service-provider extras (only used by services listings) ─
+    provider_years_experience: Optional[int] = None
+    provider_jobs_completed: Optional[int] = None
+    provider_specializations: List[str] = Field(default_factory=list)
+    provider_service_areas: List[str] = Field(default_factory=list)
+    is_fixa_verified: bool = False
+    fixa_badges: List[str] = Field(default_factory=list)  # e.g. ["Background Checked", "Insured", "Top Pro"]
+
+
+class Vendor(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    tagline: str
+    logo: str
+    cover: str
+    verified: bool = True
+    rating: float
+    reviews: int
+    followers: int
+    location: str
+    about: str
+    contact_phone: str
+    contact_email: str
+    joined_year: int
+
+
+class Collection(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    slug: str
+    title: str
+    subtitle: str
+    banner: str
+    accent: str
+    tag_filter: Optional[str] = None
+    category_filter: Optional[str] = None
+
+
+class Neighborhood(BaseModel):
+    id: str
+    name: str
+    city: str
+    state: str
+    image: str
+    avg_price: int
+    price_change_pct: float
+    walk_score: int
+    school_score: int
+    safety_score: int
+    infrastructure_score: int
+    overall_score: int
+    latitude: float
+    longitude: float
+    trending: bool = False
+
+
+class FavoriteToggleIn(BaseModel):
+    property_id: str
+
+
+class AiSearchIn(BaseModel):
+    query: str
+    session_id: Optional[str] = None
+
+
+# ─── Auth utils ───────────────────────────────────────────
+def hash_password(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(pw: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(pw.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
+
+
+def create_token(user_id: str) -> str:
+    payload = {
+        "sub": user_id,
+        "exp": datetime.now(timezone.utc) + timedelta(days=JWT_EXPIRES_DAYS),
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+
+
+async def optional_viewer_id(creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer)) -> Optional[str]:
+    """Public routes that still personalise the paywall gate: the viewer's id when a valid token is
+    sent, else None (everything stays at the teaser tier)."""
+    if not creds:
+        return None
+    try:
+        return jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG]).get("sub")
+    except jwt.PyJWTError:
+        return None
+
+
+
+async def get_current_user(
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+) -> dict:
+    if not creds:
+        raise HTTPException(401, "Not authenticated")
+    try:
+        payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+        user_id = payload.get("sub")
+    except jwt.PyJWTError:
+        raise HTTPException(401, "Invalid token")
+    if payload.get("typ") not in (None, "user"):
+        raise HTTPException(401, "Invalid token")  # portal / brand tokens never act as app users
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(401, "User not found")
+    if user.get("account_status") == "suspended":
+        raise HTTPException(403, "This account has been suspended. Contact support@amass.africa.")
+    # Normalize admin flag from allow-list or explicit doc field.
+    email = (user.get("email") or "").lower()
+    user["is_admin"] = bool(user.get("is_admin")) or email in ADMIN_EMAILS
+    return user
+
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if not user.get("is_admin"):
+        raise HTTPException(403, "Admin only")
+    return user
+
+
+# ─── Monetization core: shared unlock service, entitlements, zone pricing, FIX gate ───
+from monetization import (
+    register_monetization_routes,
+    ensure_monetization_indexes,
+    property_fee,
+    annotate_properties,
+    UnlockService as _UnlockService,
+    _jitter as approx_location,
+)
+_mon_router, _mon_admin, _unlock_svc = register_monetization_routes(db, get_current_user, require_admin)
+app.include_router(_mon_router)
+app.include_router(_mon_admin)
+
+
+def user_to_out(u: dict) -> UserOut:
+    email = (u.get("email") or "").lower()
+    is_admin = bool(u.get("is_admin")) or email in ADMIN_EMAILS
+    return UserOut(
+        id=u["id"],
+        email=u.get("email"),
+        full_name=u.get("full_name") or "AMASS neighbour",
+        phone=u.get("phone"),
+        phone_verified=bool(u.get("phone_verified")),
+        avatar_url=u.get("avatar_url"),
+        city=u.get("city"),
+        is_agent=u.get("is_agent", False),
+        is_admin=is_admin,
+        identity_verified=bool(u.get("identity_verified")),
+        created_at=u["created_at"],
+    )
+
+
+def decode_user_id(token: str) -> Optional[str]:
+    """Best-effort user id from a bearer token (None when missing/invalid)."""
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG]).get("sub")
+    except jwt.PyJWTError:
+        return None
+
+
+# ─── Auth endpoints ───────────────────────────────────────
+@api.post("/auth/register", response_model=TokenOut)
+async def register(data: RegisterIn):
+    existing = await db.users.find_one({"email": data.email.lower()})
+    if existing:
+        raise HTTPException(400, "This email is already registered. Try signing in instead.")
+    user_id = str(uuid.uuid4())
+    user_doc = {
+        "id": user_id,
+        "email": data.email.lower(),
+        "password_hash": hash_password(data.password),
+        "full_name": data.full_name,
+        "phone": data.phone,
+        "avatar_url": None,
+        "is_agent": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    await db.users.insert_one(user_doc)
+    return TokenOut(access_token=create_token(user_id), user=user_to_out(user_doc))
+
+
+@api.post("/auth/login", response_model=TokenOut)
+async def login(data: LoginIn):
+    email = data.email.lower()
+    locked = await check_login_locked(db, email)
+    if locked:
+        mins = max(1, round(locked / 60))
+        raise HTTPException(429, f"Too many attempts. Try again in about {mins} minute(s).")
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(data.password, user.get("password_hash", "")):
+        await record_login_failure(db, email)
+        raise HTTPException(401, "Invalid email or password")
+    await clear_login_failures(db, email)
+    if user.get("account_status") == "suspended":
+        raise HTTPException(403, "This account has been suspended. Contact support@amass.africa.")
+    return TokenOut(access_token=create_token(user["id"]), user=user_to_out(user))
+
+
+@api.get("/auth/me", response_model=UserOut)
+async def me(user: dict = Depends(get_current_user)):
+    return user_to_out(user)
+
+
+# ─── Properties ───────────────────────────────────────────
+@api.get("/public/welcome-photos")
+async def welcome_photos(limit: int = 3):
+    """Public (no auth): real verified listing photos for the welcome collage.
+
+    Returns the freshest verified, live listings that have a cover photo so new
+    users see actual AMASS homes before they sign in. Cached in-process for 10 min.
+    """
+    import re
+    import time as _t
+
+    limit = max(1, min(int(limit), 6))
+    cache = getattr(welcome_photos, "_cache", None)
+    if cache and cache["at"] > _t.time() - 600 and len(cache["items"]) >= limit:
+        return {"items": cache["items"][:limit], "cached": True}
+    cur = (
+        db.properties.find(
+            {"verified": True, "images.0": {"$exists": True}, "status": {"$nin": ["sold", "archived", "hidden", "draft", "rejected"]}},
+            {"_id": 0, "id": 1, "title": 1, "location": 1, "city": 1, "images": {"$slice": 1}, "created_at": 1},
+        )
+        .sort("created_at", -1)
+        .limit(24)
+    )
+    items, seen_cities = [], set()
+    async for p in cur:
+        img = (p.get("images") or [None])[0]
+        if not img or not str(img).startswith("http") or "example.com" in str(img):
+            continue
+        if re.search(r"\b(test|dummy|sample)\b", p.get("title") or "", re.I):
+            continue
+        city = (p.get("city") or "").strip()
+        # Prefer one photo per city so the collage spans the map.
+        if city and city in seen_cities and len(items) < 12:
+            continue
+        seen_cities.add(city)
+        label = city or (p.get("location") or "").split(",")[0].strip() or "AMASS Verified"
+        # Collage pills are ~90dp wide — keep labels short and recognisable.
+        short = {"Victoria Island": "V.I. Lagos", "Port Harcourt": "PH City", "Lekki Phase 1": "Lekki"}
+        if len(label) > 11:
+            label = short.get(label) or label.split(" ")[0]
+        items.append({"property_id": p["id"], "image": img, "label": label[:12], "title": p.get("title", "")})
+        if len(items) >= 6:
+            break
+    welcome_photos._cache = {"at": _t.time(), "items": items}  # type: ignore[attr-defined]
+    return {"items": items[:limit], "cached": False}
+
+
+@api.get("/properties")
+async def list_properties(
+    listing_type: Optional[str] = None,
+    property_type: Optional[str] = None,
+    min_price: Optional[int] = None,
+    max_price: Optional[int] = None,
+    bedrooms: Optional[int] = None,
+    city: Optional[str] = None,
+    verified: Optional[bool] = None,
+    listing_source: Optional[str] = None,
+    q: Optional[str] = None,
+    token_filter: Optional[Literal["free", "token", "amass_exclusive"]] = None,
+    # Viewport (bounding box) filter — lazy-load only listings visible on screen.
+    min_lat: Optional[float] = None,
+    max_lat: Optional[float] = None,
+    min_lng: Optional[float] = None,
+    max_lng: Optional[float] = None,
+    limit: int = 100,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+):
+    query: dict = {"status": {"$ne": "withdrawn"}}  # hidden by the agent via the listing manager
+    if listing_type:
+        query["listing_type"] = listing_type
+    if property_type:
+        query["property_type"] = property_type
+    if bedrooms is not None:
+        query["bedrooms"] = {"$gte": bedrooms}
+    if city:
+        query["city"] = {"$regex": re.escape(city), "$options": "i"}
+    if verified is not None:
+        query["verified"] = verified
+    if listing_source:
+        query["listing_source"] = listing_source
+    if token_filter == "amass_exclusive":
+        query["is_amass_exclusive"] = True
+    elif token_filter == "free":
+        query["is_amass_exclusive"] = True
+    elif token_filter == "token":
+        query["is_amass_exclusive"] = {"$ne": True}
+    if min_lat is not None and max_lat is not None:
+        query["latitude"] = {"$gte": min_lat, "$lte": max_lat}
+    if min_lng is not None and max_lng is not None:
+        query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
+    if min_price is not None or max_price is not None:
+        price_q: dict = {}
+        if min_price is not None:
+            price_q["$gte"] = min_price
+        if max_price is not None:
+            price_q["$lte"] = max_price
+        query["price"] = price_q
+    if q:
+        q = re.escape(q.strip())
+        query["$or"] = [
+            {"title": {"$regex": q, "$options": "i"}},
+            {"location": {"$regex": q, "$options": "i"}},
+            {"city": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+        ]
+    # Active promotions first (boost > feature > promote), then standard listings.
+    docs = await find_promoted_first(db, query, limit)
+
+    # Determine current user (optional) for personalized unlock flags
+    user_id: Optional[str] = None
+    if creds:
+        try:
+            payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+            user_id = payload.get("sub")
+        except jwt.PyJWTError:
+            user_id = None
+
+    # Enrich with recent view/favorite counts (last 7 days) + token economy fields.
+    if docs:
+        ids = [p["id"] for p in docs]
+        since = datetime.now(timezone.utc) - timedelta(days=7)
+        pipeline = [
+            {"$match": {"property_id": {"$in": ids}, "created_at": {"$gte": since}}},
+            {"$group": {"_id": {"pid": "$property_id", "type": "$event_type"}, "count": {"$sum": 1}}},
+        ]
+        counts: dict = {pid: {"views_recent": 0, "favorites_recent": 0} for pid in ids}
+        async for row in db.property_events.aggregate(pipeline):
+            pid = row["_id"]["pid"]
+            t = row["_id"]["type"]
+            if t == "view":
+                counts[pid]["views_recent"] = row["count"]
+            elif t == "favorite":
+                counts[pid]["favorites_recent"] = row["count"]
+        for p in docs:
+            c = counts.get(p["id"], {"views_recent": 0, "favorites_recent": 0})
+            p["views_recent"] = c["views_recent"]
+            p["favorites_recent"] = c["favorites_recent"]
+    # Zone/category pricing + entitlements (same source of truth as /unlocks and /map/markers).
+    await annotate_properties(db, docs, user_id)
+    annotate_promotion(docs)
+    return docs
+
+
+@api.get("/properties/{property_id}")
+async def get_property(
+    property_id: str,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+):
+    doc = await db.properties.find_one({"id": property_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Property not found")
+    user_id: Optional[str] = None
+    if creds:
+        try:
+            payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+            user_id = payload.get("sub")
+        except jwt.PyJWTError:
+            user_id = None
+
+    is_exclusive = bool(doc.get("is_amass_exclusive", False))
+    # Monetization: one zone/category-priced unlock per property, agent contact included.
+    access_cost, is_free = await property_fee(db, doc)
+    agent_cost = 0
+
+    flags = await unlock_flags(db, user_id, property_id)
+    is_owner = bool(user_id) and (doc.get("agent_id") == user_id)
+    access_unlocked = is_free or flags["access"] or is_owner
+    agent_unlocked = access_unlocked
+
+    doc["is_amass_exclusive"] = is_exclusive
+    doc["is_free_amass_sale"] = is_free
+    doc["token_cost"] = access_cost
+    doc["access_cost"] = access_cost
+    doc["agent_contact_cost"] = agent_cost
+    doc["unlocked"] = access_unlocked
+    doc["agent_unlocked"] = agent_unlocked
+    annotate_promotion([doc])
+
+    if not access_unlocked:
+        # Public preview only — strip premium info + agent identity. Same approximate pin as /map/markers.
+        gallery = [u for u in (doc.get("images") or []) if u]
+        first_image = doc.get("image") or (gallery[0] if gallery else None)
+        exact_lat, exact_lng = doc.get("latitude"), doc.get("longitude")
+        approx_lat, approx_lng = approx_location(doc["id"], exact_lat, exact_lng) if exact_lat is not None and exact_lng is not None else (exact_lat, exact_lng)
+        preview_desc = (doc.get("description") or "")[:120]
+        if len(doc.get("description") or "") > 120:
+            preview_desc += "…"
+        return {
+            "id": doc["id"],
+            "title": doc.get("title") or "Home",
+            "description": preview_desc,
+            "price": doc.get("price") or 0,
+            "currency": doc.get("currency", "NGN"),
+            "listing_type": doc.get("listing_type") or "buy",
+            "property_type": doc.get("property_type") or "residential",
+            "bedrooms": doc.get("bedrooms", 0),
+            "bathrooms": doc.get("bathrooms", 0),
+            "size_sqm": doc.get("size_sqm", 0),
+            "location": doc.get("city", ""),  # City-level only
+            "city": doc.get("city", ""),
+            "state": doc.get("state", ""),
+            "country": doc.get("country", "Nigeria"),
+            "latitude": approx_lat,
+            "longitude": approx_lng,
+            "approx": True,
+            "image_count": max(len(gallery), 1 if first_image else 0),
+            "images": [first_image] if first_image else [],
+            "has_video": bool((doc.get("walkthrough_video") or {}).get("url")),
+            "amenities": [],
+            "status": doc.get("status", "available"),
+            "verified": doc.get("verified", False),
+            "listing_source": doc.get("listing_source", "pending"),
+            "agent_name": None,
+            "agent_avatar": None,
+            "agent_id": None,
+            "agent_phone": None,
+            "agent_email": None,
+            "year_built": None,
+            "parking": None,
+            "investment_score": None,
+            "ai_valuation": None,
+            "mandate": None,
+            "views_recent": doc.get("views_recent", 0),
+            "favorites_recent": doc.get("favorites_recent", 0),
+            "is_amass_exclusive": False,
+            "token_cost": access_cost,
+            "access_cost": access_cost,
+            "agent_contact_cost": agent_cost,
+            "unlocked": False,
+            "agent_unlocked": False,
+            "promotion": doc.get("promotion"),
+            **_docs_summary(doc),
+        }
+
+    # Access unlocked → full basic details + agent PUBLIC identity.
+    # Agent PRIVATE contact (phone/email) stays gated behind the agent tier.
+    doc["views_recent"] = doc.get("views_recent", 0)
+    doc["favorites_recent"] = doc.get("favorites_recent", 0)
+    doc["has_video"] = bool((doc.get("walkthrough_video") or {}).get("url"))
+    doc.update(_docs_summary(doc))
+    if doc.get("agent_id"):
+        _agent_user = await db.users.find_one({"id": doc["agent_id"]}, {"_id": 0, "identity_verified": 1})
+        doc["agent_identity_verified"] = bool((_agent_user or {}).get("identity_verified"))
+    if agent_unlocked:
+        contact = await agent_contact_for(db, doc)
+        doc["agent_phone"] = (contact or {}).get("phone")
+        doc["agent_email"] = (contact or {}).get("email")
+    else:
+        doc["agent_phone"] = None
+        doc["agent_email"] = None
+        # Keep owner name but hide owner's private phone until agent tier paid.
+        if isinstance(doc.get("mandate"), dict):
+            doc["mandate"] = {**doc["mandate"], "owner_phone": None}
+    return doc
+
+
+# ─── Analytics events ────────────────────────────────────
+async def log_event(property_id: str, event_type: str, user_id: Optional[str] = None):
+    """Insert an event. `view` events are deduped per user+property per day
+    to avoid inflating counts on refreshes."""
+    now = datetime.now(timezone.utc)
+    if event_type == "view":
+        # Dedupe key
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        existing = await db.property_events.find_one(
+            {
+                "property_id": property_id,
+                "event_type": "view",
+                "user_id": user_id,
+                "created_at": {"$gte": day_start},
+            }
+        )
+        if existing:
+            return
+    await db.property_events.insert_one(
+        {
+            "id": str(uuid.uuid4()),
+            "property_id": property_id,
+            "user_id": user_id,
+            "event_type": event_type,
+            "created_at": now,
+        }
+    )
+
+
+@api.post("/properties/{property_id}/view")
+async def record_view(
+    property_id: str,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+):
+    prop = await db.properties.find_one({"id": property_id}, {"id": 1, "_id": 0})
+    if not prop:
+        raise HTTPException(404, "Property not found")
+    user_id: Optional[str] = None
+    if creds:
+        try:
+            payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+            user_id = payload.get("sub")
+        except jwt.PyJWTError:
+            user_id = None
+    await log_event(property_id, "view", user_id)
+    return {"ok": True}
+
+
+# ─── Property submission (Agent) ─────────────────────────
+class MandateIn(BaseModel):
+    owner_name: str
+    owner_phone: str
+    mandate_type: Literal["exclusive", "sole", "open", "verbal"]
+    mandate_expiry: Optional[str] = None  # ISO date
+    documents: List[str] = []
+
+
+class PropertyCreateIn(BaseModel):
+    title: str
+    description: str
+    price: int
+    listing_type: Literal["buy", "rent", "lease", "shortlet"]
+    property_type: Literal["duplex", "apartment", "bungalow", "land", "commercial", "penthouse", "terrace"]
+    bedrooms: int = 0
+    bathrooms: int = 0
+    size_sqm: int
+    location: str
+    city: str
+    state: str
+    country: str = "Nigeria"
+    latitude: float
+    longitude: float
+    images: List[str] = []
+    amenities: List[str] = []
+    year_built: Optional[int] = None
+    parking: Optional[int] = None
+    # Optional walkthrough: YouTube / Vimeo link or an uploaded video URL (see /uploads/video/*)
+    walkthrough_video_url: Optional[str] = None
+    # Trust & authority
+    is_owner: bool = False
+    has_mandate: bool = False
+    mandate: Optional[MandateIn] = None
+
+
+@api.post("/properties", response_model=Property)
+async def create_property(data: PropertyCreateIn, user: dict = Depends(get_current_user)):
+    # SECURITY: enforce per-plan listing quota server-side (frontend limits
+    # are advisory only). Raises HTTP 402 with an "upgrade" hint payload.
+    await check_listing_quota(db, user["id"])
+
+    # Determine listing_source
+    if data.is_owner:
+        listing_source: str = "owner_listed"
+    elif data.has_mandate and data.mandate:
+        # Mandate submitted — starts as pending until admin verifies (unless the
+        # agent is already an approved Level-3 mandated agent).
+        agent_app = await db.agent_applications.find_one(
+            {"user_id": user["id"], "status": "approved", "verification_level": {"$gte": 3}}
+        )
+        listing_source = "mandated" if agent_app else "pending"
+    else:
+        # Agent is marketing without a confirmed mandate
+        listing_source = "independent"
+
+    from walkthrough_video import parse_video_link
+
+    prop_kwargs = data.model_dump(exclude={"is_owner", "has_mandate", "mandate", "walkthrough_video_url"})
+    prop = Property(
+        **prop_kwargs,
+        walkthrough_video=parse_video_link(data.walkthrough_video_url),
+        status="coming_soon",
+        verified=False,
+        agent_id=user["id"],
+        agent_name=user["full_name"],
+        agent_avatar=user.get("avatar_url"),
+        listing_source=listing_source,
+        mandate=data.mandate.model_dump() if data.mandate else None,
+    )
+    await db.properties.insert_one(prop.model_dump())
+    # Listing a property does NOT make someone an Agent — Agent status is granted only when an AMASS admin
+    # verifies their application (agent_platform.set_agent_verification).
+    # Reward: 40 tokens for uploading a property (rate-limited to 5/day server-side).
+    try:
+        from tokens import WalletService as _WS
+        _svc = _WS(db)
+        today = datetime.now(timezone.utc).date().isoformat()
+        cnt = await db.token_transactions.count_documents(
+            {
+                "user_id": user["id"],
+                "kind": "earn_reward",
+                "meta.task_id": "upload_property",
+                "meta.date": today,
+            }
+        )
+        if cnt < 5:
+            await _svc.credit(
+                user["id"],
+                40,
+                "earn_reward",
+                "Reward: Uploaded a property",
+                meta={"task_id": "upload_property", "date": today, "property_id": prop.id},
+            )
+    except Exception:
+        logger.exception("failed to award upload_property")
+
+    # After crediting: check whether this listing brings the agent to
+    # 5+ verified quality listings → mark Starter Kit eligible.
+    try:
+        await maybe_mark_starter_kit_eligible(db, user["id"])
+    except Exception:
+        logger.exception("starter kit eligibility check failed")
+
+    return prop
+
+
+# ─── Become an Agent ─────────────────────────────────────
+class AgentApplyIn(BaseModel):
+    # Personal
+    full_name: str
+    phone: str
+    email: str
+    nin: Optional[str] = None
+    id_document_url: Optional[str] = None
+    selfie_url: Optional[str] = None
+    # Business
+    agency_name: Optional[str] = None
+    cac_number: Optional[str] = None
+    office_address: Optional[str] = None
+    state: str
+    lga: Optional[str] = None
+    years_experience: int = 0
+    # Coverage & specialisation
+    areas_of_operation: List[str] = []
+    specialisations: List[str] = []
+    # Mandate declaration
+    has_mandate_authority: bool = False
+
+
+class AgentPublic(BaseModel):
+    id: str
+    user_id: str
+    full_name: str
+    phone: str
+    email: str
+    agency_name: Optional[str] = None
+    office_address: Optional[str] = None
+    state: str
+    lga: Optional[str] = None
+    years_experience: int
+    areas_of_operation: List[str]
+    specialisations: List[str]
+    verification_level: int  # 1 basic, 2 identity, 3 mandated
+    verification_badge: str  # "Registered Agent" | "Identity Verified" | "Verified Mandated Agent"
+    status: Literal["pending", "approved", "rejected", "suspended"]
+    avatar_url: Optional[str] = None
+    rating: float = 0.0
+    reviews_count: int = 0
+    active_listings: int = 0
+    total_sold: int = 0
+    total_rented: int = 0
+    mandate_verification_rate: float = 0.0
+    rejection_reason: Optional[str] = None
+    identity_verified: bool = False
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+def _badge_for(level: int) -> str:
+    if level >= 3:
+        return "Verified Mandated Agent"
+    if level == 2:
+        return "Identity Verified"
+    return "Registered Agent"
+
+
+@api.post("/agents/apply", response_model=AgentPublic)
+async def agent_apply(data: AgentApplyIn, user: dict = Depends(get_current_user)):
+    existing = await db.agent_applications.find_one({"user_id": user["id"]})
+
+    # Compute initial verification level (self-declared, admin later upgrades).
+    verification_level = 1
+    if data.id_document_url and data.selfie_url:
+        verification_level = 2
+
+    now = datetime.now(timezone.utc)
+    doc = {
+        "user_id": user["id"],
+        "full_name": data.full_name,
+        "phone": data.phone,
+        "email": data.email,
+        "nin": data.nin,
+        "id_document_url": data.id_document_url,
+        "selfie_url": data.selfie_url,
+        "agency_name": data.agency_name,
+        "cac_number": data.cac_number,
+        "office_address": data.office_address,
+        "state": data.state,
+        "lga": data.lga,
+        "years_experience": data.years_experience,
+        "areas_of_operation": data.areas_of_operation,
+        "specialisations": data.specialisations,
+        "has_mandate_authority": data.has_mandate_authority,
+        "verification_level": verification_level,
+        "status": "pending",
+        "updated_at": now,
+    }
+
+    if existing:
+        await db.agent_applications.update_one({"user_id": user["id"]}, {"$set": doc})
+        agent = await db.agent_applications.find_one({"user_id": user["id"]}, {"_id": 0})
+    else:
+        doc["id"] = str(uuid.uuid4())
+        doc["created_at"] = now
+        doc["avatar_url"] = user.get("avatar_url")
+        doc["rating"] = 0.0
+        doc["reviews_count"] = 0
+        await db.agent_applications.insert_one(doc)
+        agent = doc
+
+    # Applying does not grant Agent status — an AMASS admin must verify the application first.
+    # A re-application after rejection/suspension stays pending until reviewed again.
+    if existing and existing.get("status") == "approved":
+        await db.agent_applications.update_one({"user_id": user["id"]}, {"$set": {"status": "approved"}})
+        agent = await db.agent_applications.find_one({"user_id": user["id"]}, {"_id": 0})
+
+    return _agent_to_public(agent)
+
+
+async def _agent_stats(user_id: str) -> dict:
+    listings = await db.properties.find({"agent_id": user_id}, {"_id": 0, "status": 1, "listing_source": 1}).to_list(500)
+    active = [p for p in listings if p.get("status") not in ("sold",)]
+    sold = [p for p in listings if p.get("status") == "sold"]
+    mandated = [p for p in listings if p.get("listing_source") == "mandated"]
+    rate = (len(mandated) / len(listings)) if listings else 0.0
+    return {
+        "active_listings": len(active),
+        "total_sold": len(sold),
+        "total_rented": 0,
+        "mandate_verification_rate": round(rate, 2),
+    }
+
+
+def _agent_to_public(doc: dict) -> AgentPublic:
+    return AgentPublic(
+        id=doc.get("id", ""),
+        user_id=doc["user_id"],
+        full_name=doc["full_name"],
+        phone=doc["phone"],
+        email=doc["email"],
+        agency_name=doc.get("agency_name"),
+        office_address=doc.get("office_address"),
+        state=doc["state"],
+        lga=doc.get("lga"),
+        years_experience=doc.get("years_experience", 0),
+        areas_of_operation=doc.get("areas_of_operation", []) or [],
+        specialisations=doc.get("specialisations", []) or [],
+        verification_level=doc.get("verification_level", 1),
+        verification_badge=_badge_for(doc.get("verification_level", 1)),
+        status=doc.get("status", "pending"),
+        avatar_url=doc.get("avatar_url"),
+        rating=doc.get("rating", 0.0),
+        reviews_count=doc.get("reviews_count", 0),
+        active_listings=0,
+        total_sold=0,
+        total_rented=0,
+        mandate_verification_rate=0.0,
+        rejection_reason=doc.get("rejection_reason"),
+        created_at=doc.get("created_at", datetime.now(timezone.utc)),
+        updated_at=doc.get("updated_at"),
+    )
+
+
+@api.get("/agents/me", response_model=AgentPublic)
+async def agent_me(user: dict = Depends(get_current_user)):
+    doc = await db.agent_applications.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "No agent application yet")
+    out = _agent_to_public(doc)
+    out.identity_verified = bool(user.get("identity_verified"))
+    stats = await _agent_stats(user["id"])
+    out.active_listings = stats["active_listings"]
+    out.total_sold = stats["total_sold"]
+    out.total_rented = stats["total_rented"]
+    out.mandate_verification_rate = stats["mandate_verification_rate"]
+    return out
+
+
+@api.get("/agents/{user_id}", response_model=AgentPublic)
+async def get_agent(user_id: str):
+    doc = await db.agent_applications.find_one({"user_id": user_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Agent not found")
+    out = _agent_to_public(doc)
+    _u = await db.users.find_one({"id": user_id}, {"_id": 0, "identity_verified": 1})
+    out.identity_verified = bool((_u or {}).get("identity_verified"))
+    stats = await _agent_stats(user_id)
+    out.active_listings = stats["active_listings"]
+    out.total_sold = stats["total_sold"]
+    out.total_rented = stats["total_rented"]
+    out.mandate_verification_rate = stats["mandate_verification_rate"]
+    return out
+
+
+@api.get("/agents/{user_id}/listings")
+async def agent_listings_public(user_id: str, viewer: Optional[str] = Depends(optional_viewer_id)):
+    docs = await db.properties.find({"agent_id": user_id}, {"_id": 0}).to_list(200)
+    # Public profile — teaser tier unless the viewer has unlocked (or owns) the listing.
+    await annotate_properties(db, docs, viewer)
+    annotate_promotion(docs)
+    return docs
+
+
+# ─── Agent dashboard ─────────────────────────────────────
+@api.get("/agent/listings")
+async def agent_listings(user: dict = Depends(get_current_user)):
+    docs = await db.properties.find({"agent_id": user["id"]}, {"_id": 0}).to_list(500)
+    annotate_promotion(docs)
+    return docs
+
+
+@api.get("/agent/dashboard")
+async def agent_dashboard(user: dict = Depends(get_current_user)):
+    listings = await db.properties.find({"agent_id": user["id"]}, {"_id": 0}).to_list(500)
+    active = [p for p in listings if p.get("status") != "sold"]
+    verified = [p for p in listings if p.get("verified")]
+    total_value = sum(int(p.get("price", 0)) for p in active)
+
+    listing_ids = [p["id"] for p in listings]
+    since = datetime.now(timezone.utc) - timedelta(days=30)
+
+    views_30d = 0
+    favorites_30d = 0
+    if listing_ids:
+        views_30d = await db.property_events.count_documents(
+            {
+                "property_id": {"$in": listing_ids},
+                "event_type": "view",
+                "created_at": {"$gte": since},
+            }
+        )
+        favorites_30d = await db.property_events.count_documents(
+            {
+                "property_id": {"$in": listing_ids},
+                "event_type": "favorite",
+                "created_at": {"$gte": since},
+            }
+        )
+
+    return {
+        "stats": {
+            "listings": len(listings),
+            "active": len(active),
+            "verified": len(verified),
+            "views_30d": views_30d,
+            "favorites_30d": favorites_30d,
+            "total_value": total_value,
+        },
+        "recent": listings[:5],
+    }
+
+
+@api.get("/agent/listings-analytics")
+async def agent_listings_analytics(user: dict = Depends(get_current_user)):
+    """Per-listing view + favorite counts for the current agent."""
+    listings = await db.properties.find({"agent_id": user["id"]}, {"_id": 0}).to_list(500)
+    listing_ids = [p["id"] for p in listings]
+    if not listing_ids:
+        return []
+
+    pipeline = [
+        {"$match": {"property_id": {"$in": listing_ids}}},
+        {"$group": {"_id": {"pid": "$property_id", "type": "$event_type"}, "count": {"$sum": 1}}},
+    ]
+    agg = await db.property_events.aggregate(pipeline).to_list(1000)
+
+    counts: dict = {pid: {"views": 0, "favorites": 0} for pid in listing_ids}
+    for row in agg:
+        pid = row["_id"]["pid"]
+        t = row["_id"]["type"]
+        if pid not in counts:
+            continue
+        if t == "view":
+            counts[pid]["views"] = row["count"]
+        elif t == "favorite":
+            counts[pid]["favorites"] = row["count"]
+
+    return [
+        {
+            "property_id": p["id"],
+            "title": p["title"],
+            "image": (p.get("images") or [""])[0],
+            "price": p["price"],
+            "status": p.get("status"),
+            "verified": p.get("verified", False),
+            "views": counts[p["id"]]["views"],
+            "favorites": counts[p["id"]]["favorites"],
+        }
+        for p in listings
+    ]
+
+
+@api.get("/agent/leads")
+async def agent_leads(user: dict = Depends(get_current_user)):
+    listings = await db.properties.find({"agent_id": user["id"]}, {"_id": 0}).to_list(500)
+    if not listings:
+        return []
+    # Generate mock leads tied to real listings so the dashboard feels live.
+    LEAD_TEMPLATES = [
+        {"name": "Chidinma Eze", "avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200", "channel": "chat", "message": "Is this still available? Can I inspect on Saturday?"},
+        {"name": "Tobi Adeyemi", "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200", "channel": "call", "message": "Missed call — interested in a viewing this week."},
+        {"name": "Amaka Nwosu", "avatar": "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200", "channel": "chat", "message": "What's the minimum down payment for this unit?"},
+        {"name": "Fola Ojo", "avatar": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200", "channel": "email", "message": "Requesting the C of O documents ahead of inspection."},
+        {"name": "Zainab Musa", "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200", "channel": "chat", "message": "Any flexibility on the price? Serious buyer."},
+    ]
+    leads = []
+    for i, tmpl in enumerate(LEAD_TEMPLATES):
+        prop = listings[i % len(listings)]
+        leads.append(
+            {
+                "id": f"lead-{i}",
+                **tmpl,
+                "property_id": prop["id"],
+                "property_title": prop["title"],
+                "property_image": (prop.get("images") or [""])[0],
+                "created_at": (datetime.now(timezone.utc) - timedelta(hours=i * 6 + 1)).isoformat(),
+                "unread": i < 2,
+            }
+        )
+    return leads
+
+
+# ─── Favorites ────────────────────────────────────────────
+@api.get("/favorites")
+async def list_favorites(user: dict = Depends(get_current_user)):
+    docs = await db.favorites.find({"user_id": user["id"]}, {"_id": 0}).to_list(500)
+    prop_ids = [d["property_id"] for d in docs]
+    props = await db.properties.find({"id": {"$in": prop_ids}}, {"_id": 0}).to_list(500)
+    # Saving a home never bypasses the paywall — same teaser gate as every other list.
+    await annotate_properties(db, props, user["id"])
+    annotate_promotion(props)
+    return props
+
+
+@api.post("/favorites/toggle")
+async def toggle_favorite(
+    data: FavoriteToggleIn, user: dict = Depends(get_current_user)
+):
+    existing = await db.favorites.find_one(
+        {"user_id": user["id"], "property_id": data.property_id}
+    )
+    if existing:
+        await db.favorites.delete_one(
+            {"user_id": user["id"], "property_id": data.property_id}
+        )
+        await log_event(data.property_id, "unfavorite", user["id"])
+        return {"favorited": False}
+    await db.favorites.insert_one(
+        {
+            "id": str(uuid.uuid4()),
+            "user_id": user["id"],
+            "property_id": data.property_id,
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+    await log_event(data.property_id, "favorite", user["id"])
+    return {"favorited": True}
+
+
+@api.get("/favorites/ids")
+async def favorite_ids(user: dict = Depends(get_current_user)):
+    docs = await db.favorites.find({"user_id": user["id"]}, {"_id": 0}).to_list(500)
+    return {"ids": [d["property_id"] for d in docs]}
+
+
+# ─── Marketplace ──────────────────────────────────────────
+@api.get("/marketplace")
+async def marketplace(
+    category: Optional[str] = None,
+    subcategory: Optional[str] = None,
+    q: Optional[str] = None,
+    tag: Optional[str] = None,
+    popular: Optional[bool] = None,
+    on_sale: Optional[bool] = None,
+    min_price: Optional[int] = None,
+    max_price: Optional[int] = None,
+    verified: Optional[bool] = None,
+    condition: Optional[str] = None,
+    city: Optional[str] = None,
+    seller_type: Optional[str] = None,
+    boosted_only: Optional[bool] = None,
+    sort: Optional[str] = None,  # newest | price_asc | price_desc | views | saves
+    limit: int = 200,
+):
+    # Public feeds only show live listings (paused/sold/removed are hidden).
+    query: dict = {"status": {"$nin": ["paused", "sold", "removed"]}}
+    if category:
+        query["category"] = category
+    if subcategory:
+        query["subcategory"] = subcategory
+    if tag:
+        query["tags"] = tag
+    if popular is not None:
+        query["popular"] = popular
+    if on_sale is not None:
+        query["on_sale"] = on_sale
+    if verified is not None:
+        query["verified"] = verified
+    if condition:
+        query["condition"] = condition
+    if city:
+        query["city"] = {"$regex": re.escape(city), "$options": "i"}
+    if seller_type:
+        query["seller_type"] = seller_type
+    if boosted_only:
+        query["is_boosted"] = True
+    if min_price is not None or max_price is not None:
+        price_q: dict = {}
+        if min_price is not None:
+            price_q["$gte"] = min_price
+        if max_price is not None:
+            price_q["$lte"] = max_price
+        query["price"] = price_q
+    if q:
+        q = re.escape(q.strip())
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+            {"subcategory": {"$regex": q, "$options": "i"}},
+            {"brand": {"$regex": q, "$options": "i"}},
+            {"city": {"$regex": q, "$options": "i"}},
+        ]
+    cursor = db.marketplace.find(query, {"_id": 0})
+    sort_map = {
+        "newest": [("posted_at", -1)],
+        "price_asc": [("price", 1)],
+        "price_desc": [("price", -1)],
+        "views": [("views", -1)],
+        "saves": [("saves", -1)],
+    }
+    if sort and sort in sort_map:
+        cursor = cursor.sort(sort_map[sort])
+    else:
+        # default: boosted first, then newest
+        cursor = cursor.sort([("is_boosted", -1), ("is_featured", -1), ("posted_at", -1)])
+    docs = await cursor.limit(limit).to_list(limit)
+    return [_strip_fixa_contact(d) for d in docs]
+
+
+def _strip_fixa_contact(doc: dict) -> dict:
+    """FIXA is free: provider contact details are public. Kept as a pass-through so call sites read the same."""
+    return doc
+
+
+@api.get("/marketplace/collections")
+async def marketplace_collections():
+    docs = await db.collections.find({}, {"_id": 0}).to_list(100)
+    return docs
+
+
+@api.get("/marketplace/vendors")
+async def marketplace_vendors():
+    docs = await db.vendors.find({}, {"_id": 0}).to_list(100)
+    return docs
+
+
+@api.get("/marketplace/vendors/{vendor_id}")
+async def marketplace_vendor(vendor_id: str):
+    v = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
+    if not v:
+        raise HTTPException(404, "Vendor not found")
+    items = await db.marketplace.find({"vendor_id": vendor_id}, {"_id": 0}).to_list(200)
+    return {"vendor": v, "items": items}
+
+
+@api.get("/marketplace/items/{item_id}")
+async def marketplace_item(
+    item_id: str,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+):
+    it = await db.marketplace.find_one({"id": item_id, "status": {"$ne": "removed"}}, {"_id": 0})
+    if not it:
+        raise HTTPException(404, "Item not found")
+    it.setdefault("status", "active")
+    # Related items from the same subcategory (live listings only)
+    related = await db.marketplace.find(
+        {"subcategory": it["subcategory"], "id": {"$ne": it["id"]}, "status": {"$nin": ["paused", "sold", "removed"]}},
+        {"_id": 0},
+    ).limit(6).to_list(6)
+    return {"item": it, "related": related}
+
+
+@api.post("/marketplace/items/{item_id}/view")
+async def record_marketplace_view(item_id: str, user: dict = Depends(get_current_user)):
+    it = await db.marketplace.find_one({"id": item_id}, {"id": 1, "_id": 0})
+    if not it:
+        raise HTTPException(404, "Item not found")
+    now = datetime.now(timezone.utc)
+    # Pull existing then re-insert to keep newest-first & dedupe
+    await db.users.update_one(
+        {"id": user["id"]},
+        {
+            "$pull": {"recently_viewed_market": {"item_id": item_id}},
+        },
+    )
+    await db.users.update_one(
+        {"id": user["id"]},
+        {
+            "$push": {
+                "recently_viewed_market": {
+                    "$each": [{"item_id": item_id, "viewed_at": now}],
+                    "$position": 0,
+                    "$slice": 20,
+                }
+            }
+        },
+    )
+    return {"ok": True}
+
+
+@api.get("/marketplace/recently-viewed")
+async def marketplace_recently_viewed(user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "recently_viewed_market": 1})
+    if not u:
+        return []
+    rows = u.get("recently_viewed_market", []) or []
+    ids = [r["item_id"] for r in rows][:12]
+    if not ids:
+        return []
+    docs = await db.marketplace.find({"id": {"$in": ids}}, {"_id": 0}).to_list(50)
+    order = {i: idx for idx, i in enumerate(ids)}
+    docs.sort(key=lambda d: order.get(d["id"], 999))
+    return docs
+
+
+# ─── FIXA Bookings ────────────────────────────────────────
+class FixaBookingIn(BaseModel):
+    item_id: str
+    customer_name: str
+    customer_phone: str
+    address: str
+    scheduled_date: str  # ISO date, YYYY-MM-DD
+    scheduled_time: str  # e.g. "Morning" / "Afternoon" / "10:00"
+    notes: Optional[str] = None
+
+
+@api.post("/marketplace/fixa/book")
+async def fixa_book(data: FixaBookingIn, user: dict = Depends(get_current_user)):
+    """Free booking — FIXA has no tokens. The provider (when registered) is notified and confirms from /fixa/provider."""
+    from fixa import HIDDEN_STATUSES as _FIXA_HIDDEN
+    from notification_center import emit as _emit
+
+    it = await db.marketplace.find_one({"id": data.item_id}, {"_id": 0})
+    if not it:
+        raise HTTPException(404, "Provider not found")
+    if it.get("category") != "services":
+        raise HTTPException(400, "This item is not a FIXA service listing")
+    if it.get("fixa_status") in _FIXA_HIDDEN or it.get("status") in ("removed", "paused"):
+        raise HTTPException(409, "This provider isn't taking bookings right now")
+    if it.get("seller_id") == user["id"]:
+        raise HTTPException(400, "You can't book your own profile")
+    if await db.fixa_bookings.find_one({"item_id": data.item_id, "user_id": user["id"], "status": {"$in": ["pending", "confirmed"]}}, {"_id": 0, "id": 1}):
+        raise HTTPException(409, "You already have an open booking with this provider")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "item_id": data.item_id,
+        "provider_id": it.get("seller_id"),
+        "provider_name": it.get("seller_name") or it.get("vendor"),
+        "provider_avatar": it.get("seller_avatar") or it.get("image"),
+        "provider_phone": it.get("seller_phone"),
+        "provider_whatsapp": it.get("seller_whatsapp"),
+        "trade": it.get("subcategory"),
+        "customer_name": data.customer_name,
+        "customer_phone": data.customer_phone,
+        "address": data.address,
+        "scheduled_date": data.scheduled_date,
+        "scheduled_time": data.scheduled_time,
+        "notes": data.notes or "",
+        "status": "pending",  # pending | confirmed | completed | cancelled | declined
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.fixa_bookings.insert_one(doc.copy())
+    doc.pop("_id", None)
+    if it.get("seller_id") and not str(it["seller_id"]).startswith("fixa_"):
+        try:
+            await _emit(db, it["seller_id"], "FIXA_BOOKING_REQUESTED", "New booking request", f"{data.customer_name} wants {it.get('subcategory') or 'a job'} on {data.scheduled_date} · {data.scheduled_time}.", {"booking_id": doc["id"], "provider_item_id": it["id"]}, action_url="/fixa/provider")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("fixa booking notification failed: %s", e)
+    return {"ok": True, "booking": doc}
+
+
+class FixaBookingCancelIn(BaseModel):
+    note: Optional[str] = None
+
+
+@api.post("/marketplace/fixa/bookings/{booking_id}/cancel")
+async def fixa_booking_cancel(booking_id: str, data: FixaBookingCancelIn | None = None, user: dict = Depends(get_current_user)):
+    b = await db.fixa_bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not b or b["user_id"] != user["id"]:
+        raise HTTPException(404, "Booking not found")
+    if b.get("status") not in ("pending", "confirmed"):
+        raise HTTPException(409, "This booking is already closed")
+    await db.fixa_bookings.update_one({"id": booking_id}, {"$set": {"status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat(), "cancel_note": ((data.note if data else None) or "").strip() or None}})
+    if b.get("provider_id") and not str(b["provider_id"]).startswith("fixa_"):
+        from notification_center import emit as _emit
+        try:
+            await _emit(db, b["provider_id"], "FIXA_BOOKING_CANCELLED", "Booking cancelled", f"{b.get('customer_name')} cancelled {b.get('scheduled_date')} · {b.get('scheduled_time')}.", {"booking_id": booking_id}, action_url="/fixa/provider")
+        except Exception:  # noqa: BLE001
+            pass
+    return {"ok": True, "status": "cancelled"}
+
+
+@api.get("/marketplace/fixa/bookings")
+async def fixa_my_bookings(user: dict = Depends(get_current_user)):
+    docs = await db.fixa_bookings.find(
+        {"user_id": user["id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return docs
+
+
+class FixaBookingCompleteIn(BaseModel):
+    rating: Optional[int] = Field(default=None, ge=1, le=5)  # 1-5 stars — reputation only
+    review: Optional[str] = None
+
+
+@api.post("/marketplace/fixa/bookings/{booking_id}/complete")
+async def fixa_booking_complete(
+    booking_id: str,
+    data: FixaBookingCompleteIn,
+    user: dict = Depends(get_current_user),
+):
+    """Customer marks a booking complete and (optionally) rates it. Reputation only — jobs done + rating are
+    recomputed on the provider's profile; nothing is earned or spent. Idempotent by booking_id."""
+    from fixa import recompute_provider_rating
+
+    booking = await db.fixa_bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+    if booking["user_id"] != user["id"]:
+        raise HTTPException(403, "Only the booking owner can complete this booking")
+    if booking.get("status") == "completed":
+        return {"ok": True, "already_completed": True}
+    if booking.get("status") in ("cancelled", "declined"):
+        raise HTTPException(409, "This booking was closed before it happened")
+
+    now = datetime.now(timezone.utc).isoformat()
+    update: dict = {"status": "completed", "completed_at": now}
+    if data.rating is not None:
+        update["rating"] = int(max(1, min(5, data.rating)))
+    if data.review:
+        update["review"] = data.review[:500]
+    await db.fixa_bookings.update_one({"id": booking_id}, {"$set": update})
+    if booking.get("item_id"):
+        await recompute_provider_rating(db, booking["item_id"])
+    if booking.get("provider_id") and not str(booking["provider_id"]).startswith("fixa_"):
+        from notification_center import emit as _emit
+        try:
+            stars = f" · {update['rating']}★" if update.get("rating") else ""
+            await _emit(db, booking["provider_id"], "FIXA_JOB_COMPLETED", "Job marked done" + stars, f"{booking.get('customer_name')} marked the {booking.get('trade') or 'job'} complete.", {"booking_id": booking_id}, action_url="/fixa/provider")
+        except Exception:  # noqa: BLE001
+            pass
+    return {"ok": True, "booking_id": booking_id, "rating": update.get("rating")}
+
+
+# ─── Cart ─────────────────────────────────────────────────
+class CartItemIn(BaseModel):
+    item_id: str
+    quantity: int = 1
+
+
+@api.get("/cart")
+async def get_cart(user: dict = Depends(get_current_user)):
+    doc = await db.carts.find_one({"user_id": user["id"]}, {"_id": 0})
+    lines = (doc or {}).get("items", []) if doc else []
+    if not lines:
+        return {"items": [], "subtotal": 0}
+    ids = [l["item_id"] for l in lines]
+    items = await db.marketplace.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+    id_map = {i["id"]: i for i in items}
+    detailed = []
+    subtotal = 0
+    for l in lines:
+        it = id_map.get(l["item_id"])
+        if not it:
+            continue
+        qty = int(l.get("quantity", 1))
+        subtotal += it["price"] * qty
+        detailed.append({"item": it, "quantity": qty})
+    return {"items": detailed, "subtotal": subtotal}
+
+
+@api.post("/cart/add")
+async def cart_add(data: CartItemIn, user: dict = Depends(get_current_user)):
+    it = await db.marketplace.find_one({"id": data.item_id}, {"id": 1, "_id": 0})
+    if not it:
+        raise HTTPException(404, "Item not found")
+    doc = await db.carts.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not doc:
+        await db.carts.insert_one(
+            {
+                "id": str(uuid.uuid4()),
+                "user_id": user["id"],
+                "items": [{"item_id": data.item_id, "quantity": max(1, data.quantity)}],
+                "updated_at": datetime.now(timezone.utc),
+            }
+        )
+    else:
+        items = doc.get("items", []) or []
+        found = False
+        for line in items:
+            if line["item_id"] == data.item_id:
+                line["quantity"] = max(1, int(line.get("quantity", 1)) + data.quantity)
+                found = True
+                break
+        if not found:
+            items.append({"item_id": data.item_id, "quantity": max(1, data.quantity)})
+        await db.carts.update_one(
+            {"user_id": user["id"]},
+            {"$set": {"items": items, "updated_at": datetime.now(timezone.utc)}},
+        )
+    return await get_cart(user)
+
+
+@api.post("/cart/update")
+async def cart_update(data: CartItemIn, user: dict = Depends(get_current_user)):
+    if data.quantity <= 0:
+        await db.carts.update_one(
+            {"user_id": user["id"]},
+            {"$pull": {"items": {"item_id": data.item_id}}},
+        )
+    else:
+        await db.carts.update_one(
+            {"user_id": user["id"], "items.item_id": data.item_id},
+            {"$set": {"items.$.quantity": data.quantity}},
+        )
+    return await get_cart(user)
+
+
+@api.delete("/cart/{item_id}")
+async def cart_remove(item_id: str, user: dict = Depends(get_current_user)):
+    await db.carts.update_one(
+        {"user_id": user["id"]},
+        {"$pull": {"items": {"item_id": item_id}}},
+    )
+    return await get_cart(user)
+
+
+@api.post("/cart/clear")
+async def cart_clear(user: dict = Depends(get_current_user)):
+    await db.carts.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"items": []}},
+    )
+    return {"items": [], "subtotal": 0}
+
+
+@api.post("/checkout")
+async def checkout(user: dict = Depends(get_current_user)):
+    """Mock checkout — clears the cart and returns a fake order confirmation."""
+    cart = await get_cart(user)
+    if not cart["items"]:
+        raise HTTPException(400, "Cart is empty")
+    order_id = f"AMS-{str(uuid.uuid4())[:8].upper()}"
+    await db.orders.insert_one(
+        {
+            "id": order_id,
+            "user_id": user["id"],
+            "items": cart["items"],
+            "subtotal": cart["subtotal"],
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+    await db.carts.update_one({"user_id": user["id"]}, {"$set": {"items": []}})
+    return {"order_id": order_id, "subtotal": cart["subtotal"], "eta_days": 3}
+
+
+# ─── Neighborhoods / Discover ─────────────────────────────
+@api.get("/neighborhoods")
+async def neighborhoods():
+    docs = await db.neighborhoods.find({}, {"_id": 0}).to_list(200)
+    return docs
+
+
+# ─── AI search ────────────────────────────────────────────
+@api.post("/ai/search")
+async def ai_search(data: AiSearchIn):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(500, "AI service not configured")
+
+    system = (
+        "You are AMASS AI, an expert Africa real-estate assistant for a Nigeria-focused "
+        "property platform. Users ask about buying, renting, leasing, investment yields "
+        "and neighborhood comparisons. Prices are in Nigerian Naira (₦). Use markdown-lite "
+        "concise responses: short paragraphs, bullet points where helpful, and highlight "
+        "areas (Lekki, Ikoyi, Victoria Island, Ikeja, Abuja, Abeokuta). Keep replies under "
+        "180 words. Be warm, insightful, premium in tone."
+    )
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=data.session_id or str(uuid.uuid4()),
+        system_message=system,
+    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+
+    async def event_generator() -> AsyncGenerator[bytes, None]:
+        try:
+            async for ev in chat.stream_message(UserMessage(text=data.query)):
+                if isinstance(ev, TextDelta):
+                    yield f"data: {ev.content}\n\n".encode("utf-8")
+                elif isinstance(ev, StreamDone):
+                    yield b"data: [DONE]\n\n"
+                    break
+        except Exception as e:
+            logger.exception("ai stream error")
+            yield f"data: [ERROR] {str(e)}\n\n".encode("utf-8")
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@api.post("/ai/search/sync")
+async def ai_search_sync(data: AiSearchIn):
+    """Non-streaming variant for simple clients."""
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(500, "AI service not configured")
+
+    system = (
+        "You are AMASS AI, an expert Africa real-estate assistant. Prices in ₦. "
+        "Concise, premium, 150 words max."
+    )
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=data.session_id or str(uuid.uuid4()),
+        system_message=system,
+    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+    text_parts = []
+    try:
+        async for ev in chat.stream_message(UserMessage(text=data.query)):
+            if isinstance(ev, TextDelta):
+                text_parts.append(ev.content)
+            elif isinstance(ev, StreamDone):
+                break
+    except Exception as e:
+        raise HTTPException(500, f"AI error: {e}")
+    return {"reply": "".join(text_parts)}
+
+
+# ─── Seed ─────────────────────────────────────────────────
+SEED_PROPERTIES = [
+    {
+        "title": "Palatial Ocean-View Duplex, Lekki Phase 1",
+        "description": "A stunning modern duplex with panoramic ocean views, private pool, and smart home features. Nestled in the heart of Lekki Phase 1.",
+        "price": 145_000_000,
+        "listing_type": "buy",
+        "property_type": "duplex",
+        "bedrooms": 5,
+        "bathrooms": 6,
+        "size_sqm": 620,
+        "location": "Admiralty Way, Lekki Phase 1",
+        "city": "Lekki",
+        "state": "Lagos",
+        "latitude": 6.4361,
+        "longitude": 3.4739,
+        "images": [
+            "https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200",
+            "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200",
+            "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200",
+        ],
+        "amenities": ["Swimming Pool", "Smart Home", "24/7 Security", "Gym", "Solar Power"],
+        "status": "premium",
+        "verified": True,
+        "year_built": 2023,
+        "parking": 4,
+        "investment_score": 92,
+        "ai_valuation": 158_000_000,
+        "agent_name": "Adaeze Okoye",
+        "agent_avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200",
+    },
+    {
+        "title": "Serene 4-Bedroom Terrace, Ikoyi",
+        "description": "Refined family terrace with private garden. Steps from Ikoyi Club.",
+        "price": 320_000_000,
+        "listing_type": "buy",
+        "property_type": "terrace",
+        "bedrooms": 4,
+        "bathrooms": 5,
+        "size_sqm": 480,
+        "location": "Bourdillon Road, Ikoyi",
+        "city": "Ikoyi",
+        "state": "Lagos",
+        "latitude": 6.4488,
+        "longitude": 3.4356,
+        "images": [
+            "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200",
+            "https://images.unsplash.com/photo-1600585152220-90363fe7e115?w=1200",
+        ],
+        "amenities": ["Private Garden", "BQ", "CCTV", "Borehole"],
+        "status": "verified",
+        "verified": True,
+        "year_built": 2022,
+        "parking": 3,
+        "investment_score": 88,
+        "ai_valuation": 340_000_000,
+        "agent_name": "Chidi Nwosu",
+        "agent_avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200",
+    },
+    {
+        "title": "Skyline Penthouse, Victoria Island",
+        "description": "Elite penthouse overlooking the Lagos skyline. Concierge and private lift.",
+        "price": 480_000_000,
+        "listing_type": "buy",
+        "property_type": "penthouse",
+        "bedrooms": 4,
+        "bathrooms": 5,
+        "size_sqm": 550,
+        "location": "Ahmadu Bello Way, Victoria Island",
+        "city": "Victoria Island",
+        "state": "Lagos",
+        "latitude": 6.4281,
+        "longitude": 3.4219,
+        "images": [
+            "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=1200",
+            "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=1200",
+        ],
+        "amenities": ["Concierge", "Rooftop Pool", "Private Lift", "Wine Cellar"],
+        "status": "premium",
+        "verified": True,
+        "year_built": 2024,
+        "parking": 3,
+        "investment_score": 95,
+        "ai_valuation": 510_000_000,
+        "agent_name": "Fatima Bello",
+        "agent_avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200",
+    },
+    {
+        "title": "Modern 3-Bed Apartment for Rent, Lekki",
+        "description": "Fully serviced apartment in a gated estate. Available immediately.",
+        "price": 8_500_000,
+        "listing_type": "rent",
+        "property_type": "apartment",
+        "bedrooms": 3,
+        "bathrooms": 3,
+        "size_sqm": 180,
+        "location": "Chevron Drive, Lekki",
+        "city": "Lekki",
+        "state": "Lagos",
+        "latitude": 6.4432,
+        "longitude": 3.5119,
+        "images": [
+            "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200",
+            "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200",
+        ],
+        "amenities": ["Furnished", "24/7 Power", "Pool", "Gym"],
+        "status": "available",
+        "verified": True,
+        "year_built": 2021,
+        "parking": 2,
+        "investment_score": 78,
+        "ai_valuation": 9_200_000,
+        "agent_name": "Tunde Adebayo",
+        "agent_avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200",
+    },
+    {
+        "title": "Prime Land, Abeokuta",
+        "description": "One acre of verified land with clear title. Great for development.",
+        "price": 18_000_000,
+        "listing_type": "buy",
+        "property_type": "land",
+        "bedrooms": 0,
+        "bathrooms": 0,
+        "size_sqm": 4046,
+        "location": "Kobape, Abeokuta",
+        "city": "Abeokuta",
+        "state": "Ogun",
+        "latitude": 7.1608,
+        "longitude": 3.3480,
+        "images": [
+            "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200",
+        ],
+        "amenities": ["C of O", "Cleared", "Road Access"],
+        "status": "verified",
+        "verified": True,
+        "investment_score": 82,
+        "ai_valuation": 20_000_000,
+        "agent_name": "Kemi Ola",
+        "agent_avatar": "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200",
+    },
+    {
+        "title": "Contemporary Bungalow, Abuja",
+        "description": "Bright 4-bedroom bungalow with expansive compound in Maitama.",
+        "price": 210_000_000,
+        "listing_type": "buy",
+        "property_type": "bungalow",
+        "bedrooms": 4,
+        "bathrooms": 4,
+        "size_sqm": 380,
+        "location": "Maitama District, Abuja",
+        "city": "Abuja",
+        "state": "FCT",
+        "latitude": 9.0863,
+        "longitude": 7.4906,
+        "images": [
+            "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200",
+            "https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=1200",
+        ],
+        "amenities": ["Garden", "Study", "Solar Backup"],
+        "status": "available",
+        "verified": True,
+        "year_built": 2020,
+        "parking": 4,
+        "investment_score": 85,
+        "ai_valuation": 225_000_000,
+        "agent_name": "Ibrahim Musa",
+        "agent_avatar": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200",
+    },
+    {
+        "title": "Short-Let Studio, Ikeja GRA",
+        "description": "Cozy fully-serviced studio, great for business travelers.",
+        "price": 65_000,
+        "listing_type": "shortlet",
+        "property_type": "apartment",
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "size_sqm": 45,
+        "location": "Isaac John, Ikeja GRA",
+        "city": "Ikeja",
+        "state": "Lagos",
+        "latitude": 6.5833,
+        "longitude": 3.3500,
+        "images": [
+            "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200",
+        ],
+        "amenities": ["Netflix", "Wifi", "Kitchen", "AC"],
+        "status": "available",
+        "verified": False,
+        "year_built": 2019,
+        "parking": 1,
+        "investment_score": 70,
+        "ai_valuation": 68_000,
+        "agent_name": "Amina Yusuf",
+        "agent_avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200",
+    },
+    {
+        "title": "Commercial Office Space, Victoria Island",
+        "description": "Grade-A office space, 300sqm open plan floor.",
+        "price": 45_000_000,
+        "listing_type": "lease",
+        "property_type": "commercial",
+        "bedrooms": 0,
+        "bathrooms": 4,
+        "size_sqm": 300,
+        "location": "Adeola Odeku, Victoria Island",
+        "city": "Victoria Island",
+        "state": "Lagos",
+        "latitude": 6.4276,
+        "longitude": 3.4258,
+        "images": [
+            "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200",
+        ],
+        "amenities": ["Elevator", "Backup Power", "Fibre Internet", "Parking"],
+        "status": "coming_soon",
+        "verified": True,
+        "year_built": 2023,
+        "parking": 20,
+        "investment_score": 89,
+        "ai_valuation": 48_000_000,
+        "agent_name": "Chidi Nwosu",
+        "agent_avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200",
+    },
+    {
+        "title": "Sold - Elegant Terrace, Ikoyi",
+        "description": "Recently sold reference property.",
+        "price": 275_000_000,
+        "listing_type": "buy",
+        "property_type": "terrace",
+        "bedrooms": 4,
+        "bathrooms": 4,
+        "size_sqm": 420,
+        "location": "Gerard Road, Ikoyi",
+        "city": "Ikoyi",
+        "state": "Lagos",
+        "latitude": 6.4520,
+        "longitude": 3.4390,
+        "images": [
+            "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=1200",
+        ],
+        "amenities": ["BQ", "Garden", "Security"],
+        "status": "sold",
+        "verified": True,
+        "year_built": 2019,
+        "parking": 3,
+        "investment_score": 80,
+    },
+]
+
+SEED_MARKETPLACE = MARKET_ITEMS
+
+SEED_VENDORS = VENDORS
+
+SEED_COLLECTIONS = COLLECTIONS
+
+SEED_NEIGHBORHOODS = [
+    {"id": "n1", "name": "Lekki Phase 1", "city": "Lekki", "state": "Lagos", "image": "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=1200", "avg_price": 155_000_000, "price_change_pct": 8.2, "walk_score": 72, "school_score": 85, "safety_score": 82, "infrastructure_score": 88, "overall_score": 87, "latitude": 6.4361, "longitude": 3.4739, "trending": True},
+    {"id": "n2", "name": "Ikoyi", "city": "Ikoyi", "state": "Lagos", "image": "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=1200", "avg_price": 310_000_000, "price_change_pct": 4.1, "walk_score": 80, "school_score": 92, "safety_score": 90, "infrastructure_score": 91, "overall_score": 92, "latitude": 6.4488, "longitude": 3.4356, "trending": True},
+    {"id": "n3", "name": "Victoria Island", "city": "Victoria Island", "state": "Lagos", "image": "https://images.unsplash.com/photo-1519222970733-f546218fa6d7?w=1200", "avg_price": 380_000_000, "price_change_pct": 5.7, "walk_score": 84, "school_score": 88, "safety_score": 87, "infrastructure_score": 93, "overall_score": 90, "latitude": 6.4281, "longitude": 3.4219, "trending": False},
+    {"id": "n4", "name": "Maitama, Abuja", "city": "Abuja", "state": "FCT", "image": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200", "avg_price": 220_000_000, "price_change_pct": 6.9, "walk_score": 70, "school_score": 86, "safety_score": 91, "infrastructure_score": 90, "overall_score": 88, "latitude": 9.0863, "longitude": 7.4906, "trending": True},
+    {"id": "n5", "name": "Abeokuta", "city": "Abeokuta", "state": "Ogun", "image": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200", "avg_price": 22_000_000, "price_change_pct": 12.3, "walk_score": 55, "school_score": 68, "safety_score": 78, "infrastructure_score": 62, "overall_score": 68, "latitude": 7.1608, "longitude": 3.3480, "trending": True},
+]
+
+
+@api.post("/seed")
+async def seed_data(dry_run: bool = False, _admin: dict = Depends(require_admin)):
+    """Dev helper: tops up the starter listings, marketplace, vendors, collections and
+    neighbourhoods (only rows that are missing are inserted — nothing is wiped).
+    `?dry_run=true` only reports what would be seeded."""
+    if dry_run:
+        return {
+            "dry_run": True,
+            "properties": len(SEED_PROPERTIES),
+            "marketplace": len(SEED_MARKETPLACE),
+            "vendors": len(SEED_VENDORS),
+            "collections": len(SEED_COLLECTIONS),
+            "neighborhoods": len(SEED_NEIGHBORHOODS),
+        }
+    return await _do_seed()
+
+
+async def _seed_missing(col, docs, key: str) -> int:
+    """Insert the seed rows that aren't there yet, matched on `key` — never deletes or overwrites."""
+    inserted = 0
+    for d in docs:
+        if await col.find_one({key: d[key]}, {"_id": 1}) is None:
+            await col.insert_one(d)
+            inserted += 1
+    return inserted
+
+
+async def _do_seed():
+    """Idempotent: safe to run on every boot (and against a live production DB)."""
+    out = {
+        "properties": await _seed_missing(db.properties, [Property(**p).model_dump() for p in SEED_PROPERTIES], "title"),
+        "marketplace": await _seed_missing(db.marketplace, [MarketplaceItem(**m).model_dump() for m in SEED_MARKETPLACE], "id"),
+    }
+    # C2C classifieds (OfferUp/Letgo-style) + FIXA verified service providers — keyed by name.
+    extra = 0
+    for group, label in ((C2C_MARKET_ITEMS, "c2c"), (FIXA_PROVIDERS, "fixa")):
+        docs = []
+        for m in group:
+            try:
+                docs.append(MarketplaceItem(**m).model_dump())
+            except Exception as e:
+                logger.warning(f"skip {label} seed item {m.get('name','?')}: {e}")
+        extra += await _seed_missing(db.marketplace, docs, "name")
+    out["marketplace"] += extra
+    out["vendors"] = await _seed_missing(db.vendors, [v.copy() for v in SEED_VENDORS], "id")
+    out["collections"] = await _seed_missing(db.collections, [c.copy() for c in SEED_COLLECTIONS], "id")
+    out["neighborhoods"] = await _seed_missing(db.neighborhoods, [n.copy() for n in SEED_NEIGHBORHOODS], "id")
+    return out
+
+
+@api.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"app": "AMASS API", "version": "1.0.0"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks(limit: int = Query(20, ge=1, le=100)):
-    status_checks = await db.status_checks.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+from demo_homes_seed import seed_demo_homes, purge_test_listings  # noqa: E402
+from kyc_documents import register_kyc_routes, ensure_kyc_indexes, docs_summary as _docs_summary  # noqa: E402
+from agent_listing_manager import register_listing_manager_routes  # noqa: E402
 
-# Include the router in the main app
-app.include_router(api_router)
+
+@api.post("/admin/maintenance/purge-test-listings")
+async def admin_purge_test_listings(_admin: dict = Depends(require_admin)):
+    """Remove automated-test fixtures (TEST_* titles, example.com photos) and re-run the demo-homes seed."""
+    purged = await purge_test_listings(db)
+    seeded = await seed_demo_homes(db, Property, hash_password)
+    return {"purged": purged, "seeded": seeded}
+
+
+# ─── Mount ────────────────────────────────────────────────
+app.include_router(api)
+app.include_router(register_kyc_routes(db, get_current_user, require_admin))
+app.include_router(register_listing_manager_routes(db, get_current_user))
+app.include_router(register_token_routes(db))
+
+
+# AI helper — used by agent tools (description gen + search parser)
+class _ChatWrapper:
+    def __init__(self, system: str):
+        self._chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=str(uuid.uuid4()),
+            system_message=system,
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+
+    async def ask(self, text: str) -> str:
+        parts: list = []
+        async for ev in self._chat.stream_message(UserMessage(text=text)):
+            if isinstance(ev, TextDelta):
+                parts.append(ev.content)
+            elif isinstance(ev, StreamDone):
+                break
+        return "".join(parts)
+
+
+def _chat_factory(system: str) -> _ChatWrapper:
+    return _ChatWrapper(system)
+
+
+app.include_router(register_earn_routes(db))
+app.include_router(register_agent_tool_routes(db, _chat_factory))
+app.include_router(register_promotion_routes(db, get_current_user, require_admin, WalletService(db)))
+app.include_router(register_ads_routes(db))
+app.include_router(register_marketplace_v2_routes(db, get_current_user, require_admin))
+
+# ─── Neighbours (social) layer: phone OTP sign-in · funnel analytics · friends/collections · estates ───
+from phone_auth import register_phone_auth_routes, ensure_phone_auth_indexes
+from analytics import register_analytics_routes, ensure_analytics_indexes
+from social import register_social_routes, ensure_social_indexes
+from community import register_community_routes, ensure_community_indexes, event_reminder_sweep
+from social_seed import seed_neighbours_pilot
+from shop import register_shop_routes, ensure_shop_indexes
+from shop_seed import seed_shop
+
+app.include_router(register_phone_auth_routes(db, get_current_user, bearer, decode_user_id, create_token, user_to_out, hash_password))
+app.include_router(register_analytics_routes(db, bearer, decode_user_id, require_admin))
+app.include_router(register_social_routes(db, get_current_user, require_admin, annotate_properties))
+app.include_router(register_community_routes(db, get_current_user, require_admin, bearer, decode_user_id))
+app.include_router(register_shop_routes(db, get_current_user, bearer, decode_user_id))
+from social_feed import register_social_feed_routes, ensure_social_feed_indexes  # noqa: E402
+from social_feed_seed import seed_social_feed  # noqa: E402
+_sf_router, _sf_files = register_social_feed_routes(db, get_current_user, require_admin)
+app.include_router(_sf_router)
+app.include_router(_sf_files)
+from intelligence import register_intelligence_routes  # noqa: E402
+app.include_router(register_intelligence_routes(db))
+from apple_auth import register_apple_auth_route  # noqa: E402
+app.include_router(register_apple_auth_route(db, create_token, user_to_out))
+
+# ─── Saved Searches / Alerts ──────────────────────────────────
+from saved_searches import register_saved_search_routes
+app.include_router(register_saved_search_routes(db, get_current_user))
+
+# ─── Real payments (Paystack + Flutterwave) with MOCK_PAYMENT fallback
+from payments import register_payment_routes
+app.include_router(register_payment_routes(db, get_current_user))
+from receipts import register_receipt_routes, ensure_receipt_indexes
+app.include_router(register_receipt_routes(db, get_current_user))
+
+# ─── Property Improvement, Inspection, Finance & Renovation Projects
+from property_improvement import register_property_improvement_routes
+app.include_router(register_property_improvement_routes(db, get_current_user))
+
+# ─── Property viewings (buyer books a slot with the listing agent after unlocking)
+from viewings import register_viewing_routes, start_viewings
+app.include_router(register_viewing_routes(db, get_current_user))
+
+# ─── FIXA (free): providers, Join FIXA applications, provider jobs, reports, admin verification
+from fixa import ensure_fixa_indexes, register_fixa_routes
+_fixa_router, _fixa_admin = register_fixa_routes(db, get_current_user, require_admin, ADMIN_EMAILS)
+app.include_router(_fixa_router)
+app.include_router(_fixa_admin)
+
+# ─── AMASS Partner (Agent) App: roles, counts, photo upload, FIXA job stages
+from partner_app import register_partner_routes, seed_partner_demo
+app.include_router(register_partner_routes(db, get_current_user))
+
+# ─── Map time (1 MASS per hour on the Find Home map; 0 MASS → no markers). /map/markers runs the same meter.
+from map_time import ensure_map_time_indexes, register_map_time_routes
+_map_time_router, _map_time_meter = register_map_time_routes(db, get_current_user)
+app.include_router(_map_time_router)
+
+# ─── My Home hub: homes, bills (reminders only), records, items, repairs, calendar, private uploads
+from home_hub import register_home_hub_routes, start_home_hub, seed_home_hub_demo
+app.include_router(register_home_hub_routes(db, get_current_user, require_admin))
+
+# ─── Agent Platform (Phase 1: onboarding, plans, quotas, founding, admin)
+from agent_platform import (
+    register_agent_platform_routes,
+    check_listing_quota,
+    maybe_mark_starter_kit_eligible,
+    _ensure_plans_seeded,
+)
+_agent_platform_router, _agent_platform_admin_router = register_agent_platform_routes(
+    db, get_current_user, require_admin
+)
+app.include_router(_agent_platform_router)
+app.include_router(_agent_platform_admin_router)
+
+# ─── Agent Platform v2 (Phase 2: public profiles, badges, apple deletion)
+from agent_platform_v2 import register_agent_platform_v2_routes
+import agent_platform as _ap  # for _FINALIZE_SUBSCRIPTION lookup
+_v2_router, _v2_admin_router = register_agent_platform_v2_routes(
+    db,
+    get_current_user,
+    require_admin,
+    finalize_subscription_hook=lambda pending: _ap._FINALIZE_SUBSCRIPTION(pending),  # type: ignore
+    optional_viewer=optional_viewer_id,
+    gate_listings=annotate_properties,
+)
+app.include_router(_v2_router)
+app.include_router(_v2_admin_router)
+
+# ─── Marketing & Sharing (Phase 3: share links, WhatsApp, QR events)
+from share_routes import register_share_routes
+app.include_router(register_share_routes(db, get_current_user))
+
+# ─── Reviews · Agent Score · Analytics · Lead CRM (Phase 4)
+from reviews_score_crm import register_phase4_routes
+_p4_router, _p4_admin_router = register_phase4_routes(db, get_current_user, require_admin)
+app.include_router(_p4_router)
+app.include_router(_p4_admin_router)
+
+# ─── Agency teams: admin-created agencies, email invites accepted in-app, one shared CRM with assignments
+from agency_teams import ensure_agency_indexes, register_agency_routes
+_agency_router, _agency_admin = register_agency_routes(db, get_current_user, require_admin)
+app.include_router(_agency_router)
+app.include_router(_agency_admin)
+
+# ─── Property Identity Core (Phase 6A)
+from property_identity import register_property_identity_routes
+_pi_router, _pi_public = register_property_identity_routes(
+    db, get_current_user, require_admin
+)
+app.include_router(_pi_router)
+app.include_router(_pi_public)
+
+# ─── Duplicate Detection Engine (Phase 6B)
+from duplicate_detection import register_duplicate_routes
+_dup_router, _dup_admin = register_duplicate_routes(db, get_current_user, require_admin)
+app.include_router(_dup_router)
+app.include_router(_dup_admin)
+
+# ─── Property Representations & Claims (Phase 6C)
+from property_representations import register_representation_routes
+_rep_agent, _rep_public, _rep_admin = register_representation_routes(
+    db, get_current_user, require_admin
+)
+app.include_router(_rep_agent)
+app.include_router(_rep_public)
+app.include_router(_rep_admin)
+
+# ─── Property Passport — public SEO-friendly page (Phase 6C)
+from property_passport import register_passport_routes
+_pp_public, _pp_admin = register_passport_routes(db, get_current_user, require_admin)
+app.include_router(_pp_public)
+app.include_router(_pp_admin)
+
+# ─── Admin Cockpit — duplicate queue, merge, audit, verify (Phase 6D)
+from admin_cockpit import register_admin_cockpit_routes
+app.include_router(register_admin_cockpit_routes(db, require_admin))
+
+# ─── Legal: public Privacy Policy + Terms (Play/App Store compliance) ─
+from legal import register_legal_routes
+app.include_router(register_legal_routes())
+
+# ─── D-1: Property Type registry + App Settings (feature flags, weights, pricing) ─
+from property_types import register_property_type_routes, ensure_default_property_types
+from app_settings import register_app_settings_routes, ensure_default_settings
+_pt_public, _pt_admin = register_property_type_routes(db, require_admin)
+_as_public, _as_admin = register_app_settings_routes(db, require_admin)
+app.include_router(_pt_public)
+app.include_router(_pt_admin)
+app.include_router(_as_public)
+app.include_router(_as_admin)
+
+# ─── D-2: Google Places server-side discovery (mockable-first) ─
+from discovery_google import register_discovery_google_routes
+app.include_router(register_discovery_google_routes(db, require_admin))
+
+# ─── D-3: Candidate reducer + bulk discovery jobs pipeline ─
+from discovery_pipeline import register_discovery_pipeline_routes, fail_crashed_jobs
+app.include_router(register_discovery_pipeline_routes(db, require_admin))
+
+# ─── D-5: Agent task queue + territory + verification wizard ─
+from agent_tasks import register_agent_tasks_routes, expire_stale_tasks
+_agent_router, _admin_tasks_router = register_agent_tasks_routes(db, get_current_user, require_admin)
+app.include_router(_agent_router)
+app.include_router(_admin_tasks_router)
+
+# ─── D-5: Emergent Object Storage — authenticated file download ─
+from object_storage import get_object as _os_get_object, init_storage as _os_init
+from fastapi import Response as _FileResp
+
+# ─── D-6: Verification scoring + fraud signals ───
+from verification_scoring import register_verification_scoring_routes
+app.include_router(register_verification_scoring_routes(db, get_current_user, require_admin))
+
+# ─── D-8: AI valuation (HybridComparableEstimator) ───
+from property_valuations import register_valuation_routes
+app.include_router(register_valuation_routes(db, get_current_user, require_admin))
+
+# ─── In-app Chat (Phase 1) ───
+from chat import register_chat_routes, create_chat_indexes
+app.include_router(register_chat_routes(db, get_current_user, require_admin))
+
+# ─── Push notifications (Emergent-managed) ───
+from push_notifications import register_push_routes
+app.include_router(register_push_routes())
+
+# ─── Notification Center (user-controlled categories / frequency / quiet hours / push) ───
+from notification_center import register_notification_center_routes, start_notification_center
+app.include_router(register_notification_center_routes(db, get_current_user, require_admin))
+
+# ─── Emergent-managed Google Auth bridge ───
+from google_auth import register_google_auth_routes
+app.include_router(
+    register_google_auth_routes(db, create_token, user_to_out, hash_password)
+)
+
+# ─── Two-tier property access charging (access fee + agent-contact fee) ───
+from property_access import (
+    register_property_access_routes,
+    get_wallet_pricing,
+    access_fee_for,
+    agent_contact_fee_for,
+    unlock_flags,
+    agent_contact_for,
+)
+app.include_router(register_property_access_routes(db, get_current_user, require_admin))
+
+# ─── Auth security — password reset (email) + brute-force lockout ───
+from auth_security import (
+    register_auth_security_routes,
+    check_login_locked,
+    record_login_failure,
+    clear_login_failures,
+)
+app.include_router(register_auth_security_routes(db, hash_password))
+
+# ─── Branded emails: public logo assets + admin previews; public origin learned from inbound requests ───
+from email_theme import register_email_asset_routes, register_email_preview_routes  # noqa: E402
+from public_url import load_remembered as _load_public_base, remember_from_request as _remember_public_base  # noqa: E402
+
+app.include_router(register_email_asset_routes())
+app.include_router(register_email_preview_routes(require_admin))
+
+# ─── Roles & admin integration: AMASS Admin Portal compat API + Brands (brand-only logins) ───
+from admin_portal import register_admin_portal_routes  # noqa: E402
+from brands import register_brand_routes  # noqa: E402
+
+_portal_router = register_admin_portal_routes(db, ADMIN_EMAILS)
+app.include_router(_portal_router, prefix="/api/portal")       # portal API base = https://<backend>/api/portal
+app.include_router(_portal_router, prefix="/api/portal/api")   # …or keep the portal's "+ /api" suffix
+_brands_admin, _brand_portal = register_brand_routes(db, require_admin)
+app.include_router(_brands_admin)
+app.include_router(_brand_portal)
+from admin_accounts import register_admin_accounts_routes  # noqa: E402
+
+app.include_router(register_admin_accounts_routes(db, require_admin))
+from social_publishing import register_social_routes  # noqa: E402
+from walkthrough_video import register_walkthrough_routes  # noqa: E402
+
+app.include_router(register_walkthrough_routes(db, get_current_user))
+
+_social_admin, _social_public = register_social_routes(db, require_admin)
+app.include_router(_social_admin)
+app.include_router(_social_public)
+
+
+@app.middleware("http")
+async def _learn_public_base(request, call_next):
+    await _remember_public_base(db, request)
+    return await call_next(request)
+
+@app.get("/api/files/{file_path:path}")
+async def _download_file(file_path: str, user: dict = Depends(get_current_user)):
+    """Auth-checked passthrough to Emergent Object Storage.
+    Path convention: `amass/uploads/{user_id}/{uuid}.{ext}`. Admins can
+    read any path; other users can only read paths that begin with
+    `amass/uploads/{their_user_id}/` — which is where their own uploads land."""
+    if not file_path.startswith("amass/"):
+        raise HTTPException(400, "Invalid path")
+    if not user.get("is_admin"):
+        prefix = f"amass/uploads/{user['id']}/"
+        # Also allow files referenced from agent_verification_tasks the agent claimed
+        # or from properties they can see, but for MVP we scope strictly to owner.
+        if not file_path.startswith(prefix):
+            # Allow if the file is referenced on a property they've verified or an
+            # agent_verification_task they own
+            ref_task = await db.agent_verification_tasks.find_one(
+                {"$or": [
+                    {"verification_data.photo_path": file_path, "assigned_agent_id": user["id"]},
+                ]},
+                {"_id": 0, "id": 1},
+            )
+            if not ref_task:
+                # Neighbours: estate managers may open a pending resident's proof;
+                # approved estate members may see service-request photos.
+                url = f"/api/files/{file_path}"
+                allowed = False
+                proof = await db.estate_members.find_one({"proof_url": url}, {"_id": 0, "estate_id": 1})
+                if proof:
+                    allowed = await db.estate_members.find_one({"estate_id": proof["estate_id"], "user_id": user["id"], "role": "manager", "status": "approved"}, {"_id": 0, "id": 1}) is not None
+                if not allowed:
+                    sr = await db.service_requests.find_one({"photos": url}, {"_id": 0, "estate_id": 1})
+                    if sr:
+                        allowed = await db.estate_members.find_one({"estate_id": sr["estate_id"], "user_id": user["id"], "status": "approved"}, {"_id": 0, "id": 1}) is not None
+                if not allowed:
+                    raise HTTPException(403, "Forbidden")
+    try:
+        data, ct = await _os_get_object(file_path)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(404, "File not found")
+    return _FileResp(content=data, media_type=ct)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+
+async def _monetization_startup():
+    """Indexes → ₦100/MASS migration → default prices → legacy unlock migration → reconciliation loop."""
+    try:
+        await ensure_monetization_indexes(db)
+        await ensure_receipt_indexes(db)
+        seeded = await _unlock_svc.pricing.seed_defaults()
+        migrated = await _unlock_svc.migrate_legacy_unlocks()
+        rec = await _unlock_svc.reconcile()
+        logging.getLogger("amass.monetization").info("monetization ready seeded=%s migrated=%s reconcile=%s", seeded, migrated, rec)
+    except Exception as e:  # never block boot
+        logging.getLogger("amass.monetization").exception("monetization startup failed: %s", e)
+
+    async def _loop():
+        while True:
+            await asyncio.sleep(600)
+            try:
+                await _unlock_svc.reconcile()
+            except Exception as e:
+                logging.getLogger("amass.monetization").warning("reconcile failed: %s", e)
+
+    asyncio.create_task(_loop())
+
 
 @app.on_event("startup")
-async def start_index_build():
-    app.state.index_task = asyncio.create_task(ensure_indexes())  # background: a big index build must not block boot
+async def on_startup():
+    await _load_public_base(db)  # origin for logos/links in emails sent from background tasks
+    await _monetization_startup()
+    await start_notification_center(db)  # indexes + hourly matcher/digest sweep
+    await start_viewings(db)  # indexes + 24h reminder sweep
+    await ensure_map_time_indexes(db)
+    await ensure_fixa_indexes(db)
+    await ensure_agency_indexes(db)
+    await start_home_hub(db)  # indexes + 30-min bill / maintenance / expiry reminder sweep
+    try:
+        _demo_hh = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0, "id": 1})
+        if _demo_hh:
+            await seed_home_hub_demo(db, _demo_hh)
+    except Exception as _e:  # never block boot
+        logger.warning("home hub demo seed failed: %s", _e)
+    try:
+        logger.info("partner demo seed: %s", await seed_partner_demo(db, hash_password))
+    except Exception as _e:  # never block boot
+        logger.warning("partner demo seed failed: %s", _e)
+    # ─── DB Indexes (idempotent) ─────────────────────────────
+    try:
+        await db.properties.create_index("id", unique=True)
+        await db.properties.create_index("agent_id")
+        await db.properties.create_index("listing_type")
+        await db.properties.create_index([("latitude", 1), ("longitude", 1)])
+        await db.properties.create_index("verified")
+        await db.wallets.create_index([("user_id", 1), ("currency", 1)], unique=True)
+        await db.token_transactions.create_index([("user_id", 1), ("created_at", -1)])
+        await db.token_transactions.create_index("meta.idempotency_key", sparse=True)
+        await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
+        await db.notifications.create_index("id", unique=True)
+        await ensure_phone_auth_indexes(db)  # partial-unique email (phone-only accounts) + OTP TTLs
+        await ensure_analytics_indexes(db)
+        await ensure_social_indexes(db)
+        await ensure_community_indexes(db)
+        try:
+            _demo = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0, "id": 1})
+            _seeded = await seed_neighbours_pilot(db, (_demo or {}).get("id"))
+            logger.info("neighbours pilot seed: %s", _seeded)
+        except Exception as _e:  # never block boot
+            logger.warning("neighbours seed failed: %s", _e)
+        try:
+            await ensure_shop_indexes(db)
+            logger.info("shop seed: %s", await seed_shop(db))
+        except Exception as _e:  # never block boot
+            logger.warning("shop seed failed: %s", _e)
+        try:
+            await ensure_social_feed_indexes(db)
+            _demo_sf = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0, "id": 1})
+            logger.info("social feed seed: %s", await seed_social_feed(db, (_demo_sf or {}).get("id"), hash_password))
+        except Exception as _e:  # never block boot
+            logger.warning("social feed seed failed: %s", _e)
+        try:
+            await db.properties.create_index("seed_key", sparse=True)
+            await ensure_kyc_indexes(db)
+            logger.info("demo homes seed: %s", await seed_demo_homes(db, Property, hash_password))
+        except Exception as _e:  # never block boot
+            logger.warning("demo homes seed failed: %s", _e)
+        try:
+            from walkthrough_video import seed_demo_walkthroughs
+
+            logger.info("walkthrough seed: %s", await seed_demo_walkthroughs(db))
+        except Exception as _e:  # never block boot
+            logger.warning("walkthrough seed failed: %s", _e)
+
+        async def _reminder_loop():
+            while True:
+                await asyncio.sleep(600)
+                try:
+                    await event_reminder_sweep(db)
+                except Exception as _e:
+                    logger.warning("event reminder sweep failed: %s", _e)
+
+        asyncio.create_task(_reminder_loop())
+        await db.users.create_index("referral_code", sparse=True)
+        await db.favorites.create_index([("user_id", 1), ("property_id", 1)], unique=True)
+        await db.favorites.create_index("property_id")
+        # Two-tier property access unlocks (access + agent_contact)
+        await db.property_unlocks.create_index([("user_id", 1), ("property_id", 1)])
+        await db.property_unlocks.create_index(
+            [("user_id", 1), ("property_id", 1), ("tier", 1)],
+            unique=True,
+            partialFilterExpression={"tier": {"$exists": True}},
+            name="property_unlocks_tier_uniq",
+        )
+        # Auth security: reset codes + login lockout
+        await db.password_resets.create_index("email", unique=True)
+        await db.password_resets.create_index("expires_at", expireAfterSeconds=3600)
+        await db.login_attempts.create_index("email", unique=True)
+        await db.marketplace.create_index("id", unique=True)
+        await db.agent_referrals.create_index("agent_user_id")
+        await db.agent_referrals.create_index("id", unique=True)
+        # Agent Platform (Phase 1)
+        await db.agent_plans.create_index("id", unique=True)
+        await db.agent_subscriptions.create_index([("user_id", 1), ("status", 1)])
+        await db.agent_subscriptions.create_index("id", unique=True)
+        await db.agent_subscriptions.create_index("payment_reference", sparse=True)
+        await db.agent_starter_kits.create_index("user_id", unique=True)
+        await db.founding_program.create_index("id", unique=True)
+        await db.pending_agent_subscriptions.create_index("reference", unique=True)
+        await db.agent_applications.create_index("user_id", unique=True)
+        await db.agent_applications.create_index("status")
+        await db.agent_applications.create_index("slug", unique=True, sparse=True)
+        await db.account_deletions.create_index("user_id_hash", unique=True)
+        await db.share_events.create_index([("target_id", 1), ("created_at", -1)])
+        await db.share_events.create_index([("user_id", 1), ("created_at", -1)])
+        # Phase 4 — reviews / CRM
+        await db.agent_reviews.create_index([("agent_id", 1), ("status", 1), ("created_at", -1)])
+        await db.agent_reviews.create_index([("reviewer_id", 1), ("agent_id", 1)], unique=True)
+        await db.agent_reviews.create_index("id", unique=True)
+        await db.agent_review_reports.create_index("review_id")
+        await db.lead_unlocks.create_index([("agent_id", 1), ("crm_status", 1)])
+        await db.lead_unlocks.create_index([("agent_id", 1), ("next_follow_up_at", 1)], sparse=True)
+        # Phase 6A — Property Identity Core (MongoDB 2dsphere)
+        await db.properties_geo.create_index([("entrance_point", "2dsphere")])
+        await db.properties_geo.create_index("amass_property_id", unique=True)
+        await db.properties_geo.create_index("property_uuid", unique=True)
+        await db.properties_geo.create_index("aliases")
+        await db.properties_geo.create_index([("state", 1), ("lga", 1), ("area", 1)])
+        await db.properties_geo.create_index("normalized_address")
+        await db.property_listings.create_index("property_id")
+        await db.property_listings.create_index([("agent_id", 1), ("listing_status", 1)])
+        await db.property_listings.create_index("id", unique=True)
+        await db.property_onboarding.create_index(
+            [("client_submission_id", 1), ("agent_id", 1)], unique=True
+        )
+        await db.property_onboarding.create_index("id", unique=True)
+        await db.property_onboarding.create_index([("agent_id", 1), ("status", 1)])
+        await db.property_id_counters.create_index("state_code", unique=True)
+        await db.property_audit_logs.create_index([("property_id", 1), ("created_at", -1)])
+        await db.property_audit_logs.create_index("id", unique=True)
+        # Phase 6C — Representations & Claims
+        await db.property_representations.create_index("id", unique=True)
+        await db.property_representations.create_index(
+            [("property_id", 1), ("status", 1)]
+        )
+        await db.property_representations.create_index(
+            [("user_id", 1), ("status", 1)]
+        )
+        await db.property_representations.create_index("listing_id", sparse=True)
+        await db.property_representations.create_index(
+            [("listing_id", 1), ("user_id", 1)], unique=True, sparse=True
+        )
+        await db.property_claims.create_index("id", unique=True)
+        await db.property_claims.create_index(
+            [("representation_id", 1), ("submitted_at", -1)]
+        )
+        # ─── Phase D-1: Property types + app settings + D-3/D-5/D-8 collections ─
+        await db.property_types.create_index("slug", unique=True)
+        await db.property_types.create_index([("order", 1), ("active", 1)])
+        await db.app_settings.create_index("key", unique=True)
+        # Discovery pipeline (populated in D-2/D-3)
+        await db.property_candidates.create_index("id", unique=True)
+        await db.property_candidates.create_index("google_place_id", sparse=True)
+        await db.property_candidates.create_index([("status", 1), ("created_at", -1)])
+        await db.property_candidates.create_index([("location", "2dsphere")])
+        await db.discovery_jobs.create_index("id", unique=True)
+        await db.discovery_jobs.create_index([("status", 1), ("created_at", -1)])
+        await db.discovery_admin_overrides.create_index("id", unique=True)
+        await db.discovery_admin_overrides.create_index([("candidate_id", 1), ("created_at", -1)])
+        await db.discovery_admin_overrides.create_index([("amass_property_id", 1), ("created_at", -1)])
+        await db.google_places_cache.create_index("place_id", unique=True)
+        await db.google_places_cache.create_index([("cached_at", 1)])
+        await db.google_places_usage.create_index([("day", 1)])
+        # Verification tasks + territories + valuations (populated D-5..D-8)
+        await db.agent_verification_tasks.create_index("id", unique=True)
+        await db.agent_verification_tasks.create_index([("assigned_agent_id", 1), ("status", 1)])
+        await db.agent_verification_tasks.create_index([("status", 1), ("state", 1), ("created_at", -1)])
+        await db.agent_verification_tasks.create_index([("property_uuid", 1), ("status", 1)])
+        await db.agent_verification_tasks.create_index([("location", "2dsphere")])
+        await db.agent_verification_tasks.create_index([("expires_at", 1)])
+        await db.agent_territories.create_index([("agent_id", 1)], unique=True, name="agent_territories_agent_id_uniq")
+        await db.agent_territories.create_index([("state", 1), ("is_active", 1)])
+        await db.property_valuations.create_index([("amass_property_id", 1), ("valued_at", -1)])
+        await db.property_valuations.create_index("id", unique=True)
+        await db.property_valuations.create_index([("property_uuid", 1), ("status", 1), ("valued_at", -1)])
+        # D-6 fraud flags
+        await db.fraud_flags.create_index("id", unique=True)
+        await db.fraud_flags.create_index([("property_uuid", 1), ("flag_type", 1), ("status", 1)])
+        await db.fraud_flags.create_index([("status", 1), ("created_at", -1)])
+        # Chat indexes
+        from chat import create_chat_indexes as _chat_idx
+        await _chat_idx(db)
+        # Seed defaults (idempotent)
+        from property_types import ensure_default_property_types as _ensure_pt
+        from app_settings import ensure_default_settings as _ensure_as
+        await _ensure_pt(db)
+        await _ensure_as(db)
+        # D-3: mark any RUNNING/QUEUED jobs as FAILED (crash recovery)
+        from discovery_pipeline import fail_crashed_jobs as _fail_crashed
+        await _fail_crashed(db)
+        # D-5: expire stale verification tasks
+        from agent_tasks import expire_stale_tasks as _expire_tasks
+        expired = await _expire_tasks(db)
+        if expired:
+            logger.info(f"Expired {expired} stale verification tasks")
+        # D-5: initialize Emergent Object Storage handshake (best-effort)
+        try:
+            from object_storage import init_storage as _init_os
+            await _init_os()
+        except Exception as e:
+            logger.warning(f"Object storage init failed (uploads may fail): {e}")
+    except Exception as e:
+        logger.warning(f"Index creation issue (safe to ignore on re-boot): {e}")
+
+    # ─── Seed Agent Platform plans + founding program ─────────
+    try:
+        await _ensure_plans_seeded(db)
+    except Exception:
+        logger.exception("failed to seed agent plans")
+
+    # ─── Backfill slugs on existing agent_applications (Phase 2) ────
+    try:
+        from agent_platform_v2 import _ensure_slug as _ensure_agent_slug
+        cursor = db.agent_applications.find({"slug": {"$exists": False}}, {"_id": 0})
+        async for a in cursor:
+            try:
+                await _ensure_agent_slug(db, a)
+            except Exception:
+                pass
+    except Exception:
+        logger.exception("agent slug backfill failed")
+
+    # Auto-seed if empty
+    count = await db.properties.count_documents({})
+    if count == 0:
+        logger.info("Seeding initial data …")
+        await _do_seed()
+    # Mark AMASS Exclusive listings (Category 1 — free forever)
+    # Marketing inventory: keep a curated handful as AMASS Exclusive.
+    # First, unmark all so we can converge to a deterministic state each boot.
+    await db.properties.update_many({}, {"$set": {"is_amass_exclusive": False}})
+    exclusive_ids: list = []
+    # Pick top 2 verified + 1 owner_listed as exclusive if available.
+    top_verified = await db.properties.find(
+        {"verified": True}, {"id": 1, "_id": 0}
+    ).sort("price", -1).limit(2).to_list(2)
+    exclusive_ids.extend([d["id"] for d in top_verified])
+    owner_listed = await db.properties.find(
+        {"listing_source": "owner_listed"}, {"id": 1, "_id": 0}
+    ).limit(1).to_list(1)
+    exclusive_ids.extend([d["id"] for d in owner_listed])
+    if exclusive_ids:
+        await db.properties.update_many(
+            {"id": {"$in": exclusive_ids}},
+            {"$set": {"is_amass_exclusive": True}},
+        )
+
+    # Seed a single always-on demo advertisement (marketplace-facing) so the
+    # smart ad delivery flow is testable end-to-end.
+    from ads import Ad, AdMedia  # local import to avoid circular
+    ad_count = await db.advertisements.count_documents({"seller_id": "demo-system"})
+    if ad_count == 0:
+        # Pick a marketplace item to advertise
+        sample_item = await db.marketplace_items.find_one({}, {"_id": 0})
+        cover = None
+        if sample_item:
+            imgs = sample_item.get("images") or []
+            cover = imgs[0] if imgs else None
+        demo_ad = Ad(
+            seller_id="demo-system",
+            marketplace_item_id=sample_item["id"] if sample_item else None,
+            tier="premium",
+            title=(sample_item.get("title") if sample_item else "Discover premium home essentials"),
+            description="Handpicked pieces from AMASS-verified vendors. Free delivery on your first order.",
+            cta_label="Shop the collection",
+            media=[
+                AdMedia(
+                    kind="image",
+                    url=cover
+                    or "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1080",
+                    aspect_ratio=1.6,
+                )
+            ],
+            target_cities=["Lagos", "Abuja"],
+            tokens_paid=0,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=180),
+            status="active",
+        )
+        await db.advertisements.insert_one(demo_ad.model_dump())
+
+    # Assign 2 seed properties to the demo user so /agent-dashboard is
+    # populated for demo E2E flow (Boost / Leads UI) — only when the demo user owns none yet.
+    demo_user = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0})
+    if demo_user and await db.properties.count_documents({"agent_id": demo_user["id"]}) < 2:
+        demo_props = await db.properties.find(
+            {"agent_id": {"$ne": demo_user["id"]}, "seed_key": {"$exists": False}}, {"_id": 0}
+        ).sort("price", -1).limit(2).to_list(2)
+        if demo_props:
+            await db.properties.update_many(
+                {"id": {"$in": [p["id"] for p in demo_props]}},
+                {
+                    "$set": {
+                        "agent_id": demo_user["id"],
+                        "agent_name": demo_user.get("full_name", "Ada Demo"),
+                    }
+                },
+            )
+            await db.users.update_one({"id": demo_user["id"]}, {"$set": {"is_agent": True}})
+
 
 @app.on_event("shutdown")
-async def shutdown_db_client():
-    app.state.index_task.cancel()  # stop a build still running before its client closes
-    with suppress(asyncio.CancelledError):
-        await app.state.index_task
+async def on_shutdown():
     client.close()

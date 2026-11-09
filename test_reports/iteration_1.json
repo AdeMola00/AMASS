@@ -1,0 +1,45 @@
+{
+  "summary": "First run on the AMASS Partner app (backend + Expo web at 390x844). Backend: 14/14 pytest pass (partner/me roles+counts for agent/seller/fixa/buyer, roles validation, upload, FIXA stage 404/409/422/200 + persistence, agent manager/leads, viewings, seller my-listings/offers, chat, brand login/products). Frontend: login, the wrong-password error, automatic fallback to brand login, agent home tiles, listing detail Hide->Show again, visit 'Another time' sheet, the 7-step Add-a-home wizard incl. web gallery upload, seller item Pause/Live, offer counter sheet, Sell-an-item wizard (published), FIXA accept + On my way->Working->Finished, Messages list->thread, quick reply + typed send, Alerts segment, Me language switch (Pidgin/Yoruba labels change), voice switch, Listen, add role via welcome -> role switcher, sign out, buyer welcome, brand product list/edit/save and add-product screen all work. Found and FIXED 1 critical bug: the chat thread was always empty because it asked for limit=60 and the backend caps at 50 (422, error hidden). HIGH open issue: the demo agent cannot publish a home (POST /api/properties 402, plan listing limit), and the user only finds out after all 7 steps. No deprecated Expo packages (expo-av / expo-barcode-scanner / expo-background-fetch) found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/partner/upload", "issue": "Object storage returned a 500 once (integrations objstore PUT). It is not caught, so the client gets a raw 500 with no detail. I retried 6 times after that and all returned 201, so it was transient. Wrap upload_photo_base64 in try/except and return a 502 with a friendly message (maybe retry once). No MIME or image check on data_url."},
+      {"endpoint": "GET /api/partner/me", "issue": "counts.fixa_jobs_active counts confirmed jobs whose job_stage is 'finished', so the 'Jobs to do' tile still shows finished jobs (it showed 2 after I finished one). Also, unread_messages makes one query per conversation (N+1, up to 200 conversations)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Chat thread", "issue": "FIXED: chat/[id].tsx asked for /messages?limit=60, but chat.py MAX_PAGE=50, so the API returned 422 and the catch block showed an empty thread. Incoming customer messages never appeared and /read was never called. Changed it to limit=50. Verified: the seeded buyer message now shows and /read returns 200.", "testID": "chat-message-*", "priority": "CRITICAL (fixed)"},
+      {"component": "Add a home wizard publish", "issue": "POST /api/properties returns 402 (check_listing_quota: plan_limit_reached or no plan) for adaeze, who has 24 listings. The user only learns this at the end of 7 steps through a 2.8s error toast. There is no upgrade path or explanation, which is bad for low-literacy users. Check the quota before or at step 1 and show a clear blocking card. Also, demo agents need plan headroom so the flow can be tested.", "testID": "wizard-next-button", "priority": "HIGH"},
+      {"component": "FIXA job detail", "issue": "After Finished, the status pill still says 'Accepted' and the job stays in To do instead of moving to Finished.", "testID": "job-status", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global toast", "issues": ["The toast sits at top: insets.top+8, covering the header Back button for 2.8s (listing, item and job detail). On list screens the Listen pill overlaps the toast text (see item publish toast). Move the toast below the header or to the bottom."]},
+      {"screen": "Seller offers", "issues": ["After a counter, the card says 'You replied' but does not show the counter amount (₦165,000).", "The counter amount input shows a raw '165000'. Other money inputs format as ₦1,500,000."]},
+      {"screen": "Sell an item", "issues": ["The toast says 'Published! AMASS will check it soon' but the new item shows the 'Live' pill right away, which is inconsistent."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_app.py", "/app/test_reports/pytest/partner_app.xml", "/app/backend/tests/helper_partner_upload_probe.py", "/app/backend/tests/helper_partner_chat_probe.py", "/app/backend/tests/helper_partner_count_probe.py", "/app/backend/tests/helper_partner_cleanup.py"],
+  "action_items": [
+    "HIGH: Add-a-home: check the listing quota or plan before step 1 (or right after it). Show a big blocking card with an icon and voice when the limit is reached, and a path to upgrade. Make sure the demo agent accounts have plan headroom.",
+    "Backend partner/upload: catch object-storage errors and return a 502 with a message. Optionally retry once.",
+    "partner/me: leave job_stage=='finished' out of fixa_jobs_active. In the FIXA UI, move finished jobs to the 'Finished' segment or show a 'Finished, waiting for customer' pill.",
+    "Toast: stop it covering the header Back and Listen buttons.",
+    "Offers: show the counter amount on replied offers, and format the counter input as ₦.",
+    "Note: frontend/.env has EXPO_PUBLIC_BACKEND_URL (not EXPO_BACKEND_URL). The tests read either one."
+  ],
+  "critical_code_review_comments": [
+    "chat/[id].tsx load() swallows every error with no error state, which hid the 422 bug. Show an error/retry state there.",
+    "partner_app.py upload checks the size after base64 but does not validate MIME; any payload is stored as public.",
+    "Brand login fallback always makes a 401 /auth/login call first (expected). Fine."
+  ],
+  "updated_files": ["/app/frontend/app/chat/[id].tsx (limit=60 -> 50)", "/app/backend/tests/test_partner_app.py (new)", "/app/backend/tests/helper_partner_*.py (probes/cleanup)"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "~90% of executed flows (Add-a-home publish blocked by 402; chat fixed)"},
+  "seed_data_creation": "No seed data. Created TEST_ Blender marketplace item (deleted by id) and TEST_ chat messages in adaeze's demo conversation (cannot be deleted). Demo data changed by the tests: adaeze's demo viewing is now 'rescheduled' (Wed 13:00, waiting for the buyer). The seller sofa offer was countered at 165000. The FIXA pending job was accepted and finished, and the other confirmed job was moved to stage 'working'. fixa.demo now also has the seller partner role. Listing hide->show and item pause->live were put back. The brand product 151d47aa description was edited and then restored from shop_seed_data.json.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Not executed, because each demo account had only one record of each kind and I used propose/counter on them: visit Accept and Decline, offer Accept and Decline, FIXA job Decline, and actually creating a brand product (only the screen was opened; no save to the real catalog). After this run the agent has no visit waiting, the seller has no open offer, and FIXA has no new job; re-seed or create TEST_ records to cover them. Tabs render twice in the DOM, so use the :visible selector. Bottom sheets slide in, so wait about 1.2s or use dispatch_event('click'). Web gallery upload works with page.expect_file_chooser on [data-testid=photo-adder-gallery]. The Work list shows 18 of 24 listings in the DOM because of FlatList virtualization; this is expected.",
+  "rca_of_issue": "Empty chat thread: the frontend asked for limit=60 but the backend Query has le=MAX_PAGE (50), giving a 422. The api() helper throws, and the catch in load() sets msgs to [] with no error shown. Fixed by using limit=50. Add-a-home 402: server.py create_property calls agent_platform.check_listing_quota, which raises 402 plan_limit_reached for adaeze's plan."
+}

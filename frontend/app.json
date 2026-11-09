@@ -1,22 +1,27 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "AMASS Partner",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/images/amass-icon-square.png",
+    "scheme": "amasspartner",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.amasspreview.jup7r1"
+      "bundleIdentifier": "com.emergent.amasspreview.jup7r1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take photos of homes and items you list",
+        "NSPhotoLibraryUsageDescription": "Add photos to your listings"
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/images/amass-adaptive-foreground.png",
+        "backgroundColor": "#FFFFFF"
       },
-      "package": "com.emergent.amasspreview.jup7r1"
+      "package": "com.emergent.amasspreview.jup7r1",
+      "permissions": ["CAMERA"]
     },
     "web": {
       "bundler": "metro",
@@ -28,20 +33,28 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-image.png",
-          "imageWidth": 200,
+          "image": "./assets/images/amass-emblem.png",
+          "imageWidth": 160,
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#F7F6F3"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Add photos to your listings",
+          "cameraPermission": "Take photos of homes and items you list"
         }
       ],
       "expo-font",
       "expo-image",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-status-bar"
+      "expo-status-bar",
+      "@react-native-vector-icons/ionicons"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": false
     }
   }
 }

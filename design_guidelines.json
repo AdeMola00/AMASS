@@ -1,0 +1,165 @@
+{
+  "app_name": "Amass Agent App",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A structured, accessible, and welcoming utility interface designed for clarity and confidence, accommodating low-literacy users through large targets, clear colors, and multi-modal support.",
+  "color": {
+    "surface": "#F7F6F3",
+    "onSurface": "#111111",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#111111",
+    "surfaceTertiary": "#EAE8E3",
+    "onSurfaceTertiary": "#111111",
+    "surfaceInverse": "#111111",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#E11B22",
+    "brandPrimary": "#E11B22",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#FCE8E9",
+    "onBrandSecondary": "#E11B22",
+    "brandTertiary": "#FAF5E5",
+    "onBrandTertiary": "#8A6D14",
+    "success": "#2E8B57",
+    "onSuccess": "#FFFFFF",
+    "warning": "#D4AF37",
+    "onWarning": "#FFFFFF",
+    "error": "#E11B22",
+    "onError": "#FFFFFF",
+    "info": "#5C5C59",
+    "onInfo": "#FFFFFF",
+    "border": "#EAE8E3",
+    "borderStrong": "#5C5C59",
+    "divider": "#EAE8E3",
+    "muted": "#5C5C59",
+    "onBrand": "#FFFFFF"
+  },
+  "typography": {
+    "displayFontFamily": "DM Serif Display",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Handle spacing correctly dont have extra spaces where its not required, handle padding and margin corectly and subtle for buttons and components",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 10,
+    "md": 14,
+    "lg": 24,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Use on bottom tab bar when content scrolls behind it",
+      "Use on sticky headers over scrolling content",
+      "Use on Floating Action Buttons (FAB)"
+    ],
+    "dont's": [
+      "Never blur form fields, body text regions, or entire screens",
+      "Avoid on dense list rows to maintain high contrast for low-literacy users"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Login",
+      "purpose": "Simple email and password login entry point.",
+      "states": {
+        "loading": "Centered spinner",
+        "empty": "N/A",
+        "error": "Readable message + Retry button"
+      },
+      "layout": "Minimalist single-column form centered vertically. Large input fields with labels above. Sticky full-width submit button pinned to the bottom (above keyboard)."
+    },
+    {
+      "name": "Home",
+      "purpose": "Role-aware dashboard showing 'What needs you now' via large, colorful task tiles.",
+      "states": {
+        "loading": "Centered spinner",
+        "empty": "Illustration + 'No active tasks today' + CTA",
+        "error": "Readable message + Retry button"
+      },
+      "layout": "Header with role switcher and fixed Voice Guidance speaker button. Content is a 2-column grid of oversized touch target tiles (`surfaceSecondary` or `brandSecondary`) with large count badges and paired icons/text. Flat, scrollable self-contained page."
+    },
+    {
+      "name": "ListingsOrJobs",
+      "purpose": "Manage property/item listings or Fixa job requests depending on role.",
+      "states": {
+        "loading": "Centered spinner",
+        "empty": "Friendly abstract illustration + 'No listings yet' + Primary 'Add' CTA",
+        "error": "Readable message + Retry button"
+      },
+      "layout": "List view with large thumbnails and simple status badges (color + icon, e.g., Green check for active). Includes a Job Status Stepper (On my way -> Working -> Finished) for Fixa providers. FAB at bottom right to trigger creation wizard."
+    },
+    {
+      "name": "Messages",
+      "purpose": "Inbox for enquiries, leads chat, and activity notifications.",
+      "states": {
+        "loading": "Centered spinner",
+        "empty": "Minimal empty mailbox illustration + 'No messages yet'",
+        "error": "Readable message + Retry button"
+      },
+      "layout": "Standard list view with large avatars (initials or real PNGs). Minimum 56pt row height for easy tapping."
+    },
+    {
+      "name": "Me",
+      "purpose": "Profile settings, language picker, voice toggle, and role management.",
+      "states": {
+        "loading": "Centered spinner",
+        "empty": "N/A",
+        "error": "Readable message + Retry button"
+      },
+      "layout": "Single-column list of oversized setting rows. Icon + Label structure. Language picker clearly visible."
+    }
+  ],
+  "images": {
+    "home_hero_bg": {
+      "url": "https://images.unsplash.com/photo-1595757816291-ab4c1cba0fc2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHwxfHxyZWQlMjB3YXJtJTIwYWJzdHJhY3QlMjB0ZXh0dXJlJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3OTQyNTEyODh8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Warm red abstract texture for hero section"
+    },
+    "empty_state_tasks": {
+      "url": "https://images.unsplash.com/photo-1580582433505-55aaf66b67e2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxmcmllbmRseSUyMGFic3RyYWN0JTIwaWxsdXN0cmF0aW9uJTIwdGFzayUyMGVtcHR5fGVufDB8fHx8MTc5NDI1MTI4OXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Abstract neon sign reading empty for no tasks"
+    },
+    "empty_state_messages": {
+      "url": "https://images.unsplash.com/photo-1581022294641-9a0405d315ad?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwxfHxtYWlsYm94JTIwZW1wdHklMjBtaW5pbWFsJTIwaWxsdXN0cmF0aW9ufGVufDB8fHx8MTc5NDI1MTI4OHww&ixlib=rb-4.1.0&q=85",
+      "alt": "Minimal pink background with a red mailbox"
+    }
+  },
+  "instructions_to_main_agent": [
+    "ACCESSIBILITY FIRST: Target users may have low literacy. Ensure ALL touch targets are at least 56x56pt (oversized from standard 44pt) using hitSlop or padding.",
+    "MULTI-MODAL: Place a prominent 'Speaker' (Voice Guidance) icon button in the header of EVERY screen using expo-speech.",
+    "NO STANDALONE ICONS: Every icon must be paired with a simple, clear text label. Icons alone are often misinterpreted by this demographic.",
+    "COLOR + ICON STATUS: Statuses must be understandable without reading. Use semantic colors paired with distinct icons (e.g., success Green + Checkmark, warning Gold + Clock).",
+    "FLAT NAVIGATION: Avoid deep hierarchies or complex nested menus. Rely heavily on the bottom tab bar (max 4 tabs: Home, Listings/Jobs, Messages, Me).",
+    "CREATE WIZARD: Use a step-by-step wizard pattern for creating listings with photos, showing one clear action per screen to reduce cognitive load.",
+    "RESEARCH LEARNING: Low literacy users struggle with scrolling and dense text. Keep screens self-contained where possible, use auto-complete/varied input for forms, and prioritize large visual tiles for navigation.",
+    "BRANDING: Strictly adhere to the provided Amass color palette and typography (DM Serif Display for headings/prices, Plus Jakarta Sans for body). Do NOT introduce unauthorized blues or purples."
+  ]
+}

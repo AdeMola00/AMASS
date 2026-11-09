@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 2 retest of the 6 fixes from iteration 1, plus the paths not tested before. Backend: 11 of 11 new pytest cases pass (test_partner_iter2.py). Frontend: Playwright at 390x844, all 6 fixes confirmed in the UI. (1) adaeze sees the blocking card 'Starter · 23/5' with a 'My homes' button. agent.demo got through all 7 Add-a-home steps (photo upload, ₦ price, city and area), published, and the home appeared in Work > Homes. (2) A FIXA job set to Finished moves to the Finished segment with 'Done' and 'Finished' pills, and 'Jobs to do' drops. (3) Upload 502 handling is correct in the code; invalid base64 returns 400, too large returns 413. (4) The toast sits at y=672-748, above the tab bar, and no longer covers Back or Listen. (5) A countered offer shows 'Your price: ₦165,000', and the counter input formats as ₦. (6) The marketplace item toast reads 'Published! Buyers can see it now.' Previously untested paths now pass: brand product create (UI and API), seller offer accept (UI) and decline (API), FIXA decline (UI and API; the job moves to Finished with 'Declined'). Visit accept/decline was skipped because no viewing is waiting. Deprecated packages: none found in the reviewed files.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/partner/upload", "issue": "Any MIME type is accepted. data:text/plain;base64 was stored as a PUBLIC .bin file (201). This lets anyone host arbitrary public files. Allow only image/jpeg, png, webp and heic."},
+      {"endpoint": "GET /api/partner/me", "issue": "counts.agent_listings leaves out sold/withdrawn, but listing_quota.used leaves out archived/sold/rented. The 'My homes' number and the quota number can disagree."},
+      {"endpoint": "GET /api/marketplace/my-listings", "issue": "It returns the FIXA services profile, so for fixa.demo (who also has the seller role) 'My items' lists 'Chinedu Plumbing Works' while the tile count seller_items is 0, because it leaves out services."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Seller Work > Items (FIXA pro with seller role)", "issue": "The FIXA service profile shows as a sellable item, and the tile says 'My items 0' while the list shows 1. fixa.demo also opens on the Selling role by default, not FIXA (the roles order is agent, seller, fixa).", "testID": "home-tile-items", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Work (Homes/Items) after publish", "issues": ["The bottom toast (bottom = insets+96) sits on top of the red FAB ('Add a home' / 'Sell an item') for 2.8s. It is pointerEvents none, so taps still work, but the FAB is hidden. Raise the toast above the FAB, or move it to the top under the header."]},
+      {"screen": "Seller Offers", "issues": ["Offers the buyer withdrew show the pill 'Hidden' (status_withdrawn). Low-literacy users may not understand it; 'Buyer cancelled' is clearer. Old declined and withdrawn offers fill the list; sort open offers first or hide closed ones."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_iter2.py", "/app/backend/tests/helper_partner_iter2_fixtures.py", "/app/backend/tests/helper_partner_iter2_cleanup.py", "/app/test_reports/pytest/pytest_iter2.xml"],
+  "action_items": [
+    "MEDIUM: In /api/partner/upload, accept only image/* MIME types (jpeg, png, webp, heic) and return 415 for anything else.",
+    "LOW: Lift the toast above the FAB (for example bottom = insets.bottom + 96 + 72 on screens with a FAB), or show it at the top under the header.",
+    "LOW: Leave category 'services' out of the Seller 'My items' list (or out of /marketplace/my-listings for the partner app) so it matches counts.seller_items. Consider making 'fixa' the default role when the user has a FIXA profile.",
+    "LOW: Use the same status filter for counts.agent_listings and listing_quota.used, or label them differently.",
+    "LOW: Rename status_withdrawn for offers to 'Buyer cancelled', and sort open offers first."
+  ],
+  "critical_code_review_comments": [
+    "In FixaWork, the 'finished' filter puts declined and cancelled jobs in the Finished segment as well. This is correct (pill 'Declined'), but the segment label 'Finished' is a little misleading for declined jobs.",
+    "In listing/new.tsx the quota gate uses me.listing_quota from the auth context. If 'me' is stale (for example the agent just used their last slot in another session), the wizard still opens and POST /properties is refused at publish. The error toast does show, but the user has already done 7 steps. Consider calling refresh() on mount.",
+    "The backend quota rule matches check_listing_quota in agent_platform.py (status $nin archived/sold/rented). POST /properties for adaeze is correctly refused."
+  ],
+  "updated_files": ["/app/backend/tests/test_partner_iter2.py (new)", "/app/backend/tests/helper_partner_iter2_fixtures.py (new)", "/app/backend/tests/helper_partner_iter2_cleanup.py (new)"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% of retested fixes (6/6) and untested paths (4/5; visit accept/decline skipped because there is no data)"},
+  "seed_data_creation": "Created TEST_ buyer accounts (test_partner_*@amass-qa.africa), TEST_ FIXA bookings on fixa.demo's provider item (now finished or declined) and TEST_ offers on seller.demo items (accepted, countered, declined or withdrawn; these stay in offer history). I deleted the following by id: the agent.demo property a53cfb6f (TEST_Yaba), seller item a06afb69 (TEST_ Partner lamp), and brand product 08320350. The offers and bookings stay, because they have no delete endpoint. Existing data change from before this run: fixa.demo has partner_roles ['seller'] (likely added in iteration 1), so it opens on the Selling role.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use selectors with :visible, because tabs render twice. The fixa.demo home opens on Seller; tap role-switch-fixa to see the FIXA tiles (home-tile-new, home-tile-active). Buyers can hold only one open FIXA booking per provider (409), so register fresh TEST_ buyers via /api/auth/register (see helper_partner_iter2_fixtures.py). There is no agent endpoint to delete a property, so remove test properties by id. The brand 'Add product' tile is home-tile-new and opens /product/edit; after save the app goes back to Home. Visit accept/decline is still untested: no viewing waits for adaeze.",
+  "rca_of_issue": ""
+}

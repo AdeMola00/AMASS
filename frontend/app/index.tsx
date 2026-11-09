@@ -1,30 +1,12 @@
-import { View, StyleSheet, Image } from "react-native";
+import { Redirect } from "expo-router";
 
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { useAuth } from "@/src/auth";
+import { LoadingView } from "@/src/ui";
 
 export default function Index() {
-  console.log(EXPO_PUBLIC_BACKEND_URL, "EXPO_PUBLIC_BACKEND_URL");
-
-  return (
-    <View style={styles.container}>
-      <Image
-        source={require("../assets/images/app-image.png")}
-        style={styles.image}
-      />
-    </View>
-  );
+  const { status, roles, kind } = useAuth();
+  if (status === "loading") return <LoadingView />;
+  if (status === "out") return <Redirect href="/login" />;
+  if (kind === "user" && roles.length === 0) return <Redirect href="/welcome" />;
+  return <Redirect href="/(tabs)" />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0c0c0c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
-  },
-});
