@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, naira } from "@/src/api";
 import { ago } from "@/src/format";
 import { useSettings } from "@/src/settings";
+import { shareListingOnWhatsApp } from "@/src/share";
 import { fonts, radius, space, useTheme } from "@/src/theme";
 import { Avatar, BigButton, Card, ErrorView, LoadingView, ScreenHeader, StatusPill, useToast } from "@/src/ui";
 import { useLoad } from "@/src/useLoad";
@@ -39,6 +40,16 @@ export default function ListingDetail() {
   };
 
   const p = d.data?.p;
+  const share = async () => {
+    setBusy("share");
+    try {
+      await shareListingOnWhatsApp(id);
+    } catch (e: any) {
+      toast.show(e?.message || t("something_wrong"), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
       <ScreenHeader title={p ? naira(p.price) : ""} guide="guide_detail" back />
@@ -66,6 +77,8 @@ export default function ListingDetail() {
             ))}
           </View>
           <View style={{ gap: space.sm }}>
+            <BigButton label={t("share_whatsapp")} icon="logo-whatsapp" tone="success" onPress={share} loading={busy === "share"} testID="listing-share-whatsapp" />
+            <BigButton label={t("edit_listing")} icon="create" tone="gold" onPress={() => router.push(`/listing/edit/${id}`)} testID="listing-edit-button" />
             {p.status !== "available" ? <BigButton label={t("show_again")} icon="eye" tone="success" onPress={() => setStatus("available")} loading={busy === "available"} testID="listing-status-available" /> : null}
             {p.status !== "sold" ? <BigButton label={t("mark_sold")} icon="pricetag" tone="dark" onPress={() => setStatus("sold")} loading={busy === "sold"} testID="listing-status-sold" /> : null}
             {p.status !== "withdrawn" ? <BigButton label={t("hide")} icon="eye-off" tone="neutral" outline onPress={() => setStatus("withdrawn")} loading={busy === "withdrawn"} testID="listing-status-hide" /> : null}

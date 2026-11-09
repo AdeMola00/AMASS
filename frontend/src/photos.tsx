@@ -68,10 +68,10 @@ export function PhotoAdder({ photos, onChange, uploadPath, max = 8, testID = "ph
               <Pressable
                 testID={`${testID}-remove-${i}`}
                 onPress={() => onChange(photos.filter((_, j) => j !== i))}
-                hitSlop={8}
-                style={{ position: "absolute", top: 4, right: 4, width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surfaceInverse, alignItems: "center", justifyContent: "center" }}
+                hitSlop={4}
+                style={{ position: "absolute", top: 2, right: 2, width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceInverse, alignItems: "center", justifyContent: "center" }}
               >
-                <Ionicons name="close" size={22} color={colors.onSurfaceInverse} />
+                <Ionicons name="close" size={26} color={colors.onSurfaceInverse} />
               </Pressable>
             </View>
           ))}

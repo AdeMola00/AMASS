@@ -12,6 +12,7 @@ import { usesNativeTabs } from "@/src/navigation";
 import { useSettings } from "@/src/settings";
 import { fonts, radius, space, useTheme } from "@/src/theme";
 import { Avatar, ScreenHeader, tap, Tile, Tone } from "@/src/ui";
+import { WeekCard } from "@/src/WeekCard";
 
 
 type T = { key: string; label: TKey; icon: any; count?: number; tone: Tone; href: string };
@@ -137,6 +138,8 @@ export default function Home() {
             </Animated.View>
           ))}
         </View>
+
+        {role && role !== "brand" ? <WeekCard role={role} /> : null}
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.xs }}>
           <Ionicons name="hand-left" size={20} color={colors.muted} />

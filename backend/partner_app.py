@@ -42,6 +42,11 @@ class UploadIn(BaseModel):
     data_url: str
 
 
+class ListingEditIn(BaseModel):
+    price: float | None = Field(default=None, gt=0, le=1e12)
+    images: list[str] | None = Field(default=None, max_length=12)
+
+
 class StageIn(BaseModel):
     stage: Literal["on_the_way", "working", "finished"]
 
@@ -121,6 +126,86 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
             logger.warning("partner upload failed: %s", e)
             raise HTTPException(502, "Photo upload failed. Please try again.")
         return {"url": f"{public_api_base()}/api/public-files/{path}", "path": path}
+
+    @router.patch("/listings/{property_id}")
+    async def edit_listing(property_id: str, body: ListingEditIn, user: dict = Depends(get_current_user)):
+        p = await db.properties.find_one({"id": property_id}, {"_id": 0, "agent_id": 1, "price": 1})
+        if not p or p.get("agent_id") != user["id"]:
+            raise HTTPException(404, "Listing not found")
+        changes: dict = {"updated_at": _now()}
+        if body.price is not None:
+            body.price = int(body.price) if float(body.price).is_integer() else body.price
+            changes["price"] = body.price
+        if body.images is not None:
+            if not body.images:
+                raise HTTPException(400, "Add at least one photo")
+            changes.update({"images": body.images, "image": body.images[0], "image_count": len(body.images)})
+        push = {"price_history": {"price": body.price, "old_price": p.get("price"), "at": _iso(_now())}} if body.price is not None and body.price != p.get("price") else None
+        await db.properties.update_one({"id": property_id}, {"$set": changes, **({"$push": push} if push else {})})
+        return {"ok": True, "price": changes.get("price", p.get("price")), "images": changes.get("images")}
+
+    @router.get("/summary")
+    async def summary(user: dict = Depends(get_current_user)):
+        """This week vs last week, plus a 7-day bar series for each partner type."""
+        uid = user["id"]
+        now = _now()
+        week0 = now - timedelta(days=7)
+        prev0 = now - timedelta(days=14)
+        days = [(now - timedelta(days=6 - i)).date() for i in range(7)]
+
+        def ts(v):
+            if not v:
+                return None
+            if isinstance(v, datetime):
+                return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+            try:
+                d = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+                return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+            except ValueError:
+                return None
+
+        def bucket(stamps: list):
+            out = {d: 0 for d in days}
+            for s in stamps:
+                if s and s >= week0 and s.date() in out:
+                    out[s.date()] += 1
+            return [{"day": d.isoformat(), "n": out[d]} for d in days]
+
+        def split(stamps: list):
+            return sum(1 for s in stamps if s and s >= week0), sum(1 for s in stamps if s and prev0 <= s < week0)
+
+        res: dict = {}
+        # Agent: homes sold, new interested people, visits
+        props = await db.properties.find({"agent_id": uid}, {"_id": 0, "id": 1, "status": 1, "status_changed_at": 1}).to_list(1000)
+        if props or user.get("is_agent"):
+            pids = [p["id"] for p in props]
+            sold = [ts(p.get("status_changed_at")) for p in props if p.get("status") == "sold"]
+            convs = await db.conversations.find({"property_id": {"$in": pids}}, {"_id": 0, "created_at": 1}).to_list(2000)
+            views = await db.viewings.find({"agent_id": uid}, {"_id": 0, "created_at": 1, "status": 1}).to_list(2000)
+            leads = [ts(c.get("created_at")) for c in convs] + [ts(v.get("created_at")) for v in views]
+            s_now, s_prev = split(sold)
+            l_now, l_prev = split(leads)
+            v_now, v_prev = split([ts(v.get("created_at")) for v in views if v.get("status") == "confirmed"])
+            res["agent"] = {"metrics": [{"key": "homes_sold", "now": s_now, "prev": s_prev}, {"key": "new_leads", "now": l_now, "prev": l_prev}, {"key": "visits_confirmed", "now": v_now, "prev": v_prev}], "series_key": "new_leads", "series": bucket(leads)}
+        # Seller: offers won + money
+        offers = await db.marketplace_offers.find({"seller_id": uid}, {"_id": 0, "status": 1, "updated_at": 1, "created_at": 1, "amount": 1, "agreed_amount": 1}).to_list(2000)
+        if offers or "seller" in (user.get("partner_roles") or []):
+            won = [o for o in offers if o.get("status") == "accepted"]
+            w_now, w_prev = split([ts(o.get("updated_at")) for o in won])
+            money_now = sum(int(o.get("agreed_amount") or o.get("amount") or 0) for o in won if (ts(o.get("updated_at")) or prev0) >= week0)
+            money_prev = sum(int(o.get("agreed_amount") or o.get("amount") or 0) for o in won if prev0 <= (ts(o.get("updated_at")) or now) < week0)
+            o_now, o_prev = split([ts(o.get("created_at")) for o in offers])
+            res["seller"] = {"metrics": [{"key": "offers_won", "now": w_now, "prev": w_prev}, {"key": "money_won", "now": money_now, "prev": money_prev, "money": True}, {"key": "offers_received", "now": o_now, "prev": o_prev}], "series_key": "offers_received", "series": bucket([ts(o.get("created_at")) for o in offers])}
+        # FIXA: jobs done
+        prof = await _fixa_profile(uid)
+        if prof:
+            jobs = await db.fixa_bookings.find({"item_id": prof["id"]}, {"_id": 0, "status": 1, "job_stage": 1, "job_stage_at": 1, "completed_at": 1, "confirmed_at": 1, "rating": 1}).to_list(2000)
+            done = [ts(j.get("completed_at")) or ts(j.get("job_stage_at")) for j in jobs if j.get("status") == "completed" or j.get("job_stage") == "finished"]
+            d_now, d_prev = split(done)
+            a_now, a_prev = split([ts(j.get("confirmed_at")) for j in jobs])
+            ratings = [j["rating"] for j in jobs if j.get("rating")]
+            res["fixa"] = {"metrics": [{"key": "jobs_done", "now": d_now, "prev": d_prev}, {"key": "jobs_accepted", "now": a_now, "prev": a_prev}, {"key": "rating", "now": round(sum(ratings) / len(ratings), 1) if ratings else 0, "prev": None}], "series_key": "jobs_done", "series": bucket(done)}
+        return res
 
     @router.post("/fixa/jobs/{job_id}/stage")
     async def job_stage(job_id: str, body: StageIn, user: dict = Depends(get_current_user)):

@@ -10,6 +10,7 @@ import { useAuth } from "@/src/auth";
 import { fmtDay, fmtTime } from "@/src/format";
 import { usesNativeTabs } from "@/src/navigation";
 import { useSettings } from "@/src/settings";
+import { shareListingOnWhatsApp } from "@/src/share";
 import { fonts, radius, space, useTheme } from "@/src/theme";
 import { Avatar, BigButton, Card, EmptyState, ErrorView, Fab, LoadingView, Segments, Sheet, StatusPill, tap, useToast } from "@/src/ui";
 import { useLoad } from "@/src/useLoad";
@@ -100,10 +101,22 @@ export function AgentWork({ tab }: { tab?: string }) {
                   <StatusPill status={x.status} />
                   <Text style={{ fontFamily: fonts.display, fontSize: 26, color: colors.onSurface }}>{naira(x.price)}</Text>
                   <Text numberOfLines={2} style={{ fontFamily: fonts.bold, fontSize: 16, color: colors.onSurface }}>{x.title}</Text>
-                  <View style={{ flexDirection: "row", gap: space.lg }}>
+                  <View style={{ flexDirection: "row", gap: space.lg, alignItems: "center" }}>
                     <Stat icon="eye" n={x.views_total} />
                     <Stat icon="people" n={x.leads?.total} hot={!!x.leads?.total_30d} />
                     <Stat icon="heart" n={x.saves} />
+                    <View style={{ flex: 1 }} />
+                    <Pressable
+                      testID={`listing-card-share-${x.id}`}
+                      accessibilityLabel={t("share_whatsapp")}
+                      onPress={() => {
+                        tap();
+                        shareListingOnWhatsApp(x.id).catch((e) => toast.show(e?.message || t("something_wrong"), "error"));
+                      }}
+                      style={({ pressed }) => ({ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.success, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.8 : 1 })}
+                    >
+                      <Ionicons name="logo-whatsapp" size={30} color={colors.onSuccess} />
+                    </Pressable>
                   </View>
                 </View>
               </Card>

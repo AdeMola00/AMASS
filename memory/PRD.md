@@ -24,6 +24,12 @@ Study the existing AMASS app (https://github.com/AdeMola00/AMASS) — design, fe
 - Me: 5 languages, voice on/off, auto-read screens, work types, sign out
 - Tested: iteration_1 & iteration_2 all pass
 
+## Iteration 3 (Jun 2026)
+- Edit listing: PATCH /api/partner/listings/{id} (price + photos, price_history); screen /listing/edit/[id] with ±5/10% buttons
+- Share on WhatsApp: listing detail button + round button on Work>Homes cards (uses /api/share/property/{id})
+- Weekly summary: GET /api/partner/summary; dark "This week" card on Home (agent/seller/FIXA) with Listen
+- Voice notes NOT built: workspace install guard blocks adding expo-audio while expo-speech is installed; needs user decision (switch voice guidance to AI voice via OpenAI TTS, which unblocks expo-audio)
+
 ## Backlog
 - P1: Voice notes in chat; customer-side FIXA rating prompt from partner app; brand order handoffs view
 - P1: Edit listing price/photos after publishing

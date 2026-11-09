@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 3 tested only the new features. Voice notes were not tested, as instructed. Backend: 16/16 pytest pass. PATCH /api/partner/listings/{id} handles owner-only access (404 for another agent or an unknown id), rejects price 0, -5 or 'abc' with 422, returns 400 for images [], stores price as an int, sets image=images[0] and image_count, and pushes price_history only when the price changes. GET /api/partner/summary returns the agent, seller and fixa blocks with 7-day series. homes_sold goes up by 1 after a listing is marked sold. offers_received, offers_won and money_won go up after an offer and its acceptance. The buyer gets no agent or fixa block. Frontend (390x844): the This week card shows the hero metric, 2 small metrics, 7 bars and the Listen button for agent (adaeze), seller and FIXA (after the role switch). It is not shown for brand. On listing detail, Share on WhatsApp calls GET /api/share/property/{id} (200) and opens a wa.me popup containing the listing text. The WhatsApp circle on Work>Homes cards works and does not also open the card. Edit screen: price is prefilled, the -10/-5/+5/+10% buttons and typed input update the price and the old -> new line, photo X removes photos, Save is disabled with 0 photos and shows a hint, and Save sends the PATCH (200) and returns to detail with the new price, which was checked in the DB. No deprecated Expo packages were detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/partner/listings/{id}", "issue": "price_history entry stores the raw body.price (float, e.g. 1800000.0) instead of the int-normalised changes['price']. Reference: backend/partner_app.py:142"},
+      {"endpoint": "GET /api/share/property/{id} -> wa.me", "issue": "The backend wa.me URL correctly encodes the emojis (\ud83d\udcb0 \ud83c\udfe0 \ud83d\udc49). WhatsApp's wa.me -> api.whatsapp.com redirect on web turns them into U+FFFD (\ufffd) in the prefilled text. This is a known WhatsApp redirect quirk. Consider using https://api.whatsapp.com/send?text= directly, or whatsapp://send on native."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Change price and photos", "issues": ["Photo remove X (edit-photos-remove-{i}) is 36x36, below the 44pt minimum touch target. This matters for low-literacy and older users."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_iter3.py", "/app/backend/tests/helper_partner_iter3_fixture.py", "/app/test_reports/pytest/pytest_iter3.xml"],
+  "action_items": [
+    "Restore the seed data on adaeze's listing ddbec2b1-cc9b-4d47-a305-096a685e7233 (Fully Serviced 3-Bed Apartment, Lekki). E1's curl smoke test changed its price from 14000000 to 123000000.0 (stored as a float) and added a price_history entry.",
+    "Store the int-normalised price in price_history (partner_app.py:142).",
+    "Raise the photo remove X hit area to 44x44 or larger (src/photos.tsx), for example with hitSlop or a bigger size.",
+    "Optional: build the share link as api.whatsapp.com/send?text= so the emojis survive the redirect."
+  ],
+  "critical_code_review_comments": [
+    "edit/[id].tsx:35 runs absUrl() on the existing images, and Save sends them back. Any relative '/api/...' image path gets rewritten into an absolute URL on the current backend host (the preview domain). Those links break after deploy or a host change. Keep the original paths for display-only absUrl and send the raw values in the PATCH.",
+    "Summary: homes_sold relies on status_changed_at. Listings sold through other paths that don't set status_changed_at (legacy or admin) are not counted. admin_portal does set it, so this is acceptable.",
+    "Edit screen: a non-owner can open /listing/edit/{id} because GET /properties/{id} is public. Save then returns 404 'Listing not found' as a toast. This is handled correctly."
+  ],
+  "updated_files": ["/app/backend/tests/test_partner_iter3.py", "/app/backend/tests/helper_partner_iter3_fixture.py"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% of requested flows (week card x4 roles, share x2 entry points, edit price/photos/save)"},
+  "seed_data_creation": "Created 2 TEST_ properties for agent.demo (pytest one plus 'TEST_iter3 UI home' 9f7a6ba9-...), 1 TEST_ buyer and 1 TEST_ accepted offer on seller.demo's fridge. All were deleted by id afterwards. seller.demo's weekly totals still include TEST_ offers left over from iteration 2 (offers_won 4, money ₦123,246).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use agent.demo (free quota) to create TEST_ listings for edit/share tests; helper_partner_iter3_fixture.py create|delete <id>. Use :visible selectors (tabs render twice). WhatsApp opens as a popup page (context 'page' event) redirected to api.whatsapp.com. For FIXA, tap role-switch-fixa before checking week-card."
+}
