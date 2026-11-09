@@ -2031,7 +2031,7 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ milestone_key, note }) }
     ),
   notifications: () =>
-    req<{ unread: number; items: any[] }>("/notifications"),
+    req<{ unread: number; items: any[] }>("/notifications?audience=consumer"),
   markNotificationsRead: () =>
     req<{ ok: boolean }>("/notifications/mark-read", { method: "POST" }),
 
@@ -2040,15 +2040,15 @@ export const api = {
 
   // ─── Notification Center (user-controlled categories / frequency / quiet hours / push) ───
   notifCenter: (params: { category?: string; before?: string; limit?: number; unreadOnly?: boolean } = {}) => {
-    const q = new URLSearchParams();
+    // audience=consumer — professional kinds (FIXA applications, agent leads, admin moderation…) stay in the Agent app.
+    const q = new URLSearchParams({ audience: "consumer" });
     if (params.category && params.category !== "all") q.set("category", params.category);
     if (params.before) q.set("before", params.before);
     if (params.limit) q.set("limit", String(params.limit));
     if (params.unreadOnly) q.set("unread_only", "true");
-    const qs = q.toString();
-    return req<NotifCenterPage>(`/notifications/center${qs ? `?${qs}` : ""}`);
+    return req<NotifCenterPage>(`/notifications/center?${q.toString()}`);
   },
-  notifUnreadCount: () => req<{ unread: number }>("/notifications/unread-count"),
+  notifUnreadCount: () => req<{ unread: number }>("/notifications/unread-count?audience=consumer"),
   notifPrefs: () => req<NotifPrefs>("/notifications/prefs"),
   updateNotifPrefs: (body: NotifPrefsUpdate) =>
     req<NotifPrefs>("/notifications/prefs", { method: "PUT", body: JSON.stringify(body) }),

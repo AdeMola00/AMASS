@@ -63,7 +63,7 @@ export default function ImproveHub() {
   const rows = tab === "inspections" ? data.inspections : tab === "loans" ? data.finance_applications : data.projects;
 
   return (
-    <Screen testID="improve-hub">
+    <Screen testID="improve-screen">
       <Stack.Screen options={{ headerShown: false }} />
       <ScreenHeader title="Improve My Property" right={<IconButton icon="notifications-outline" label="Notifications" onPress={() => router.push("/notifications" as any)} />} />
 

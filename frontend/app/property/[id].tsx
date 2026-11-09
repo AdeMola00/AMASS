@@ -25,8 +25,8 @@ import { formatNaira } from "@/src/constants/theme";
 import { listingSourceMeta } from "@/src/constants/listingSource";
 import { useTheme } from "@/src/theme";
 import { gradients, motion, radii, space } from "@/src/theme/tokens";
-import { AppText, Avatar, Badge, Button, Card, EmptyState, FrostedCircle, FrostedLabel, IconButton, PressableScale, Sheet, Skeleton, UnlockDialog, useMoneyRain, useToast } from "@/src/ui";
-import { WalkthroughPicker, WalkthroughPlayer } from "@/src/components/WalkthroughVideo";
+import { AppText, Avatar, Badge, Button, Card, EmptyState, FrostedCircle, FrostedLabel, IconButton, PressableScale, Skeleton, UnlockDialog, useMoneyRain, useToast } from "@/src/ui";
+import { WalkthroughPlayer } from "@/src/components/WalkthroughVideo";
 import type { IconName } from "@/src/ui";
 import { PricePin, WALKTHROUGH_PURPLE } from "@/src/components/map/PricePin";
 import { toPin } from "@/src/components/map/pins";
@@ -69,9 +69,6 @@ export default function PropertyDetails() {
   const [favorited, setFavorited] = useState(false);
   const [intel, setIntel] = useState<Awaited<ReturnType<typeof api.propertyIntelligence>> | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [walkOpen, setWalkOpen] = useState(false);
-  const [walkDraft, setWalkDraft] = useState<string | null>(null);
-  const [walkSaving, setWalkSaving] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
   /** Open viewing (requested / confirmed / rescheduled) for this home — `undefined` until loaded, `null` when none. */
@@ -144,7 +141,6 @@ export default function PropertyDetails() {
     () => (property ? (property.views_recent ?? 0) >= 5 || (property.favorites_recent ?? 0) >= 3 : false),
     [property]
   );
-  const isOwnListing = !!(user?.id && property?.agent_id && user.id === property.agent_id);
 
   const toggleFav = useCallback(async () => {
     if (!property) return;
@@ -384,7 +380,7 @@ export default function PropertyDetails() {
         <View style={[styles.sheet, { backgroundColor: colors.bg }]}>
           <View style={styles.badgeRow}>
             <StatusBadge status={property.status} />
-            <PromotionBadge promotion={property.promotion} withDays={isOwnListing} testID="detail-promo-badge" />
+            <PromotionBadge promotion={property.promotion} testID="detail-promo-badge" />
             {property.verified && property.status !== "verified" && <Badge label="Verified" tone="success" icon="shield-checkmark" />}
             {property.documents_verified && <Badge label="Title docs verified" tone="fix" icon="document-text" testID="docs-verified-badge" />}
             {property.is_free_amass_sale && (
@@ -474,14 +470,11 @@ export default function PropertyDetails() {
           </View>
 
           {/* Walkthrough video — the camera badge on the map pin leads here */}
-          {property.has_video || isOwnListing ? (
+          {property.has_video ? (
             <View style={styles.section} testID="walkthrough-section">
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <AppText variant="h2" style={{ flex: 1 }} numberOfLines={1}>
-                  Walkthrough
-                </AppText>
-                {isOwnListing ? <Button label={property.has_video ? "Replace" : "Add video"} size="sm" variant="secondary" iconLeft={property.has_video ? "swap-horizontal" : "add"} onPress={() => setWalkOpen(true)} testID="walkthrough-manage" /> : null}
-              </View>
+              <AppText variant="h2" numberOfLines={1}>
+                Walkthrough
+              </AppText>
               {property.walkthrough_video ? (
                 <WalkthroughPlayer video={property.walkthrough_video} />
               ) : property.has_video ? (
@@ -625,25 +618,9 @@ export default function PropertyDetails() {
                     ) : null}
                   </View>
                 </View>
-              ) : isOwnListing ? (
-                <Pressable onPress={() => router.push(`/agent/listing/${property.id}?tab=docs` as any)} accessibilityRole="button" style={[styles.docsRow, { backgroundColor: colors.warningSoft }]} testID="docs-upload-nudge">
-                  <Ionicons name="document-outline" size={18} color={colors.warning} />
-                  <AppText variant="bodySm" color={colors.warning} style={{ flex: 1 }}>
-                    {property.documents_status === "pending" ? "Your title documents are under review." : "Upload the C of O or survey plan to earn the Title documents verified badge."}
-                  </AppText>
-                  <Ionicons name="chevron-forward" size={16} color={colors.warning} />
-                </Pressable>
               ) : null}
 
-              {isOwnListing ? (
-                <View style={[styles.ownerNote, { backgroundColor: colors.infoSoft }]} testID="own-listing-note">
-                  <Ionicons name="information-circle" size={18} color={colors.info} />
-                  <AppText variant="bodySm" color={colors.info} style={{ flex: 1 }}>
-                    This is your listing. Buyers will see the contact and chat options here.
-                  </AppText>
-                </View>
-              ) : (
-                <>
+              <>
                   {/* Direct contact — included in the single unlock */}
                   {property.agent_phone || property.agent_email ? (
                     <View style={styles.contactRevealed} testID="agent-contact-revealed">
@@ -691,8 +668,7 @@ export default function PropertyDetails() {
                       <Button label="Book a viewing" variant="secondary" iconLeft="calendar-outline" fullWidth onPress={() => setBookOpen(true)} style={{ marginTop: space[2] }} testID="btn-book-viewing" />
                     )
                   ) : null}
-                </>
-              )}
+              </>
             </View>
           )}
 
@@ -766,20 +742,7 @@ export default function PropertyDetails() {
         {hasAccess ? (
           <>
             <IconButton icon="share-outline" label="Share this property" variant="secondary" size={ctaIcon} iconSize={22} onPress={onShare} testID="chat-agent-btn" />
-            {isOwnListing ? (
-              <>
-                <IconButton icon="rocket" label={property.promotion ? "Extend boost" : "Boost listing"} variant="brand" size={ctaIcon} iconSize={22} onPress={() => router.push(`/agent/boost/${property.id}` as any)} testID="boost-listing-btn" />
-                <Button
-                  label="Manage"
-                  variant="primary"
-                  size={tight ? "md" : "lg"}
-                  iconLeft={tight ? undefined : "briefcase"}
-                  onPress={() => router.push(`/agent/listing/${property.id}` as any)}
-                  style={{ flex: 1 }}
-                  testID="book-tour-btn"
-                />
-              </>
-            ) : canBook ? (
+            {canBook ? (
               <>
                 <IconButton icon="chatbubbles-outline" label="Chat with agent · free" variant="secondary" size={ctaIcon} iconSize={22} onPress={startChat} testID="cta-chat-icon" />
                 {viewing ? (
@@ -831,72 +794,6 @@ export default function PropertyDetails() {
         )}
       </View>
       <UnlockDialog visible={unlockOpen} featureKey="property" targetId={property.id} onClose={() => setUnlockOpen(false)} onUnlocked={onUnlocked} />
-      {isOwnListing ? (
-        <Sheet
-          visible={walkOpen}
-          onClose={() => {
-            if (walkSaving) return;
-            setWalkOpen(false);
-            setWalkDraft(null);
-          }}
-          title={property.has_video ? "Replace walkthrough video" : "Add a walkthrough video"}
-          testID="walkthrough-sheet"
-        >
-          <View style={{ gap: space[3] }}>
-            <AppText variant="bodySm" tone="secondary">
-              Buyers see a purple camera badge on your pin and the video plays on this page once they unlock the listing.
-            </AppText>
-            <WalkthroughPicker value={walkDraft} onChange={setWalkDraft} />
-            <Button
-              label={walkSaving ? "Saving…" : "Save video"}
-              variant="primary"
-              fullWidth
-              iconLeft="checkmark"
-              disabled={!walkDraft || walkSaving}
-              loading={walkSaving}
-              onPress={async () => {
-                if (!walkDraft) return;
-                setWalkSaving(true);
-                try {
-                  await api.setWalkthrough(property.id, walkDraft);
-                  setWalkOpen(false);
-                  setWalkDraft(null);
-                  toast.success("Walkthrough saved", "Your pin now shows the camera badge.");
-                  reload();
-                } catch (e: any) {
-                  toast.error("Couldn't save the video", e?.message);
-                } finally {
-                  setWalkSaving(false);
-                }
-              }}
-              testID="walkthrough-save"
-            />
-            {property.has_video && !walkDraft ? (
-              <Button
-                label="Delete current video"
-                variant="ghost"
-                fullWidth
-                iconLeft="trash-outline"
-                disabled={walkSaving}
-                onPress={async () => {
-                  setWalkSaving(true);
-                  try {
-                    await api.setWalkthrough(property.id, null);
-                    setWalkOpen(false);
-                    toast.success("Walkthrough removed");
-                    reload();
-                  } catch (e: any) {
-                    toast.error("Couldn't remove the video", e?.message);
-                  } finally {
-                    setWalkSaving(false);
-                  }
-                }}
-                testID="walkthrough-remove-current"
-              />
-            ) : null}
-          </View>
-        </Sheet>
-      ) : null}
       {canBook && property.agent_id ? (
         <ViewingSheet
           visible={bookOpen}
@@ -1166,14 +1063,6 @@ const styles = StyleSheet.create({
   mapMini: { height: 220, borderRadius: radii.lg, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
   agentCard: { flexDirection: "row", alignItems: "center", gap: space[3] },
   docsRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: space[3], padding: space[3], borderRadius: radii.md },
-  ownerNote: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: space[3],
-    padding: space[3],
-    borderRadius: radii.md,
-  },
   contactRevealed: { marginTop: space[3], gap: 8 },
   viewingRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: radii.lg, marginTop: space[2] },
   contactLine: {

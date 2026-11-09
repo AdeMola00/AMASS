@@ -3,17 +3,17 @@ import { View, StyleSheet, FlatList, RefreshControl } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, FixaStatus, ProviderPreview } from "@/src/lib/api";
+import { api, ProviderPreview } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { Appear, AppText, Button, EmptyState, Input, PressableScale, Screen, ScreenHeader, SkeletonRows, Tile, useToast } from "@/src/ui";
-import { ProviderRow, STATUS_META, tradeIcon } from "@/src/components/fixa/FixaBits";
+import { Appear, AppText, EmptyState, Input, Screen, ScreenHeader, SkeletonRows, Tile, useToast } from "@/src/ui";
+import { ProviderRow, tradeIcon } from "@/src/components/fixa/FixaBits";
 import { FixaIntro } from "@/src/components/intro/FixaIntro";
 import { useOnceIntro } from "@/src/components/intro/sectionIntro";
 
 /**
  * FIXA directory — free for everyone. Verified pros only (new applicants stay hidden until AMASS Admin approves),
- * phone + WhatsApp on every row, "Join FIXA" for aspiring providers.
+ * phone + WhatsApp on every row. Pros join and manage their profile in the separate AMASS Agent app.
  */
 export default function FixaBrowse() {
   const router = useRouter();
@@ -26,7 +26,6 @@ export default function FixaBrowse() {
   const [sub, setSub] = useState<string | null>(params.category ?? null);
   const [query, setQuery] = useState(params.q ?? "");
   const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [myStatus, setMyStatus] = useState<FixaStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,7 +37,6 @@ export default function FixaBrowse() {
       const res = await api.fixaProviders({ q: query.trim() || undefined, subcategory: sub ?? undefined, verified: verifiedOnly || undefined, limit: 80 });
       setItems(res.items);
       setSubs(res.subcategories);
-      setMyStatus(res.my_status);
     } catch (e: any) {
       setError(e?.message ?? "Couldn't load FIXA providers.");
     } finally {
@@ -57,7 +55,7 @@ export default function FixaBrowse() {
   return (
     <Screen testID="fixa-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title="FIXA" subtitle={subtitle} right={<JoinPill status={myStatus} onPress={() => router.push((myStatus ? "/fixa/provider" : "/fixa/join") as any)} />} />
+      <ScreenHeader title="FIXA" subtitle={subtitle} />
       <FlatList
         data={items}
         keyExtractor={(p) => p.id}
@@ -95,22 +93,6 @@ export default function FixaBrowse() {
               <Note icon="calendar" label="Book without paying" />
               <Note icon="star" label="Rate after the job" />
             </View>
-            {!myStatus ? (
-              <PressableScale onPress={() => router.push("/fixa/join" as any)} style={[styles.joinCard, { backgroundColor: colors.surfaceInverse }]} accessibilityRole="button" accessibilityLabel="Are you a pro? Join FIXA" testID="fixa-join-card">
-                <View style={[styles.joinIcon, { backgroundColor: colors.fix }]}>
-                  <Ionicons name="hammer" size={18} color="#fff" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <AppText variant="title" color={colors.textInverse}>
-                    Are you a tradesperson?
-                  </AppText>
-                  <AppText variant="caption" color="rgba(255,255,255,0.75)">
-                    Join FIXA free. AMASS Admin verifies you, then homeowners can find and book you.
-                  </AppText>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textInverse} />
-              </PressableScale>
-            ) : null}
           </View>
         }
         ListEmptyComponent={
@@ -157,15 +139,7 @@ function Note({ icon, label }: { icon: any; label: string }) {
   );
 }
 
-function JoinPill({ status, onPress }: { status: FixaStatus | null; onPress: () => void }) {
-  if (!status) return <Button label="Join FIXA" size="sm" variant="fix" iconLeft="hammer" onPress={onPress} testID="fixa-join-btn" />;
-  const meta = STATUS_META[status];
-  return <Button label={status === "verified" ? "My FIXA" : meta.label} size="sm" variant="secondary" iconLeft={meta.icon} onPress={onPress} testID="fixa-my-btn" />;
-}
-
 const styles = StyleSheet.create({
   note: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 32, borderRadius: radii.pill },
   noteRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  joinCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: space[4], borderRadius: radii.lg },
-  joinIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
 });

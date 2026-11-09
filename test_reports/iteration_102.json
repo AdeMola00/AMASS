@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 102 retest + new Promote flow. Backend 27/28 pass (iter101 suite + new iter102 suite). Every retest item from iter101 passes: all 6 stale pro routes render not-found-screen and not-found-home goes back to /(tabs) (/fixa/provider no longer shows 'Provider not found'). The consumer notification filter works: center returned 93 rows over all pages, 0 pro rows. Unread count is 64 consumer vs 651 all, and the Feeds badge shows 64. The default audience still includes pro rows, and the legacy /notifications endpoint is filtered too. The Promote flow works end to end: the sofa shows promoted-{id} and manage-campaign goes to /ads/{id}. A new listing gets manage-promote, which opens a 4-tier sheet (no map tier, featured preselected). Picking basic and submitting shows the celebration, then /ads shows the new ACTIVE BASIC campaign on top. The wallet was debited exactly 30 MASS and /ads/mine has marketplace_item_id set. The shortfall path works: POST /ads premium returns 402 with insufficient_tokens/required/shortfall. In the UI the sheet shows promote-shortfall + promote-topup, which goes to /buy-tokens?currency=MASS. The /ads empty state (ads-empty-promote) and the header ads-promote button both go to /marketplace/my-listings. Layout retests pass: fixa-bookings header and card buttons on 2 rows; fixa detail location wraps; agent WhatsApp label fits; 'Active listings (8)' matches ACTIVE 8 with sold homes excluded; improve-screen is present. Quick regression passes: 5 tabs, Market segments, agent-app-pointer toast, property detail. No console errors. New problems: POST /ads does not check marketplace_item_id; the Promote sheet's main button is clipped at 375x667; minor /ads counts and status labels. No deprecated Expo packages detected (no expo-av/expo-barcode-scanner/expo-background-fetch).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/ads", "issue": "marketplace_item_id is not checked. The endpoint accepts ids that don't exist or that belong to another seller, and it still debits MASS (a 'nonexistent-…' id with tier=map returned 200 and debited 100 MASS). It also allows tier 'map' for a marketplace item and does not block a second active campaign for the same item (only the UI guards this). Ref: /app/backend/ads.py:315-370", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/ads/mine", "issue": "Hard cap of to_list(200) with no pagination. Demo has 345 ads, 24 active in the DB, but the /ads header shows '17 active · 200 total'. Ref: ads.py:372-384"},
+      {"endpoint": "POST /api/ads/{id}/cancel", "issue": "A cancelled campaign gets status 'expired' (cancelled_at is set), so /ads shows a user-cancelled campaign as EXPIRED. Ref: ads.py:531"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PromoteSheet / ui Sheet", "issue": "At 375x667 the main button (promote-submit / promote-topup) is pushed below the bottom of the screen; its bounding box is y=645 with height 60, ending at 705. Only the top ~20px shows. Sheet.tsx has no ScrollView (maxHeight 92%), so on small phones users can't scroll to it. Fix: wrap the content in a ScrollView or pin the footer button.", "testID": "promote-submit", "priority": "HIGH"},
+      {"component": "Unlock sheet (map preview -> locked home)", "issue": "Primary button label is cut to 'Confirm & Vi…' at 375 width.", "testID": "unlock confirm button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PromoteSheet", "issues": ["The intro text uses numberOfLines=2, which cuts off 'pause anytime from My Ad Campaigns'", "The Premium tier perk is cut to 'Full-screen image/video ads show…'", "Tier rows use accessibilityRole=radio with accessibilityState.selected; it should be 'checked' (no aria-checked is rendered)"]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_consumer_iter102.py", "/app/backend/tests/test_consumer_purge_iter101.py", "/app/test_reports/pytest/pytest_iter102.xml"],
+  "action_items": [
+    "ads.py POST /ads: when marketplace_item_id is set, check that the item exists, belongs to the user and is active (404/403). Reject tier 'map' for marketplace items (or require property_id). Reject with 409 if the item already has an active/paused campaign. Do all checks BEFORE svc.debit.",
+    "Sheet/PromoteSheet: make the content scrollable (ScrollView) or pin the button in a footer so promote-submit/promote-topup is fully visible at 375x667.",
+    "/ads: get header counts from a server-side count (or paginate /ads/mine); consider a 'cancelled' status instead of 'expired' for user cancels.",
+    "PromoteSheet: don't show the shortfall/top-up button until the wallet has loaded (mass is undefined, so balance falls back to 0). Remove onClose/toast from the tiers useEffect deps: the parent passes an inline onClose, so tiers are refetched on every parent render.",
+    "Minor: unlock sheet 'Confirm & Vi…' label truncation."
+  ],
+  "critical_code_review_comments": [
+    "ads.py create_ad debits before any validation and has no idempotency, so a double submit or retry can charge twice (the UI busy flag helps only partly).",
+    "PromoteSheet.tsx:44 useEffect deps [item, onClose, toast]: onClose is an inline arrow in my-listings.tsx:308, which causes repeated GET /ads/tiers while the sheet is open.",
+    "PromoteSheet.tsx:47 balance = mass?.spendable ?? 0: the top-up button briefly flashes before the wallet loads.",
+    "my-listings.tsx is 600 lines, close to the 700-line limit."
+  ],
+  "updated_files": ["/app/backend/tests/test_consumer_iter102.py (new)"],
+  "success_rate": {"backend": "96% (27/28; the failing test is the new marketplace_item_id validation check)", "frontend": "~95% (all requested flows pass; Promote sheet button clipped at 375x667)"},
+  "seed_data_creation": "Created temporary TEST_ users (test_iter102_*, test_iter102ui_*), TEST_promote_* / TEST_shortfall_chair listings and TEST ads. All were cancelled (refunded) and hard-deleted by id. Demo wallet is back to 16309 MASS. The demo sofa and its Basic campaign were left untouched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && EXPO_PUBLIC_BACKEND_URL=... pytest tests/test_consumer_iter102.py tests/test_consumer_purge_iter101.py (pytest.ini adds xdist). The test_consumer_iter102 teardown cancels/soft-deletes the ads and items it creates (marketplace DELETE sets status=removed). TEST_ users from test_insufficient_tokens_402 need DB cleanup by id. Demo user ids: sofa item 30c79164-…, sofa ad 163d638e-…. Agent slug with a sold home: ada-demo-a8d30c. New users get 30 bonus MASS (not 0), and Find Home map time burns about 1 MASS/hour after login. Observation: is_amass_exclusive property 6bfa65fc still shows 'Unlock · 12 MASS', although the credentials file says exclusive = free (not in scope; verify the business rule)."
+}

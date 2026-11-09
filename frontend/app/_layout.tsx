@@ -23,6 +23,7 @@ import { ToastProvider } from "@/src/ui/Toast";
 import { CelebrationProvider } from "@/src/ui/Celebrate";
 import { MoneyRainProvider } from "@/src/ui/MoneyRain";
 import { OfflineBanner } from "@/src/ui/OfflineBanner";
+import { isProRoute } from "@/src/lib/proRoutes";
 
 LogBox.ignoreAllLogs(true);
 SplashScreen.preventAutoHideAsync();
@@ -54,6 +55,7 @@ function openPushUrl(router: ReturnType<typeof useRouter>, data: any) {
   let url = data?.deeplink || data?.action_url;
   if (!url || typeof url !== "string") return;
   if (url.startsWith("/neighbours")) return; // legacy Neighbours screens were removed
+  if (isProRoute(url)) return; // professional tools live in the AMASS Agent app
   if (url.startsWith("/(tabs)/social")) url = "/(tabs)/updates"; // old Social tab → Feeds
   try {
     if (url.startsWith("http")) Linking.openURL(url);

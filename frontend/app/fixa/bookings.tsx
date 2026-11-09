@@ -8,7 +8,7 @@ import * as Haptics from "expo-haptics";
 import { api, ApiError, FixaBooking } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
 import { space } from "@/src/theme/tokens";
-import { AppText, Badge, Button, Card, EmptyState, Screen, ScreenHeader, SegmentedControl, SkeletonRows, useBounceRefresh, useCelebrate, useToast } from "@/src/ui";
+import { AppText, Badge, Button, Card, EmptyState, IconButton, Screen, ScreenHeader, SegmentedControl, SkeletonRows, useBounceRefresh, useCelebrate, useToast } from "@/src/ui";
 import { BOOKING_META, callProvider, formatSlot, RateSheet, whatsappProvider } from "@/src/components/fixa/FixaBits";
 
 type Filter = "open" | "past";
@@ -75,7 +75,7 @@ export default function FixaBookingsScreen() {
   return (
     <Screen testID="fixa-bookings-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title="My FIXA bookings" subtitle={items ? `${openCount} open · free, no fees` : "Free, no fees"} right={<Button label="Find a pro" size="sm" variant="fix" iconLeft="search" onPress={() => router.push("/fixa" as any)} testID="fixa-bookings-find" />} />
+      <ScreenHeader title="FIXA bookings" subtitle={items ? `${openCount} open · free, no fees` : "Free, no fees"} right={<IconButton icon="search" label="Find a pro" onPress={() => router.push("/fixa" as any)} testID="fixa-bookings-find" />} />
       {items === null ? (
         <View style={{ padding: space[4] }}>
           <SkeletonRows rows={6} />
@@ -129,11 +129,15 @@ export default function FixaBookingsScreen() {
                     </View>
                   ) : null}
                   {b.status === "pending" || b.status === "confirmed" ? (
-                    <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                      <Button label="Call" variant="secondary" size="sm" iconLeft="call" onPress={() => !callProvider(b.provider_phone) && toast.info("No phone number", "This pro hasn't added a number yet.")} testID={`fixa-booking-call-${b.id}`} />
-                      <Button label="WhatsApp" variant="secondary" size="sm" iconLeft="logo-whatsapp" onPress={() => !whatsappProvider(prov) && toast.info("No WhatsApp number", "This pro hasn't added WhatsApp yet.")} testID={`fixa-booking-wa-${b.id}`} />
-                      <Button label="Done & rate" variant="fix" size="sm" iconLeft="star" onPress={() => setRating(b)} style={{ flex: 1 }} testID={`fixa-booking-complete-${b.id}`} />
-                      <Button label="Cancel" variant="ghost" size="sm" onPress={() => cancel(b)} loading={busy} testID={`fixa-booking-cancel-${b.id}`} />
+                    <View style={{ gap: 8 }}>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <Button label="Call" variant="secondary" size="sm" iconLeft="call" style={{ flex: 1 }} onPress={() => !callProvider(b.provider_phone) && toast.info("No phone number", "This pro hasn't added a number yet.")} testID={`fixa-booking-call-${b.id}`} />
+                        <Button label="WhatsApp" variant="secondary" size="sm" iconLeft="logo-whatsapp" style={{ flex: 1 }} onPress={() => !whatsappProvider(prov) && toast.info("No WhatsApp number", "This pro hasn't added WhatsApp yet.")} testID={`fixa-booking-wa-${b.id}`} />
+                      </View>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <Button label="Done & rate" variant="fix" size="sm" iconLeft="star" onPress={() => setRating(b)} style={{ flex: 1 }} testID={`fixa-booking-complete-${b.id}`} />
+                        <Button label="Cancel" variant="ghost" size="sm" onPress={() => cancel(b)} loading={busy} testID={`fixa-booking-cancel-${b.id}`} />
+                      </View>
                     </View>
                   ) : (
                     <Button label="View provider" variant="ghost" size="sm" iconLeft="person-outline" onPress={() => router.push(`/fixa/${b.item_id}` as any)} testID={`fixa-booking-view-${b.id}`} />

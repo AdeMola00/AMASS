@@ -145,15 +145,6 @@ export default function Login() {
               </Pressable>
             </Link>
           </View>
-          <View style={styles.footer}>
-            <Link href={"/brand" as any} asChild>
-              <Pressable testID="go-to-brand-login" accessibilityRole="link" hitSlop={8}>
-                <AppText variant="bodySm" tone="tertiary">
-                  Brand partner? <AppText variant="bodySm">Brand sign in</AppText>
-                </AppText>
-              </Pressable>
-            </Link>
-          </View>
 
           <LegalConsent action="signing in" />
         </View>

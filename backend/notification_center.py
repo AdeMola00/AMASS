@@ -158,6 +158,25 @@ KIND_CATEGORY: dict[str, str] = {
 def kinds_for(category: str) -> list[str]:
     return [k for k, c in KIND_CATEGORY.items() if c == category]
 
+# Written for agents, FIXA providers, brands and AMASS Admin. Those screens live in the separate AMASS Agent app,
+# so the consumer app (audience=consumer) never lists or counts them. The Agent app / tests use the default audience=all.
+PRO_KINDS = (
+    "FIXA_APPLICATION", "FIXA_REPORT", "VERIFICATION_TASK_ASSIGNED", "CANDIDATE_PROMOTED", "FRAUD_FLAG_RAISED",
+    "REPRESENTATION_DECISION", "VERIFICATION_WIN", "LEAD_ASSIGNED", "AGENCY_CREATED", "AGENCY_INVITE", "AGENCY_JOINED",
+    "AGENCY_ROLE", "AGENCY_REMOVED", "starter_kit_eligible", "starter_kit_status", "badge_update", "review_moderation",
+    "account_status", "agent_referral_created", "verification_result", "subscription_activated", "DOCS_VERIFIED", "DOCS_REJECTED",
+    "review_received",
+)
+PRO_URL_PREFIXES = ("/admin", "/agent-", "/become-agent", "/agency", "/submit-property", "/fixa/provider", "/brand", "/agent/tasks", "/agent/listing", "/agent/boost")
+PRO_URL_REGEX = "^(" + "|".join(p.replace("/", r"\/").replace("-", r"\-") for p in PRO_URL_PREFIXES) + ")"
+
+
+def audience_filter(audience: Optional[str]) -> dict:
+    """Extra Mongo filter for the consumer app: drop professional kinds and anything deep-linking to a pro screen."""
+    if audience != "consumer":
+        return {}
+    return {"kind": {"$nin": list(LEGACY_KINDS) + list(PRO_KINDS)}, "$nor": [{"action_url": {"$regex": PRO_URL_REGEX}}]}
+
 # Written by the retired Neighbours module (estates, friends, shared lists, events, estate issues).
 # Those screens no longer exist, so these rows have nowhere to go: hidden from lists and counts.
 LEGACY_KINDS = (
@@ -919,12 +938,13 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
 
     LIVE = {"dismissed": {"$ne": True}, "kind": {"$nin": list(LEGACY_KINDS)}}  # swiped-away rows stay in the DB (undo) but leave every list and count; retired Neighbours kinds too
 
-    async def _unread(user_id: str) -> int:
-        return await db.notifications.count_documents({"user_id": user_id, "read": False, **LIVE})
+    async def _unread(user_id: str, audience: Optional[str] = None) -> int:
+        return await db.notifications.count_documents({"user_id": user_id, "read": False, **LIVE, **audience_filter(audience)})
 
     @router.get("/center")
-    async def center(category: Optional[str] = None, before: Optional[str] = None, unread_only: bool = False, limit: int = Query(40, le=100), user: dict = Depends(require_auth)):
-        q: dict = {"user_id": user["id"], **LIVE}
+    async def center(category: Optional[str] = None, before: Optional[str] = None, unread_only: bool = False, limit: int = Query(40, le=100), audience: Optional[str] = None, user: dict = Depends(require_auth)):
+        aud = audience_filter(audience)
+        q: dict = {"user_id": user["id"], **LIVE, **aud}
         if before:
             q["created_at"] = {"$lt": before}
         if unread_only:
@@ -938,16 +958,16 @@ def register_notification_center_routes(db, require_auth, require_admin) -> APIR
             q["$or"] = [{"category": category}, legacy]
         docs = await db.notifications.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
         docs = [_annotate(d) for d in docs]
-        all_unread = [_annotate(d) async for d in db.notifications.find({"user_id": user["id"], "read": False, **LIVE}, {"_id": 0, "kind": 1, "category": 1})]
+        all_unread = [_annotate(d) async for d in db.notifications.find({"user_id": user["id"], "read": False, **LIVE, **aud}, {"_id": 0, "kind": 1, "category": 1})]
         by_cat: dict[str, int] = {}
         for d in all_unread:
             by_cat[d["category"]] = by_cat.get(d["category"], 0) + 1
-        read_count = await db.notifications.count_documents({"user_id": user["id"], "read": True, **LIVE, **({"$or": q["$or"]} if "$or" in q else {})})
+        read_count = await db.notifications.count_documents({"user_id": user["id"], "read": True, **LIVE, **aud, **({"$or": q["$or"]} if "$or" in q else {})})
         return {"items": docs, "unread": len(all_unread), "unread_by_category": by_cat, "read_count": read_count, "categories": CATEGORIES, "next_before": docs[-1]["created_at"] if len(docs) >= limit else None}
 
     @router.get("/unread-count")
-    async def unread_count(user: dict = Depends(require_auth)):
-        return {"unread": await _unread(user["id"])}
+    async def unread_count(audience: Optional[str] = None, user: dict = Depends(require_auth)):
+        return {"unread": await _unread(user["id"], audience)}
 
     @router.get("/prefs")
     async def prefs(user: dict = Depends(require_auth)):

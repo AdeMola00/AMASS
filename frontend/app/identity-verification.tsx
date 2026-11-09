@@ -1,7 +1,6 @@
 /**
  * Identity Verification — real KYC: pick an ID type, photograph the ID, take a selfie, submit.
  * The AMASS team reviews it in the admin portal; the verified badge only appears after approval.
- * Agents additionally see the mandate step (level 3) from their agent profile.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
@@ -9,7 +8,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { api, type AgentPublic, type KycMe } from "@/src/lib/api";
+import { api, type KycMe } from "@/src/lib/api";
 import { useAuth } from "@/src/contexts/auth";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
@@ -24,7 +23,6 @@ export default function IdentityVerification() {
   const toast = useToast();
   const celebrate = useCelebrate();
   const [kyc, setKyc] = useState<KycMe | null>(null);
-  const [agent, setAgent] = useState<AgentPublic | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
@@ -39,13 +37,11 @@ export default function IdentityVerification() {
   const load = useCallback(async () => {
     setError(false);
     try {
-      const [k, a] = await Promise.all([api.kycMe(), user?.is_agent ? api.agentMe().catch(() => null) : Promise.resolve(null)]);
-      setKyc(k);
-      setAgent(a);
+      setKyc(await api.kycMe());
     } catch {
       setError(true);
     }
-  }, [user?.is_agent]);
+  }, []);
 
   useEffect(() => {
     load().finally(() => setLoading(false));
@@ -63,7 +59,6 @@ export default function IdentityVerification() {
   const rejected = status === "rejected";
   const emailDone = !!user?.email;
   const phoneDone = !!user?.phone_verified;
-  const mandateDone = (agent?.verification_level ?? 0) >= 3;
   const verifiedCount = [emailDone, phoneDone, idDone].filter(Boolean).length;
   const meta = KYC_META[status];
   const canSubmit = !!idPhoto && !!selfie && !submitting;
@@ -104,9 +99,6 @@ export default function IdentityVerification() {
       badge: pending ? <IdentityBadge status="pending" /> : rejected ? <IdentityBadge status="rejected" /> : undefined,
     },
   ];
-  if (user?.is_agent) {
-    steps.push({ done: mandateDone, icon: "ribbon", title: "Verified Mandated Agent", caption: mandateDone ? "Approved by AMASS" : idDone ? "Granted once AMASS reviews a mandate on one of your listings" : "Unlocks after your identity is verified" });
-  }
   const currentIdx = steps.findIndex((s) => !s.done);
 
   return (
@@ -134,7 +126,7 @@ export default function IdentityVerification() {
               <Ionicons name={idDone ? "shield-checkmark" : pending ? "time" : rejected ? "alert-circle" : "shield-outline"} size={28} color="#fff" />
             </View>
             <AppText variant="h2" color="#fff" testID="idv-hero-title">
-              {mandateDone ? "Verified Mandated Agent" : idDone ? "Identity verified" : pending ? "Documents under review" : rejected ? "Needs another look" : "Build trust with verification"}
+              {idDone ? "Identity verified" : pending ? "Documents under review" : rejected ? "Needs another look" : "Build trust with verification"}
             </AppText>
             <AppText variant="bodySm" color="rgba(255,255,255,0.75)">
               {idDone
@@ -143,7 +135,7 @@ export default function IdentityVerification() {
                   ? `We received your ${kyc?.id_type_label ?? "ID"} and selfie. The AMASS trust team reviews most submissions within one business day.`
                   : rejected
                     ? kyc?.reason || "Your last submission couldn't be verified. Please resubmit clear, well-lit photos."
-                    : "Verified members win more trust — and it's required to market properties as an agent."}
+                    : "Verified members win more trust with agents, sellers and neighbours — and unlock trusted messaging."}
             </AppText>
             <View style={{ gap: 6, marginTop: 4 }}>
               <ProgressBar value={verifiedCount / 3} tone={idDone ? "fix" : "mass"} height={6} style={{ backgroundColor: "rgba(255,255,255,0.18)" }} />
@@ -259,8 +251,6 @@ export default function IdentityVerification() {
           ) : null}
 
           {!formOpen && status === "none" ? <Button label="Verify my identity" variant="primary" size="lg" fullWidth iconLeft="shield-checkmark" onPress={() => setFormOpen(true)} testID="idv-cta" /> : null}
-          {idDone && user?.is_agent && !mandateDone ? <Button label="Open my listings" variant="secondary" size="lg" fullWidth iconLeft="briefcase-outline" onPress={() => router.push("/agent-dashboard" as any)} testID="idv-cta" /> : null}
-          {idDone && !user?.is_agent ? <Button label="Become a verified agent" variant="secondary" size="lg" fullWidth iconLeft="ribbon-outline" onPress={() => router.push("/become-agent")} testID="idv-cta" /> : null}
         </ScrollView>
       )}
     </Screen>

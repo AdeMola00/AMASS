@@ -13,6 +13,8 @@ import type { IconName } from "@/src/ui";
 import { BadgeStrip, BOOKING_META, callProvider, formatSlot, ProviderAvatar, RateSheet, ReportSheet, tradeIcon, whatsappProvider } from "@/src/components/fixa/FixaBits";
 import { WorkPhotosGallery } from "@/src/components/fixa/WorkPhotos";
 import { BookingSheet, BookingSheetRef } from "@/src/components/marketplace/BookingSheet";
+import { NotFoundView } from "@/src/components/NotFoundView";
+import { isProRoute } from "@/src/lib/proRoutes";
 
 /**
  * FIXA provider profile — everything is free: phone + WhatsApp are always visible, booking costs nothing,
@@ -34,7 +36,7 @@ export default function FixaProviderScreen() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    if (!id) return;
+    if (!id || isProRoute(`/fixa/${id}`)) return;
     try {
       setP(await api.fixaProvider(id));
     } catch (e: any) {
@@ -105,6 +107,15 @@ export default function FixaProviderScreen() {
     }
   };
 
+  // Stale professional deep links (/fixa/provider, /fixa/apply…) moved to the AMASS Agent app.
+  if (id && isProRoute(`/fixa/${id}`)) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <NotFoundView />
+      </>
+    );
+  }
   if (loading) {
     return (
       <Screen testID="fixa-provider-loading">
@@ -181,9 +192,9 @@ export default function FixaProviderScreen() {
                 </AppText>
               )}
               {p.area ? (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1, minWidth: 0 }}>
                   <Ionicons name="location" size={12} color={colors.textTertiary} />
-                  <AppText variant="bodySm" tone="tertiary">
+                  <AppText variant="bodySm" tone="tertiary" numberOfLines={2} style={{ flexShrink: 1 }}>
                     {p.area}
                   </AppText>
                 </View>
@@ -323,9 +334,7 @@ export default function FixaProviderScreen() {
           ) : (
             <Button label="Report this provider" variant="ghost" size="sm" iconLeft="flag-outline" onPress={() => setReportOpen(true)} testID="fixa-report-btn" />
           )
-        ) : (
-          <Button label="Manage my FIXA profile" variant="secondary" iconLeft="create-outline" onPress={() => router.push("/fixa/provider" as any)} testID="fixa-manage-btn" />
-        )}
+        ) : null}
       </ScrollView>
 
       {/* Sticky CTA */}

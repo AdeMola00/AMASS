@@ -28,7 +28,6 @@ const TASK_ICON: Record<string, IconName> = {
   share_listing: "share-social",
   phone_verify: "call",
   complete_profile: "person",
-  upload_property: "home",
   refer_friend: "people",
   identity_verify: "shield-checkmark",
   first_review: "star",
@@ -39,7 +38,6 @@ const TASK_HINT: Record<string, string> = {
   share_listing: "Share any listing with a friend. Up to 3 bonuses a day.",
   phone_verify: "Confirm your number to unlock trusted messaging.",
   complete_profile: "Add your city and a short bio.",
-  upload_property: "Publish a listing — credited automatically on approval.",
   refer_friend: "Enter a friend's code, or share yours below.",
 };
 
@@ -72,7 +70,8 @@ export default function EarnScreen() {
     try {
       const [tasksRes, refRes] = await Promise.all([api.earnTasks(), api.myReferral()]);
       // Hide not-yet-available stub tasks so nothing looks broken to users.
-      const HIDDEN_TASKS = ["identity_verify", "first_review"];
+      // upload_property is an Agent-app task; it never shows in the consumer app.
+      const HIDDEN_TASKS = ["identity_verify", "first_review", "upload_property"];
       setTasks(tasksRes.tasks.filter((t) => !HIDDEN_TASKS.includes(t.id)));
       setStreak(tasksRes.streak);
       setReferral(refRes);
@@ -157,9 +156,6 @@ export default function EarnScreen() {
         return;
       case "complete_profile":
         router.push("/settings");
-        return;
-      case "upload_property":
-        router.push("/submit-property");
         return;
       case "refer_friend":
         setReferralModal(true);

@@ -1,5 +1,5 @@
 /**
- * /viewings/[id] — one viewing: when, where, who, what's needed from me. Agents confirm / suggest another time /
+ * /viewings/[id] — one of my viewings: when, where, who, what's needed from me. I confirm a suggested time,
  * decline / mark done; buyers confirm a suggested time, suggest another, or cancel. Both can open the chat.
  */
 import React, { useCallback, useEffect, useState } from "react";
@@ -28,7 +28,7 @@ export default function ViewingDetail() {
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [propose, setPropose] = useState(false);
-  const [reason, setReason] = useState<null | "decline" | "cancel">(null);
+  const [reason, setReason] = useState<null | "cancel">(null);
   const [reasonText, setReasonText] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
 
@@ -109,18 +109,16 @@ export default function ViewingDetail() {
   }
 
   const badge = statusBadge(v.status, v.awaiting, v.role);
-  const other = v.role === "agent" ? v.buyer : v.agent;
+  const other = v.agent;
   const closed = !["requested", "confirmed", "rescheduled"].includes(v.status);
   const lastNote = [...(v.history ?? [])].reverse().find((h) => h.note)?.note;
   const headline =
     v.status === "confirmed"
       ? "You're all set"
       : v.status === "requested"
-        ? v.role === "agent"
-          ? "A buyer wants to visit"
-          : "Waiting for the agent"
+        ? "Waiting for the agent"
         : v.status === "rescheduled"
-          ? v.awaiting === v.role
+          ? v.awaiting === "buyer"
             ? "A new time was suggested"
             : "Waiting for a reply"
           : v.status === "declined"
@@ -132,7 +130,7 @@ export default function ViewingDetail() {
   return (
     <Screen testID="viewing-detail">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title="Viewing" subtitle={v.role === "agent" ? "Request on your listing" : "Your visit"} />
+      <ScreenHeader title="Viewing" subtitle="Your visit" />
       <ScrollView contentContainerStyle={{ padding: space[4], paddingBottom: 40 + insets.bottom, gap: space[4] }} showsVerticalScrollIndicator={false}>
         {/* When */}
         <View style={[styles.hero, { backgroundColor: v.status === "confirmed" ? colors.successSoft : v.status === "declined" || v.status === "cancelled" ? colors.surfaceAlt : colors.warningSoft }]} testID="viewing-hero">
@@ -182,9 +180,9 @@ export default function ViewingDetail() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <Avatar name={other?.full_name} uri={other?.avatar_url ?? undefined} size={48} verified={!!other?.verified} />
             <View style={{ flex: 1 }}>
-              <AppText variant="title">{other?.full_name ?? (v.role === "agent" ? "Buyer" : "Agent")}</AppText>
+              <AppText variant="title">{other?.full_name ?? "Agent"}</AppText>
               <AppText variant="caption" tone="tertiary">
-                {v.role === "agent" ? "Buyer · unlocked this home" : "Listing agent"}
+                Listing agent
               </AppText>
             </View>
           </View>
@@ -196,16 +194,10 @@ export default function ViewingDetail() {
           <View style={{ gap: 10 }} testID="viewing-actions">
             {v.can_confirm ? <Button label={v.status === "rescheduled" ? `Confirm ${fmtWhen(v.start)}` : "Confirm viewing"} variant="primary" size="lg" fullWidth iconLeft="checkmark-circle" loading={busy === "confirm"} onPress={() => act("confirm", () => api.confirmViewing(v.id), "Viewing confirmed")} testID="viewing-confirm" /> : null}
             {v.can_propose ? <Button label="Suggest another time" variant="secondary" size="lg" fullWidth iconLeft="time-outline" onPress={() => setPropose(true)} testID="viewing-propose" /> : null}
-            {v.can_complete ? <Button label="Mark as done" variant="secondary" size="md" fullWidth iconLeft="checkmark-done" loading={busy === "complete"} onPress={() => act("complete", () => api.completeViewing(v.id), "Marked as done")} testID="viewing-complete" /> : null}
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              {v.can_decline ? <Button label="Decline" variant="ghost" size="md" iconLeft="close-circle-outline" onPress={() => setReason("decline")} style={{ flex: 1 }} testID="viewing-decline" /> : null}
-              {v.can_cancel && !v.can_decline ? <Button label="Cancel viewing" variant="ghost" size="md" iconLeft="trash-outline" onPress={() => setReason("cancel")} style={{ flex: 1 }} testID="viewing-cancel" /> : null}
-            </View>
+            {v.can_cancel ? <Button label="Cancel viewing" variant="ghost" size="md" fullWidth iconLeft="trash-outline" onPress={() => setReason("cancel")} testID="viewing-cancel" /> : null}
           </View>
         ) : v.status === "declined" || v.status === "cancelled" ? (
-          v.role === "buyer" ? (
-            <Button label="Request another time" variant="primary" size="lg" fullWidth iconLeft="calendar" onPress={() => router.push(`/property/${v.property_id}?rained=1&book=1` as any)} testID="viewing-rebook" />
-          ) : null
+          <Button label="Request another time" variant="primary" size="lg" fullWidth iconLeft="calendar" onPress={() => router.push(`/property/${v.property_id}?rained=1&book=1` as any)} testID="viewing-rebook" />
         ) : null}
 
         {/* History */}
@@ -235,7 +227,7 @@ export default function ViewingDetail() {
         viewingId={v.id}
         propertyId={v.property_id}
         agentId={v.agent_id}
-        asAgent={v.role === "agent"}
+        asAgent={false}
         onDone={(next) => {
           setPropose(false);
           setV(next);
@@ -243,24 +235,23 @@ export default function ViewingDetail() {
         }}
       />
 
-      <Sheet visible={reason !== null} onClose={() => setReason(null)} title={reason === "decline" ? "Decline this viewing?" : "Cancel this viewing?"} testID="viewing-reason-sheet">
+      <Sheet visible={reason !== null} onClose={() => setReason(null)} title="Cancel this viewing?" testID="viewing-reason-sheet">
         <View style={{ gap: space[3] }}>
           <AppText variant="bodySm" tone="secondary">
-            {reason === "decline" ? "The buyer will be told and can request another time." : "The other side will be told right away."}
+            The agent will be told right away.
           </AppText>
-          <Input label="Reason (optional)" value={reasonText} onChangeText={setReasonText} placeholder={reason === "decline" ? "e.g. Away that week" : "e.g. Something came up"} multiline maxLength={400} testID="viewing-reason" />
+          <Input label="Reason (optional)" value={reasonText} onChangeText={setReasonText} placeholder="e.g. Something came up" multiline maxLength={400} testID="viewing-reason" />
           <Button
-            label={reason === "decline" ? "Decline viewing" : "Cancel viewing"}
+            label="Cancel viewing"
             variant="destructive"
             size="lg"
             fullWidth
-            loading={busy === "decline" || busy === "cancel"}
+            loading={busy === "cancel"}
             onPress={async () => {
-              const r = reason!;
               const note = reasonText.trim() || undefined;
               setReason(null);
               setReasonText("");
-              await act(r, () => (r === "decline" ? api.declineViewing(v.id, note) : api.cancelViewing(v.id, note)), r === "decline" ? "Viewing declined" : "Viewing cancelled");
+              await act("cancel", () => api.cancelViewing(v.id, note), "Viewing cancelled");
             }}
             testID="viewing-reason-submit"
           />

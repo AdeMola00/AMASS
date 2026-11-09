@@ -12,7 +12,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { api } from "@/src/lib/api";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
-import { AppText, Badge, Card, EmptyState, Screen, ScreenHeader, SkeletonRows, type BadgeTone } from "@/src/ui";
+import { AppText, Badge, Card, EmptyState, IconButton, Screen, ScreenHeader, SkeletonRows, type BadgeTone } from "@/src/ui";
 
 const TIER_TONE: Record<string, BadgeTone> = { basic: "neutral", featured: "inverse", spotlight: "brand", map: "mass", premium: "fix" };
 const STATUS_TONE: Record<string, BadgeTone> = { active: "success", paused: "warning", expired: "neutral", rejected: "error", draft: "neutral", pending: "warning" };
@@ -48,7 +48,11 @@ export default function MyAdsScreen() {
   return (
     <Screen testID="my-ads-screen">
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenHeader title="My Ad Campaigns" subtitle={ads.length ? `${active} active · ${ads.length} total` : "Promote listings & marketplace items"} />
+      <ScreenHeader
+        title="My Ad Campaigns"
+        subtitle={ads.length ? `${active} active · ${ads.length} total` : "Promote your Declutter listings"}
+        right={<IconButton icon="megaphone-outline" label="Promote a listing" onPress={() => router.push("/marketplace/my-listings" as any)} testID="ads-promote" />}
+      />
 
       {loading ? (
         <View style={{ padding: space[4] }}>
@@ -72,7 +76,7 @@ export default function MyAdsScreen() {
               tintColor={colors.text}
             />
           }
-          ListEmptyComponent={<EmptyState icon="megaphone-outline" title="No campaigns yet" body="Promote a listing or marketplace item to start driving views." actionLabel="Go to Market" onAction={() => router.push("/(tabs)/marketplace" as any)} />}
+          ListEmptyComponent={<EmptyState icon="megaphone-outline" title="No campaigns yet" body="Promote one of your Declutter listings to get it in front of more buyers nearby." actionLabel="Promote a listing" actionIcon="megaphone" onAction={() => router.push("/marketplace/my-listings" as any)} actionTestID="ads-empty-promote" testID="ads-empty" />}
           renderItem={({ item }) => (
             <Card onPress={() => router.push(`/ads/${item.id}` as any)} testID={`ad-row-${item.id}`} elevation="xs" padded={false}>
               <View style={styles.row}>
@@ -84,7 +88,7 @@ export default function MyAdsScreen() {
                     <AppText variant="title" numberOfLines={1} style={{ flex: 1 }}>
                       {item.title}
                     </AppText>
-                    <Badge label={(item.status ?? "?").toUpperCase()} tone={STATUS_TONE[item.status] ?? "neutral"} size="xs" />
+                    <Badge label={item.cancelled_at ? "CANCELLED" : (item.status ?? "?").toUpperCase()} tone={STATUS_TONE[item.status] ?? "neutral"} size="xs" />
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Badge label={(item.tier ?? "").toUpperCase()} tone={TIER_TONE[item.tier] ?? "inverse"} size="xs" />

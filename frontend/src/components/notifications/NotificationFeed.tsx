@@ -19,6 +19,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, BrandGradient, Button, Chip, EmptyState, SkeletonRows, useBounceRefresh, useToast, type IconName } from "@/src/ui";
 import { SwipeableNotification, swipedRecently } from "./SwipeableNotification";
+import { isProRoute } from "@/src/lib/proRoutes";
 
 const UNREAD_ONLY_KEY = "amass_notif_unread_only_v1";
 
@@ -144,6 +145,7 @@ export function routeFor(n: AppNotification): string | null {
   // Legacy Neighbours destinations (estates, friends, shared lists, events, posts, services) no longer exist.
   if (n.action_url && n.action_url.startsWith("/neighbours")) return null;
   if (n.action_url && n.action_url.startsWith("/(tabs)/social")) return "/(tabs)/updates"; // old Social tab → Feeds
+  if (n.action_url && isProRoute(n.action_url)) return null;
   if (n.action_url) return n.action_url;
   const meta = n.meta || {};
   if (n.kind === "MARKET_OFFER" && meta.offer_id) return `/marketplace/my-listings?tab=${meta.tab === "sent" ? "sent" : "received"}`;
@@ -154,15 +156,13 @@ export function routeFor(n: AppNotification): string | null {
   if (meta.inspection_id) return `/improve/inspection/${meta.inspection_id}`;
   if (meta.application_id) return `/improve/finance/${meta.application_id}`;
   if (meta.project_id) return `/improve/project/${meta.project_id}`;
-  if (meta.task_id) return `/agent/tasks/${meta.task_id}`;
   if (meta.amass_property_id) return `/property-passport/${meta.amass_property_id}`;
   if (meta.property_id) return `/property/${meta.property_id}`;
   if (meta.saved_search_id && !meta.preview) return "/saved-searches";
   if (meta.retailer_slug) return `/shop/store/${meta.retailer_slug}`;
   if (meta.reference) return "/wallet";
-  if (n.kind === "verification_result" || n.kind === "account_status") return "/become-agent";
-  if (n.kind === "badge_update" || n.kind === "review_received") return "/agent-score";
-  if (n.kind === "subscription_activated") return "/agent-plans";
+  if (n.kind === "verification_result") return "/identity-verification";
+  if (n.kind === "subscription_activated") return "/wallet";
   return null;
 }
 

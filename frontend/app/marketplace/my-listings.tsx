@@ -18,6 +18,7 @@ import { formatNaira } from "@/src/constants/theme";
 import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, Button, Card, EmptyState, IconButton, Input, Screen, ScreenHeader, SegmentedControl, Sheet, SkeletonRows, StatTile, useToast, type BadgeTone } from "@/src/ui";
+import { PromoteSheet } from "@/src/components/marketplace/PromoteSheet";
 
 type Tab = "listings" | "received" | "sent";
 
@@ -69,6 +70,9 @@ export default function MyListingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [manage, setManage] = useState<MarketplaceItem | null>(null);
+  const [promote, setPromote] = useState<MarketplaceItem | null>(null);
+  /** marketplace_item_id → active ad campaign (so a promoted row shows it and can't be promoted twice). */
+  const [activeAds, setActiveAds] = useState<Record<string, any>>({});
   const [edit, setEdit] = useState<MarketplaceItem | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<MarketplaceItem | null>(null);
   const [counter, setCounter] = useState<MarketOffer | null>(null);
@@ -77,10 +81,13 @@ export default function MyListingsScreen() {
   const load = useCallback(async () => {
     setError(false);
     try {
-      const [l, r, s] = await Promise.all([api.marketplaceMyListings(), api.marketplaceOffersReceived(), api.marketplaceOffersSent()]);
+      const [l, r, s, ads] = await Promise.all([api.marketplaceMyListings(), api.marketplaceOffersReceived(), api.marketplaceOffersSent(), api.myAds().catch(() => [] as any[])]);
       setItems(l);
       setReceived(r);
       setSent(s);
+      const map: Record<string, any> = {};
+      for (const a of ads) if (a.marketplace_item_id && (a.status === "active" || a.status === "paused")) map[a.marketplace_item_id] = a;
+      setActiveAds(map);
     } catch {
       setError(true);
     } finally {
@@ -220,7 +227,7 @@ export default function MyListingsScreen() {
             {items.length === 0 ? (
               <EmptyState icon="storefront-outline" title="Nothing listed yet" body="Declutter your home — snap a photo, set a price and buyers nearby will find it." actionLabel="Sell an item" onAction={() => router.push("/marketplace/sell" as any)} testID="my-listings-empty" />
             ) : (
-              items.map((it) => <ListingRow key={it.id} item={it} onPress={() => router.push(`/marketplace/${it.id}` as any)} onManage={() => setManage(it)} />)
+              items.map((it) => <ListingRow key={it.id} item={it} promoted={!!activeAds[it.id]} onPress={() => router.push(`/marketplace/${it.id}` as any)} onManage={() => setManage(it)} />)
             )}
           </>
         ) : tab === "received" ? (
@@ -271,6 +278,13 @@ export default function MyListingsScreen() {
               </AppText>
             </View>
             <Button label="View listing" variant="secondary" iconLeft="eye-outline" fullWidth onPress={() => { setManage(null); router.push(`/marketplace/${manage.id}` as any); }} testID="manage-view" />
+            {(manage.status ?? "active") === "active" ? (
+              activeAds[manage.id] ? (
+                <Button label="View ad campaign" variant="premium" iconLeft="megaphone" fullWidth onPress={() => { setManage(null); router.push(`/ads/${activeAds[manage.id].id}` as any); }} testID="manage-campaign" />
+              ) : (
+                <Button label="Promote this listing" variant="premium" iconLeft="megaphone" fullWidth onPress={() => { setPromote(manage); setManage(null); }} testID="manage-promote" />
+              )
+            ) : null}
             <Button label="Edit price & details" variant="secondary" iconLeft="create-outline" fullWidth onPress={() => { setEdit(manage); setManage(null); }} testID="manage-edit" />
             {(manage.status ?? "active") !== "sold" ? (
               <Button label="Mark as sold" iconLeft="checkmark-done" fullWidth loading={busy === manage.id} onPress={() => patchListing(manage, { status: "sold" }, "Marked as sold · open offers closed")} testID="manage-sold" />
@@ -289,6 +303,16 @@ export default function MyListingsScreen() {
 
       <EditListingSheet item={edit} onClose={() => setEdit(null)} onSaved={(updated) => { setItems((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x))); setEdit(null); }} />
 
+      <PromoteSheet
+        item={promote}
+        onClose={() => setPromote(null)}
+        onCreated={(ad) => {
+          if (ad?.marketplace_item_id) setActiveAds((prev) => ({ ...prev, [ad.marketplace_item_id]: ad }));
+          setPromote(null);
+          router.push("/ads" as any);
+        }}
+      />
+
       {/* Delete confirm */}
       <Sheet visible={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Delete this listing?" testID="delete-sheet">
         <View style={{ gap: 12 }}>
@@ -305,7 +329,7 @@ export default function MyListingsScreen() {
   );
 }
 
-function ListingRow({ item, onPress, onManage }: { item: MarketplaceItem; onPress: () => void; onManage: () => void }) {
+function ListingRow({ item, promoted, onPress, onManage }: { item: MarketplaceItem; promoted?: boolean; onPress: () => void; onManage: () => void }) {
   const { colors } = useTheme();
   const status = item.status ?? "active";
   const meta = STATUS_META[status] ?? STATUS_META.active;
@@ -332,6 +356,7 @@ function ListingRow({ item, onPress, onManage }: { item: MarketplaceItem; onPres
             </AppText>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <Badge label={meta.label} tone={meta.tone} size="xs" />
+              {promoted ? <Badge label="Promoted" tone="mass" icon="megaphone" size="xs" testID={`promoted-${item.id}`} /> : null}
               <AppText variant="micro" tone="tertiary" tabular>
                 {item.views || 0} views · {item.saves || 0} saves · {timeAgo(item.posted_at)}
               </AppText>

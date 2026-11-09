@@ -319,6 +319,28 @@ def register_ads_routes(db: AsyncIOMotorDatabase) -> APIRouter:
     ):
         user_id = await _require_uid(creds)
         cfg = AD_TIERS[data.tier]
+        # Validate the creative's subject (when there is one) BEFORE any MASS moves. Generic brand/admin ads carry no subject.
+        if data.marketplace_item_id:
+            item = await db.marketplace.find_one({"id": data.marketplace_item_id}, {"_id": 0, "seller_id": 1, "status": 1})
+            if not item:
+                raise HTTPException(404, "Listing not found")
+            if item.get("seller_id") != user_id:
+                raise HTTPException(403, "You can only promote your own listings")
+            if (item.get("status") or "active") != "active":
+                raise HTTPException(409, "Only live listings can be promoted")
+            if data.tier == "map":
+                raise HTTPException(422, "Map promotion is for properties only")
+            dup = await db.advertisements.find_one(
+                {"marketplace_item_id": data.marketplace_item_id, "status": {"$in": ["active", "paused"]}}, {"_id": 0, "id": 1}
+            )
+            if dup:
+                raise HTTPException(409, {"error": "already_promoted", "ad_id": dup["id"]})
+        if data.property_id:
+            prop = await db.properties.find_one({"id": data.property_id}, {"_id": 0, "agent_id": 1, "owner_id": 1})
+            if not prop:
+                raise HTTPException(404, "Property not found")
+            if user_id not in (prop.get("agent_id"), prop.get("owner_id")):
+                raise HTTPException(403, "You can only promote your own properties")
         # Debit
         try:
             await svc.debit(

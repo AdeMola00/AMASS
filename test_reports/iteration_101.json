@@ -1,0 +1,53 @@
+{
+  "summary": "Full consumer-app regression after the pro-tools purge (mobile 375x667 web preview + backend smoke). Backend: 19/19 pytest pass (login/me/wallet/properties/marketplace/fixa providers+detail/ads/mine/viewings/notifications/fixa bookings all 200; admin endpoints 403 for a non-admin TEST_ user, 401 unauthenticated). Frontend: login, door intro + brand-skip, onboarding for logged-out users, all 5 tabs, Market segments (brands-intro, fixa-intro, fixa-bookings-btn, section-aware search to /shop/search, /fixa and /marketplace/search, sell-fab, market-my-listings-btn), all 16 My Amass menu rows, the agent-app-pointer toast, sign out, map pin to preview card, property detail, agent public profile (no 'View all'), /fixa, /fixa/[id], /fixa/bookings, /ads, /ads/[id], settings, help (mentions the Agent app) and about all render with no page errors. No agent or admin rows anywhere in My Amass. Stale links (/admin, /agent-dashboard, /submit-property, /become-agent, /agency, /agent/listing/x) show not-found-screen and 'Back to AMASS' works. Issues: (1) testID not-found-home is on the EmptyState wrapper, not the button. (2) /fixa/provider is caught by /fixa/[id] and shows 'Provider not found' instead of not-found-screen. (3) Admin FIXA moderation notifications (13 of 30) still show in the consumer notification feed, and tapping them does nothing. (4) The consumer app has no way to create an ad campaign for a Declutter item. (5) A few minor layout issues. Deprecated packages detected: none. SafeAreaView issues detected: none.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/admin/fixa/overview, /api/admin/kyc/queue", "issue": "These return 200 for demo@amass.africa. This is correct, not a guard bug: demo is is_admin=true because ADMIN_EMAILS defaults to 'demo@amass.africa,admin@amass.africa' (server.py:55). The review request expected 401/403 for demo. Guard confirmed: 403 for a non-admin TEST_ user, 401 unauthenticated. The hardcoded default in os.environ.get breaks the env-only config rule."},
+      {"endpoint": "GET /api/agent-platform/public/{slug}/listings", "issue": "Returns a status='sold' property ('Sold - Elegant Terrace, Ikoyi'). The agent profile then shows 'Active listings (9)' next to the stat '8 ACTIVE'."},
+      {"endpoint": "GET /api/notifications", "issue": "For the demo admin user, 13 of 30 items are admin moderation notifications (FIXA_APPLICATION / FIXA_REPORT, action_url /admin/fixa...). They are sent to the consumer feed."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "+not-found.tsx", "issue": "testID 'not-found-home' is passed to EmptyState, which puts it on the wrapper View (src/ui/Feedback.tsx:159). The Button gets no testID. Tapping [data-testid=not-found-home] does nothing; tapping the 'Back to AMASS' button text correctly goes to /(tabs), or to /login when logged out.", "testID": "not-found-home", "priority": "MEDIUM"},
+      {"component": "/fixa/provider stale deep link", "issue": "app/fixa/[id].tsx matches it with id='provider' and shows a 'Provider not found' empty state with Browse FIXA (plus a 404 console error), not the not-found-screen. It does not white-screen. Fix: in fixa/[id].tsx, show the +not-found UI when isProRoute(`/fixa/${id}`) is true (e.g. 'provider', 'apply').", "testID": "not-found-screen", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Notifications / Feeds", "issue": "Admin notifications ('New FIXA application', 'FIXA re-application', 'Provider reported · auto-hidden') still appear in the consumer /notifications list and the Feeds feed. routeFor() returns null for pro routes, so these items are dead taps. That breaks the 'no admin UI remains' goal. Filter them out (client: drop items where isProRoute(action_url); or backend: tag audience='pro'/'admin' and exclude them from the consumer feed and the unread count).", "affected_testIDs": ["notifications-screen"]},
+      {"flow": "Ad campaigns for Declutter sellers", "issue": "api.createAd is not used anywhere in app/ or src/. My Declutter Listings, marketplace/[id] and sell have no Promote or Boost entry. /ads can only show existing campaigns. Its empty state says 'Promote a listing or marketplace item' but only offers 'Go to Market'. Sellers cannot start a new campaign.", "affected_testIDs": ["my-ads-screen", "my-listings-screen"]}
+    ],
+    "design_issues": [
+      {"screen": "/fixa/bookings", "issues": ["Header title is truncated to 'My FIXA book…' next to the 'Find a pro' button", "On the booking card the third action button is truncated to 'D…'"]},
+      {"screen": "/fixa/[id]", "issues": ["Location line 'Lagos - Victoria Island' is clipped at the right edge of the screen"]},
+      {"screen": "Market › Declutter", "issues": ["sell-fab overlaps the sort-pill ('Nea…') and view-toggle row when the screen first loads"]},
+      {"screen": "/agent/[slug]", "issues": ["'Message on Wh…' CTA is truncated at 375px", "Stat shows '8 ACTIVE' but the list header says 'Active listings (9)' and includes a sold home"]},
+      {"screen": "/improve", "issues": ["No screen-level testID (other screens use *-screen)"]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_consumer_purge_iter101.py", "/app/test_reports/pytest/pytest_iter101.xml"],
+  "action_items": [
+    "Fix the not-found-home testID: add an actionTestID prop to EmptyState (src/ui/Feedback.tsx) and pass it to the primary Button, then use actionTestID='not-found-home' in app/+not-found.tsx.",
+    "Filter pro/admin notifications out of the consumer NotificationFeed and /notifications (drop items where isProRoute(action_url)), ideally on the backend too so the unread badge (652) excludes them.",
+    "Make /fixa/provider and /fixa/apply render the not-found-screen instead of the 'Provider not found' state.",
+    "Add an ad-campaign creation entry for Declutter sellers (e.g. 'Promote' on My Declutter Listings rows calling api.createAd), or reword the /ads empty state.",
+    "Exclude status='sold' from /api/agent-platform/public/{slug}/listings, or label it as sold and keep it out of the 'Active listings' count.",
+    "Minor layout fixes: truncation on /fixa/bookings (header and 'D…' button), /fixa/[id] location clipping, Declutter Sell FAB overlapping the sort row, agent profile WhatsApp CTA truncation.",
+    "Remove the hardcoded ADMIN_EMAILS default in server.py:55 (read it from env only)."
+  ],
+  "critical_code_review_comments": [
+    "src/lib/api.ts (3561 lines) still holds many dead admin/agent client methods (adminPricing, adminZones, agentListingLeads, /agent/leads/unlock, adminPromotionConfig, ...). None are used by the consumer app now. Prune them or move them to the Agent app, and split the file (>700 lines).",
+    "server.py is 2687 lines; consider more router modules.",
+    "PRO_ROUTE_PREFIXES lives in NotificationFeed.tsx and is imported by app/_layout.tsx. Move it to src/lib/routes.ts.",
+    "Console warning: require cycle src/ui/Button.tsx -> Shimmer.tsx -> Feedback.tsx -> Button.tsx.",
+    "Demo user owns several seeded properties (agent_id = demo). Their detail pages show 'Chat · Free' and book-tour CTAs to the owner (chatting with yourself). Consider hiding consumer CTAs when viewer == agent_id."
+  ],
+  "updated_files": ["/app/backend/tests/test_consumer_purge_iter101.py (new)"],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "~92% (all core flows pass; 2 deep-link/testID issues, 2 integration gaps, minor layout issues)"},
+  "seed_data_creation": "Created 2 non-admin TEST_ users (test_iter101_<hex>@example.com) through /api/auth/register to check the admin guard. The second run deletes its user via /api/agent-platform/account/delete in fixture teardown. The first run's user was created before teardown existed and is still in the DB. No seeded or user data was modified.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login: demo@amass.africa / amass2026. demo is is_admin=true and is_agent=true, so admin APIs return 200 for demo by design; use a TEST_ user for guard tests. Login returns access_token, not token. The first-login intent sheet appears: click [data-testid=intent-rent] or intent-all. Profile menu rows sit under the bottom nav, so force-clicks after scroll_into_view can hit the Market tab. Use element.scrollIntoView({block:'center'}) and a normal click. Web sign-out uses window.confirm, so accept the dialog. FIXA bookings endpoint: /api/marketplace/fixa/bookings. Ads list: /api/ads/mine (200 campaigns for demo, mostly TEST data). Viewings: /api/viewings/mine?role=all.",
+  "rca_of_issue": "not-found-home: EmptyState forwards testID only to its wrapper View (Feedback.tsx:159), and the action Button gets no testID. /fixa/provider: Expo Router matches the dynamic app/fixa/[id].tsx before +not-found, so stale pro paths under existing dynamic segments never reach the safety net. Admin notifications: routeFor() returns null for pro URLs but the list still renders them, and the backend notification center does not filter by audience."
+}

@@ -121,6 +121,7 @@ export function EmptyState({
   actionLabel,
   actionIcon,
   onAction,
+  actionTestID,
   secondaryLabel,
   onSecondary,
   variant = "empty",
@@ -136,6 +137,8 @@ export function EmptyState({
   actionLabel?: string;
   actionIcon?: IconName;
   onAction?: () => void;
+  /** testID for the primary action button (the wrapper gets `testID`). */
+  actionTestID?: string;
   secondaryLabel?: string;
   onSecondary?: () => void;
   variant?: "empty" | "error" | "offline" | "success";
@@ -177,7 +180,7 @@ export function EmptyState({
       {actionLabel && onAction ? (
         <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
           {secondaryLabel && onSecondary ? <Button label={secondaryLabel} variant="secondary" size="md" onPress={onSecondary} /> : null}
-          <Button label={actionLabel} size="md" iconLeft={actionIcon ?? (variant === "error" || variant === "offline" ? "refresh" : undefined)} onPress={onAction} variant={variant === "success" ? "fix" : "primary"} />
+          <Button label={actionLabel} size="md" iconLeft={actionIcon ?? (variant === "error" || variant === "offline" ? "refresh" : undefined)} onPress={onAction} variant={variant === "success" ? "fix" : "primary"} testID={actionTestID} />
         </View>
       ) : null}
     </View>

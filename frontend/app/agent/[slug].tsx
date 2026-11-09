@@ -37,7 +37,8 @@ export default function AgentPublicProfile() {
       setError(null);
       const [a, l, r] = await Promise.all([api.publicAgentBySlug(slug as string), api.publicAgentListings(slug as string).catch(() => []), api.listAgentReviews(slug as string, 10).catch(() => [])]);
       setAgent(a);
-      setListings(l);
+      // Only homes a buyer can still act on (matches the "active" stat tile).
+      setListings(l.filter((p: Property) => p.status !== "sold" && p.status !== "withdrawn"));
       setReviews(r);
     } catch (e: any) {
       setError(e?.message ?? "Could not load agent profile");
@@ -158,7 +159,7 @@ export default function AgentPublicProfile() {
 
         {/* CTAs */}
         <View style={styles.ctaRow}>
-          <Button label="Message on WhatsApp" iconLeft="logo-whatsapp" style={{ flex: 1, backgroundColor: WHATSAPP_GREEN }} onPress={openWhatsApp} testID="agent-whatsapp" />
+          <Button label="WhatsApp" iconLeft="logo-whatsapp" style={{ flex: 1, backgroundColor: WHATSAPP_GREEN }} onPress={openWhatsApp} testID="agent-whatsapp" />
           <Button label="Share" variant="secondary" iconLeft="share-outline" onPress={onShare} testID="agent-share" />
         </View>
 
@@ -185,11 +186,11 @@ export default function AgentPublicProfile() {
         )}
 
         {/* Listings */}
-        <Section title={`Active listings (${listings.length})`} actionLabel={listings.length > 3 ? "View all" : undefined} onAction={listings.length > 3 ? () => router.push(`/agent/${agent.slug}/listings` as any) : undefined}>
+        <Section title={`Active listings (${listings.length})`}>
           {listings.length === 0 ? (
             <EmptyState compact icon="business-outline" title="No active listings yet" />
           ) : (
-            listings.slice(0, 5).map((p) => (
+            listings.map((p) => (
               <Card key={p.id} onPress={() => router.push(`/property/${p.id}`)} elevation="xs" padded={false} testID={`agent-listing-${p.id}`}>
                 <View style={styles.listingRow}>
                   <Image source={{ uri: p.images?.[0] }} style={[styles.listingImg, { backgroundColor: colors.skeleton }]} contentFit="cover" transition={200} />

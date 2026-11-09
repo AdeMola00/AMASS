@@ -1309,3 +1309,45 @@ agent_communication:
       (3) /fixa route (app/fixa/index.tsx) shows the same `fixa-intro` once per session (shared key "fixa" — if it already played in the Market tab it won't replay).
       (4) Store graphics are build-time scripts only (scripts/capture_store_screens.py, store_common.py, generate_*.py) — no runtime surface.
       Login: demo@amass.africa / amass2026. Saved section pref key in localStorage: amass_market_section (JSON string "brands" | "fixa" | "declutter").
+
+  - agent: "main"
+    message: |
+      Iteration 101 (to run, BOTH — full consumer-app regression after the professional-feature purge).
+      Deleted routes (must NOT exist / must not be reachable from any button): app/admin/*, app/agency/*, app/agent-dashboard, agent-plans, agent-score,
+      agent-workspace, become-agent, app/agent/{boost,listing,listing-docs,onboarding,representations,tasks}, app/submit-property, app/fixa/provider*, app/brand*.
+      Kept: app/agent/[slug].tsx (public agent profile a consumer opens from a property / chat avatar — "View all" link removed, all listings inline).
+      New: app/+not-found.tsx (stale deep link → "That page isn't in this app" + Back to AMASS → /(tabs)); src/components/AgentAppPointer.tsx rendered in
+      My Amass › "For professionals" (testID agent-app-pointer → toast "AMASS Agent app · Coming soon" since EXPO_PUBLIC_AGENT_APP_URL is unset);
+      NotificationFeed.routeFor + push openPushUrl ignore pro routes (isProRoute). Market tab header: FIXA section now shows a calendar IconBtn
+      (testID fixa-bookings-btn → /fixa/bookings) instead of "My listings"; FIXA search bar routes to /fixa; placeholder per section.
+      Profile menu groups: Wallet & rewards (Wallet, My Unlocks, Earn Tokens) · Home search (Saved Properties, Saved Searches, Viewings) ·
+      Market & services (My Declutter Listings, My Ad Campaigns, My FIXA Bookings, Improve My Property) · Trust & documents · Account · For professionals.
+      Login: demo@amass.africa / amass2026 (this user is_agent=true in DB — the consumer app must still show NO agent tools for them).
+      Regression scope: login → tabs (Find Home map, Feeds, Market brands/fixa/declutter + intros, My Home, My Amass) → every profile menu row opens →
+      property detail (unlock/viewing/chat buttons, no edit/manage/boost) → Declutter my-listings + /ads campaigns → /fixa + /fixa/[id] + bookings →
+      settings/help/about. Backend: smoke the consumer endpoints (auth, wallet, properties, marketplace, fixa, ads, viewings, notifications); admin/agent
+      endpoints are intentionally still served (shared backend for the future Agent app) — just confirm they 401/403 for a plain user, don't test their UI.
+
+  - agent: "main"
+    message: |
+      Iteration 102 (to run, BOTH — retest of iteration 101 fixes + NEW Promote flow). Fixed since 101:
+      (1) not-found-home is now on the Button (EmptyState actionTestID). (2) /fixa/provider (and /fixa/apply, /fixa/join) render not-found-screen
+      via isProRoute guard in app/fixa/[id].tsx. (3) Admin/pro notifications: backend `audience=consumer` on GET /api/notifications/center,
+      /unread-count and legacy /notifications (notification_center.audience_filter: PRO_KINDS + action_url regex ^/admin|/agent-|…). Frontend
+      api.ts always sends audience=consumer → demo unread 651 → 64, zero FIXA_APPLICATION/FIXA_REPORT rows in /notifications and Feeds.
+      Default (no param) unchanged → test_fixa_free admin assertions still hold. (4) NEW Promote flow: My Declutter Listings → manage-{id} →
+      manage-promote → promote-sheet (4 tiers basic 30 / featured 80 / spotlight 150 / premium 300 MASS; map tier hidden) → promote-submit →
+      POST /api/ads (debits MASS) → celebration → /ads; row shows promoted-{id}, manage sheet shows manage-campaign instead. When balance <
+      tier cost: promote-shortfall + promote-topup → /buy-tokens. /ads header ads-promote + empty-state ads-empty-promote → /marketplace/my-listings.
+      Demo user now owns listing "Grey 3-seater sofa (demo)" (already promoted Basic — expect manage-campaign; create another listing via
+      POST /api/marketplace/items to exercise manage-promote). (5) Minor: agent profile hides sold/withdrawn listings + "WhatsApp" label;
+      FIXA bookings header/buttons no longer truncate at 375; provider location wraps; /improve testID improve-screen.
+      Login demo@amass.africa / amass2026. Don't re-test the intros or the admin UI.
+
+  - agent: "main"
+    message: |
+      Iteration 102 follow-ups applied by main (verified locally): POST /api/ads validates subject before debit (404 fake item, 403 not owner,
+      409 not live / already_promoted, 422 map tier on an item; property_id ownership) — balance unchanged on every rejection; PromoteSheet tier
+      list scrolls with the CTA pinned (promote-submit at y≈583–643 on 375×667); wallet-ready gating; tiers fetched once per item; /ads shows
+      CANCELLED for cancelled campaigns. pytest tests/test_ads_phase_cde.py + tests/test_consumer_iter102.py → 35 passed.
+      Demo user now also owns "Oak bookshelf (demo)" (not promoted) for manage-promote testing.

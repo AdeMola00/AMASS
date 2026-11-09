@@ -188,12 +188,6 @@ export default function Marketplace() {
   const [sortKey, setSortKey] = useState<SortKey>("nearby");
   const [sortOpen, setSortOpen] = useState(false);
   const { count: basketCount } = useShopBasket();
-  // FIXA is free — no token gate. The FAB routes a pro to Join FIXA (or their dashboard once they have a profile).
-  const [myFixaStatus, setMyFixaStatus] = useState<string | null>(null);
-  useEffect(() => {
-    if (section !== "fixa") return;
-    api.fixaMe().then((m) => setMyFixaStatus(m.status)).catch(() => setMyFixaStatus(null));
-  }, [section]);
 
   // Restore prefs
   const [prefsReady, setPrefsReady] = useState(false);
@@ -634,6 +628,8 @@ export default function Marketplace() {
                 <IconBtn icon="heart-outline" onPress={() => router.push("/shop/saved" as any)} label="Saved products and stores" testID="shop-saved-btn" />
                 <IconBtn icon="cart-outline" onPress={() => router.push("/shop/basket" as any)} label={`Basket, ${basketCount} items`} badge={basketCount} testID="shop-basket-btn" />
               </>
+            ) : section === "fixa" ? (
+              <IconBtn icon="calendar-outline" onPress={() => router.push("/fixa/bookings" as any)} label="My FIXA bookings" testID="fixa-bookings-btn" />
             ) : (
               <>
                 <IconBtn icon="storefront-outline" onPress={() => router.push("/marketplace/my-listings" as any)} label="My listings and offers" testID="market-my-listings-btn" />
@@ -647,14 +643,14 @@ export default function Marketplace() {
         <View style={styles.searchRow}>
           <Pressable
             style={styles.searchBar}
-            onPress={() => router.push((section === "brands" ? "/shop/search" : "/marketplace/search") as any)}
+            onPress={() => router.push((section === "brands" ? "/shop/search" : section === "fixa" ? "/fixa" : "/marketplace/search") as any)}
             accessibilityRole="search"
-            accessibilityLabel={section === "brands" ? "Search stores, brands and products" : "Search the marketplace"}
+            accessibilityLabel={section === "brands" ? "Search stores, brands and products" : section === "fixa" ? "Search FIXA pros" : "Search Declutter"}
             testID="market-search-bar"
           >
             <Ionicons name="search" size={18} color={colors.textSecondary} />
             <Text style={styles.searchPlaceholder} numberOfLines={1}>
-              {section === "brands" ? "Search stores, brands, products…" : "Search homes, services, finds…"}
+              {section === "brands" ? "Search stores, brands, products…" : section === "fixa" ? "Search a trade or a pro…" : "Search Declutter finds…"}
             </Text>
           </Pressable>
           {section !== "brands" && (
@@ -719,25 +715,22 @@ export default function Marketplace() {
         </View>
       )}
 
-      {/* Sell / Join FAB (the Shop has its own basket pill) */}
-      {section !== "brands" && (
+      {/* Sell FAB — Declutter only (the Shop has its own basket pill; FIXA pros join from the Agent app) */}
+      {section === "declutter" && (
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-          if (section === "declutter") router.push("/marketplace/sell" as any);
-          else router.push((myFixaStatus && myFixaStatus !== "none" ? "/fixa/provider" : "/fixa/join") as any);
+          router.push("/marketplace/sell" as any);
         }}
         style={({ pressed }) => [styles.sellFab, { bottom: tabBarOffset + 16 }, pressed && { transform: [{ scale: 0.95 }] }]}
         accessibilityRole="button"
-        accessibilityLabel={section === "declutter" ? "Sell an item" : myFixaStatus && myFixaStatus !== "none" ? "My FIXA profile" : "Join FIXA"}
+        accessibilityLabel="Sell an item"
         testID="sell-fab"
       >
-        <LinearGradient colors={[...(section === "declutter" ? gradients.declutter : gradients.fix)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={[...gradients.declutter]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         <Shimmer intensity={0.7} delay={1200} />
-        <Ionicons name={section === "declutter" ? "pricetag" : "hammer"} size={20} color="#fff" />
-        <Text style={styles.sellFabText}>
-          {section === "declutter" ? "Sell" : myFixaStatus && myFixaStatus !== "none" ? "My FIXA" : "Join FIXA"}
-        </Text>
+        <Ionicons name="pricetag" size={20} color="#fff" />
+        <Text style={styles.sellFabText}>Sell</Text>
       </Pressable>
       )}
 

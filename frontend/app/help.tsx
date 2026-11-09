@@ -8,6 +8,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { openPrivacyPolicy, openTerms } from "@/src/lib/legal";
 import { AppText, Card, EmptyState, Input, ListRow, RowGroup, Screen, ScreenHeader } from "@/src/ui";
+import { AgentAppPointer } from "@/src/components/AgentAppPointer";
 
 const SUPPORT_EMAIL = "hello@amass.africa";
 
@@ -23,9 +24,9 @@ const FAQS: { q: string; a: string; tags: string[] }[] = [
     tags: ["unlock", "fee", "property", "access"],
   },
   {
-    q: "How do I become a verified agent?",
-    a: "Open 'Become an Agent' from your profile and complete the short application (ID + selfie for Level 2). AMASS reviews within 1–2 business days, then you can list and market properties.",
-    tags: ["agent", "verification", "apply"],
+    q: "I'm an agent, FIXA pro or brand — where do I manage my listings?",
+    a: "Professional tools — listing and managing properties, FIXA profiles and bookings, brand storefronts and orders — live in the separate AMASS Agent app. This app is for finding, unlocking and living in your home.",
+    tags: ["agent", "fixa", "brand", "listing", "professional"],
   },
   {
     q: "How do saved searches and alerts work?",
@@ -33,9 +34,9 @@ const FAQS: { q: string; a: string; tags: string[] }[] = [
     tags: ["saved", "search", "alerts", "notifications"],
   },
   {
-    q: "Can I get a refund on an ad campaign?",
-    a: "Yes — you can pause or request a refund on active ad campaigns from 'My Ad Campaigns', subject to spend already delivered.",
-    tags: ["ads", "refund", "campaign"],
+    q: "Can I get a refund on a Declutter ad campaign?",
+    a: "Yes — you can pause or request a refund on active campaigns for your Declutter items from 'My Ad Campaigns', subject to spend already delivered.",
+    tags: ["ads", "refund", "campaign", "declutter"],
   },
   {
     q: "How do I reset my password?",
@@ -124,6 +125,10 @@ export default function HelpSupport() {
             </Card>
           )}
         </View>
+
+        <RowGroup title="For professionals">
+          <AgentAppPointer />
+        </RowGroup>
 
         <RowGroup title="Legal">
           <ListRow icon="shield-checkmark-outline" label="Privacy Policy" onPress={() => openPrivacyPolicy()} testID="help-privacy" trailing={<Ionicons name="open-outline" size={16} color={colors.textMuted} />} />
