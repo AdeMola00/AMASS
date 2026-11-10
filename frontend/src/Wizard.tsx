@@ -106,13 +106,27 @@ export function BigInput(props: any) {
   );
 }
 
-export function ReviewRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+// Tappable when onEdit is given: jumps straight to that question, then back to the review.
+export function ReviewRow({ icon, label, value, onEdit, testID }: { icon: any; label: string; value: string; onEdit?: () => void; testID?: string }) {
   const { colors } = useTheme();
+  const { t } = useSettings();
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52 }}>
+    <Pressable
+      testID={testID}
+      disabled={!onEdit}
+      accessibilityRole={onEdit ? "button" : undefined}
+      accessibilityLabel={onEdit ? `${t("change")} ${label}` : undefined}
+      onPress={onEdit}
+      style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 56, borderRadius: 12, opacity: pressed ? 0.6 : 1 })}
+    >
       <Ionicons name={icon} size={26} color={colors.brandPrimary} />
       <Text style={{ fontFamily: fonts.medium, fontSize: 15, color: colors.muted, width: 100 }}>{label}</Text>
       <Text style={{ flex: 1, fontFamily: fonts.bold, fontSize: 17, color: colors.onSurface }}>{value}</Text>
-    </View>
+      {onEdit ? (
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name="pencil" size={20} color={colors.brandPrimary} />
+        </View>
+      ) : null}
+    </Pressable>
   );
 }

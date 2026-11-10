@@ -1,0 +1,29 @@
+{
+  "summary": "Retest of the iteration 10 fixes on the Expo web preview at 375x667. All 5 items PASS. (1) Snapshot restore on Back. Item wizard (seller.demo): review-edit-name, type 'ab' (Next disabled), Back. Review shows the old name 'TEST_ Blue Sofa'. Clearing the price and pressing Back restores ₦45,000. A valid edit followed by Back also restores the old value. Listing wizard (TEST agent): review-edit-price, clear (Next disabled), Back restores ₦25,000,000. A valid edit followed by Back restores the price, and an area edit followed by Back restores 'Lekki, Lagos'. The Publish button turns disabled when the only photo is removed on the review step (item wizard checked). (2) Listing kind Land to Flat/apartment from review goes to step 4 'How many rooms?' with the label 'Done, back to check'. Done returns to review with the rooms row ('4 · 2 Toilets'). Back from that rooms step restores Land with no rooms row. Flat to Duplex returns straight to review. (3) The /viewing-hours stepper shows time and AM/PM on two lines ('9:00 / AM', '12:00 / PM', '8:30 / AM', '5:30 / PM'). scrollWidth equals clientWidth, so nothing is cut off. (4) Seeded Monday 09-12 + 14-17 and Wednesday 08:30-17:30 via PUT. Opened the screen and saved without changes. The PUT body and GET both still have both Monday windows. (5) Regression: edit with Next ('Done, back to check') saves the new name, price and rooms.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/viewing-hours", "issues": ["Extra same-day windows are kept on save but never shown. Monday shows only 9:00 AM–12:00 PM, and the 2:00–5:00 PM window is invisible and can't be edited. If the user widens the first window so it overlaps, the hidden one is silently dropped. Optional: show a small note like '+1 more window' (app/viewing-hours.tsx:42-51, 74-77)."]},
+      {"screen": "wizard review (item/listing)", "issues": ["When Publish is disabled (for example after removing the last photo on review) there is no hint about what is missing. Optional: show a short message such as 'Add a photo'.", "'1 photos added' has a plural error (pre-existing)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/helper_iter9_draft_users.py"],
+  "action_items": [
+    "Optional LOW: show the hidden extra windows on /viewing-hours, or warn before they get dropped.",
+    "Optional LOW: show a hint for why Publish is disabled on the review step; fix the '1 photos added' plural."
+  ],
+  "critical_code_review_comments": [
+    "item/new.tsx snapshot does not include photos. That's fine because photos are edited in place on review, not through edit().",
+    "viewing-hours treats the first window in API order as the main one, not the earliest. That's harmless because the order is kept on save."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend retest)", "frontend": "100% (5/5 fixes verified)"},
+  "seed_data_creation": "Created 2 TEST agent+seller users (helper_iter9_draft_users.py) and deleted them by id afterwards (users collection, 2 docs; nothing else referenced them). Nothing was published. Adaeze's viewing hours were seeded for the test, then reset to hours=[] with slot 60 (checked by GET). The item/listing drafts are local to the browser context, and the seller.demo draft was cleared with Start over.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Wizard testIDs: wizard-next-button / wizard-back-button / wizard-question. Review rows: review-edit-*. Review photo remove: review-photos-remove-0. Listing inputs: price-input, area-input, city-<Name>, kind-<key>, deal-<key>, beds-plus. Item: item-name-input, item-price-input, item-city-<Name>, cat-<key>. Drafts are per browser context (a new Playwright session starts clean). Viewing hours values: hours-day-<i>-start-value / -end-value (time only; AM/PM is a sibling Text).",
+  "rca_of_issue": ""
+}

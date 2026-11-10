@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { View } from "react-native";
+import { useRef, useState } from "react";
+import { Text, View } from "react-native";
 
 import { api, ApiError, naira } from "@/src/api";
 import { useAuth } from "@/src/auth";
@@ -8,13 +8,14 @@ import { DraftBanner, DRAFTS, useDraft } from "@/src/drafts";
 import { PhotoAdder, uploadPending } from "@/src/photos";
 import { CITIES } from "@/src/roles";
 import { useSettings } from "@/src/settings";
-import { space } from "@/src/theme";
+import { fonts, space, useTheme } from "@/src/theme";
 import { Card, LoadingView, useToast } from "@/src/ui";
 import { useLoad } from "@/src/useLoad";
 import { BigInput, OptionGrid, ReviewRow, Wizard } from "@/src/Wizard";
 
 export default function NewItem() {
   const { t } = useSettings();
+  const { colors } = useTheme();
   const { refresh } = useAuth();
   const router = useRouter();
   const toast = useToast();
@@ -26,6 +27,7 @@ export default function NewItem() {
   const [price, setPrice] = useState("");
   const [city, setCity] = useState<string | null>("Lagos");
   const [busy, setBusy] = useState(false);
+  const [fromReview, setFromReview] = useState(false);
   const TOTAL = 5;
   const draft = useDraft(
     DRAFTS.item.key,
@@ -72,12 +74,41 @@ export default function NewItem() {
   };
 
   const q: Record<number, string> = { 1: t("step_item_photo"), 2: t("step_item_name"), 3: t("step_item_cat"), 4: t("item_price_q"), 5: t("step_check") };
-  const can = [true, photos.length > 0, name.trim().length >= 3, !!cat, priceN > 0 && !!city, true][step];
+  const allOk = photos.length > 0 && name.trim().length >= 3 && !!cat && priceN > 0 && !!city;
+  const can = [true, photos.length > 0, name.trim().length >= 3, !!cat, priceN > 0 && !!city, allOk][step];
+  const snap = useRef<any>(null);
 
   if (!draft.ready || (cats.loading && !cats.data)) return <LoadingView />;
 
+  const edit = (s: number) => {
+    snap.current = { name, cat, price, city };
+    setFromReview(true);
+    setStep(s);
+  };
+  const toReview = () => {
+    setFromReview(false);
+    setStep(TOTAL);
+  };
+  // Back while editing = keep the old answer.
+  const cancelEdit = () => {
+    const o = snap.current;
+    if (o) {
+      setName(o.name);
+      setCat(o.cat);
+      setPrice(o.price);
+      setCity(o.city);
+    }
+    toReview();
+  };
+  const next = () => {
+    draft.dismiss();
+    if (step === TOTAL) return publish();
+    if (fromReview) return toReview();
+    setStep(step + 1);
+  };
+
   return (
-    <Wizard title={t("tile_add_item")} step={step} total={TOTAL} question={q[step]} guide="guide_work" onBack={() => setStep(step - 1)} onNext={() => { draft.dismiss(); if (step === TOTAL) publish(); else setStep(step + 1); }} canNext={can} busy={busy} nextLabel={step === TOTAL ? t("publish") : undefined} nextIcon={step === TOTAL ? "cloud-upload" : undefined} top={draft.restoredAt ? <DraftBanner at={draft.restoredAt} onStartOver={startOver} /> : null}>
+    <Wizard title={t("tile_add_item")} step={step} total={TOTAL} question={q[step]} guide="guide_work" onBack={() => (fromReview ? cancelEdit() : setStep(step - 1))} onNext={next} canNext={can} busy={busy} nextLabel={step === TOTAL ? t("publish") : fromReview ? t("back_to_review") : undefined} nextIcon={step === TOTAL ? "cloud-upload" : fromReview ? "checkmark-done" : undefined} top={draft.restoredAt ? <DraftBanner at={draft.restoredAt} onStartOver={startOver} /> : null}>
       {step === 1 ? <PhotoAdder photos={photos} onChange={setPhotos} uploadPath="/partner/upload" max={5} allowOffline /> : null}
       {step === 2 ? <BigInput testID="item-name-input" value={name} onChangeText={setName} placeholder={t("item_name")} autoFocus /> : null}
       {step === 3 ? (
@@ -86,7 +117,10 @@ export default function NewItem() {
           value={cat}
           onChange={(k) => {
             setCat(k);
-            setStep(4);
+            if (fromReview) {
+              setFromReview(false);
+              setStep(TOTAL);
+            } else setStep(4);
           }}
           options={options}
         />
@@ -100,10 +134,11 @@ export default function NewItem() {
       {step === 5 ? (
         <Card testID="item-review">
           <PhotoAdder photos={photos} onChange={setPhotos} uploadPath="/partner/upload" max={5} allowOffline testID="review-photos" />
-          <ReviewRow icon="pricetag" label={t("item_name")} value={name} />
-          <ReviewRow icon="grid" label={t("group")} value={catLabel} />
-          <ReviewRow icon="cash" label={t("price")} value={naira(priceN)} />
-          <ReviewRow icon="location" label={t("city")} value={city || ""} />
+          <Text style={{ fontFamily: fonts.medium, fontSize: 14, color: colors.muted }}>{t("tap_to_change")}</Text>
+          <ReviewRow icon="pricetag" label={t("item_name")} value={name} onEdit={() => edit(2)} testID="review-edit-name" />
+          <ReviewRow icon="grid" label={t("group")} value={catLabel} onEdit={() => edit(3)} testID="review-edit-cat" />
+          <ReviewRow icon="cash" label={t("price")} value={naira(priceN)} onEdit={() => edit(4)} testID="review-edit-price" />
+          <ReviewRow icon="location" label={t("city")} value={city || ""} onEdit={() => edit(4)} testID="review-edit-city" />
         </Card>
       ) : null}
     </Wizard>

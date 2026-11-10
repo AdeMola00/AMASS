@@ -65,6 +65,10 @@ class StageIn(BaseModel):
     stage: Literal["on_the_way", "working", "finished"]
 
 
+class PaidIn(BaseModel):
+    amount: int = Field(gt=0, le=100_000_000)
+
+
 def register_partner_routes(db, get_current_user) -> APIRouter:
     router = APIRouter(prefix="/api/partner", tags=["partner-app"])
 
@@ -215,12 +219,14 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
         # FIXA: jobs done
         prof = await _fixa_profile(uid)
         if prof:
-            jobs = await db.fixa_bookings.find({"item_id": prof["id"]}, {"_id": 0, "status": 1, "job_stage": 1, "job_stage_at": 1, "completed_at": 1, "confirmed_at": 1, "rating": 1}).to_list(2000)
+            jobs = await db.fixa_bookings.find({"item_id": prof["id"]}, {"_id": 0, "status": 1, "job_stage": 1, "job_stage_at": 1, "completed_at": 1, "confirmed_at": 1, "rating": 1, "amount_paid": 1, "paid_at": 1}).to_list(2000)
             done = [ts(j.get("completed_at")) or ts(j.get("job_stage_at")) for j in jobs if j.get("status") == "completed" or j.get("job_stage") == "finished"]
             d_now, d_prev = split(done)
-            a_now, a_prev = split([ts(j.get("confirmed_at")) for j in jobs])
+            paid = [(ts(j.get("paid_at")), int(j.get("amount_paid") or 0)) for j in jobs if j.get("amount_paid")]
+            m_now = sum(v for s, v in paid if s and s >= week0)
+            m_prev = sum(v for s, v in paid if s and prev0 <= s < week0)
             ratings = [j["rating"] for j in jobs if j.get("rating")]
-            res["fixa"] = {"metrics": [{"key": "jobs_done", "now": d_now, "prev": d_prev}, {"key": "jobs_accepted", "now": a_now, "prev": a_prev}, {"key": "rating", "now": round(sum(ratings) / len(ratings), 1) if ratings else 0, "prev": None}], "series_key": "jobs_done", "series": bucket(done)}
+            res["fixa"] = {"metrics": [{"key": "jobs_done", "now": d_now, "prev": d_prev}, {"key": "money_earned", "now": m_now, "prev": m_prev, "money": True}, {"key": "rating", "now": round(sum(ratings) / len(ratings), 1) if ratings else 0, "prev": None}], "series_key": "jobs_done", "series": bucket(done)}
         return res
 
     @router.get("/trends")
@@ -263,12 +269,27 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
             ]}
         prof = await _fixa_profile(uid)
         if prof:
-            jobs = await db.fixa_bookings.find({"item_id": prof["id"]}, {"_id": 0, "status": 1, "job_stage": 1, "job_stage_at": 1, "completed_at": 1, "confirmed_at": 1}).to_list(5000)
+            jobs = await db.fixa_bookings.find({"item_id": prof["id"]}, {"_id": 0, "status": 1, "job_stage": 1, "job_stage_at": 1, "completed_at": 1, "confirmed_at": 1, "amount_paid": 1, "paid_at": 1}).to_list(5000)
             res["fixa"] = {"charts": [
+                {"key": "money_earned", "money": True, "weeks": weekly([(_ts(j.get("paid_at")), int(j.get("amount_paid") or 0)) for j in jobs if j.get("amount_paid")])},
                 {"key": "jobs_done", "weeks": weekly([(_ts(j.get("completed_at")) or _ts(j.get("job_stage_at")), 1) for j in jobs if j.get("status") == "completed" or j.get("job_stage") == "finished"])},
                 {"key": "jobs_accepted", "weeks": weekly([(_ts(j.get("confirmed_at")), 1) for j in jobs])},
             ]}
         return res
+
+    @router.post("/fixa/jobs/{job_id}/paid")
+    async def job_paid(job_id: str, body: PaidIn, user: dict = Depends(get_current_user)):
+        """Pro records what the customer paid (feeds the earnings card + chart). Can be corrected later."""
+        prof = await _fixa_profile(user["id"])
+        b = await db.fixa_bookings.find_one({"id": job_id}, {"_id": 0, "item_id": 1, "status": 1, "job_stage": 1, "paid_at": 1})
+        if not prof or not b or b.get("item_id") != prof["id"]:
+            raise HTTPException(404, "Job not found")
+        if b.get("status") != "completed" and b.get("job_stage") != "finished":
+            raise HTTPException(409, "Finish the job first")
+        # Keep the first payment date so a later correction doesn't move money to another week.
+        paid_at = b.get("paid_at") or _iso(_now())
+        await db.fixa_bookings.update_one({"id": job_id}, {"$set": {"amount_paid": body.amount, "paid_at": paid_at}})
+        return {"ok": True, "amount_paid": body.amount, "paid_at": paid_at}
 
     @router.post("/fixa/jobs/{job_id}/stage")
     async def job_stage(job_id: str, body: StageIn, user: dict = Depends(get_current_user)):

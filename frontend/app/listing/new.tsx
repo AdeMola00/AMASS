@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Text, View } from "react-native";
 
 import { api, ApiError, naira } from "@/src/api";
@@ -102,14 +102,44 @@ export default function NewListing() {
   };
 
   const skipRooms = kind === "land" || kind === "commercial";
+  // Editing one answer from the review page: Next/Back return straight to the review.
+  const [fromReview, setFromReview] = useState(false);
+  const snap = useRef<any>(null);
+  const edit = (s: number) => {
+    snap.current = { deal, kind, photos, beds, baths, price, city, area };
+    setFromReview(true);
+    setStep(s);
+  };
+  const toReview = () => {
+    setFromReview(false);
+    setStep(TOTAL);
+  };
+  // Back while editing = keep the old answer.
+  const cancelEdit = () => {
+    const o = snap.current;
+    if (o) {
+      setDeal(o.deal);
+      setKind(o.kind);
+      setPhotos(o.photos);
+      setBeds(o.beds);
+      setBaths(o.baths);
+      setPrice(o.price);
+      setCity(o.city);
+      setArea(o.area);
+    }
+    toReview();
+  };
+  const advance = (s: number) => (fromReview ? toReview() : setStep(s));
   const next = () => {
     draft.dismiss();
-    if (step === 3 && skipRooms) return setStep(5);
     if (step === TOTAL) return publish();
+    if (fromReview) return toReview();
+    if (step === 3 && skipRooms) return setStep(5);
     setStep(step + 1);
   };
-  const back = () => setStep(step === 5 && skipRooms ? 3 : step - 1);
-  const can = [true, !!deal, !!kind, photos.length > 0, true, priceN > 0, !!city, true][step];
+  const back = () => (fromReview ? cancelEdit() : setStep(step === 5 && skipRooms ? 3 : step - 1));
+  const allOk = !!deal && !!kind && photos.length > 0 && priceN > 0 && !!city;
+  const can = [true, !!deal, !!kind, photos.length > 0, true, priceN > 0, !!city, allOk][step];
 
   const questions: Record<number, string> = { 1: t("step_deal"), 2: t("step_kind"), 3: t("step_photos"), 4: t("step_rooms"), 5: t("step_price"), 6: t("step_place"), 7: t("step_check") };
 
@@ -132,14 +162,14 @@ export default function NewListing() {
   }
 
   return (
-    <Wizard title={t("tile_new_listing")} step={step} total={TOTAL} question={questions[step]} guide="guide_work" onBack={back} onNext={next} canNext={can} busy={busy} nextLabel={step === TOTAL ? t("publish") : undefined} nextIcon={step === TOTAL ? "cloud-upload" : undefined} top={draft.restoredAt ? <DraftBanner at={draft.restoredAt} onStartOver={startOver} /> : null}>
+    <Wizard title={t("tile_new_listing")} step={step} total={TOTAL} question={questions[step]} guide="guide_work" onBack={back} onNext={next} canNext={can} busy={busy} nextLabel={step === TOTAL ? t("publish") : fromReview ? t("back_to_review") : undefined} nextIcon={step === TOTAL ? "cloud-upload" : fromReview ? "checkmark-done" : undefined} top={draft.restoredAt ? <DraftBanner at={draft.restoredAt} onStartOver={startOver} /> : null}>
       {step === 1 ? (
         <OptionGrid
           testPrefix="deal"
           value={deal}
           onChange={(k) => {
             setDeal(k);
-            setStep(2);
+            advance(2);
           }}
           options={[
             { key: "buy", label: t("deal_buy"), icon: "pricetag" },
@@ -155,7 +185,9 @@ export default function NewListing() {
           value={kind}
           onChange={(k) => {
             setKind(k);
-            setStep(3);
+            // Land/commercial → home type while editing: ask for rooms before going back to the review.
+            if (fromReview && skipRooms && k !== "land" && k !== "commercial") return setStep(4);
+            advance(3);
           }}
           options={[
             { key: "apartment", label: t("kind_apartment"), icon: "business" },
@@ -185,11 +217,12 @@ export default function NewListing() {
       {step === 7 ? (
         <Card testID="listing-review">
           <PhotoAdder photos={photos} onChange={setPhotos} uploadPath="/partner/upload" allowOffline testID="review-photos" />
-          <ReviewRow icon="pricetag" label={t("step_deal").replace("?", "")} value={t(`deal_${deal}` as any)} />
-          <ReviewRow icon="home" label={t("step_kind").replace("?", "")} value={t(`kind_${kind}` as any)} />
-          {!skipRooms ? <ReviewRow icon="bed" label={t("bedrooms")} value={`${beds} · ${baths} ${t("bathrooms")}`} /> : null}
-          <ReviewRow icon="cash" label={t("price")} value={naira(priceN)} />
-          <ReviewRow icon="location" label={t("city")} value={`${area ? area + ", " : ""}${city}`} />
+          <Text style={{ fontFamily: fonts.medium, fontSize: 14, color: colors.muted }}>{t("tap_to_change")}</Text>
+          <ReviewRow icon="pricetag" label={t("step_deal").replace("?", "")} value={t(`deal_${deal}` as any)} onEdit={() => edit(1)} testID="review-edit-deal" />
+          <ReviewRow icon="home" label={t("step_kind").replace("?", "")} value={t(`kind_${kind}` as any)} onEdit={() => edit(2)} testID="review-edit-kind" />
+          {!skipRooms ? <ReviewRow icon="bed" label={t("bedrooms")} value={`${beds} · ${baths} ${t("bathrooms")}`} onEdit={() => edit(4)} testID="review-edit-rooms" /> : null}
+          <ReviewRow icon="cash" label={t("price")} value={naira(priceN)} onEdit={() => edit(5)} testID="review-edit-price" />
+          <ReviewRow icon="location" label={t("city")} value={`${area ? area + ", " : ""}${city}`} onEdit={() => edit(6)} testID="review-edit-place" />
         </Card>
       ) : null}
     </Wizard>

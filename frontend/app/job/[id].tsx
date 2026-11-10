@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Linking, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { api } from "@/src/api";
+import { api, naira } from "@/src/api";
 import { useAuth } from "@/src/auth";
 import { fmtDay } from "@/src/format";
 import { TKey } from "@/src/i18n";
@@ -12,6 +12,7 @@ import { useSettings } from "@/src/settings";
 import { fonts, radius, space, useTheme } from "@/src/theme";
 import { Avatar, BigButton, Card, ErrorView, LoadingView, ScreenHeader, StatusPill, useToast } from "@/src/ui";
 import { useLoad } from "@/src/useLoad";
+import { BigInput } from "@/src/Wizard";
 import { STAGE_ICON } from "@/src/work/FixaWork";
 
 const STAGES = ["on_the_way", "working", "finished"] as const;
@@ -105,9 +106,61 @@ export default function JobDetail() {
               ) : null}
             </View>
           ) : null}
+          {j.job_stage === "finished" || j.status === "completed" ? <PaidCard job={j} onSaved={d.reload} /> : null}
         </ScrollView>
       )}
     </View>
+  );
+}
+
+// After the job: the pro types what the customer paid → feeds "Money from jobs" on the week card and charts.
+function PaidCard({ job, onSaved }: { job: any; onSaved: () => void }) {
+  const { colors } = useTheme();
+  const { t } = useSettings();
+  const toast = useToast();
+  const [editing, setEditing] = useState(!job.amount_paid);
+  const [value, setValue] = useState(job.amount_paid ? String(job.amount_paid) : "");
+  const [busy, setBusy] = useState(false);
+  const n = parseInt(value.replace(/\D/g, ""), 10) || 0;
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await api(`/partner/fixa/jobs/${job.id}/paid`, { body: { amount: n } });
+      toast.show(t("saved"));
+      setEditing(false);
+      onSaved();
+    } catch (e: any) {
+      toast.show(e?.message || t("something_wrong"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card testID="job-paid-card">
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+        <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: colors.successSoft, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name="cash" size={28} color={colors.success} />
+        </View>
+        <Text style={{ flex: 1, fontFamily: fonts.heavy, fontSize: 18, color: colors.onSurface }}>{editing ? t("job_paid_q") : t("job_paid_label")}</Text>
+      </View>
+      {editing ? (
+        <>
+          <BigInput testID="job-paid-input" money value={value ? naira(n) : ""} onChangeText={setValue} keyboardType="number-pad" placeholder="₦0" />
+          <BigButton label={t("save")} icon="checkmark-circle" tone="success" onPress={save} disabled={n <= 0} loading={busy} testID="job-paid-save" />
+        </>
+      ) : (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+          <Text testID="job-paid-amount" style={{ flex: 1, fontFamily: fonts.display, fontSize: 32, color: colors.onSurface }}>
+            {naira(job.amount_paid)}
+          </Text>
+          <View style={{ width: 130 }}>
+            <BigButton label={t("change")} icon="pencil" tone="neutral" outline compact onPress={() => setEditing(true)} testID="job-paid-change" />
+          </View>
+        </View>
+      )}
+    </Card>
   );
 }
 

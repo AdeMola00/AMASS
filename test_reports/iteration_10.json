@@ -1,0 +1,40 @@
+{
+  "summary": "Tested 3 features end to end (backend + Expo web at 375x667). (1) Fixa job prices: POST /partner/fixa/jobs/{id}/paid returns 404 for another user's or an unknown job, 409 'Finish the job first' for the 'working' job, 422 for amounts of 0, negative, non-numbers and over 100M, 200 for finished jobs, and a correction keeps the first paid_at. Summary metrics are [jobs_done, money_earned(money), rating]. In trends, money_earned is the first chart and its latest week matches the summary. UI works: Work > Finished > job > job-paid-card. Save is disabled while empty, the amount is saved (₦25,000), Change pre-fills it, and a correction (₦30,000) saves. The working job shows no paid card. The home WeekCard 'Money from jobs' updated to ₦48,000 and /progress chart-money_earned matches. (2) Viewing hours: open-viewing-hours opens /viewing-hours. Presets, switches, steppers (including the min/max limits), slot chips, save (PUT body correct), reopening and hours-summary all work. Adaeze reset to hours=[] with slot 60, checked in the DB. (3) Edit from review: in the listing wizard (TEST agent) and the item wizard (seller.demo), every review-edit-* row jumps to the right question. The Next label is 'Done, back to check' and returns to review with the change shown. Option taps (deal/kind/cat) return straight to review. Back returns to review. Draft banner regression passes in both wizards. One real bug: Back from an edit step skips validation (details in issues). No deprecated Expo packages found (expo-av / expo-barcode-scanner / expo-background-fetch).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/properties", "issue": "PropertyCreateIn.price is a plain int with no gt=0. A listing with price 0 is accepted (checked with a TEST user, then deleted). The wizard's Back from an edited step can now reach this (see the integration issue)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Wizard Back while editing from review", "issue": "In fromReview mode, Back calls toReview() without checking the current step. Example: on review-edit-name, typing 'ab' disables Next, but Back still returns to review showing 'Item name: ab', and Publish (step 5, can=true) is enabled. The same happens in the listing wizard: clear the price and press Back to get ₦0 on review. For items the backend then rejects with a 422 (name min_length=3). For listings the backend accepts price 0. Fix: Back should either undo the edit (snapshot the value on edit() and restore it on Back) or be blocked while the step is invalid, and the review step's `can` should re-check all fields. Reference: app/item/new.tsx:97, app/listing/new.tsx:123-124", "testID": "wizard-back-button", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/viewing-hours", "issues": ["At 375px the stepper time values are cut off ('8:30 …', '5:30 …', '6:00 …'). The AM/PM is lost because adjustsFontSizeToFit has no effect on web. Use a shorter format (e.g. '8:30a' / 24h), a smaller font, or stack From/To vertically. Reference: app/viewing-hours.tsx:169"]},
+      {"screen": "listing wizard review", "issues": ["Changing kind from land/commercial to a home type in review-edit-kind goes straight back to review without asking the rooms question. Bedrooms silently use the previous/default values (2 · 2). You could send the user to step 4 when skipRooms changes from true to false. Reference: app/listing/new.tsx:115,168-171"]},
+      {"screen": "job detail PaidCard", "issues": ["After tapping Change there is no Cancel. The user must save again or leave the screen. Optional."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_iter10_paid_hours.py", "/app/backend/tests/test_partner_iter8_trends_summary.py", "/app/test_reports/pytest/iter10.xml"],
+  "action_items": [
+    "MEDIUM: wizard Back while editing from review skips validation (item name <3 chars, listing price 0 reach review with Publish enabled). Snapshot and restore on Back, or block it, and re-check all fields at the review step (app/item/new.tsx, app/listing/new.tsx).",
+    "LOW: add price > 0 validation to PropertyCreateIn (server.py ~line 741).",
+    "LOW: viewing-hours stepper time text is cut off at 375px wide (AM/PM lost).",
+    "LOW: listing review edit of kind from land to apartment skips the rooms question."
+  ],
+  "critical_code_review_comments": [
+    "viewing-hours.tsx fills the form from only the first window of each day. If an agent ever has two windows on one day (the API allows non-overlapping ones), saving from this screen silently drops the second window.",
+    "job_paid: paid_at is kept on correction, which is good. But a job paid 2 weeks ago that gets recorded late is counted in the current week (paid_at = now). That's acceptable, just worth knowing.",
+    "FixaWork 'done' segment includes declined jobs (finished = status not pending/confirmed). Opening them shows no paid card, which is correct."
+  ],
+  "updated_files": ["/app/backend/tests/test_partner_iter10_paid_hours.py (new)", "/app/backend/tests/test_partner_iter8_trends_summary.py (expected fixa keys updated for the new money_earned spec)"],
+  "success_rate": {"backend": "100% (20/20 new + 9/9 iter8 regression after spec update)", "frontend": "~95% (all requested flows work; 1 validation bypass bug)"},
+  "seed_data_creation": "Created 2 TEST agent+seller users (helper_iter9_draft_users.py) and 1 TEST property with price 0. All deleted by id afterwards. fixa.demo jobs now have amount_paid: b04687fc=18000, 6b56ff6d=30000 (allowed demo data). Adaeze's viewing hours were reset to [] with slot 60. The seller.demo item draft was cleared with Start over.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login testIDs: login-email-input / login-password-input / login-submit-button. Fixa Work segments: segment-new/accepted/done; job cards job-card-<id>. Agent Work: segment-visits opens open-viewing-hours. Photo upload on web: page.expect_file_chooser() around photo-adder-gallery, then set_files('/tmp/sofa.jpg'). Counter ids: beds-plus/minus. City chips: city-<Name> (listing), item-city-<Name> (item). Item category ids: cat-vehicles, cat-phones, etc. Run pytest WITHOUT -p no:xdist (pytest.ini uses -n).",
+  "rca_of_issue": "Back bypass: Wizard's onBack in fromReview mode is `toReview()` with no validation. Step-7/5 `can` is hard-coded true, so invalid values reach Publish."
+}

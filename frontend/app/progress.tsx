@@ -24,6 +24,7 @@ const ICON: Record<string, any> = {
   offers_received: "mail-unread",
   jobs_done: "checkmark-done-circle",
   jobs_accepted: "thumbs-up",
+  money_earned: "cash",
 };
 
 const short = (v: number, money?: boolean) => {

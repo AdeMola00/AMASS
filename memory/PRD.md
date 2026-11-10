@@ -51,6 +51,11 @@ Study the existing AMASS app (https://github.com/AdeMola00/AMASS) — design, fe
 - Offline photos: wizard photos taken without signal stay on the phone (native documents folder; web data URL) with a cloud badge, uploaded on publish (progress saved, local file deleted).
 - Earnings charts: GET /api/partner/trends (8 rolling weeks per role) + /progress screen with bar charts, opened from the WeekCard "See my last 8 weeks" button.
 
+## Iteration 10 (Jun 2026)
+- FIXA job prices: POST /api/partner/fixa/jobs/{id}/paid {amount} (only finished/completed jobs; first paid_at kept on corrections). Job detail "How much did the customer pay?" card. Week card FIXA metrics: jobs_done, money_earned, rating; trends adds money_earned chart.
+- Viewing hours editor: /viewing-hours screen (7 day switches, From/To steppers in 30 min, presets, visit length 30/45/60/90) → PUT /api/viewings/availability/me. Entry: Work → Visits header card.
+- Edit from review: listing + item wizard review rows are tappable (pencil) → jump to that question, Next says "Done, back to check".
+
 ## Backlog
 - P1: Voice notes in chat; customer-side FIXA rating prompt from partner app; brand order handoffs view
 - P1: Edit listing price/photos after publishing

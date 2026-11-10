@@ -96,6 +96,22 @@ export function AgentWork({ tab }: { tab?: string }) {
           contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: bottomChrome + 120 }}
           refreshControl={<RefreshControl refreshing={false} onRefresh={cur.reload} tintColor={colors.brandPrimary} />}
           ListEmptyComponent={<EmptyState icon={seg === "homes" ? "home" : "calendar"} text={t("empty_work")} />}
+          ListHeaderComponent={
+            seg === "visits" ? (
+              <Pressable
+                testID="open-viewing-hours"
+                onPress={() => router.push("/viewing-hours")}
+                style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg, minHeight: 72, borderRadius: radius.lg, backgroundColor: colors.surfaceInverse, opacity: pressed ? 0.85 : 1 })}
+              >
+                <Ionicons name="time" size={30} color={colors.warning} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: fonts.heavy, fontSize: 17, color: colors.onSurfaceInverse }}>{t("viewing_hours")}</Text>
+                  <Text style={{ fontFamily: fonts.medium, fontSize: 14, color: colors.onSurfaceInverse }}>{t("viewing_hours_hint")}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={28} color={colors.onSurfaceInverse} />
+              </Pressable>
+            ) : undefined
+          }
           renderItem={({ item: x }) =>
             seg === "homes" ? (
               <Card onPress={() => router.push(`/listing/${x.id}`)} testID={`listing-card-${x.id}`} style={{ padding: 0, overflow: "hidden", gap: 0 }}>

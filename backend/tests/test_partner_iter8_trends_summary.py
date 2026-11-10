@@ -10,7 +10,7 @@ BASE_URL = (os.environ.get("EXPO_BACKEND_URL") or os.environ.get("EXPO_PUBLIC_BA
 EXPECTED = {
     "agent": ["money_sold", "new_leads", "visits_confirmed"],
     "seller": ["money_won", "offers_won", "offers_received"],
-    "fixa": ["jobs_done", "jobs_accepted"],
+    "fixa": ["money_earned", "jobs_done", "jobs_accepted"],  # iter10: money_earned added first
 }
 ACCOUNTS = {
     "agent": ("adaeze.okoye@amass.africa", "Agent2026!"),
@@ -87,7 +87,7 @@ def test_summary_still_ok(sessions, role):
 def test_trends_consistent_with_summary(sessions):
     pairs = {"agent": [("new_leads", "new_leads"), ("visits_confirmed", "visits_confirmed")],
              "seller": [("offers_won", "offers_won"), ("offers_received", "offers_received"), ("money_won", "money_won")],
-             "fixa": [("jobs_done", "jobs_done"), ("jobs_accepted", "jobs_accepted")]}
+             "fixa": [("jobs_done", "jobs_done"), ("money_earned", "money_earned")]}  # iter10: summary dropped jobs_accepted
     mismatches = []
     for role, ps in pairs.items():
         t = sessions[role].get(f"{BASE_URL}/api/partner/trends", timeout=30).json()[role]["charts"]
