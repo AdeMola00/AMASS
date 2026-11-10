@@ -56,6 +56,10 @@ Study the existing AMASS app (https://github.com/AdeMola00/AMASS) — design, fe
 - Viewing hours editor: /viewing-hours screen (7 day switches, From/To steppers in 30 min, presets, visit length 30/45/60/90) → PUT /api/viewings/availability/me. Entry: Work → Visits header card.
 - Edit from review: listing + item wizard review rows are tappable (pencil) → jump to that question, Next says "Done, back to check".
 
+## Iteration 12 (Jun 2026)
+- Days off: viewing_availability.off_days (Lagos YYYY-MM-DD; PUT optional, None keeps saved, past dropped). Buyer booking/propose on a day off → 400 "The agent is away that day". /viewing-hours "Days off" chips + 60-day picker sheet.
+- FIXA price reminder: price sheet opens right after marking a job finished; /partner/me counts fixa_jobs_unpaid + fixa_unpaid_first → home reminder card; Work → Done "Add price" badge / amount pill.
+
 ## Backlog
 - P1: Voice notes in chat; customer-side FIXA rating prompt from partner app; brand order handoffs view
 - P1: Edit listing price/photos after publishing

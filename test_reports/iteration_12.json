@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 12: Days off (agent off_days) and FIXA price reminder. Backend: 17/17 pytest PASS (test_partner_iter12_offdays_unpaid.py). PUT availability/me with off_days: the list is sorted, duplicates are removed and past days are dropped. Today is kept. Omitted or null keeps the saved days, [] clears them. Bad dates give 400. A day 150 days ahead gives 400 and 85 days is OK. A failed request does not wipe the saved days. GET /me and GET /availability/{agent}?property_id= return off_days. With a fresh TEST buyer who unlocked one of adaeze's homes: POST /viewings on a day off gives 400 'The agent is away that day', including 23:00 Lagos time. A buyer propose on a day off gives 400, and the agent can propose on their own day off (200). /partner/me for fixa returns fixa_jobs_unpaid=1 and fixa_unpaid_first=c844250b. Seller has no fixa counts. Frontend at 375x667, all PASS: /viewing-hours shows off-none, off-add-button opens off-sheet with 60 tiles that toggle, off-sheet-done is reachable after scrolling, chips show and tapping one removes it. The save PUT body has the off_days and reopening shows the same chips. FIXA home reminder shows '1 finished job(s) have no price' and opens /job/c844250b. The Work Done tab shows the job-needs-price badge on c844250b and ₦18,000 / ₦30,000 on the paid jobs. On job 3974b21d, pressing Finished opens job-paid-sheet with the input focused, Save disabled until a number is typed, and Later visible. Saving ₦25,000 closes the sheet, the paid card shows ₦25,000 and the API persisted it. The home count stays 1. adaeze is reset to no hours and no days off. The 'Later' path was not exercised because no other 'working' job is left.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/viewings/availability/me", "issue": "off_days with more than 90 items gives a raw 422 (Pydantic max_length=90), not a friendly 400. The upper limit is MAX_DAYS_AHEAD+60 = 90 days, not ~120 as the review request says (viewings.py:72, 232)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "job detail paid sheet", "issue": "While job-paid-sheet is open, the PaidCard behind it also renders in edit mode. job-paid-input and job-paid-save each appear twice in the DOM, so the testIDs are not unique (app/job/[id].tsx:123 and 129).", "testID": "job-paid-input", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home (fixa) / Work Done list", "issues": ["White text on gold #D4AF37 has about 2.1:1 contrast, below WCAG AA 4.5:1. This affects the fixa-unpaid-reminder card ((tabs)/index.tsx:140-145) and the 'Add price' badge job-needs-price-* (FixaWork.tsx:115-117). Use dark text (onSurface) on gold, or a darker amber background.", "The text '1 finished job(s) have no price' uses '(s)'. Use real singular/plural forms."]},
+      {"screen": "/viewing-hours off-sheet", "issues": ["The day tiles use the device's local date (new Date()), not Lagos time (viewing-hours.tsx:173-176). On a device behind WAT, the first tile can be 'yesterday' in Lagos. The backend silently drops it, so the chosen day vanishes after save.", "The 64px tiles fit 4 per row at 375px wide, which leaves about 60px empty on the right. Consider a centered grid or flexible tile width.", "No hint shows which days are already closed by the weekly hours (optional)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_iter12_offdays_unpaid.py", "/app/test_reports/pytest/iter12.xml"],
+  "action_items": [
+    "LOW: Improve contrast on the gold fixa-unpaid-reminder card and the job-needs-price badge (white on #D4AF37 is about 2.1:1).",
+    "LOW: Build the off-day tiles from the Lagos date (UTC+1) so they match the backend.",
+    "LOW: Avoid duplicate job-paid-input/job-paid-save while the sheet is open, for example by hiding the PaidCard form while askPaid is true.",
+    "LOW: Optional friendly 400 for more than 90 off_days. Fix the 'job(s)' plural."
+  ],
+  "critical_code_review_comments": [
+    "viewings.py: the off-day check uses the Lagos date of the start time, correctly applied in request_viewing and in buyer-only propose. Confirm does not re-check off days. A viewing requested before the agent adds that day off can still be confirmed by the agent; that is acceptable since it is the agent's own choice.",
+    "partner_app.py:112 relies on {'$in':[None,0]} matching a missing amount_paid. It works, as verified."
+  ],
+  "updated_files": ["/app/backend/tests/test_partner_iter12_offdays_unpaid.py (new)"],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% of tested flows"},
+  "seed_data_creation": "Two TEST buyers (test_offdays+xxxx@amass.africa) were registered, each unlocking one adaeze home. Their viewings were cancelled (f82e1a35, 49abc512). The user records remain because there is no delete API. Demo job 3974b21d was moved to finished with amount_paid 25000, as allowed. adaeze availability was reset to hours [] and off_days [].",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The container clock is Nov 2026, so the day tiles start at today's date. fixa.demo now has no 'working' job left: 3974b21d is finished and paid ₦25,000, and c844250b is still unpaid, so the reminder count is 1. To test the 'Later' path, create or reset a TEST job to the working stage. Run pytest with -n 0 because pytest.ini enables xdist.",
+  "rca_of_issue": ""
+}

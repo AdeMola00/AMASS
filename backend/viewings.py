@@ -68,6 +68,8 @@ class HoursWindow(BaseModel):
 class AvailabilityIn(BaseModel):
     hours: list[HoursWindow] = Field(default_factory=list, max_length=21)
     slot_minutes: int = Field(default=SLOT_MINUTES, ge=30, le=120)
+    # Whole days off (Lagos dates, YYYY-MM-DD). None = keep what is saved (older clients don't send it).
+    off_days: Optional[list[str]] = Field(default=None, max_length=120)
 
 
 class ViewingCreate(BaseModel):
@@ -151,7 +153,12 @@ def register_viewing_routes(db: AsyncIOMotorDatabase, require_auth) -> APIRouter
 
     async def _availability(agent_id: str) -> dict:
         a = await db.viewing_availability.find_one({"agent_id": agent_id}, {"_id": 0}) or {}
-        return {"hours": a.get("hours", []), "slot_minutes": int(a.get("slot_minutes") or SLOT_MINUTES), "has_hours": bool(a.get("hours"))}
+        today = _now().astimezone(LAGOS).date().isoformat()
+        off = sorted(d for d in (a.get("off_days") or []) if d >= today)
+        return {"hours": a.get("hours", []), "slot_minutes": int(a.get("slot_minutes") or SLOT_MINUTES), "has_hours": bool(a.get("hours")), "off_days": off}
+
+    def _is_off(av: dict, start: datetime) -> bool:
+        return start.astimezone(LAGOS).date().isoformat() in av.get("off_days", [])
 
     def _inside_hours(av: dict, start: datetime, minutes: int) -> bool:
         if not av["has_hours"]:
@@ -211,9 +218,24 @@ def register_viewing_routes(db: AsyncIOMotorDatabase, require_auth) -> APIRouter
             if any(s < oe and e > os_ for os_, oe in by_day.get(w.weekday, [])):
                 raise HTTPException(400, "Viewing windows on the same day can't overlap")
             by_day.setdefault(w.weekday, []).append((s, e))
+        upd = {"agent_id": user["id"], "hours": [w.model_dump() for w in body.hours], "slot_minutes": body.slot_minutes, "updated_at": _iso(_now())}
+        if body.off_days is not None:
+            today = _now().astimezone(LAGOS).date()
+            days = set()
+            for d in body.off_days:
+                try:
+                    dd = datetime.strptime(d, "%Y-%m-%d").date()
+                except ValueError:
+                    raise HTTPException(400, f"{d} isn't a valid date")
+                if dd < today:
+                    continue  # past days off are simply dropped
+                if dd > today + timedelta(days=MAX_DAYS_AHEAD + 60):
+                    raise HTTPException(400, "Days off can only be set up to a few months ahead")
+                days.add(dd.isoformat())
+            upd["off_days"] = sorted(days)
         await db.viewing_availability.update_one(
             {"agent_id": user["id"]},
-            {"$set": {"agent_id": user["id"], "hours": [w.model_dump() for w in body.hours], "slot_minutes": body.slot_minutes, "updated_at": _iso(_now())}},
+            {"$set": upd},
             upsert=True,
         )
         return await _availability(user["id"])
@@ -252,6 +274,8 @@ def register_viewing_routes(db: AsyncIOMotorDatabase, require_auth) -> APIRouter
         _validate_start(start)
         av = await _availability(agent_id)
         minutes = av["slot_minutes"]
+        if _is_off(av, start):
+            raise HTTPException(400, "The agent is away that day. Please pick another day")
         if not _inside_hours(av, start, minutes):
             raise HTTPException(400, "That time is outside the agent's viewing hours")
         if await _conflict(agent_id, start, minutes):
@@ -363,6 +387,8 @@ def register_viewing_routes(db: AsyncIOMotorDatabase, require_auth) -> APIRouter
         _validate_start(start)
         if role == "buyer":
             av = await _availability(v["agent_id"])
+            if _is_off(av, start):
+                raise HTTPException(400, "The agent is away that day. Please pick another day")
             if not _inside_hours(av, start, av["slot_minutes"]):
                 raise HTTPException(400, "That time is outside the agent's viewing hours")
         if await _conflict(v["agent_id"], start, int(v.get("slot_minutes") or SLOT_MINUTES), exclude_id=v["id"]):

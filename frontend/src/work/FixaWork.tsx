@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FlatList, RefreshControl, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { api } from "@/src/api";
+import { api, naira } from "@/src/api";
 import { useAuth } from "@/src/auth";
 import { fmtDay } from "@/src/format";
 import { TKey } from "@/src/i18n";
@@ -109,6 +109,16 @@ export function FixaWork({ tab }: { tab?: string }) {
                 {j.job_stage ? (
                   <View style={{ paddingHorizontal: space.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.successSoft }}>
                     <Text style={{ fontFamily: fonts.bold, color: colors.success }}>{t(`stage_${j.job_stage}` as TKey)}</Text>
+                  </View>
+                ) : null}
+                {(j.job_stage === "finished" || j.status === "completed") && !j.amount_paid ? (
+                  <View testID={`job-needs-price-${j.id}`} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: space.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.warningSoft, borderWidth: 1, borderColor: colors.warning }}>
+                    <Ionicons name="cash" size={16} color={colors.onSurface} />
+                    <Text style={{ fontFamily: fonts.bold, color: colors.onSurface }}>{t("add_price")}</Text>
+                  </View>
+                ) : j.amount_paid ? (
+                  <View style={{ paddingHorizontal: space.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.surfaceTertiary }}>
+                    <Text style={{ fontFamily: fonts.bold, color: colors.onSurface }}>{naira(j.amount_paid)}</Text>
                   </View>
                 ) : null}
               </View>

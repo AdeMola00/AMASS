@@ -10,7 +10,7 @@ import { fmtDay } from "@/src/format";
 import { TKey } from "@/src/i18n";
 import { useSettings } from "@/src/settings";
 import { fonts, radius, space, useTheme } from "@/src/theme";
-import { Avatar, BigButton, Card, ErrorView, LoadingView, ScreenHeader, StatusPill, useToast } from "@/src/ui";
+import { Avatar, BigButton, Card, ErrorView, LoadingView, ScreenHeader, Sheet, StatusPill, useToast } from "@/src/ui";
 import { useLoad } from "@/src/useLoad";
 import { BigInput } from "@/src/Wizard";
 import { STAGE_ICON } from "@/src/work/FixaWork";
@@ -26,6 +26,7 @@ export default function JobDetail() {
   const toast = useToast();
   const d = useLoad(async () => (await api<{ items: any[] }>("/fixa/jobs")).items.find((j) => j.id === id), [id]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [askPaid, setAskPaid] = useState(false);
   const j = d.data;
 
   const run = async (key: string, fn: () => Promise<any>) => {
@@ -102,23 +103,49 @@ export default function JobDetail() {
                 );
               })}
               {nextStage && j.status === "confirmed" ? (
-                <BigButton label={t(`stage_${nextStage}` as TKey)} icon={STAGE_ICON[nextStage]} tone={nextStage === "finished" ? "success" : "brand"} onPress={() => run("stage", () => api(`/partner/fixa/jobs/${j.id}/stage`, { body: { stage: nextStage } }))} loading={busy === "stage"} testID="job-next-stage-button" />
+                <BigButton
+                  label={t(`stage_${nextStage}` as TKey)}
+                  icon={STAGE_ICON[nextStage]}
+                  tone={nextStage === "finished" ? "success" : "brand"}
+                  onPress={() =>
+                    run("stage", async () => {
+                      await api(`/partner/fixa/jobs/${j.id}/stage`, { body: { stage: nextStage } });
+                      // Just finished → ask for the price right away so no earnings are missed.
+                      if (nextStage === "finished" && !j.amount_paid) setAskPaid(true);
+                    })
+                  }
+                  loading={busy === "stage"}
+                  testID="job-next-stage-button"
+                />
               ) : null}
             </View>
           ) : null}
-          {j.job_stage === "finished" || j.status === "completed" ? <PaidCard job={j} onSaved={d.reload} /> : null}
+          {(j.job_stage === "finished" || j.status === "completed") && !askPaid ? <PaidCard key={j.amount_paid || 0} job={j} onSaved={d.reload} /> : null}
         </ScrollView>
       )}
+      {j ? (
+        <Sheet visible={askPaid} onClose={() => setAskPaid(false)} title={t("job_paid_q")} testID="job-paid-sheet">
+          <Text style={{ fontFamily: fonts.medium, fontSize: 16, color: colors.muted }}>{t("job_paid_why")}</Text>
+          <PaidForm
+            job={j}
+            autoFocus
+            onSaved={() => {
+              setAskPaid(false);
+              d.reload();
+              refresh();
+            }}
+          />
+          <BigButton label={t("later")} icon="time" tone="neutral" outline onPress={() => setAskPaid(false)} testID="job-paid-later" />
+        </Sheet>
+      ) : null}
     </View>
   );
 }
 
 // After the job: the pro types what the customer paid → feeds "Money from jobs" on the week card and charts.
-function PaidCard({ job, onSaved }: { job: any; onSaved: () => void }) {
-  const { colors } = useTheme();
+function PaidForm({ job, onSaved, autoFocus }: { job: any; onSaved: () => void; autoFocus?: boolean }) {
   const { t } = useSettings();
   const toast = useToast();
-  const [editing, setEditing] = useState(!job.amount_paid);
   const [value, setValue] = useState(job.amount_paid ? String(job.amount_paid) : "");
   const [busy, setBusy] = useState(false);
   const n = parseInt(value.replace(/\D/g, ""), 10) || 0;
@@ -128,7 +155,6 @@ function PaidCard({ job, onSaved }: { job: any; onSaved: () => void }) {
     try {
       await api(`/partner/fixa/jobs/${job.id}/paid`, { body: { amount: n } });
       toast.show(t("saved"));
-      setEditing(false);
       onSaved();
     } catch (e: any) {
       toast.show(e?.message || t("something_wrong"), "error");
@@ -136,6 +162,18 @@ function PaidCard({ job, onSaved }: { job: any; onSaved: () => void }) {
       setBusy(false);
     }
   };
+  return (
+    <>
+      <BigInput testID="job-paid-input" money value={value ? naira(n) : ""} onChangeText={setValue} keyboardType="number-pad" placeholder="₦0" autoFocus={autoFocus} />
+      <BigButton label={t("save")} icon="checkmark-circle" tone="success" onPress={save} disabled={n <= 0} loading={busy} testID="job-paid-save" />
+    </>
+  );
+}
+
+function PaidCard({ job, onSaved }: { job: any; onSaved: () => void }) {
+  const { colors } = useTheme();
+  const { t } = useSettings();
+  const [editing, setEditing] = useState(!job.amount_paid);
 
   return (
     <Card testID="job-paid-card">
@@ -146,10 +184,13 @@ function PaidCard({ job, onSaved }: { job: any; onSaved: () => void }) {
         <Text style={{ flex: 1, fontFamily: fonts.heavy, fontSize: 18, color: colors.onSurface }}>{editing ? t("job_paid_q") : t("job_paid_label")}</Text>
       </View>
       {editing ? (
-        <>
-          <BigInput testID="job-paid-input" money value={value ? naira(n) : ""} onChangeText={setValue} keyboardType="number-pad" placeholder="₦0" />
-          <BigButton label={t("save")} icon="checkmark-circle" tone="success" onPress={save} disabled={n <= 0} loading={busy} testID="job-paid-save" />
-        </>
+        <PaidForm
+          job={job}
+          onSaved={() => {
+            setEditing(false);
+            onSaved();
+          }}
+        />
       ) : (
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
           <Text testID="job-paid-amount" style={{ flex: 1, fontFamily: fonts.display, fontSize: 32, color: colors.onSurface }}>

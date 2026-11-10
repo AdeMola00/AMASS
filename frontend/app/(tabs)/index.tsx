@@ -133,6 +133,20 @@ export default function Home() {
         ) : null}
 
         {role === "agent" && me?.listing_quota?.can_add !== false ? <DraftNotice kind="listing" /> : role === "seller" ? <DraftNotice kind="item" /> : null}
+        {role === "fixa" && c.fixa_jobs_unpaid ? (
+          <Pressable
+            testID="fixa-unpaid-reminder"
+            onPress={() => router.push(`/job/${c.fixa_unpaid_first}`)}
+            style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg, minHeight: 72, borderRadius: radius.lg, backgroundColor: colors.surfaceInverse, opacity: pressed ? 0.85 : 1 })}
+          >
+            <Ionicons name="cash" size={32} color={colors.warning} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: fonts.heavy, fontSize: 17, color: colors.onSurfaceInverse }}>{c.fixa_jobs_unpaid === 1 ? t("unpaid_job_one") : t("unpaid_jobs", { n: c.fixa_jobs_unpaid })}</Text>
+              <Text style={{ fontFamily: fonts.medium, fontSize: 14, color: colors.onSurfaceInverse }}>{t("unpaid_jobs_hint")}</Text>
+            </View>
+            <Ionicons name="arrow-forward-circle" size={36} color={colors.warning} />
+          </Pressable>
+        ) : null}
 
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.md }}>
           {tiles.map((x, i) => (

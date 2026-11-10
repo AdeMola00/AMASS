@@ -108,6 +108,10 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
         if fixa:
             counts["fixa_jobs_new"] = await db.fixa_bookings.count_documents({"item_id": fixa["id"], "status": "pending"})
             counts["fixa_jobs_active"] = await db.fixa_bookings.count_documents({"item_id": fixa["id"], "status": "confirmed", "job_stage": {"$ne": "finished"}})
+            # Finished jobs with no price yet → home reminder so no earnings are missed.
+            unpaid = await db.fixa_bookings.find({"item_id": fixa["id"], "$or": [{"job_stage": "finished"}, {"status": "completed"}], "amount_paid": {"$in": [None, 0]}}, {"_id": 0, "id": 1}).sort("job_stage_at", -1).to_list(50)
+            counts["fixa_jobs_unpaid"] = len(unpaid)
+            counts["fixa_unpaid_first"] = unpaid[0]["id"] if unpaid else None
         from chat import _unread_count_for
 
         conv_ids = [c["id"] async for c in db.conversations.find({"participant_ids": uid}, {"_id": 0, "id": 1}).limit(200)]

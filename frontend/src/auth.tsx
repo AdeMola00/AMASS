@@ -12,7 +12,7 @@ export type PartnerMe = {
   user: { id: string; full_name: string; email: string; phone?: string; avatar_url?: string; face_verified?: boolean };
   roles: Role[];
   fixa: { status: string; item_id: string; name: string } | null;
-  counts: Record<string, number>;
+  counts: Record<string, any>;
   listing_quota: { plan_name: string; limit: number; used: number; can_add: boolean } | null;
 };
 export type BrandMe = { account: { id: string; name: string; email: string }; brand: any; categories: { key: string; label: string; icon: string }[] };
