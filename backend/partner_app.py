@@ -158,6 +158,17 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
         await db.properties.update_one({"id": property_id}, {"$set": changes, **({"$push": push} if push else {})})
         return {"ok": True, "price": changes.get("price", p.get("price")), "images": changes.get("images")}
 
+    def _ts(v):
+        if not v:
+            return None
+        if isinstance(v, datetime):
+            return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+        try:
+            d = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+            return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
+
     @router.get("/summary")
     async def summary(user: dict = Depends(get_current_user)):
         """This week vs last week, plus a 7-day bar series for each partner type."""
@@ -167,16 +178,7 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
         prev0 = now - timedelta(days=14)
         days = [(now - timedelta(days=6 - i)).date() for i in range(7)]
 
-        def ts(v):
-            if not v:
-                return None
-            if isinstance(v, datetime):
-                return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
-            try:
-                d = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
-                return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
-            except ValueError:
-                return None
+        ts = _ts
 
         def bucket(stamps: list):
             out = {d: 0 for d in days}
@@ -219,6 +221,53 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
             a_now, a_prev = split([ts(j.get("confirmed_at")) for j in jobs])
             ratings = [j["rating"] for j in jobs if j.get("rating")]
             res["fixa"] = {"metrics": [{"key": "jobs_done", "now": d_now, "prev": d_prev}, {"key": "jobs_accepted", "now": a_now, "prev": a_prev}, {"key": "rating", "now": round(sum(ratings) / len(ratings), 1) if ratings else 0, "prev": None}], "series_key": "jobs_done", "series": bucket(done)}
+        return res
+
+    @router.get("/trends")
+    async def trends(user: dict = Depends(get_current_user)):
+        """Last 8 weeks (oldest first, this week last) for each partner type."""
+        uid = user["id"]
+        now = _now()
+        W = 8
+        starts = [now - timedelta(days=7 * (W - i)) for i in range(W)]
+
+        def weekly(items: list):
+            out = [0] * W
+            for s, v in items:
+                if not s:
+                    continue
+                k = int((now - s).total_seconds() // (7 * 86400))
+                if 0 <= k < W:
+                    out[W - 1 - k] += v
+            return [{"start": starts[i].date().isoformat(), "n": out[i]} for i in range(W)]
+
+        res: dict = {}
+        props = await db.properties.find({"agent_id": uid}, {"_id": 0, "id": 1, "status": 1, "status_changed_at": 1, "price": 1}).to_list(1000)
+        if props or user.get("is_agent"):
+            pids = [p["id"] for p in props]
+            convs = await db.conversations.find({"property_id": {"$in": pids}}, {"_id": 0, "created_at": 1}).to_list(5000)
+            views = await db.viewings.find({"agent_id": uid}, {"_id": 0, "created_at": 1, "status": 1}).to_list(5000)
+            sold = [(_ts(p.get("status_changed_at")), int(p.get("price") or 0)) for p in props if p.get("status") == "sold"]
+            res["agent"] = {"charts": [
+                {"key": "money_sold", "money": True, "weeks": weekly(sold)},
+                {"key": "new_leads", "weeks": weekly([(_ts(c.get("created_at")), 1) for c in convs] + [(_ts(v.get("created_at")), 1) for v in views])},
+                {"key": "visits_confirmed", "weeks": weekly([(_ts(v.get("created_at")), 1) for v in views if v.get("status") == "confirmed"])},
+            ]}
+        offers = await db.marketplace_offers.find({"seller_id": uid}, {"_id": 0, "status": 1, "updated_at": 1, "created_at": 1, "amount": 1, "agreed_amount": 1}).to_list(5000)
+        if offers or "seller" in (user.get("partner_roles") or []):
+            won = [o for o in offers if o.get("status") == "accepted"]
+            res["seller"] = {"charts": [
+                {"key": "money_won", "money": True, "weeks": weekly([(_ts(o.get("updated_at")), int(o.get("agreed_amount") or o.get("amount") or 0)) for o in won])},
+                {"key": "offers_won", "weeks": weekly([(_ts(o.get("updated_at")), 1) for o in won])},
+                {"key": "offers_received", "weeks": weekly([(_ts(o.get("created_at")), 1) for o in offers])},
+            ]}
+        prof = await _fixa_profile(uid)
+        if prof:
+            jobs = await db.fixa_bookings.find({"item_id": prof["id"]}, {"_id": 0, "status": 1, "job_stage": 1, "job_stage_at": 1, "completed_at": 1, "confirmed_at": 1}).to_list(5000)
+            res["fixa"] = {"charts": [
+                {"key": "jobs_done", "weeks": weekly([(_ts(j.get("completed_at")) or _ts(j.get("job_stage_at")), 1) for j in jobs if j.get("status") == "completed" or j.get("job_stage") == "finished"])},
+                {"key": "jobs_accepted", "weeks": weekly([(_ts(j.get("confirmed_at")), 1) for j in jobs])},
+            ]}
         return res
 
     @router.post("/fixa/jobs/{job_id}/stage")

@@ -1,7 +1,7 @@
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { api, naira } from "@/src/api";
 import { Role } from "@/src/auth";
@@ -30,6 +30,7 @@ export function WeekCard({ role }: { role: Role }) {
   const { colors } = useTheme();
   const { t, lang } = useSettings();
   const [data, setData] = useState<Record<string, Block> | null>(null);
+  const router = useRouter();
 
   useFocusEffect(
     useCallback(() => {
@@ -100,6 +101,15 @@ export function WeekCard({ role }: { role: Role }) {
           ))}
         </View>
       </View>
+
+      <Pressable
+        testID="week-see-progress"
+        onPress={() => router.push(`/progress?role=${role}`)}
+        style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm, minHeight: 52, borderRadius: radius.md, backgroundColor: colors.warning, opacity: pressed ? 0.8 : 1 })}
+      >
+        <Ionicons name="stats-chart" size={22} color={colors.onSurfaceInverse} />
+        <Text style={{ fontFamily: fonts.heavy, fontSize: 16, color: colors.onSurfaceInverse }}>{t("see_progress")}</Text>
+      </Pressable>
     </View>
   );
 }

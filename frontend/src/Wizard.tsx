@@ -23,6 +23,7 @@ export function Wizard({
   nextIcon = "arrow-forward",
   canNext = true,
   busy,
+  top,
 }: {
   title: string;
   step: number;
@@ -36,6 +37,7 @@ export function Wizard({
   nextIcon?: any;
   canNext?: boolean;
   busy?: boolean;
+  top?: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -44,6 +46,7 @@ export function Wizard({
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
       <ScreenHeader title={title} guide={guide} extra={question} back />
       <KeyboardAwareScrollView bottomOffset={120} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: 140 + insets.bottom }}>
+        {top}
         <StepBar n={step} total={total} />
         <Animated.View key={step} entering={FadeInRight.duration(250)} style={{ gap: space.lg }}>
           <Text testID="wizard-question" style={{ fontFamily: fonts.display, fontSize: 30, lineHeight: 36, color: colors.onSurface }}>

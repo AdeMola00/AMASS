@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 8 tested the Earnings Charts and the Offline Drafts at a 390x844 viewport. Backend: 9/9 pytest passed (test_partner_iter8_trends_summary.py). GET /api/partner/trends returns 401 without a token. Each role gets the right chart keys in order: agent money_sold/new_leads/visits_confirmed, seller money_won/offers_won/offers_received, fixa jobs_done/jobs_accepted. Every chart has 8 weeks, oldest first, 7 days apart, ints >= 0, and money=true only on the money charts. A buyer gets no partner charts. GET /api/partner/summary still returns 200 for all 3 roles after the _ts refactor, and each chart's last week matches the summary 'now' number for every shared metric. Frontend: week-see-progress (52px tall) opens /progress?role=agent, seller and fixa. The chart-<key>, -now and -total values match the API (agent new_leads 2; seller ₦122,012 / 3 / 9; fixa 3 / 4). header-back-button returns to home. /progress with no role param falls back to the active role. /progress?role=agent for a user without that role shows the EmptyState. Drafts: all 5 demo agents are at their listing limit (adaeze 23/5, tunde 8/5, ngozi 7/5, emeka 7/5), so the listing wizard shows the lock screen. I tested the listing wizard with a new TEST_ agent+seller user instead. Listing draft: deal, kind, photo upload, beds+1 and price saved to localStorage draft_listing. Leaving with the header back button showed draft-notice-listing. A reload on the wizard and a reload on home both kept it. Tapping the notice reopened step 5 with ₦250,000, draft-banner showing, beds=3, the photo kept and apartment selected. draft-start-over went back to step 1, removed the localStorage key, and the notice disappeared. Publishing a land listing (rooms step skipped) cleared the key and the notice. Item draft: draft_item behaved the same with seller.demo (photo, name, category, reload, restore, start over) and with the TEST user (publish cleared it). All new flows work; the issues below are design and edge-case problems.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/partner/trends (agent money_sold)", "issue": "Adds up the current property.price, not the sale price. A sold listing without status_changed_at is never counted."},
+      {"endpoint": "GET /api/partner/trends (seller)", "issue": "money_won and offers_won are placed in a week by the offer's updated_at, so any later update to an accepted offer moves it to a different week."},
+      {"endpoint": "GET /api/partner/trends (fixa jobs_accepted)", "issue": "Counts every job with confirmed_at, including jobs that were cancelled later. The summary has the same behaviour."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "src/drafts.tsx DRAFTS keys", "issue": "Draft keys are global ('draft_listing'/'draft_item'), not tied to a user. signOut (src/auth.tsx:83) does not clear them. The next person who signs in on the same phone sees the earlier user's 'Unfinished listing' with that user's uploaded photos and price, and can publish it as their own.", "testID": "draft-notice-listing", "priority": "MEDIUM"},
+      {"component": "listing/new.tsx:116 + (tabs)/index.tsx:135", "issue": "When the agent is at the listing limit, home still shows draft-notice-listing. Tapping it opens the lock screen, which has no DraftBanner or Start over, so the notice can never be cleared. Every demo agent is at the limit today.", "testID": "draft-notice-listing", "priority": "MEDIUM"},
+      {"component": "Offline drafts / PhotoAdder", "issue": "Step 3 (listing) and step 1 (item) require a photo that is already uploaded to /partner/upload. With no signal the agent cannot get past the photo step, so the draft only keeps deal and kind. The photos are not queued on the phone. This does not fully meet 'poor signal never lose their work'.", "testID": "photo-adder-gallery", "priority": "MEDIUM"},
+      {"component": "DraftNotice on home", "issue": "The notice only shows for the active role. A user with both agent and seller roles who has a listing draft sees nothing while on the Selling tab.", "testID": "draft-notice-listing", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Wizard DraftBanner", "issues": ["The 'Saved on this phone · time' line is #8A6D14 on #FAF5E5 at opacity 0.85, about 3.9:1, which is below WCAG AA for 14px text.", "The banner (about 160px tall) stays at the top on every step after a restore, which pushes the question down on small phones. Consider letting the user dismiss it, or auto-hiding it after the first step change."]},
+      {"screen": "Progress", "issues": ["The week labels are rolling 7-day windows starting from now-7d (the last bar says '3/11' on 10/11), not calendar weeks. This could confuse partners and is worth a short note in guide_progress."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_iter8_trends_summary.py", "/app/test_reports/pytest/pytest_iter8.xml"],
+  "action_items": [
+    "Tie drafts to the user (e.g. draft_listing_<uid>), or remove draft_listing and draft_item in signOut.",
+    "Hide DraftNotice when listing_quota.can_add is false, or show Start over (draft discard) on the lock screen.",
+    "Offline photo support: keep the local image URI or base64 in the draft and upload when the user publishes or the signal returns, so the wizard can go past the photo step offline.",
+    "Optional: show the other roles' draft notices on home, raise the contrast of the banner subtitle (opacity 1), and use the real sale price for money_sold."
+  ],
+  "critical_code_review_comments": [
+    "The useDraft logic is sound. apply, setRestoredAt and setReady are batched, so the restored data is never overwritten by the initial state. finish() sets done before removeItem, so nothing is written again after publish. A failed publish keeps the draft (toast offline_kept).",
+    "Photos uploaded during a draft and then thrown away with Start over stay on the server as orphaned public files.",
+    "The trends and summary bucket maths agree (k=floor((now-s)/7d) vs s>=now-7d). The to_list caps of 1000/5000 are fine for an MVP."
+  ],
+  "updated_files": ["/app/backend/tests/test_partner_iter8_trends_summary.py"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% of requested flows (progress for 3 roles; listing and item draft save, notice, reload, restore, start over, publish clear)"},
+  "seed_data_creation": "I created TEST user test_iter8_agent_1794307303@example.com (id 8b65ac84-9180-4b1a-a3e1-b8b56d8dce60, roles agent and seller), one published listing (id cd85eb39-c4a1-41af-b776-91dc458374a7) and one marketplace item (id 7760c56a-6084-4c01-9216-e71b6464ed4c). All three were deleted by id. Uploaded sofa.jpg files are left as orphaned public files. No demo data was changed: the seller.demo draft was discarded with Start over and nothing was published.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Each browser_automation call starts a new browser profile, so localStorage does not carry over; build a draft and check it in the same script. Every demo agent is at the listing limit, so create a TEST_ user with POST /api/auth/register and then POST /api/partner/roles {roles:['agent','seller']}. Photo upload: wrap the photo-adder-gallery click in expect_file_chooser and use /tmp/sofa.jpg. Marketplace items live in the 'marketplace' collection.",
+  "rca_of_issue": "Draft leak: DRAFTS keys are constants and auth.signOut only removes the session and ROLE_KEY. Stuck notice: DraftNotice reads storage without checking me.listing_quota, and NewListing returns the lock screen before the wizard and DraftBanner render."
+}

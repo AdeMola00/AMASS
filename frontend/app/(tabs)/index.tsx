@@ -6,6 +6,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/auth";
+import { DraftNotice } from "@/src/drafts";
 import { TKey } from "@/src/i18n";
 import { ROLE_META } from "@/src/roles";
 import { usesNativeTabs } from "@/src/navigation";
@@ -130,6 +131,8 @@ export default function Home() {
             <Text style={{ flex: 1, fontFamily: fonts.bold, fontSize: 16, color: colors.onBrandTertiary }}>{t("fixa_pending")}</Text>
           </View>
         ) : null}
+
+        {role === "agent" && me?.listing_quota?.can_add !== false ? <DraftNotice kind="listing" /> : role === "seller" ? <DraftNotice kind="item" /> : null}
 
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.md }}>
           {tiles.map((x, i) => (

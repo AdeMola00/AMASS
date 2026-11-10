@@ -46,6 +46,11 @@ Study the existing AMASS app (https://github.com/AdeMola00/AMASS) — design, fe
 - Native voices: Spitch TTS (yo=sade, ha=amina, ig=ngozi) used when SPITCH_API_KEY is set; otherwise OpenAI fallback. Key requested from user.
 - Known: the badge shows a face is present, not that it matches the account holder.
 
+## Iteration 8–9 (Jun 2026)
+- Offline drafts: new listing + new item wizards auto-save answers and step on the phone (key draft_listing_<userId> / draft_item_<userId>), restore with banner + Start over, home "Unfinished listing/item" notice (hidden at listing limit), cleared on publish. Network failure on publish keeps the draft.
+- Offline photos: wizard photos taken without signal stay on the phone (native documents folder; web data URL) with a cloud badge, uploaded on publish (progress saved, local file deleted).
+- Earnings charts: GET /api/partner/trends (8 rolling weeks per role) + /progress screen with bar charts, opened from the WeekCard "See my last 8 weeks" button.
+
 ## Backlog
 - P1: Voice notes in chat; customer-side FIXA rating prompt from partner app; brand order handoffs view
 - P1: Edit listing price/photos after publishing

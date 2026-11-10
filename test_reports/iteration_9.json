@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 9 retested the three fixes from iteration 8, the draft banner change and a /progress regression, at a 390x844 viewport with two new TEST_ agent+seller users (A and B) on one browser profile. All checks passed. FIX 1 (per-user drafts): A's listing draft is saved under draft_listing_<A id>. After A signs out and B signs in, B sees no draft-notice-listing and gets an empty wizard at step 1 with no draft-banner. When A signs back in, the notice is back and the draft reopens at step 3 with the banner. The item draft works the same way: B's draft_item_<B id> is not shown to A on the Selling tab, and B gets it back with the name restored. FIX 2: for adaeze (23/5, can_add false) with a draft_listing_<adaeze id> in storage, home shows no draft-notice-listing, and the tile opens the lock screen. FIX 3 (offline photos): with /api/partner/upload aborted, adding sofa.jpg in the listing and item wizards shows photo-adder-waiting-0 and the toast 'No network. Photo kept on this phone...'. Next becomes enabled and the data URL is kept in the draft. After a reload the photo and badge are restored, and review-photos-waiting-0 shows on the review step. Publishing while still offline shows the offline_kept toast, sends no /properties request and stays on review. After unblocking, publish uploads the photo first, POST /properties and /marketplace/items get only https public-files URLs, the user lands on /work, and the draft key is removed. Draft banner: it disappears after one Next press (listing and item). Regression: /progress?role=agent shows all 3 charts with -now and -total values, and /partner/summary and /partner/trends return 200 for agent (adaeze) and seller (seller.demo).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PhotoAdder offline toast", "issues": ["'No network. Photo kept on this phone' uses the green success toast with a checkmark. A warning or neutral style would be clearer, because the photo is not uploaded yet."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/helper_iter9_draft_users.py"],
+  "action_items": [
+    "Optional: use a warning or neutral tone for the photo_kept_offline toast.",
+    "Optional: on native, delete the draft-photo-*.jpg files in Paths.document after uploadPending succeeds or after Start over, so they do not pile up.",
+    "Optional: in uploadPending, write each uploaded URL back to the photos list as soon as it uploads, so a retry after a partial failure does not upload the same photos again."
+  ],
+  "critical_code_review_comments": [
+    "useDraft depends on 'me' being loaded before the wizard mounts. If the key changed from _anon to _<id> while the wizard was open, the save effect would run with empty data and removeItem(new key) before the read finished, deleting the user's draft. This works today because the auth gate loads me first (a reload on /listing/new restored correctly), but it is fragile. Consider resetting ready to false when the key changes, or skipping the effect while me is missing.",
+    "On web, offline photos are stored as base64 data URLs inside the localStorage draft (36KB for the test photo). Several large phone photos could go over the roughly 5MB localStorage limit and make setItem throw. Native stores file URIs, so this only affects the web preview.",
+    "Photos that are uploaded and then dropped with Start over are still left as orphaned public files (known from iteration 8)."
+  ],
+  "updated_files": ["/app/backend/tests/helper_iter9_draft_users.py"],
+  "success_rate": {"backend": "100% (summary/trends 200 for agent and seller)", "frontend": "100% of requested retest flows"},
+  "seed_data_creation": "Created TEST users test_iter9_a_1794307768@example.com (0e2581f3-1fab-43c3-baf9-64ac01c5bf05) and test_iter9_b_1794307770@example.com (68bd1687-0e91-4637-b7b3-89dd1fd5e8ca), listing fcb57502-220b-46ca-9dd7-96523ecc7330 and marketplace item ad705505-1a56-43d6-810c-bb73a76757c1. All were deleted by id, along with those users' wallets and token_transactions. The uploaded sofa.jpg files remain as orphaned public files. The temporary adaeze draft key was written only to browser localStorage and then removed. No demo data was changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use helper_iter9_draft_users.py (needs EXPO_PUBLIC_BACKEND_URL exported) to create two agent+seller TEST users under quota. Simulate offline with page.route('**/api/partner/upload', lambda r: r.abort('internetdisconnected')). Sign out with /me then me-signout-button. Counter testIDs are not 'beds' itself (they are beds-*).",
+  "rca_of_issue": ""
+}
