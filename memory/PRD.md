@@ -67,3 +67,10 @@ final CTA, footer w/ newsletter, lead-capture forms, dark mode.
 - testing_agent iteration_5: backend 18/18, frontend 100%, no issues. Reviewer follow-up applied (email made non-blocking).
 - NOTE: ADMIN_API_KEY lives in the platform secret store / process env, not backend/.env (per testing agent note).
 - Backlog sharpened: app-level rate-limit/honeypot on /api/leads + /api/newsletter is now P1 (each lead sends 1 email to hello@amass.africa). Needs fresh Deploy for all of this to reach the live site.
+
+## Update — Backend-Driven Logo (2026-07)
+- User: "update the Amass logo as it has been changed from the backend" — no new logo file was attached yet; user asked to make the logo backend-driven instead.
+- New CMS field branding{logo_url, app_icon_url} (server.py DEFAULT_CONTENT, content.js BRANDING_DEFAULT, preview Mongo doc seeded with empty strings).
+- Logo.jsx (navbar + footer), StoreBadges app icon and Ecosystem app icon now read from ContentProvider branding with fallback to bundled /amass-logo.png and /amass-app-icon.png.
+- Verified end-to-end: AMASS ADMIN PUT /api/admin/content {"branding":{"logo_url":"<asset url>"}} -> GET /api/content serves it -> navbar renders it (screenshot) -> reset to "" restores bundled logo.
+- PENDING: user to attach the actual new logo file -> then process (crop/transparent) and either set via ADMIN PUT or replace bundled file. Also cleaned stale "search" key from content.js SECTIONS_DEFAULT.

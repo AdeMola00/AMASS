@@ -255,6 +255,10 @@ DEFAULT_CONTENT: Dict[str, Any] = {
         "ctaSecondary": "Become an Agent",
     },
     "trust": ["Verified Listings", "AI Powered", "Secure Transactions", "Pan-African Coverage"],
+    "branding": {
+        "logo_url": "",
+        "app_icon_url": "",
+    },
     "stats": [
         {"value": "48,000+", "label": "Properties Listed"},
         {"value": "3,200+", "label": "Verified Agents"},

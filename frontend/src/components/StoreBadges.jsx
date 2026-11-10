@@ -1,6 +1,7 @@
 import React from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useLeadForm } from "@/context/LeadFormProvider";
+import { useContent } from "@/context/ContentProvider";
 
 /** Apple brand mark (official silhouette). */
 function AppleLogo({ className = "" }) {
@@ -29,6 +30,7 @@ function GooglePlayLogo({ className = "" }) {
  */
 export function StoreBadges({ size = "md", testids = {}, className = "", withIcon = true }) {
   const { openForm } = useLeadForm();
+  const { branding } = useContent();
   const notify = () => openForm("waiting_list");
   const lg = size === "lg";
   const box = lg
@@ -42,7 +44,7 @@ export function StoreBadges({ size = "md", testids = {}, className = "", withIco
     <div className={`flex flex-wrap items-center gap-3 sm:gap-4 ${className}`}>
       {withIcon && (
         <img
-          src="/amass-app-icon.png"
+          src={branding?.app_icon_url || "/amass-app-icon.png"}
           alt="AMASS app"
           data-testid={testids.icon || "amass-app-icon"}
           className={`shrink-0 rounded-2xl border border-white/25 shadow-floating ${lg ? "h-16 w-16 sm:h-[4.75rem] sm:w-[4.75rem]" : "h-14 w-14"}`}

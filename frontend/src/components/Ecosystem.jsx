@@ -1,6 +1,7 @@
 import React from "react";
 import { Briefcase, LayoutDashboard, Database } from "lucide-react";
 import { Reveal } from "@/components/anim/Reveal";
+import { useContent } from "@/context/ContentProvider";
 
 const NODES = [
   {
@@ -26,6 +27,7 @@ const NODES = [
 ];
 
 export default function Ecosystem() {
+  const { branding } = useContent();
   return (
     <section id="ecosystem" data-testid="ecosystem-section" className="relative overflow-hidden bg-brand-charcoal py-24 md:py-32">
       <div className="absolute inset-0 grain opacity-10" />
@@ -59,7 +61,7 @@ export default function Ecosystem() {
                       {Icon ? (
                         <Icon className="h-8 w-8 text-brand-emerald" />
                       ) : (
-                        <img src="/amass-app-icon.png" alt="AMASS App icon" className="h-14 w-14 rounded-xl" draggable="false" />
+                        <img src={branding?.app_icon_url || "/amass-app-icon.png"} alt="AMASS App icon" className="h-14 w-14 rounded-xl" draggable="false" />
                       )}
                     </span>
                     <h3 className="mt-4 font-display text-xl font-bold text-white">{n.title}</h3>

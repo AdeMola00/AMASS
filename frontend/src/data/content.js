@@ -211,11 +211,13 @@ export const HERO_DEFAULT = {
 };
 
 export const SECTIONS_DEFAULT = {
-  search: true, marquee: true, categories: true, pillars: true,
+  marquee: true, categories: true, pillars: true,
   showcase: true, stats: true, howItWorks: true, agents: true,
   constructionPros: true, homeMarketplace: true, mobileApp: true,
   testimonials: true, faq: true, finalCta: true, ecosystem: true,
 };
+
+export const BRANDING_DEFAULT = { logo_url: "", app_icon_url: "" };
 
 export const DEFAULT_CONTENT = {
   hero: HERO_DEFAULT,
@@ -225,4 +227,5 @@ export const DEFAULT_CONTENT = {
   testimonials: TESTIMONIALS,
   faqs: FAQS,
   sections: SECTIONS_DEFAULT,
+  branding: BRANDING_DEFAULT,
 };

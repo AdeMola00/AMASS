@@ -23,6 +23,7 @@ export function ContentProvider({ children }) {
           testimonials: d.testimonials?.length ? d.testimonials : DEFAULT_CONTENT.testimonials,
           faqs: d.faqs?.length ? d.faqs : DEFAULT_CONTENT.faqs,
           sections: { ...SECTIONS_DEFAULT, ...(d.sections || {}) },
+          branding: { ...DEFAULT_CONTENT.branding, ...(d.branding || {}) },
         });
       })
       .catch(() => {});
