@@ -8,14 +8,14 @@ import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Haptics from "expo-haptics";
-import { api, SocialPost } from "@/src/lib/api";
+import { feedApi, type FeedPost } from "@/src/lib/feedApi";
 import { track } from "@/src/lib/analytics";
 import { useTheme } from "@/src/theme";
 import { radii } from "@/src/theme/tokens";
 import { AppText, Avatar, Button, Input, Sheet, SheetLink, useToast } from "@/src/ui";
 import { socialFont } from "./socialTheme";
 
-export function ContactSheet({ visible, onClose, post, quickMessages }: { visible: boolean; onClose: () => void; post: SocialPost; quickMessages: string[] }) {
+export function ContactSheet({ visible, onClose, post, quickMessages }: { visible: boolean; onClose: () => void; post: FeedPost; quickMessages: string[] }) {
   const router = useRouter();
   const { colors } = useTheme();
   const toast = useToast();
@@ -26,7 +26,7 @@ export function ContactSheet({ visible, onClose, post, quickMessages }: { visibl
     if (busy) return;
     setBusy("chat");
     try {
-      const r = await api.socialContact(post.id, "chat", message.trim());
+      const r = await feedApi.contact(post.id, "chat", message.trim());
       track("social_contact", { post_id: post.id, channel: "chat" });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       onClose();
@@ -43,7 +43,7 @@ export function ContactSheet({ visible, onClose, post, quickMessages }: { visibl
     if (busy) return;
     setBusy(channel);
     try {
-      const r = await api.socialContact(post.id, channel);
+      const r = await feedApi.contact(post.id, channel);
       track("social_contact", { post_id: post.id, channel });
       if (r.url) await Linking.openURL(r.url);
       onClose();

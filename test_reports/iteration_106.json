@@ -1,0 +1,60 @@
+{
+  "summary": "Tested the Feed redesign end to end: backend pytest (24 tests, 22 passed) plus Playwright at 390x844 on /updates, compose, the post detail page, story/new, the creator profile, /social/creator, /social/mine, /social/moderation, Market, Home, Profile and dark mode. Core flows work: weaving puts the FIXA column after post 8, Homes at position 10 and Brands at 16; cursor pagination has no duplicates; AI moderation flagged the handgun and cocaine posts in under 10s and cleared a benign post; appeal, remove, approve, warn, suspend/restore, settings, portal and stories all work. Found 2 backend logic bugs: appeals on admin-removed posts never show in the Appeals queue, and suspension does not block new posts. Also found KPI/queue count mismatches, a repeat strike on re-removal, a nested <button> still in FeedPostCard, and the mine notice not changing after an appeal on a removed post. No red screens and no page errors.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/feed/admin/queue?status=appealed", "issue": "Appeals on admin-removed posts never appear. admin_queue base filter {status: {$ne: 'removed'}} (feed_moderation.py:178) excludes them, but /posts/mine deliberately lets authors appeal removed posts. Overview 'appeals' KPI shows 1 and the tab badge shows 1, yet the Appeals tab is empty (reproduced in the UI). GET /admin/appeals does list it. Fix: for status=='appealed' drop the status!=removed condition.", "priority": "HIGH"},
+      {"endpoint": "POST /api/feed/posts", "issue": "Suspended members can still post. The suspend action sets social_profiles.feed_suspended=True and the UI copy says it 'blocks new ones', but create_post (feed.py:699) never checks feed_suspended. A post created while suspended returned 201. Also check comments and stories.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/feed/admin/overview", "issue": "'flagged' and 'review' count every post with moderation.status flagged/review, including author-deleted ones (status removed), while the queue excludes status removed. Overview showed flagged=3 while the flagged queue held 1 item. Use the same filter as admin_queue (feed_moderation.py:140)."},
+      {"endpoint": "POST /api/feed/admin/posts/{id}/decide action=remove", "issue": "Every remove call adds a strike, even when the post is already removed (for example rejecting a fresh appeal by removing again). One post can give an author several strikes. Only $inc strikes when the previous status was not removed (feed_moderation.py:225)."},
+      {"endpoint": "POST /api/feed/admin/users/{id}/action restore", "issue": "Suspend pauses both active and reserved posts, but restore sets them all to 'active', so a reserved item loses its Reserved state. Store the previous status when suspending."},
+      {"endpoint": "DELETE /api/feed/posts/{id}", "issue": "An author cannot delete an admin-removed post from My posts: it keeps showing because /posts/mine includes decided removed posts, and DELETE leaves it unchanged."},
+      {"endpoint": "GET /api/feed/creator/dashboard", "issue": "Hero shows '8 posts' while the profile header shows 7 posts: the dashboard counts hidden_review and paused posts. 'Enquiries 99' against reach 2 looks inflated; check what social_contact_events records."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "FeedPostCard author row", "issue": "Nested <button> console error is still there on /updates and /social/moderation: the '· Follow' Pressable (role=button, FeedPostCard.tsx:124) sits inside the author Pressable (role=button, FeedPostCard.tsx:115). Move Follow out of the author Pressable, or drop accessibilityRole on the outer one.", "testID": "feed-follow-{id} / feed-post-author-{id}", "priority": "MEDIUM"},
+      {"component": "ModerationNotice (/social/mine)", "issue": "After appealing an admin-removed post, the title stays 'Removed by a moderator' because removed takes priority over appealed (mine.tsx:224). The Appeal button disappears but 'Appeal sent · under review' never shows. Hidden posts work correctly.", "testID": "social-mine-notice-{id}", "priority": "MEDIUM"},
+      {"component": "Feed search toggle", "issue": "Closing search with the header search button (updates.tsx:239) only sets searchOpen=false and keeps q. The feed stays filtered ('7 results for sofa') with no input visible to clear it. Clear q when toggling closed.", "testID": "feed-search-btn", "priority": "LOW"},
+      {"component": "Compose submit flow", "issue": "After posting, compose replaces the route with /social/post/{id} (compose.tsx:246) instead of going back to the feed with the new post on top. In the ranked feed the new post landed at position 2 because author diversity pushes it down. The spec expected it at the top of the feed.", "testID": "feed-compose-submit", "priority": "LOW"},
+      {"component": "Appeal sheet", "issue": "social-appeal-submit is not disabled (aria-disabled is not set) with fewer than 10 characters typed.", "testID": "social-appeal-submit", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Moderation Appeals tab", "issue": "The KPI and tab badge show Appeals 1, but the tab lists no cards when the appealed post was admin-removed (backend queue filter).", "affected_testIDs": ["feed-mod-kpi-appeals", "feed-mod-tabs"]}
+    ],
+    "design_issues": [
+      {"screen": "/updates (and all FeedPostCard usages)", "issues": ["At 390px wide the Like/Comment/Share row overflows: the save bookmark sits on or past the card's right border (x≈373, card edge ≈373)", "The header subtitle 'Lagos · what's happening around you' is cut to 'Lagos · what'...'"]},
+      {"screen": "/social/moderation settings sheet", "issues": ["The AI moderation toggle (feed-mod-set-ai) has no visible label, only a bare switch at the top of the sheet"]},
+      {"screen": "/social/mine", "issues": ["The paused post card shows no Paused badge; only the menu changes to 'Resume post'", "Header subtitle is truncated"]},
+      {"screen": "Homes column", "issues": ["The Homes in Lagos rail shows other agents' 'TEST_ walkthrough listing ₦12,345,678' properties (test data pollution in properties)"]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_feed_iter108.py", "/app/test_reports/pytest/pytest_feed_iter108.xml"],
+  "action_items": [
+    "feed_moderation.admin_queue: when status=='appealed', include status 'removed' posts (moderation.status appealed), so admins can act on appeals of removed posts",
+    "feed.create_post (and comments/stories): reject with 403 when social_profiles.feed_suspended is true",
+    "admin_overview flagged/review counts: add status != 'removed' to match the queue",
+    "admin_decide remove: don't add another strike if the post was already removed",
+    "Suspend/restore: keep reserved posts reserved after restore",
+    "FeedPostCard.tsx:115-128: remove the nested button (Follow inside the author Pressable)",
+    "mine.tsx:224: show 'Appeal sent · under review' when moderation.status=='appealed', even for removed posts",
+    "updates.tsx:239: clear the search query when the search toggle closes",
+    "FeedPostCard action row: make the Like/Comment/Share plus bookmark row fit 390px (shrink pills or use flex)",
+    "Add a label to the AI moderation toggle in the settings sheet; optionally add a Paused badge to cards"
+  ],
+  "critical_code_review_comments": [
+    "feed.py is 1305 lines: split into routers (feed, posts, social graph, creator, stories)",
+    "feed.py:527 `ensure(True, 200, '')` does nothing; remove it",
+    "The moderation queue and overview use different filters, so KPIs drift from what the lists show"
+  ],
+  "updated_files": ["/app/backend/tests/test_feed_iter108.py"],
+  "success_rate": {"backend": "92% (22/24; both failures are real bugs)", "frontend": "~88% (all listed flows work; issues above are logic/UX defects)"},
+  "seed_data_creation": "Created and then deleted TEST_ posts (general, sale stool, suspend probes, cocaine), a story and a comment. One TEST_ handgun post (86d08430) stays admin-removed in Ada's My posts because authors can't delete it. Data side-effects on the demo user: strikes went from 2 to 5 (1 warn plus 3 removes; strikes can't be reset via the API). The bio was set and then restored to empty. Feed settings were restored to defaults (ai on, every=8, homes=20, expiry=24, threshold=0.5). The demo user is not suspended. The previous session's flagged post d65e4df7 was left untouched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use EXPO_BACKEND_URL=https://property-os-africa.preview.emergentagent.com (the frontend/.env key is EXPO_PUBLIC_BACKEND_URL). Run: pytest tests/test_feed_iter108.py -n 0. test_appeal_after_removal_visible_to_admin and test_suspended_user_blocked_from_posting should pass once fixed; each run creates 1 AI-flagged post and adds about 3 strikes to Ada. Token injection: localStorage amass_auth_token = JSON.stringify(access_token). Demo user id a8d30ca3-f221-4240-b0b9-5bf708206efc. AI verdicts come back in about 4-8s.",
+  "rca_of_issue": "Appeals tab empty: admin_queue starts from q={'status': {'$ne': 'removed'}}, and appealed-after-removal posts keep status 'removed', so they are filtered out. Suspension bypass: feed_suspended is only written in admin_user_action and read for display; nothing in feed.py enforces it."
+}

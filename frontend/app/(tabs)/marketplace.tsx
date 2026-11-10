@@ -42,7 +42,6 @@ import { useLegacyColors, type LegacyColors } from "@/src/theme/legacy";
 import { ShopHome } from "@/src/components/shop/ShopHome";
 import { BrandsIntro } from "@/src/components/intro/BrandsIntro";
 import { FixaIntro } from "@/src/components/intro/FixaIntro";
-import { DeclutterIntro } from "@/src/components/intro/DeclutterIntro";
 import { useOnceIntro } from "@/src/components/intro/sectionIntro";
 import { useShopBasket } from "@/src/contexts/shopBasket";
 import { useTheme } from "@/src/theme";
@@ -102,7 +101,6 @@ const CITIES = [
 const SECTIONS: { key: MarketSection; label: string; icon: IconName }[] = [
   { key: "brands", label: "Brands", icon: "storefront" },
   { key: "fixa", label: "FIXA", icon: "construct" },
-  { key: "declutter", label: "Declutter", icon: "pricetag" },
 ];
 
 type SortKey = "nearby" | "newest" | "price_asc" | "price_desc" | "rating";
@@ -199,7 +197,7 @@ export default function Marketplace() {
       const c = await storage.getItem<string>(CITY_KEY, "All of Nigeria");
       if (c) setCity(c);
       const s = await storage.getItem<string>(SECTION_KEY, "brands");
-      if (s === "brands" || s === "fixa" || s === "declutter") setSection(s);
+      if (s === "brands" || s === "fixa") setSection(s);
       setPrefsReady(true);
     })();
   }, []);
@@ -207,13 +205,12 @@ export default function Marketplace() {
   // Section intros — once per app launch, only after the saved section is known (no Brands flash before FIXA).
   const brandsIntro = useOnceIntro("brands", prefsReady && section === "brands");
   const fixaIntro = useOnceIntro("fixa", prefsReady && section === "fixa");
-  const declutterIntro = useOnceIntro("declutter", prefsReady && section === "declutter");
   // Sponsored interstitials wait until any intro has finished (a Modal would otherwise sit on top of it).
   const { ad, visible: adVisible, dismiss: adDismiss, noteInteraction } = useAdTrigger({
     triggerAfter: 8,
     context: "marketplace_home",
     mountDelayMs: 3000,
-    enabled: !brandsIntro.show && !fixaIntro.show && !declutterIntro.show,
+    enabled: !brandsIntro.show && !fixaIntro.show,
   });
 
   const loadCategories = useCallback(async () => {
@@ -381,22 +378,7 @@ export default function Marketplace() {
             />
           ))}
         </View>
-      ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tileRow} testID="declutter-tile-row">
-          {DECLUTTER_CHIPS.map((c) => (
-            <Tile
-              key={c.key}
-              icon={c.icon}
-              label={c.label}
-              color={tc.declutter}
-              size="md"
-              selected={declutterChip === c.key}
-              onPress={() => setDeclutterChip(declutterChip === c.key ? null : c.key)}
-              testID={`declutter-chip-${c.key}`}
-            />
-          ))}
-        </ScrollView>
-      )}
+      ) : null}
     </View>
   );
 
@@ -717,24 +699,7 @@ export default function Marketplace() {
         </View>
       )}
 
-      {/* Sell FAB — Declutter only (the Shop has its own basket pill; FIXA pros join from the Agent app) */}
-      {section === "declutter" && (
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-          router.push("/marketplace/sell" as any);
-        }}
-        style={({ pressed }) => [styles.sellFab, { bottom: tabBarOffset + 16 }, pressed && { transform: [{ scale: 0.95 }] }]}
-        accessibilityRole="button"
-        accessibilityLabel="Sell an item"
-        testID="sell-fab"
-      >
-        <LinearGradient colors={[...gradients.declutter]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-        <Shimmer intensity={0.7} delay={1200} />
-        <Ionicons name="pricetag" size={20} color="#fff" />
-        <Text style={styles.sellFabText}>Sell</Text>
-      </Pressable>
-      )}
+      {/* Selling moved to the Feed (For sale / Free posts) — no Sell FAB here. */}
 
       <MarketFilterSheet ref={filterRef} value={filters} categories={categories} onApply={setFilters} />
       <BookingSheet ref={bookingRef} />
@@ -774,7 +739,6 @@ export default function Marketplace() {
       {/* First-open-this-session intros for the Brands shop (1.5 s) and FIXA (1 s) */}
       {brandsIntro.show && <BrandsIntro onDone={brandsIntro.done} />}
       {fixaIntro.show && <FixaIntro onDone={fixaIntro.done} />}
-      {declutterIntro.show && <DeclutterIntro onDone={declutterIntro.done} />}
     </ScreenLift>
   );
 }

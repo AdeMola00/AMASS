@@ -2064,6 +2064,11 @@ from social_feed_seed import seed_social_feed  # noqa: E402
 _sf_router, _sf_files = register_social_feed_routes(db, get_current_user, require_admin)
 app.include_router(_sf_router)
 app.include_router(_sf_files)
+from feed import register_feed_routes, ensure_feed_indexes  # noqa: E402
+from feed_moderation import register_feed_admin_routes  # noqa: E402
+from feed_migrate import migrate_feed  # noqa: E402
+app.include_router(register_feed_routes(db, get_current_user, require_admin))
+app.include_router(register_feed_admin_routes(db, require_admin))
 from intelligence import register_intelligence_routes  # noqa: E402
 app.include_router(register_intelligence_routes(db))
 from apple_auth import register_apple_auth_route  # noqa: E402
@@ -2455,6 +2460,11 @@ async def _startup_work():
             logger.info("social feed seed: %s", await seed_social_feed(db, (_demo_sf or {}).get("id"), hash_password))
         except Exception as _e:  # never block boot
             logger.warning("social feed seed failed: %s", _e)
+        try:
+            await ensure_feed_indexes(db)
+            logger.info("feed migration: %s", await migrate_feed(db))
+        except Exception as _e:  # never block boot
+            logger.warning("feed migration failed: %s", _e)
         try:
             await db.properties.create_index("seed_key", sparse=True)
             await ensure_kyc_indexes(db)

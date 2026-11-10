@@ -42,7 +42,7 @@ logger = logging.getLogger("amass.portal")
 # ─── RBAC ────────────────────────────────────────────────────────────────────
 MODULES = [
     "dashboard", "leads", "cms", "analytics", "reports", "properties", "property_verification", "agents", "users",
-    "property_owners", "developers", "construction_marketplace", "home_marketplace", "marketplace", "brands", "app_config",
+    "property_owners", "developers", "construction_marketplace", "home_marketplace", "marketplace", "brands", "feed", "app_config",
     "tokens", "media", "transactions", "payments", "subscriptions", "messages", "notifications", "roles",
     "ai_management", "settings",
 ]
@@ -83,12 +83,12 @@ def default_permissions(role: str) -> dict:
         p["settings"] = _perm(True, True, True, False)
         return p
     grants: dict[str, dict[str, dict]] = {
-        "content_manager": {"cms": _all(), "media": _all(), "marketplace": _all(), "brands": _all(), "notifications": _all(), "app_config": _perm(True, False, True), "properties": _perm(True), "analytics": _perm(True)},
+        "content_manager": {"cms": _all(), "media": _all(), "marketplace": _all(), "brands": _all(), "feed": _all(), "notifications": _all(), "app_config": _perm(True, False, True), "properties": _perm(True), "analytics": _perm(True)},
         "property_manager": {"properties": _all(), "property_verification": _all(), "property_owners": _all(), "developers": _all(), "agents": _perm(True), "leads": _perm(True, False, True), "analytics": _perm(True), "reports": _perm(True)},
         "agent_manager": {"agents": _all(), "leads": _perm(True, False, True, True), "properties": _perm(True), "property_verification": _perm(True), "users": _perm(True), "analytics": _perm(True)},
-        "customer_support": {"users": _perm(True, False, True), "leads": _perm(True, False, True), "agents": _perm(True), "properties": _perm(True), "transactions": _perm(True), "payments": _perm(True), "subscriptions": _perm(True), "notifications": _perm(True), "messages": _perm(True, True, True)},
+        "customer_support": {"users": _perm(True, False, True), "feed": _perm(True, False, True), "leads": _perm(True, False, True), "agents": _perm(True), "properties": _perm(True), "transactions": _perm(True), "payments": _perm(True), "subscriptions": _perm(True), "notifications": _perm(True), "messages": _perm(True, True, True)},
         "finance": {"transactions": _all(), "payments": _all(), "subscriptions": _all(), "tokens": _all(), "reports": _all(), "analytics": _perm(True), "users": _perm(True)},
-        "marketing": {"leads": _perm(True, True, True), "cms": _perm(True, True, True), "notifications": _all(), "marketplace": _perm(True, True, True), "brands": _perm(True, True, True), "analytics": _perm(True), "reports": _all(), "media": _all()},
+        "marketing": {"leads": _perm(True, True, True), "cms": _perm(True, True, True), "notifications": _all(), "marketplace": _perm(True, True, True), "brands": _perm(True, True, True), "feed": _perm(True, False, True), "analytics": _perm(True), "reports": _all(), "media": _all()},
     }
     for m, v in grants.get(role, {}).items():
         p[m] = v
@@ -817,4 +817,7 @@ def register_admin_portal_routes(db: AsyncIOMotorDatabase, admin_emails: set[str
     from admin_portal_market import register_market_routes
 
     router.include_router(register_market_routes(db, require, audit))
+    from feed_moderation import register_feed_portal_routes
+
+    router.include_router(register_feed_portal_routes(db, require))
     return router

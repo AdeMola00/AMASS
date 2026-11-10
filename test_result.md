@@ -1444,3 +1444,16 @@ agent_communication:
       test_pay_once_then_delete_home_cancels_cover accepts late idempotent 200s (same policy id) and now covers claim withdrawal;
       quote step-1 footer reads "from N MASS/yr" (cheapest plan) until a plan is picked; ToggleRow is tappable across the whole
       row (testID `{id}-row`); delete-confirm copy reworded. pytest iter105+106+107 → 30 passed.
+
+  - agent: "main"
+    message: |
+      Iteration 108 (FEED REDESIGN — to run, BOTH). Unified Feed = app/(tabs)/updates.tsx (Stories strip, inline "New for you"
+      activity card, filter chips For you/Following/Nearby/Properties/Services/Products/Videos, FeedPostCard with reactions
+      (tap = like, long-press = emoji picker), comments, share, save, FIXA Pros + Brands columns every 8 posts, Homes every 20,
+      compose FAB → sheet → /social/compose?type=, story → /social/story/new). New screens this iteration: /social/moderation
+      (in-app admin queue, is_admin only), /social/creator (creator insights), /social/mine rewritten on feedApi (Under review /
+      Removed filters + Appeal sheet). Backend: /api/feed/* (feed.py) + /api/feed/admin/* and /api/portal/feed/* (feed_moderation.py,
+      new `warn` user action, GET /schema). AI moderation flags via gpt-5.4 in background within ~10s; flagged → status
+      hidden_review until admin approves. Demo: demo@amass.africa / amass2026 (is_admin). A flagged test post exists
+      ("Unregistered pistol, cash only", id d65e4df7…) in the Flagged queue; one admin-removed post exists in My posts › Removed.
+      Declutter migration already ran (45 "For sale" posts, source=declutter_migration). Don't re-test Home Protect / Market / ads.

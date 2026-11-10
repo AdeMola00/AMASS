@@ -1,0 +1,38 @@
+{
+  "summary": "RETEST of iteration_106 fixes (targeted, not full suite). Backend: 4/4 new pytest checks pass (overview counts exclude author-deleted posts, double-remove = single strike, clear_strikes, suspend->restore preserves 'reserved', suspended author POST /feed/posts -> 403). Manual API flow: the prohibited post was hidden_review within ~3s; after a UI appeal, admin remove rejected the open appeal and dropped the post from the appealed queue (expected). Re-appealing then worked (201) and queue?status=appealed listed it with status=removed and moderation.status=appealed. Frontend (390x844 and 360x740): no nested-<button> console errors and 0 nested buttons in the DOM. Action rows fit inside every card checked (6 at 390, 5 at 360), are icon-only at 360 and 44px tall. Subtitle 'Around Lagos' is not truncated and the emblem is hidden at 360. Search open/filter/close restores the feed and the input is empty on reopen. Compose lands on /updates with the new post first, and delete via the menu works. In /social/mine the hidden notice shows, submit stays disabled under 10 chars, and the title switches to 'Appeal sent · under review' right away and after reload. In /social/moderation the settings sheet has the labelled AI toggle and cancel works. The Appeals tab shows the quote and 'Restore' with no Remove button. The ⋯ menu hides 'Clear strikes' at 0 strikes; warn adds the '1 strike' badge and Clear strikes removes it. Restore takes the card out of the queue and the post becomes active. All fixes verified, no regressions found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/feed/posts/{id}/appeal", "issue": "After a moderator removes a post (which rejects the open appeal), the author can appeal again with no limit. Appeal -> remove -> appeal can loop forever. Consider a max appeal count per post, or a cooldown."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/social/moderation settings sheet", "issues": ["Toggle feed-mod-set-ai hit box is 46x26, below the 44pt minimum height (add hitSlop or a taller wrapper)."]},
+      {"screen": "/updates seed data", "issues": ["Seeded post 'Teak Outdoor Lounge Set (4pc)' by Casa Milano shows a garden trowel/soil photo, not furniture. The image doesn't match the item."]}
+    ],
+    "react_native_issues": [
+      {"component": "Require cycle", "issue": "Console warning on every load: Require cycle src/ui/Button.tsx -> src/ui/Shimmer.tsx -> src/ui/Feedback.tsx -> src/ui/Button.tsx (can give uninitialized imports). Reference: /app/frontend/src/ui/Button.tsx"}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_feed_iter109_retest.py", "/app/backend/tests/iter109_helper.py", "/app/test_reports/pytest/pytest_iter109.xml"],
+  "action_items": [
+    "(minor) Limit repeat appeals per post after a moderator rejects one (count or cooldown).",
+    "(minor) Make the Toggle touch target at least 44pt tall (hitSlop) in the moderation settings sheet.",
+    "(minor) Break the Button <-> Shimmer <-> Feedback require cycle.",
+    "(minor) Swap the mismatched seed photo on 'Teak Outdoor Lounge Set (4pc)'."
+  ],
+  "critical_code_review_comments": [
+    "admin_decide approve on a removed post sets status=active even if the post was paused/reserved before removal (pre-removal status is not saved, unlike status_before_suspend). This is edge-case only.",
+    "Demo's My posts still has pre-existing posts that are not TEST_-prefixed: 'Pistol for sale, no questions asked' (removed) and another 'Weapons are prohibited' removed card. The cleanup script (TEST_ prefix) won't purge them. Left untouched."
+  ],
+  "updated_files": ["/app/backend/tests/test_feed_iter109_retest.py (new)", "/app/backend/tests/iter109_helper.py (new)"],
+  "success_rate": {"backend": "100% (4/4 pytest + manual appeal/queue API flow)", "frontend": "100% (7/7 requested flows)"},
+  "seed_data_creation": "Created and deleted: 1 prohibited TEST_ handgun post (adc9fa04, deleted), 3 TEST_ pytest posts (deleted in teardown), 1 'Retest post from QA #amass' (b5093705, deleted via UI). Demo restored + clear_strikes at the end: strikes=0, suspended=false; overview flagged/review/appeals all 0. Side effect: moderation notifications (warn/restore/post back) now sit in demo's activity feed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login: inject localStorage amass_auth_token = JSON.stringify(access_token). The appeal sheet slides in, so wait ~2s before tapping social-appeal-submit or it reports 'outside viewport'. Admin remove auto-rejects the open appeal, so the post leaves the appealed queue until the author appeals again. tests/iter109_helper.py has create_bad/state/remove/appeal/delete/cleanup_user commands.",
+  "rca_of_issue": ""
+}
