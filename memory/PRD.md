@@ -33,6 +33,13 @@ Study the existing AMASS app (https://github.com/AdeMola00/AMASS) — design, fe
 ## Iteration 4 (Jun 2026)
 - Google login: "Continue with Google" on login screen (Emergent-managed), backend /api/auth/google-session (existing AMASS bridge) returns the same JWT; links to existing accounts by email; failed return shows a message. Tested iteration_4 (real Google sign-in needs a manual check).
 
+## Iteration 5–6 (Jun 2026)
+- Voice guidance switched to natural AI voice: OpenAI TTS (tts-1-hd, coral, 0.9 speed) via Emergent key, cached per phrase in object storage; /api/partner/tts (signed-in) and /tts-public (login screen, rate-limited). expo-speech removed, expo-audio single module player.
+- Voice notes in chat: tap red mic → timer → Send/Cancel; public audio upload /api/partner/chat/{id}/voice; playable voice bubbles (also AMASS-sent notes).
+- Profile photo: Me tab camera badge + button → /api/partner/avatar (also updates market seller_avatar & listing agent_avatar).
+- Market item WhatsApp share: item cards + item detail; /api/partner/share/item/{id}; public page /api/partner/go/item/{id} with store links and seller WhatsApp fallback.
+- Known: notes recorded on web are webm (may not play on iPhone); no native-accent voices for Yoruba/Hausa/Igbo (OpenAI voices are English-trained).
+
 ## Backlog
 - P1: Voice notes in chat; customer-side FIXA rating prompt from partner app; brand order handoffs view
 - P1: Edit listing price/photos after publishing

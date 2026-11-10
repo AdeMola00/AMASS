@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("amass.partner")
@@ -45,6 +45,20 @@ class UploadIn(BaseModel):
 class ListingEditIn(BaseModel):
     price: float | None = Field(default=None, gt=0, le=1e12)
     images: list[str] | None = Field(default=None, max_length=12)
+
+
+class TtsIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1500)
+    lang: Literal["en", "pcm", "yo", "ha", "ig"] = "en"
+
+
+class VoiceNoteIn(BaseModel):
+    data_url: str
+    duration_ms: int = Field(ge=300, le=120_000)
+
+
+class AvatarIn(BaseModel):
+    url: str = Field(min_length=8, max_length=1000)
 
 
 class StageIn(BaseModel):
@@ -232,7 +246,156 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
                 logger.warning("job stage notify failed: %s", e)
         return {"ok": True, "job_stage": body.stage}
 
+    # --- Natural AI voice (OpenAI TTS via Emergent key), cached per phrase ---
+    TTS_MODEL, TTS_VOICE, TTS_SPEED = "tts-1-hd", "coral", 0.9
+
+    async def _public_put(raw: bytes, content_type: str, ext: str, owner: str) -> str:
+        from object_storage import APP_NAME, put_object
+        from public_url import public_api_base
+
+        path = f"{APP_NAME}/public/{owner}/{uuid.uuid4().hex}.{ext}"
+        await put_object(path, raw, content_type)
+        return f"{public_api_base()}/api/public-files/{path}"
+
+    @router.post("/tts")
+    async def tts(body: TtsIn, user: dict = Depends(get_current_user)):
+        return await _tts(body)
+
+    _public_hits: dict = {}
+
+    @router.post("/tts-public")
+    async def tts_public(body: TtsIn, request: Request):
+        """Signed-out screens (login) — short text only, rate limited per IP."""
+        if len(body.text) > 300:
+            raise HTTPException(413, "Too long")
+        # Real client IP: Cloudflare's header, else the hop before the CDN + ingress entries.
+        xff = [x.strip() for x in (request.headers.get("x-forwarded-for") or "").split(",") if x.strip()]
+        ip = request.headers.get("cf-connecting-ip") or (xff[-3] if len(xff) >= 3 else (xff[0] if xff else (request.client.host if request.client else "?")))
+        hour = int(_now().timestamp() // 3600)
+        k, g = f"{ip}:{hour}", f"*:{hour}"
+        if len(_public_hits) > 5000:
+            _public_hits.clear()
+        _public_hits[k] = _public_hits.get(k, 0) + 1
+        _public_hits[g] = _public_hits.get(g, 0) + 1
+        if _public_hits[k] > 40 or _public_hits[g] > 600:
+            raise HTTPException(429, "Too many requests")
+        return await _tts(body)
+
+    async def _tts(body: TtsIn):
+        import hashlib
+        import os
+        import re
+
+        text = re.sub(r"https?://\S+", "", body.text)
+        text = re.sub(r"[*_#>~|★]", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            raise HTTPException(400, "Nothing to read")
+        key = hashlib.sha256(f"{text}|{TTS_VOICE}|{TTS_SPEED}|{TTS_MODEL}|mp3".encode()).hexdigest()
+        hit = await db.partner_tts_cache.find_one({"key": key}, {"_id": 0, "url": 1})
+        if hit:
+            return {"url": hit["url"], "cached": True}
+        from emergentintegrations.llm.openai import OpenAITextToSpeech
+
+        engine = OpenAITextToSpeech(api_key=os.environ["EMERGENT_LLM_KEY"])
+        try:
+            audio = await engine.generate_speech(text=text, model=TTS_MODEL, voice=TTS_VOICE, speed=TTS_SPEED, response_format="mp3")
+        except Exception as e:  # noqa: BLE001 - one fallback to the fast fixed-delivery model
+            logger.warning("tts primary failed: %s", e)
+            try:
+                audio = await engine.generate_speech(text=text, model="tts-1", voice="nova", speed=0.9, response_format="mp3")
+            except Exception as e2:  # noqa: BLE001
+                logger.error("tts fallback failed: %s", e2)
+                raise HTTPException(502, "Voice is not available right now")
+        url = await _public_put(audio, "audio/mpeg", "mp3", "tts")
+        await db.partner_tts_cache.update_one({"key": key}, {"$set": {"key": key, "url": url, "lang": body.lang, "created_at": _now()}}, upsert=True)
+        return {"url": url, "cached": False}
+
+    # --- Voice notes: public audio so the other person can play it in either app ---
+    @router.post("/chat/{conv_id}/voice", status_code=201)
+    async def voice_note(conv_id: str, body: VoiceNoteIn, user: dict = Depends(get_current_user)):
+        import base64
+
+        from chat import _assert_participant
+
+        await _assert_participant(db, conv_id, user["id"])
+        if not body.data_url.startswith("data:audio/") or ";base64," not in body.data_url:
+            raise HTTPException(415, "Only audio can be sent")
+        header, b64 = body.data_url.split(",", 1)
+        mime = header[5:].split(";", 1)[0]
+        try:
+            raw = base64.b64decode(b64)
+        except Exception:
+            raise HTTPException(400, "Invalid audio")
+        if len(raw) > 8 * 1024 * 1024:
+            raise HTTPException(413, "Voice note too long")
+        ext = {"audio/mp4": "m4a", "audio/m4a": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac", "audio/webm": "webm", "audio/mpeg": "mp3", "audio/ogg": "ogg", "audio/wav": "wav"}.get(mime, "m4a")
+        url = await _public_put(raw, mime, ext, user["id"])
+        return {"url": url, "duration_ms": body.duration_ms, "mime": mime}
+
+    # --- Profile photo (shown to customers in AMASS, incl. market & FIXA cards) ---
+    @router.post("/avatar")
+    async def set_avatar(body: AvatarIn, user: dict = Depends(get_current_user)):
+        from public_url import public_api_base
+
+        if not body.url.startswith(f"{public_api_base()}/api/public-files/"):
+            raise HTTPException(400, "Upload the photo first")
+        await db.users.update_one({"id": user["id"]}, {"$set": {"avatar_url": body.url}})
+        await db.marketplace.update_many({"seller_id": user["id"]}, {"$set": {"seller_avatar": body.url}})
+        await db.properties.update_many({"agent_id": user["id"]}, {"$set": {"agent_avatar": body.url}})
+        return {"ok": True, "avatar_url": body.url}
+
+    # --- Market item sharing (WhatsApp) ---
+    @router.get("/share/item/{item_id}")
+    async def share_item(item_id: str):
+        from urllib.parse import quote
+
+        from public_url import public_api_base
+
+        it = await db.marketplace.find_one({"id": item_id}, {"_id": 0})
+        if not it or it.get("category") == "services" or (it.get("status") or "active") != "active":
+            raise HTTPException(404, "Item not found")
+        link = f"{public_api_base()}/api/partner/go/item/{item_id}"
+        where = ", ".join([x for x in [it.get("location"), it.get("city")] if x and (x != it.get("location") or x != it.get("city"))])
+        text = f"*{it.get('name')}*\n₦{int(it.get('price') or 0):,}{' · ' + where if where else ''}\nOn AMASS Market 👉 {link}"
+        return {"link": link, "text": text, "whatsapp_url": f"https://api.whatsapp.com/send?text={quote(text)}"}
+
     return router
+
+
+def register_partner_public_routes(db) -> APIRouter:
+    from fastapi.responses import HTMLResponse
+
+    pub = APIRouter(tags=["partner-public"])
+
+    @pub.get("/api/partner/go/item/{item_id}", response_class=HTMLResponse)
+    async def go_item(item_id: str, request: Request):
+        import html
+
+        from social_publishing import BOT_UA, _store_links, get_settings
+
+        it = await db.marketplace.find_one({"id": item_id, "status": {"$ne": "removed"}}, {"_id": 0})
+        if not it:
+            return HTMLResponse("<h1>Item not found</h1>", status_code=404)
+        if not BOT_UA.search(request.headers.get("user-agent") or ""):
+            await db.marketplace.update_one({"id": item_id}, {"$inc": {"share_clicks": 1}})
+        ios, android = _store_links(await get_settings(db))
+        stores = "".join(f'<a class="s" href="{html.escape(u)}">{lbl}</a>' for u, lbl in ((android, "Get AMASS on Android"), (ios, "Get AMASS on iPhone")) if u)
+        phone = "".join(ch for ch in (it.get("seller_whatsapp") or it.get("seller_phone") or "") if ch.isdigit())
+        if phone:  # works for buyers who don't have the app yet
+            stores += f'<a class="s" href="https://wa.me/{phone}">Chat with the seller on WhatsApp</a>'
+        name = html.escape(it.get("name") or "AMASS Market")
+        img = html.escape(it.get("image") or "")
+        price = f"₦{int(it.get('price') or 0):,}"
+        city = html.escape(it.get("city") or "")
+        app_url = f"amass://marketplace/{item_id}"
+        page = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{name} - AMASS Market</title><meta property="og:title" content="{name} - {price}"><meta property="og:description" content="For sale in {city} on AMASS Market"><meta property="og:image" content="{img}">
+<style>body{{font-family:system-ui,sans-serif;background:#F7F6F3;margin:0;color:#111}}main{{max-width:480px;margin:auto;padding:20px}}img{{width:100%;border-radius:18px;background:#EAE8E3}}a.b{{display:block;text-align:center;background:#E11B22;color:#fff;padding:18px;border-radius:14px;font-weight:700;text-decoration:none;font-size:18px;margin-top:16px}}a.s{{display:block;text-align:center;border:2px solid #111;color:#111;padding:16px;border-radius:14px;font-weight:700;text-decoration:none;margin-top:12px}}</style></head>
+<body><main><img src="{img}" alt=""><h1>{name}</h1><h2>{price}</h2><p>{city}</p><a class="b" href="{app_url}">Open in AMASS</a>{stores}</main></body></html>"""
+        return HTMLResponse(page, headers={"Cache-Control": "no-store"})
+
+    return pub
 
 
 # ─── Demo data so every partner type has something to do in preview ─────────

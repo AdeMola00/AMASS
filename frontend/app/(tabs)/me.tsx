@@ -1,14 +1,17 @@
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
 import { LANGS } from "@/src/i18n";
 import { usesNativeTabs } from "@/src/navigation";
+import { PhotoAdder } from "@/src/photos";
 import { useSettings } from "@/src/settings";
 import { fonts, radius, space, useTheme } from "@/src/theme";
-import { Avatar, BigButton, Card, ScreenHeader, tap } from "@/src/ui";
+import { Avatar, BigButton, Card, ScreenHeader, Sheet, tap, useToast } from "@/src/ui";
 
 import { ROLE_META } from "@/src/roles";
 
@@ -17,7 +20,9 @@ export default function Me() {
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
   const { colors } = useTheme();
   const { t, lang, setLang, voiceOn, setVoiceOn, autoRead, setAutoRead, speak, voiceMissing } = useSettings();
-  const { me, brand, kind, roles, role, setRole, signOut } = useAuth();
+  const { me, brand, kind, roles, role, setRole, signOut, refresh } = useAuth();
+  const toast = useToast();
+  const [photoOpen, setPhotoOpen] = useState(false);
   const router = useRouter();
   const name = kind === "brand" ? brand?.brand?.name : me?.user?.full_name;
   const email = kind === "brand" ? brand?.account?.email : me?.user?.email;
@@ -34,13 +39,42 @@ export default function Me() {
       <ScreenHeader title={t("tab_me")} guide="guide_me" />
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: bottomChrome + space.xl }}>
         <Card testID="me-profile-card" style={{ flexDirection: "row", alignItems: "center" }}>
-          <Avatar name={name} uri={kind === "brand" ? brand?.brand?.logo_url : me?.user?.avatar_url} size={68} />
+          <Pressable testID="me-avatar-button" disabled={kind !== "user"} onPress={() => setPhotoOpen(true)}>
+            <Avatar name={name} uri={kind === "brand" ? brand?.brand?.logo_url : me?.user?.avatar_url} size={68} />
+            {kind === "user" ? (
+              <View style={{ position: "absolute", right: -4, bottom: -4, width: 32, height: 32, borderRadius: 16, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.surfaceSecondary }}>
+                <Ionicons name="camera" size={16} color={colors.onBrandPrimary} />
+              </View>
+            ) : null}
+          </Pressable>
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={{ fontFamily: fonts.display, fontSize: 24, color: colors.onSurface }}>{name}</Text>
             <Text style={{ fontFamily: fonts.medium, fontSize: 15, color: colors.muted }}>{email}</Text>
           </View>
         </Card>
-
+        {kind === "user" ? (
+          <BigButton label={me?.user?.avatar_url ? t("change_photo") : t("add_photo")} icon="camera" tone="dark" compact onPress={() => setPhotoOpen(true)} testID="me-change-photo-button" />
+        ) : null}
+        <Sheet visible={photoOpen} onClose={() => setPhotoOpen(false)} title={me?.user?.avatar_url ? t("change_photo") : t("add_photo")} testID="me-photo-sheet">
+          <Text style={{ fontFamily: fonts.bold, fontSize: 16, color: colors.muted }}>{t("photo_trust")}</Text>
+          <PhotoAdder
+            photos={[]}
+            max={1}
+            uploadPath="/partner/upload"
+            testID="me-photo"
+            onChange={async (urls) => {
+              if (!urls[0]) return;
+              try {
+                await api("/partner/avatar", { body: { url: urls[0] } });
+                await refresh();
+                setPhotoOpen(false);
+                toast.show(t("saved"));
+              } catch (e: any) {
+                toast.show(e?.message || t("something_wrong"), "error");
+              }
+            }}
+          />
+        </Sheet>
         <H icon="language" text={t("language")} />
         <View style={{ gap: space.sm }}>
           {LANGS.map((l) => {

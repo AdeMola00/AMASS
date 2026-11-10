@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
+import { VoiceBubble, VoiceRecorder } from "@/src/chatVoice";
 import { fmtTime } from "@/src/format";
 import { TKey } from "@/src/i18n";
 import { useSettings } from "@/src/settings";
@@ -26,6 +27,7 @@ export default function Chat() {
   const [msgs, setMsgs] = useState<any[] | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [recording, setRecording] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -94,7 +96,7 @@ export default function Chat() {
               const mine = m?.sender_id === myId;
               return (
                 <Pressable onLongPress={() => speakText(m?.text || "")} testID={`chat-message-${m?.id}`} style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "82%", padding: space.md, borderRadius: radius.md, borderBottomRightRadius: mine ? 4 : radius.md, borderBottomLeftRadius: mine ? radius.md : 4, backgroundColor: mine ? colors.brandPrimary : colors.surfaceSecondary, borderWidth: mine ? 0 : 1, borderColor: colors.border }}>
-                  <Text style={{ fontFamily: fonts.medium, fontSize: 17, lineHeight: 23, color: mine ? colors.onBrandPrimary : colors.onSurface }}>{m?.text || (m?.kind === "image" ? "📷" : "🎙️")}</Text>
+                  {m?.kind === "audio" ? <VoiceBubble m={m} mine={mine} /> : <Text style={{ fontFamily: fonts.medium, fontSize: 17, lineHeight: 23, color: mine ? colors.onBrandPrimary : colors.onSurface }}>{m?.text || (m?.kind === "image" ? "📷" : "")}</Text>}
                   <Text style={{ fontFamily: fonts.medium, fontSize: 12, marginTop: 4, color: mine ? colors.onBrandPrimary : colors.muted, opacity: 0.8 }}>{fmtTime(m?.created_at && (String(m.created_at).includes("+") || String(m.created_at).endsWith("Z") ? m.created_at : `${m.created_at}Z`))}</Text>
                 </Pressable>
               );
@@ -118,23 +120,36 @@ export default function Chat() {
             ))}
           </ScrollView>
           <View style={{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, alignItems: "flex-end" }}>
-            <TextInput
-              testID="chat-input"
-              value={text}
-              onChangeText={setText}
-              placeholder={t("type_message")}
-              placeholderTextColor={colors.muted}
-              multiline
-              style={{ flex: 1, minHeight: 56, maxHeight: 120, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceSecondary, paddingHorizontal: space.lg, paddingTop: 16, fontFamily: fonts.medium, fontSize: 17, color: colors.onSurface }}
-            />
-            <Pressable
-              testID="chat-send-button"
-              disabled={sending || !text.trim()}
-              onPress={() => send(text)}
-              style={{ width: 64, height: 56, borderRadius: radius.md, alignItems: "center", justifyContent: "center", backgroundColor: text.trim() ? colors.brandPrimary : colors.surfaceTertiary }}
-            >
-              <Ionicons name="send" size={26} color={text.trim() ? colors.onBrandPrimary : colors.muted} />
-            </Pressable>
+            {!recording ? (
+              <TextInput
+                testID="chat-input"
+                value={text}
+                onChangeText={setText}
+                placeholder={t("type_message")}
+                placeholderTextColor={colors.muted}
+                multiline
+                style={{ flex: 1, minHeight: 56, maxHeight: 120, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceSecondary, paddingHorizontal: space.lg, paddingTop: 16, fontFamily: fonts.medium, fontSize: 17, color: colors.onSurface }}
+              />
+            ) : null}
+            {text.trim() ? (
+              <Pressable
+                testID="chat-send-button"
+                disabled={sending}
+                onPress={() => send(text)}
+                style={{ width: 64, height: 56, borderRadius: radius.md, alignItems: "center", justifyContent: "center", backgroundColor: colors.brandPrimary }}
+              >
+                <Ionicons name="send" size={26} color={colors.onBrandPrimary} />
+              </Pressable>
+            ) : (
+              <VoiceRecorder
+                convId={id}
+                onActive={setRecording}
+                onSent={(m) => {
+                  setMsgs((cur) => [...(cur ?? []), m]);
+                  setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+                }}
+              />
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>

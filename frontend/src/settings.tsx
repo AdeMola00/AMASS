@@ -1,8 +1,9 @@
-import * as Speech from "expo-speech";
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
-import { Lang, LANGS, TKey, translate } from "@/src/i18n";
+import { api, getToken } from "@/src/api";
+import { Lang, TKey, translate } from "@/src/i18n";
 import { storage } from "@/src/utils/storage";
+import { audioSeq, playUrl, stopAudio } from "@/src/voice";
 
 type Ctx = {
   lang: Lang;
@@ -12,7 +13,7 @@ type Ctx = {
   autoRead: boolean;
   setAutoRead: (v: boolean) => void;
   t: (key: TKey, vars?: Record<string, string | number>) => string;
-  speak: (key: TKey, vars?: Record<string, string | number>, extra?: string) => void;
+  speak: (key: TKey, vars?: Record<string, string | number>, extra?: string) => Promise<void>;
   speakText: (text: string) => void;
   voiceMissing: boolean;
 };
@@ -23,17 +24,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
   const [voiceOn, setVoiceState] = useState(true);
   const [autoRead, setAutoState] = useState(false);
-  const [voices, setVoices] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
       setLangState(((await storage.getItem<string>("partner_lang", "en")) as Lang) || "en");
       setVoiceState((await storage.getItem<boolean>("partner_voice", true)) !== false);
       setAutoState((await storage.getItem<boolean>("partner_autoread", false)) === true);
-      try {
-        const v = await Speech.getAvailableVoicesAsync();
-        setVoices(v.map((x) => (x.language || "").toLowerCase()));
-      } catch {}
     })();
   }, []);
 
@@ -44,39 +40,42 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setVoiceOn = (v: boolean) => {
     setVoiceState(v);
     storage.setItem("partner_voice", v);
-    if (!v) Speech.stop();
+    if (!v) stopAudio();
   };
   const setAutoRead = (v: boolean) => {
     setAutoState(v);
     storage.setItem("partner_autoread", v);
   };
 
-  const code = LANGS.find((l) => l.code === lang)?.voice ?? null;
-  const hasVoice = !!code && voices.some((v) => v.startsWith(code));
-  // Pidgin is written in English letters, an English voice reads it well.
-  const voiceMissing = (lang === "yo" || lang === "ha" || lang === "ig") && !hasVoice;
-  const spokenLang: Lang = voiceMissing ? "en" : lang;
-
+  // Natural AI voice (server-side OpenAI TTS, cached per phrase) reads every language.
+  const voiceMissing = false;
   const t = useCallback((key: TKey, vars?: Record<string, string | number>) => translate(lang, key, vars), [lang]);
 
+  const sayId = useRef(0);
   const say = useCallback(
-    (text: string, language: string) => {
-      if (!voiceOn || !text) return;
-      Speech.stop();
-      Speech.speak(text, { language, rate: 0.92 });
+    async (text: string) => {
+      if (!voiceOn || !text.trim()) return;
+      stopAudio();
+      const mine = ++sayId.current;
+      const audioAt = audioSeq();
+      try {
+        const signedIn = !!(await getToken());
+        const r = await api<{ url: string }>(signedIn ? "/partner/tts" : "/partner/tts-public", { body: { text: text.slice(0, signedIn ? 1500 : 300), lang }, auth: signedIn });
+        if (mine !== sayId.current || audioAt !== audioSeq()) return; // a newer tap, or the screen was left
+        await playUrl(r.url);
+      } catch {
+        // voice is optional help — the screen still works without it
+      }
     },
-    [voiceOn],
+    [voiceOn, lang],
   );
 
   const speak = useCallback(
-    (key: TKey, vars?: Record<string, string | number>, extra?: string) => {
-      const text = translate(spokenLang, key, vars) + (extra ? `. ${extra}` : "");
-      say(text, spokenLang === "en" || spokenLang === "pcm" ? "en-NG" : `${code}-NG`);
-    },
-    [spokenLang, code, say],
+    (key: TKey, vars?: Record<string, string | number>, extra?: string) => say(translate(lang, key, vars) + (extra ? `. ${extra}` : "")),
+    [lang, say],
   );
 
-  const speakText = useCallback((text: string) => say(text, hasVoice && code && lang !== "en" ? `${code}-NG` : "en-NG"), [say, hasVoice, code, lang]);
+  const speakText = useCallback((text: string) => say(text), [say]);
 
   const value = useMemo(
     () => ({ lang, setLang, voiceOn, setVoiceOn, autoRead, setAutoRead, t, speak, speakText, voiceMissing }),

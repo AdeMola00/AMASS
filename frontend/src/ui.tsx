@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TKey } from "@/src/i18n";
 import { useSettings } from "@/src/settings";
 import { fonts, radius, space, TOUCH, ThemeColors, useTheme } from "@/src/theme";
+import { stopAudio } from "@/src/voice";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 export type Tone = "brand" | "success" | "gold" | "neutral" | "dark";
@@ -37,18 +38,21 @@ export function toneColors(c: ThemeColors, tone: Tone) {
 export function SpeakButton({ guide, extra, testID = "speak-button" }: { guide: TKey; extra?: string; testID?: string }) {
   const { colors } = useTheme();
   const { speak, t } = useSettings();
+  const [busy, setBusy] = useState(false);
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={t("speak")}
-      onPress={() => {
+      onPress={async () => {
         tap();
-        speak(guide, undefined, extra);
+        setBusy(true);
+        await speak(guide, undefined, extra);
+        setBusy(false);
       }}
       style={({ pressed }) => [s.speak, { backgroundColor: colors.surfaceInverse, opacity: pressed ? 0.8 : 1 }]}
     >
-      <Ionicons name="volume-high" size={22} color={colors.onSurfaceInverse} />
+      {busy ? <ActivityIndicator size="small" color={colors.onSurfaceInverse} /> : <Ionicons name="volume-high" size={22} color={colors.onSurfaceInverse} />}
       <Text style={[s.speakTxt, { color: colors.onSurfaceInverse }]}>{t("speak")}</Text>
     </Pressable>
   );
@@ -63,6 +67,7 @@ export function ScreenHeader({ title, guide, extra, back, right }: { title: stri
   useFocusEffect(
     useCallback(() => {
       if (autoRead) speak(guide, undefined, extra);
+      return () => stopAudio();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [autoRead, guide]),
   );

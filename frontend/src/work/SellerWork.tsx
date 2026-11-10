@@ -1,15 +1,17 @@
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { FlatList, RefreshControl, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, naira } from "@/src/api";
 import { useAuth } from "@/src/auth";
 import { usesNativeTabs } from "@/src/navigation";
 import { useSettings } from "@/src/settings";
+import { shareItemOnWhatsApp } from "@/src/share";
 import { fonts, radius, space, useTheme } from "@/src/theme";
-import { BigButton, Card, EmptyState, ErrorView, Fab, LoadingView, Segments, Sheet, StatusPill, useToast } from "@/src/ui";
+import { BigButton, Card, EmptyState, ErrorView, Fab, LoadingView, Segments, Sheet, StatusPill, tap, useToast } from "@/src/ui";
 import { useLoad } from "@/src/useLoad";
 
 export function OfferCard({ o, onDone }: { o: any; onDone: () => void }) {
@@ -85,6 +87,7 @@ export function SellerWork({ tab }: { tab?: string }) {
   const { t } = useSettings();
   const { refresh } = useAuth();
   const router = useRouter();
+  const toast = useToast();
   const [seg, setSeg] = useState<"items" | "offers">(tab === "offers" ? "offers" : "items");
   useEffect(() => {
     if (tab === "offers" || tab === "items") setSeg(tab);
@@ -133,6 +136,19 @@ export function SellerWork({ tab }: { tab?: string }) {
                       {x.open_offers ? <StatusPill status="sent" /> : null}
                     </View>
                   </View>
+                  {(x.status || "active") === "active" ? (
+                    <Pressable
+                      testID={`item-card-share-${x.id}`}
+                      accessibilityLabel={t("share_whatsapp")}
+                      onPress={() => {
+                        tap();
+                        shareItemOnWhatsApp(x.id).catch((e) => toast.show(e?.message || t("something_wrong"), "error"));
+                      }}
+                      style={({ pressed }) => ({ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.success, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.8 : 1 })}
+                    >
+                      <Ionicons name="logo-whatsapp" size={30} color={colors.onSuccess} />
+                    </Pressable>
+                  ) : null}
                 </View>
               </Card>
             ) : (

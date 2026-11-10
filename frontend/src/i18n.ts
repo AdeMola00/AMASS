@@ -19,6 +19,16 @@ const en = {
   or: "or",
   google_sign_in: "Continue with Google",
   google_failed: "Google sign-in did not work. Please try again.",
+  record_voice: "Voice message",
+  mic_why: "AMASS needs your microphone so you can send voice messages.",
+  mic_blocked: "Microphone is blocked. Open settings to allow it.",
+  mic_web_hint: "Allow the microphone from your browser's address bar, then try again.",
+  mic_failed: "Could not start recording. Please try again.",
+  voice_too_short: "Too short. Tap the mic and talk, then tap send.",
+  sending: "Sending…",
+  add_photo: "Add your photo",
+  change_photo: "Change your photo",
+  photo_trust: "Customers trust a real face. Use a clear photo of you.",
   login_help: "Use the same email and password as the AMASS app, or your Google account",
   login_error: "Wrong email or password",
   show: "Show",
@@ -51,7 +61,7 @@ const en = {
   guide_work: "This is your work. Tap a card to open it. Use the red plus button to add something new.",
   guide_messages: "These are your messages. Tap a person to reply.",
   guide_me: "Here you can change your language and voice help.",
-  guide_chat: "Tap a ready answer, or type your answer. Then tap send.",
+  guide_chat: "Tap a ready answer, type, or tap the red mic to send your voice.",
   guide_job: "This is the job. Tap the next step when you move: on my way, working, finished.",
   guide_welcome: "What work do you do? Tap one or more boxes, then tap continue.",
   guide_detail: "Here you can change this listing. Tap a big button to change it.",
@@ -233,6 +243,12 @@ export type TKey = keyof typeof en;
 type Dict = Partial<Record<TKey, string>>;
 
 const pcm: Dict = {
+  record_voice: "Voice message",
+  mic_why: "AMASS need your mic so you fit send voice message.",
+  voice_too_short: "E too short. Press mic, talk, then press send.",
+  add_photo: "Add your picture",
+  change_photo: "Change your picture",
+  photo_trust: "Customers trust real face. Use clear picture of yourself.",
   or: "or",
   google_sign_in: "Enter with Google",
   google_failed: "Google sign-in no work. Abeg try again.",
@@ -391,6 +407,9 @@ const pcm: Dict = {
 };
 
 const yo: Dict = {
+  record_voice: "Ìfiránṣẹ́ ohùn",
+  add_photo: "Fi àwòrán rẹ kún un",
+  change_photo: "Yí àwòrán rẹ padà",
   or: "tàbí",
   google_sign_in: "Wọlé pẹ̀lú Google",
   edit_listing: "Yí owó àti àwòrán padà",
@@ -540,6 +559,9 @@ const yo: Dict = {
 };
 
 const ha: Dict = {
+  record_voice: "Saƙon murya",
+  add_photo: "Ƙara hotonka",
+  change_photo: "Canza hotonka",
   or: "ko",
   google_sign_in: "Shiga da Google",
   edit_listing: "Canza farashi da hotuna",
@@ -689,6 +711,9 @@ const ha: Dict = {
 };
 
 const ig: Dict = {
+  record_voice: "Ozi olu",
+  add_photo: "Tinye foto gị",
+  change_photo: "Gbanwee foto gị",
   or: "ma ọ bụ",
   google_sign_in: "Banye site na Google",
   edit_listing: "Gbanwee ọnụahịa na foto",

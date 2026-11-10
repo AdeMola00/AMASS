@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.emergent.amasspreview.jup7r1",
       "infoPlist": {
         "NSCameraUsageDescription": "Take photos of homes and items you list",
-        "NSPhotoLibraryUsageDescription": "Add photos to your listings"
+        "NSPhotoLibraryUsageDescription": "Add photos to your listings",
+        "NSMicrophoneUsageDescription": "Send voice messages to your customers"
       }
     },
     "android": {
@@ -21,7 +22,10 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.emergent.amasspreview.jup7r1",
-      "permissions": ["CAMERA"]
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -51,7 +55,13 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-status-bar",
-      "@react-native-vector-icons/ionicons"
+      "@react-native-vector-icons/ionicons",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Send voice messages to your customers"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

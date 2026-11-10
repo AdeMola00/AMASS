@@ -2083,8 +2083,9 @@ app.include_router(_fixa_router)
 app.include_router(_fixa_admin)
 
 # ─── AMASS Partner (Agent) App: roles, counts, photo upload, FIXA job stages
-from partner_app import register_partner_routes, seed_partner_demo
+from partner_app import register_partner_public_routes, register_partner_routes, seed_partner_demo
 app.include_router(register_partner_routes(db, get_current_user))
+app.include_router(register_partner_public_routes(db))
 
 # ─── Map time (1 MASS per hour on the Find Home map; 0 MASS → no markers). /map/markers runs the same meter.
 from map_time import ensure_map_time_indexes, register_map_time_routes

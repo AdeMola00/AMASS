@@ -1,0 +1,37 @@
+{
+  "summary": "Retest of the iteration 5 fixes (viewport 390x844). Backend: 30/30 pytest passed (new test_partner_iter6_fixes.py plus the iter5 regression file). TTS now uses tts-1-hd with the coral voice. New uncached /tts and /tts-public calls returned audio/mpeg, and no new 'tts primary failed' lines were logged (count stayed at 7, all old 'instructions' errors). The /avatar guard rejects external, look-alike and /api/files URLs, and accepts an uploaded /api/public-files URL. /share/item returns 404 for paused, sold and removed items. /go/item returns 404 for removed items, shows Android and iPhone store buttons when store links are set, and does not count WhatsApp/ user agents in share_clicks (a normal browser adds 1). Frontend: Listen shows a spinner while the voice loads (checked with a 2.5s delayed response) and clears afterwards. 'Change your photo' is #111 with white text, and the sheet title matches. A web mic denial followed by Allow shows 'Microphone is blocked' with Open settings, with no loop. Regression: a chat voice note sends (voice 201, then message 200, bubble shown) and the item card WhatsApp button opens api.whatsapp.com/send. One HIGH issue: the tts-public per-IP limit keys on an ingress IP that every client shares.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/partner/tts-public", "issue": "The last X-Forwarded-For hop is NOT the client. It is the shared Google LB/ingress IP 34.149.9.106 for every request. Observed XFF: '<client>, 104.22.64.55 (Cloudflare), 34.149.9.106'. A forged header gives '9.9.9.9, <real client>, <cloudflare>, 34.149.9.106'. So the 40/hour 'per-IP' limit is really a 40/hour limit for everyone. After 40 public Listen taps in an hour, the login-screen voice stops working for all users, and the failure is silent because the client swallows the error.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/partner/go/item/{id}", "issue": "No store links are configured by default (no social_publishing setting is stored), so the page shows only the amass:// button, which does nothing when the app is not installed. A web fallback, such as an AMASS web market URL, is still missing."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "VoiceRecorder mic permission sheet (web)", "issue": "Tapping 'Open settings' on web throws 'TypeError: Linking.default.openSettings is not a function', and nothing happens. Reference: /app/frontend/src/chatVoice.tsx:147", "testID": "mic-open-settings", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_iter6_fixes.py", "/app/backend/tests/test_partner_iter5_voice_avatar_share.py", "/app/test_reports/pytest/pytest_iter6.xml"],
+  "action_items": [
+    "HIGH: In partner_app.py tts_public, key the limiter on the real client IP: use the CF-Connecting-IP header, or xff[-3] (the hop Cloudflare appended, just before the Cloudflare and Google LB hops), falling back to the last hop. Production may add different hops, so check there. Keep the global 600/hour cap.",
+    "chatVoice.tsx:147: on Platform.OS==='web', do not call Linking.openSettings. Show a hint such as 'Allow the microphone from the lock icon in your browser address bar', or hide the button, or wrap the call in try/catch.",
+    "go/item: when no store links are set, add a web fallback link (AMASS web market / item URL) next to 'Open in AMASS'.",
+    "Optional: stopAudio() does not invalidate a pending say() (sayId). If you leave a screen while TTS is still loading and auto-read is off, the old phrase plays on the next screen. Bump sayId in a stop helper called from the ScreenHeader focus cleanup.",
+    "Optional, out of scope: the seller home 'New offers' count uses status 'sent' only (shows 0), while the item cards show a 'New offer' pill for countered offers. Align the two."
+  ],
+  "critical_code_review_comments": [
+    "SpeakButton (ui.tsx:47-52) has no try/finally around await speak(). It is safe today only because say() swallows all errors.",
+    "On web, expo-audio getRecordingPermissionsAsync() calls requestRecordingPermissionsAsync() when the permission state is 'prompt', so the browser prompt appears on the first mic tap, before the app's explanation sheet."
+  ],
+  "updated_files": ["/app/backend/tests/test_partner_iter6_fixes.py (new). partner_app.py was briefly instrumented with a debug log to read the XFF chain, then restored byte-for-byte (diff clean)."],
+  "success_rate": {"backend": "100% (30/30 tests; one HIGH design issue in the rate-limit key found by inspecting real headers)", "frontend": "100% of requested flows pass; 1 low-priority web bug"},
+  "seed_data_creation": "The pytest run created four TEST_ marketplace items and a temporary social_publishing store-link setting; both were deleted by id. Two voice-note messages created in seeded chat b8375940 (ids 9004adf3..., fe9e3db9...) were deleted. The conversation's last_message_preview still reads '🎙️ Voice note'. The seller avatar was restored to its original value.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: EXPO_BACKEND_URL=$(grep EXPO_PUBLIC_BACKEND_URL /app/frontend/.env | cut -d= -f2) pytest tests/test_partner_iter6_fixes.py. The rate-limit tests run in-process with a fake db (no LLM calls, no shared counters). Do NOT send 40+ real /tts-public requests: the counter key is shared by everyone, so that would lock out the login voice. To mock a mic denial: in an init script, override navigator.mediaDevices.getUserMedia to reject and permissions.query({name:'microphone'}) to return {state:'denied'}. Seller item share buttons are on the Work tab (item-card-share-{id}). If you test a spinner with page.route, use route.fetch() then sleep, then fulfill; route.continue_() after a sleep hung."
+}

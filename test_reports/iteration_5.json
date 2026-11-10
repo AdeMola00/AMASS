@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 5 tested only the new features: AI TTS, chat voice notes, partner profile photo and WhatsApp sharing for market items. Backend: 14/14 pytest passed against the public URL. Frontend at 390x844: every flow worked end to end. The login Listen button calls /tts-public (200) and plays the mp3. Me 'Hear a test' calls /tts (200). The 'phone has no voice' note is gone. Chat: the mic shows when the input is empty and send shows after typing. Record -> timer -> send uploaded the note (/voice 201) and posted the message, and a new voice bubble appeared. Cancel works, and a too-short note shows a toast. A seeded buyer voice note renders as voice-bubble-{id} with play/pause and 0:04. Denying the mic (simulated) shows mic-permission-sheet. Me photo: the camera badge and button open me-photo-sheet with Camera and Gallery. A gallery upload saved the avatar and the UI refreshed. Seller: the round WhatsApp buttons on live item cards and 'Share on WhatsApp' on item detail both open the correct api.whatsapp.com link, and tapping the card's share button does not open the card. MAIN FINDING: the 'natural AI voice' (gpt-4o-mini-tts / coral) is NEVER used. Every TTS call silently falls back to tts-1 / nova, because emergentintegrations 0.2.0 OpenAITextToSpeech.generate_speech() has no 'instructions' argument and only supports tts-1 and tts-1-hd. No deprecated Expo packages found: expo-av and expo-speech are gone and expo-audio is used.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/partner/tts and /api/partner/tts-public", "issue": "The primary model call always fails. backend.err.log shows 'tts primary failed: OpenAITextToSpeech.generate_speech() got an unexpected keyword argument instructions' on every uncached call. emergentintegrations 0.2.0 has signature (text, model='tts-1', voice, speed, response_format) and MODELS=['tts-1','tts-1-hd'], so gpt-4o-mini-tts with instructions cannot work. Every phrase is spoken by tts-1/nova, not coral as specified. The cache is also stored under a key labelled gpt-4o-mini-tts/coral although it holds nova audio. I checked that tts-1-hd + coral and tts-1 + coral both work with the Emergent key.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/partner/tts-public", "issue": "The rate limit can be bypassed: the client sets X-Forwarded-For, and the code takes the first value from it. The limit is also kept in memory per process. Anyone can make the server generate speech from any text up to 300 characters, paid for by the LLM key. Use the last trusted proxy hop or request.client, or allow only known guide phrases or cache hits."},
+      {"endpoint": "POST /api/partner/avatar", "issue": "The check only looks for '/api/public-files/' anywhere in the URL, so https://evil.com/api/public-files/x.jpg is accepted. Require the URL to start with public_api_base() + '/api/public-files/'."},
+      {"endpoint": "GET /api/partner/go/item/{id}", "issue": "Removed items still render a full page. share_clicks also goes up on every fetch, including WhatsApp and crawler link previews. The 'Open in AMASS' button is only an amass:// link, so a buyer without the app gets a dead button. Add a web or app-store fallback."},
+      {"endpoint": "GET /api/partner/share/item/{id}", "issue": "Sold and paused items can still be shared; only removed items are blocked. The UI hides the button for them, but the API does not."},
+      {"endpoint": "POST /api/partner/chat/{conv_id}/voice", "issue": "The MIME type comes from the client and the file bytes are not checked. Notes recorded on web are stored as audio/webm, which native iOS (AVPlayer) cannot play, so voice notes from web will not play on iPhone."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "VoiceRecorder permission sheet (web)", "issue": "After the browser denies the mic, tapping Allow leaves the 'ask' sheet open with no feedback. The 'blocked' state and toast never appear because expo-audio on web reports canAskAgain=true. Reference: src/chatVoice.tsx:74-80", "testID": "mic-allow", "priority": "low"},
+      {"component": "VoiceRecorder.start", "issue": "getRecordingPermissionsAsync is not inside try/catch. If it throws (unsupported browser or insecure context), the rejection goes unhandled and no toast is shown. Reference: src/chatVoice.tsx:67-72", "testID": "voice-record-button", "priority": "low"},
+      {"component": "VoiceBubble", "issue": "Playback errors are not handled. If the audio fails to load or decode, the bubble stays in the 'pause' state. Reference: src/voice.ts:23-38", "testID": "voice-bubble-{id}", "priority": "low"}
+    ],
+    "integration_issues": [
+      {"flow": "Listen / speak (settings.say)", "issue": "Nothing shows while speech is generated (an uncached phrase takes about 1.4-2.3s). Also, stopAudio() cannot cancel a TTS request that is still in flight: if the user taps Listen and then turns voice off or moves on, the audio still plays when the request returns. Reference: src/settings.tsx:54-67", "affected_testIDs": ["login-speak-button", "me-voice-test"]}
+    ],
+    "design_issues": [
+      {"screen": "Me", "issues": ["The 'Change your photo' button (tone gold) is white text on #D4AF37, a contrast of about 2.1:1, which fails WCAG AA. Use dark text on gold.", "The sheet title always says 'Add your photo', even when the button says 'Change your photo'."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_iter5_voice_avatar_share.py", "/app/test_reports/pytest/iter5_results.xml"],
+  "action_items": [
+    "HIGH: Fix TTS in partner_app.py _tts(). emergentintegrations does not support gpt-4o-mini-tts or instructions. Use model='tts-1-hd' (or tts-1) with voice='coral' and speed≈0.9, and remove the instructions argument. Change TTS_MODEL so the cache key changes and the old nova entries are not served.",
+    "Harden the /tts-public rate limit: do not trust the client-supplied first X-Forwarded-For value. Consider allowing only known guide phrases.",
+    "/avatar: require the URL to start with public_api_base() + '/api/public-files/'.",
+    "go/item: return 404 for removed items, add a web or store fallback next to amass://, and consider not counting link-preview bot fetches.",
+    "Voice notes recorded on web are webm and will not play on iOS. Either accept this as web-only or transcode or record mp4 on web.",
+    "Optional UX: show a loading state on Listen while TTS generates, and let stop cancel a pending TTS request. Use dark text on the gold 'Change your photo' button."
+  ],
+  "critical_code_review_comments": [
+    "_tts swallows the primary failure with only a warning log, which hid the fact that the primary model never works.",
+    "_public_hits clear() at 5000 keys resets every IP's counter at once."
+  ],
+  "updated_files": ["/app/backend/tests/test_partner_iter5_voice_avatar_share.py (new)"],
+  "success_rate": {"backend": "100% (14/14 tests) — but TTS runs on the fallback model only", "frontend": "100% of requested flows worked"},
+  "seed_data_creation": "Temporary only, all cleaned up by id. Two voice messages in the Adaeze<->Kemi chat (one seeded through the API from buyer.demo, one recorded in the UI as Adaeze) were deleted, and the conversation preview was restored. Adaeze's avatar_url and properties.agent_avatar were restored to the original Unsplash URL after the UI upload test. seller.demo's avatar and marketplace seller_avatar were restored to null after the API test. A few TTS cache entries for 'TEST_' phrases were left in partner_tts_cache; they are harmless.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: EXPO_BACKEND_URL=https://amass-preview--0i87sb7d.preview.emergentagent.com pytest tests/test_partner_iter5_voice_avatar_share.py (EXPO_BACKEND_URL is not in frontend/.env; EXPO_PUBLIC_BACKEND_URL is). Seeded chat id: b8375940-6c20-4aad-a534-cb6634d2ee41. Headless Chromium grants a fake mic, so recording works on web. To test the permission sheet, override navigator.mediaDevices.getUserMedia and permissions.query in an init script. To capture WhatsApp links, stub window.open in an init script. Use get_by_text('Me', exact=True).last for the Me tab, because 'text=Me' matches Messages.",
+  "rca_of_issue": "TTS voice: OpenAITextToSpeech.generate_speech(text, model='tts-1', voice=..., speed, response_format), with MODELS=['tts-1','tts-1-hd'] in emergentintegrations 0.2.0. The call passes instructions= and model='gpt-4o-mini-tts', raises TypeError, and partner_app.py line 302 catches it and falls back to tts-1/nova. Fix: call generate_speech(text, model='tts-1-hd', voice='coral', speed=0.9, response_format='mp3')."
+}

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, naira } from "@/src/api";
 import { useAuth } from "@/src/auth";
 import { useSettings } from "@/src/settings";
+import { shareItemOnWhatsApp } from "@/src/share";
 import { fonts, radius, space, useTheme } from "@/src/theme";
 import { BigButton, ErrorView, LoadingView, ScreenHeader, StatusPill, useToast } from "@/src/ui";
 import { useLoad } from "@/src/useLoad";
@@ -52,6 +53,7 @@ export default function ItemDetail() {
           <StatusPill status={it.status || "active"} testID="item-status" />
           <Text style={{ fontFamily: fonts.bold, fontSize: 22, color: colors.onSurface }}>{it.name}</Text>
           <View style={{ gap: space.sm }}>
+            {it.status === "active" ? <BigButton label={t("share_whatsapp")} icon="logo-whatsapp" tone="success" onPress={() => shareItemOnWhatsApp(it.id).catch((e) => toast.show(e?.message || t("something_wrong"), "error"))} testID="item-share-whatsapp" /> : null}
             {it.status !== "active" ? <BigButton label={t("show_again")} icon="eye" tone="success" onPress={() => setStatus("active")} loading={busy === "active"} testID="item-status-active" /> : null}
             {it.status !== "sold" ? <BigButton label={t("mark_sold")} icon="pricetag" tone="dark" onPress={() => setStatus("sold")} loading={busy === "sold"} testID="item-status-sold" /> : null}
             {it.status !== "paused" ? <BigButton label={t("pause")} icon="pause-circle" tone="neutral" outline onPress={() => setStatus("paused")} loading={busy === "paused"} testID="item-status-paused" /> : null}
