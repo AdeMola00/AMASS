@@ -114,7 +114,11 @@ export default function ManageHomes() {
         await finish();
       } catch (e: any) {
         if (e instanceof ApiError && e.status === 409 && e.detail?.code === "HOME_NOT_EMPTY") {
-          confirm("Delete everything in it too?", `${h.name} still has ${e.detail.count} saved thing${e.detail.count === 1 ? "" : "s"} — bills, records, items or repairs. They'll be deleted with it.`, "Delete all", () => go(true));
+          const n = e.detail.count ?? 0;
+          const cover = e.detail.live_cover ?? 0;
+          const things = n ? `${n} saved thing${n === 1 ? "" : "s"} (bills, records, items or repairs)` : "";
+          const coverTxt = cover ? `live Home Protect cover${cover === 1 ? "" : ` (${cover} policies)`}` : "";
+          confirm(cover ? "Delete it and cancel its cover?" : "Delete everything in it too?", `${h.name} still has ${[things, coverTxt].filter(Boolean).join(" and ")}.${cover ? " The cover ends today with no refund and any open claims are closed." : ""} Everything saved here will be deleted.`, cover ? "Delete & cancel cover" : "Delete all", () => go(true));
           return;
         }
         toast.error("Couldn't remove this home", e?.message ?? "Please try again.");
@@ -172,7 +176,7 @@ export default function ManageHomes() {
         <Button label="Add a home" size="lg" fullWidth iconLeft="add" onPress={openNew} disabled={(homes?.length ?? 0) >= 20} testID="homes-add" />
       </View>
 
-      <Sheet visible={!!draft} onClose={() => setDraft(null)} title={draft?.id ? "Edit home" : "New home"} testID="home-form">
+      <Sheet visible={!!draft} onClose={() => setDraft(null)} title={draft?.id ? "Edit home" : "New home"} scroll testID="home-form">
         {draft ? (
           <View style={{ gap: 16 }}>
             <Input label="Name" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} placeholder="e.g. Lekki flat · Mum's house" error={tried && !draft.name.trim() ? "Give this home a name" : null} size="lg" autoFocus={!draft.id} testID="home-form-name" />

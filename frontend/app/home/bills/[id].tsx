@@ -246,7 +246,7 @@ export default function BillDetailScreen() {
             </ScrollView>
           ) : (
             <AppText variant="bodySm" tone="tertiary">
-              Snap the receipt when you pay — it's stored privately and linked here.
+              Snap the receipt when you pay — it&apos;s stored privately and linked here.
             </AppText>
           )}
         </Section>

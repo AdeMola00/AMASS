@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 107 retest of the iter106 Home Protect fixes (BOTH). Backend: all 4 main-agent suites ran with -n 0, 29/30 passed. The one failure was test_iter107::test_pay_once_then_delete_home_cancels_cover, which got codes [200,200,200,200] once and then passed 3/3 reruns. That is the idempotent replay: by design pay returns 200 with the same policy when the quote is already paid. The test has no barrier, so later requests can arrive after the first one has committed. DB check: no quote has duplicate debits and no quote has duplicate policies. New barrier-synchronised suite test_iter107_t1_verify.py 5/5 passed: pay race gives 1x200 + 3x409 payment_in_progress, one debit, one policy. Admin 'paid' race gives 1x200 + 3x409, credited once (+300 MASS), one 'paid' timeline entry. Ownership gate gives 422 ownership_required; building cover is on for owner/family and off for renting/other. Delete without force gives 409 HOME_NOT_EMPTY live_cover=1; force gives 200 with policies_cancelled=1, the policy is cancelled with cancel_reason home_deleted, status.live is null and admin shows it as not active. Notification copy reads 'runs until 9 Nov 2027'. item.home_policy_id is the live policy id, or null when the home has no cover. The claim date-range 422 also uses friendly dates. Frontend (375x667, 360x640): all requested fixes verified working (details in context_for_next_testing_agent). The scan 'Not found' fix was checked in code only (scan.tsx:274 humanises keys); no AI call was made. New issues: the Edit-home sheet does not scroll, so 'Remove this home' is off-screen at 375x667. At 360px the /home/items summary strip still breaks labels mid-word and truncates the value. Force-deleting a home leaves its open claims open on a cancelled policy.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/home/homes/{id}?force=true", "issue": "Open claims on the home's policies are left open (status 'submitted', is_open true) on a now-cancelled policy, and they stay in the admin open-claims queue. Reproduced with CLM-SR94NZ, which I then rejected as cleanup. An older orphan is already in the queue: CLM-09JYIF (claim 8f7b871a, 'The building · Accidental damage', policy HP26-QL307H, cancelled). Decide whether the force-delete should auto-close or flag these, or block it while claims are open."},
+      {"endpoint": "tests/test_iter107_home_protect_fixes.py::test_pay_once_then_delete_home_cancels_cover", "issue": "Flaky test, not a product bug (failed 1 of 4 runs). It asserts exactly one 200, but the idempotent replay legitimately returns 200 once the first pay has committed. Fix the test: accept 200s that share the same policy id, or start the requests together with a threading.Barrier. Assert one debit and one policy."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Edit home Sheet (/home/homes)", "issue": "The Sheet (src/ui/Sheet.tsx, maxHeight 92%, no ScrollView) clips its content. At 375x667 the 'Remove this home' button (home-form-delete) sits at y=681 and cannot be scrolled into view, so the user cannot delete a home on small phones. I only reached it with a JS click. Wrap the Sheet body in a ScrollView (with keyboardShouldPersistTaps).", "testID": "home-form-delete", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/home/items @360x640", "issues": ["Summary strip tiles are too narrow: 'protecte|d' and 'warrant|y ending' break mid-word, and the total value is truncated to '₦4....'. The header subtitle is truncated to 'Your a...' because the Scan button and home picker take the row. Try a 2x2 grid or horizontal scroll below about 380px, or shorter labels."]},
+      {"screen": "/home/protect/quote", "issues": ["Before a plan is chosen, the step-1 footer preview ('≈ 147 MASS/yr') uses the default/recommended plan, while the final Basic quote was 90 MASS. Consider labelling it 'from X' or using the cheapest plan.", "quote-building switch hit area is 46x26 (under 44pt). Make the whole ToggleRow pressable.", "The quote-own-other chip sits off-screen in the horizontal chip row at 375px (OK if scrollable, but it's hidden from view)."]},
+      {"screen": "/home/homes delete confirm", "issues": ["The copy reads '1 saved thing — bills, records, items or repairs and live Home Protect cover', which is awkward. On web it uses window.confirm, so the 'Delete & cancel cover' button label only appears on native."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter107_t1_verify.py", "/app/test_reports/pytest/iter107.xml"],
+  "action_items": [
+    "Make the Sheet component scroll (ScrollView inside src/ui/Sheet.tsx) so home-form-delete and other long sheet content can be reached on 667px-tall screens.",
+    "/home/items SummaryStrip at 360px: stop words breaking mid-word (wider tiles, 2x2 layout or shorter labels) and stop the value truncating.",
+    "Decide how force-deleting a home handles open claims (auto-close, flag, or block), and clean up the orphan open claim CLM-09JYIF on cancelled policy HP26-QL307H.",
+    "Fix the flaky assertion in test_iter107_home_protect_fixes.py::test_pay_once_then_delete_home_cancels_cover (accept idempotent 200s with the same policy id, or use a Barrier).",
+    "Optional: make the whole quote-building ToggleRow pressable (44pt target); show 'from X MASS' in the step-1 preview."
+  ],
+  "critical_code_review_comments": [
+    "home_protect.py pay_quote: the quoted→paying lock plus the idempotent replay are correct. If the process crashes after the debit and before the policy insert, the quote stays 'paying' forever and no stale-lock recovery was seen. Consider a paying_at timeout or a reconciliation step.",
+    "home_protect.py is 847 lines, over the 700-line guideline. Consider splitting it into quotes/policies/claims/admin modules."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter107_t1_verify.py (new)"],
+  "success_rate": {"backend": "100% product behaviour (34/35 test runs; 1 flaky test-design failure)", "frontend": "~92% (all 11 requested checks pass; 1 new HIGH sheet-scroll bug, 1 remaining 360px layout issue)"},
+  "seed_data_creation": "Created and then removed: TEST_t1_* homes from pytest (all force-deleted); TEST_t1_ui_home (UI pay HP26-1NVE6T, 90 MASS, then UI-deleted, policy cancelled); TEST_t1_claim_home (policy plus claim CLM-SR94NZ, claim rejected, home force-deleted); TEST_ Lekki TV item (deleted). Yaba studio: during the UI test the ownership chip saved 'renting', and I then set it to 'owner' via the API. It is now back to null with no cover. Wallet was spent on test premiums (several basic policies, about 60-90 MASS each) and received 300 + 500 MASS from claim payout tests.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login demo@amass.africa/amass2026. Active rate card 651e6646-7361-49da-80a7-c32c64952359. Lekki flat 2ef9df23 (policy cbd5a338, HP26-575MX8). Yaba studio 3eabdf0f has ownership null and no cover; tapping an ownership chip on the quote screen saves it immediately via PUT, so reset it to null afterwards. Claim incident keys: fire, flood, storm, theft, surge, accident, breakdown, other. On web, homes delete uses window.confirm (handle page dialogs). /tmp/api.py has helpers. Verified in iter107: quote ownership prompt and chips, disabled 'Choose own or rent first', renter note and no Building line, full UI pay flow on a TEST_ home; the 'Cover the building' / 'Live rate card' / 'Popular choice' labels show; item-protect 'Add' opens add-on mode (header 'Add to your cover', 2-step stepper, item preselected); the claim form has no premature error and an empty Send shows the toast plus inline errors; admin payout prefill 90,000 = min(150k claimed, 100k insured) − 10k excess, with the basis text; the homes delete confirm mentions live Home Protect cover and the home disappears from /home/protect; /home/protect hero buttons and admin tiles are OK at 360px."
+}

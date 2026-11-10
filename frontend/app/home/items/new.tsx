@@ -7,14 +7,23 @@ import { Pressable, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { ApiError } from "@/src/lib/api";
-import { homeApi, homeHubSignal, newId, saveOrQueue, uploadFile, withRetry, type FileRef, type ItemIn } from "@/src/lib/homeHub";
-import { AppText, Input, Screen, SkeletonRows, useToast } from "@/src/ui";
+import dayjs from "dayjs";
+import { homeApi, homeHubSignal, newId, saveOrQueue, uploadFile, withRetry, type FileRef, type ItemCategory, type ItemCondition, type ItemIn } from "@/src/lib/homeHub";
+import { AppText, Button, Input, Screen, SkeletonRows, useToast } from "@/src/ui";
 import { ChipRow, ROOMS, ROOM_ICON } from "@/src/components/home/HomeBits";
+import { CategoryStrip } from "@/src/components/home/HomeVisuals";
+import { space } from "@/src/theme/tokens";
 import { DateField } from "@/src/components/home/Calendar";
 import { AttachmentTile, Field, FormShell, HomePicker, MoneyInput, ReminderChips } from "@/src/components/home/FormBits";
 import { AttachSheet } from "@/src/components/home/AttachSheet";
 import { useSelectedHome } from "@/src/components/home/useSelectedHome";
 
+const CONDITIONS: { key: ItemCondition; label: string }[] = [
+  { key: "new", label: "New" },
+  { key: "good", label: "Good" },
+  { key: "fair", label: "Fair" },
+  { key: "poor", label: "Poor" },
+];
 const WARRANTY_OPTS = [
   { key: 0, label: "On the day" },
   { key: 7, label: "1 week before" },
@@ -24,13 +33,17 @@ const WARRANTY_OPTS = [
 export default function ItemForm() {
   const router = useRouter();
   const toast = useToast();
-  const params = useLocalSearchParams<{ id?: string; home_id?: string; room?: string }>();
+  const params = useLocalSearchParams<{ id?: string; home_id?: string; room?: string; category?: string }>();
   const editing = !!params.id;
   const { homes, homeId: selectedId, ready } = useSelectedHome();
 
   const [homeId, setHomeId] = useState<string | null>(params.home_id || null);
   const [name, setName] = useState("");
   const [room, setRoom] = useState<string>(params.room || "Living room");
+  const [category, setCategory] = useState<ItemCategory>((params.category as ItemCategory) || "other");
+  const [condition, setCondition] = useState<ItemCondition | null>(null);
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptAttach, setReceiptAttach] = useState(false);
   const [photo, setPhoto] = useState<FileRef | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -62,6 +75,8 @@ export default function ItemForm() {
         setHomeId(it.home_id);
         setName(it.name);
         setRoom(it.room);
+        setCategory(it.category ?? "other");
+        setCondition(it.condition ?? null);
         setPhoto(it.photo ?? null);
         setBrand(it.brand ?? "");
         setModel(it.model ?? "");
@@ -87,7 +102,7 @@ export default function ItemForm() {
     setTried(true);
     if (!valid || !homeId || uploading) return;
     setSaving(true);
-    const body: ItemIn = { home_id: homeId, name: name.trim(), room, photo, brand: brand.trim() || null, model: model.trim() || null, serial: serial.trim() || null, store: store.trim() || null, purchased_at: purchasedAt, price, value, warranty_until: warranty, warranty_reminders: warranty ? warrantyReminders : [], notes: notes.trim() || null };
+    const body: ItemIn = { home_id: homeId, name: name.trim(), room, category, condition, photo, brand: brand.trim() || null, model: model.trim() || null, serial: serial.trim() || null, store: store.trim() || null, purchased_at: purchasedAt, price, value, warranty_until: warranty, warranty_reminders: warranty ? warrantyReminders : [], notes: notes.trim() || null };
     try {
       if (editing && params.id) {
         await withRetry(() => homeApi.updateItem(params.id!, body));
@@ -132,9 +147,18 @@ export default function ItemForm() {
         testID="item-photo"
       />
       <Input label="Name" value={name} onChangeText={setName} placeholder='e.g. Samsung 55" TV' error={tried ? errors.name : null} size="lg" testID="item-name" />
+      <Field label="Category">
+        <View style={{ marginHorizontal: -space[4] }}>
+          <CategoryStrip value={category} onChange={(c) => setCategory(c ?? "other")} allLabel="Other" testIDPrefix="item-cat" />
+        </View>
+      </Field>
       <Field label="Room">
         <ChipRow options={ROOMS.map((r) => ({ key: r, label: r, icon: ROOM_ICON[r] }))} value={room} onChange={setRoom} testIDPrefix="item-room" />
       </Field>
+      <Field label="Condition">
+        <ChipRow options={CONDITIONS} value={condition} onChange={setCondition} allowClear testIDPrefix="item-cond" />
+      </Field>
+      <Button label={receiptBusy ? "Reading receipt…" : "Fill price & date from a receipt"} variant="secondary" size="sm" iconLeft="scan" loading={receiptBusy} onPress={() => setReceiptAttach(true)} style={{ alignSelf: "flex-start" }} testID="item-receipt-ai" />
       <View style={{ flexDirection: "row", gap: 10 }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <MoneyInput label="Paid (₦)" value={price} onChange={(v) => { setPrice(v); if (value == null || value === price) setValue(v); }} testID="item-price" />
@@ -166,6 +190,36 @@ export default function ItemForm() {
           <Input label="Notes" value={notes} onChangeText={setNotes} placeholder="Anything worth remembering" multiline numberOfLines={3} testID="item-notes" />
         </View>
       ) : null}
+      <AttachSheet
+        visible={receiptAttach}
+        onClose={() => setReceiptAttach(false)}
+        title="Receipt photo"
+        photosOnly
+        onPicked={async (o) => {
+          setReceiptAttach(false);
+          setReceiptBusy(true);
+          try {
+            const f = await uploadFile(o.input);
+            const r = await homeApi.aiReceipt({ path: f.path });
+            if (!r.is_receipt) toast.info("That doesn't look like a receipt", "Enter the price and date by hand.");
+            if (r.store && !store) setStore(r.store);
+            if (r.purchased_at) setPurchasedAt(r.purchased_at);
+            const amt = r.items.length === 1 && r.items[0].price ? r.items[0].price : r.total;
+            if (amt) {
+              setPrice(Math.round(amt));
+              if (value == null) setValue(Math.round(amt));
+            }
+            if (r.warranty_months && r.purchased_at) setWarranty(dayjs(r.purchased_at).add(r.warranty_months, "month").format("YYYY-MM-DD"));
+            if (homeId) await homeApi.createRecord({ home_id: homeId, title: `${name.trim() || "Item"} receipt`, folder: "receipts", file: f, notes: r.store ? `Bought at ${r.store}` : null }).catch(() => {});
+            setMore(true);
+            toast.success("Receipt read", [r.store, r.purchased_at, amt ? `₦${Math.round(amt).toLocaleString("en-NG")}` : null].filter(Boolean).join(" · ") || "Check the fields and adjust if needed.");
+          } catch (e: any) {
+            toast.error("Couldn't read the receipt", e instanceof ApiError && typeof e.detail === "string" ? e.detail : "Enter the price and date by hand.");
+          } finally {
+            setReceiptBusy(false);
+          }
+        }}
+      />
       <AttachSheet
         visible={attach}
         onClose={() => setAttach(false)}

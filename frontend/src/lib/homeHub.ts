@@ -13,7 +13,30 @@ export type Freq = "once" | "daily" | "weekly" | "monthly" | "yearly" | "custom"
 export type Schedule = { freq: Freq; interval?: number; unit?: "days" | "weeks" | "months" };
 export type FileRef = { path: string; url: string; name?: string | null; content_type?: string | null; size?: number | null };
 export type HomeKind = "flat" | "house" | "duplex" | "land" | "office" | "shop" | "other";
-export type Home = { id: string; user_id: string; name: string; address?: string | null; kind: HomeKind; color: string; is_default: boolean; created_at: string };
+export type Ownership = "owner" | "renting" | "family" | "other";
+export type Home = {
+  id: string;
+  user_id: string;
+  name: string;
+  address?: string | null;
+  kind: HomeKind;
+  color: string;
+  is_default: boolean;
+  created_at: string;
+  /* My Home Profile */
+  photo?: FileRef | null;
+  property_id?: string | null;
+  ownership?: Ownership | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  adults?: number | null;
+  children?: number | null;
+  pets?: boolean | null;
+  moved_in?: string | null;
+  city?: string | null;
+};
+export type ItemCategory = "tv" | "fridge" | "washer" | "ac" | "generator" | "inverter" | "laptop" | "phone" | "kitchen" | "furniture" | "other";
+export type ItemCondition = "new" | "good" | "fair" | "poor";
 export type DueStatus = "overdue" | "due_soon" | "upcoming" | "paid" | "done" | "archived" | "none";
 
 export type Bill = {
@@ -65,6 +88,8 @@ export type HomeItem = {
   home_id: string;
   name: string;
   room: string;
+  category: ItemCategory;
+  condition?: ItemCondition | null;
   photo?: FileRef | null;
   brand?: string | null;
   model?: string | null;
@@ -79,6 +104,10 @@ export type HomeItem = {
   created_at: string;
   warranty_status: "none" | "expired" | "expiring" | "active";
   warranty_days: number | null;
+  /** HOME PROTECT cover for this item ("none" until a policy includes it). */
+  protection: { status: "none" | "active" | "expiring" | "expired"; policy_id?: string; policy_no?: string; expires_at?: string | null };
+  /** Detail only: the live policy on this item's home (so an uncovered item can be added to it). */
+  home_policy_id?: string | null;
   records?: HomeRecord[];
   repairs?: Repair[];
 };
@@ -117,12 +146,60 @@ export type Overview = {
   counts: { bills: number; records: number; items: number; repairs: number; saved: number };
   attention: { overdue: number; due_soon: number; bills: { overdue: number; due_soon: number }; repairs: { overdue: number; due_soon: number } };
   month: { label: string; due_total: number; paid_total: number; overdue_total: number; from: string; to: string };
+  profile_completeness: number;
+  items_value: number;
+  warranty_expiring: number;
+  item_photos: FileRef[];
+  spend_month: { bills: number; repairs: number; purchases: number; total: number };
+  protection: { status: "none" | "active" | "expiring" | "expired"; insured_items: number; expires_at: string | null; policy_id?: string | null; plan_name?: string | null; partner_name?: string | null };
+};
+export type SpendingMonth = { month: string; bills: number; repairs: number; purchases: number; insurance: number; total: number };
+export type Spending = {
+  year: number;
+  home_id: string;
+  months: SpendingMonth[];
+  totals: { bills: number; repairs: number; purchases: number; insurance: number; total: number };
+  by_category: Record<string, number>;
+  recent: { type: "bill" | "repair" | "item" | "insurance"; title: string; amount: number; date: string; category: string; path: string }[];
+  years: number[];
+};
+export type AiIdentify = {
+  is_household_item: boolean;
+  name: string | null;
+  category: ItemCategory | null;
+  room: string | null;
+  brand: string | null;
+  model: string | null;
+  serial: string | null;
+  condition: ItemCondition | null;
+  colour: string | null;
+  replacement_value: { low: number; high: number; basis: string } | null;
+  confidence: number;
+  missing: string[];
+  notes: string | null;
+  model_used: string;
+};
+export type AiReceipt = {
+  is_receipt: boolean;
+  store: string | null;
+  purchased_at: string | null;
+  currency: string | null;
+  total: number | null;
+  items: { name: string; price: number | null; qty: number | null }[];
+  warranty_months: number | null;
+  payment_method: string | null;
+  receipt_number: string | null;
+  confidence: number;
+  missing: string[];
+  model_used: string;
 };
 export type CalendarMonth = { month: string; today: string; events: DueItem[]; days: Record<string, DueStatus[]> };
 export type Catalog = {
   bill_categories: { key: string; label: string; icon: string }[];
   record_folders: { key: string; label: string; icon: string }[];
   rooms: string[];
+  item_categories: { key: ItemCategory; label: string; icon: string; insurable: boolean }[];
+  ownership: Ownership[];
   repair_trades: string[];
   home_colors: string[];
   home_kinds: HomeKind[];
@@ -133,9 +210,26 @@ export type Catalog = {
 
 export type BillIn = { id?: string; home_id: string; name: string; category: string; amount: number; due_date: string; schedule: Schedule; reminders: number[]; payee?: string | null; notes?: string | null };
 export type RecordIn = { id?: string; home_id: string; title: string; folder: string; file?: FileRef | null; notes?: string | null; expires_at?: string | null; expiry_reminders?: number[]; bill_id?: string | null; payment_id?: string | null; item_id?: string | null; repair_id?: string | null };
-export type ItemIn = { id?: string; home_id: string; name: string; room: string; photo?: FileRef | null; brand?: string | null; model?: string | null; serial?: string | null; store?: string | null; purchased_at?: string | null; price?: number | null; value?: number | null; warranty_until?: string | null; warranty_reminders?: number[]; notes?: string | null };
+export type ItemIn = { id?: string; home_id: string; name: string; room: string; category?: ItemCategory; condition?: ItemCondition | null; photo?: FileRef | null; brand?: string | null; model?: string | null; serial?: string | null; store?: string | null; purchased_at?: string | null; price?: number | null; value?: number | null; warranty_until?: string | null; warranty_reminders?: number[]; notes?: string | null };
 export type RepairIn = { id?: string; home_id: string; title: string; trade: string; schedule: Schedule; next_due?: string | null; reminders: number[]; item_id?: string | null; provider_id?: string | null; notes?: string | null };
-export type HomeIn = { id?: string; name: string; address?: string | null; kind: HomeKind; color?: string | null; is_default?: boolean };
+export type HomeIn = {
+  id?: string;
+  name: string;
+  address?: string | null;
+  kind: HomeKind;
+  color?: string | null;
+  is_default?: boolean;
+  photo?: FileRef | null;
+  property_id?: string | null;
+  ownership?: Ownership | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  adults?: number | null;
+  children?: number | null;
+  pets?: boolean | null;
+  moved_in?: string | null;
+  city?: string | null;
+};
 
 const j = (body: unknown) => JSON.stringify(body);
 
@@ -148,6 +242,10 @@ export const homeApi = {
   overview: (home_id?: string | null) => req<Overview>(`/home/overview${qs({ home_id })}`),
   badge: () => req<{ count: number }>("/home/badge"),
   calendar: (month: string, home_id?: string | null) => req<CalendarMonth>(`/home/calendar${qs({ month, home_id })}`),
+  spending: (p: { home_id?: string | null; year?: number } = {}) => req<Spending>(`/home/spending${qs(p)}`),
+  /* AMASS AI CORE — suggestions only; the user confirms before anything is saved */
+  aiIdentify: (file: { path?: string; data_url?: string }) => req<AiIdentify>("/home/ai/identify", { method: "POST", body: j(file) }),
+  aiReceipt: (file: { path?: string; data_url?: string }) => req<AiReceipt>("/home/ai/receipt", { method: "POST", body: j(file) }),
 
   bills: (p: { home_id?: string | null; status?: string; include_archived?: boolean } = {}) => req<{ items: Bill[]; count: number; summary: Record<string, number>; today: string }>(`/home/bills${qs(p)}`),
   bill: (id: string) => req<BillDetail>(`/home/bills/${id}`),
@@ -164,7 +262,7 @@ export const homeApi = {
   updateRecord: (id: string, body: RecordIn) => req<HomeRecord>(`/home/records/${id}`, { method: "PUT", body: j(body) }),
   deleteRecord: (id: string) => req<{ ok: boolean }>(`/home/records/${id}`, { method: "DELETE" }),
 
-  items: (p: { home_id?: string | null; room?: string; q?: string } = {}) => req<{ items: HomeItem[]; count: number; total_value: number; rooms: Record<string, number> }>(`/home/items${qs(p)}`),
+  items: (p: { home_id?: string | null; room?: string; category?: string; q?: string } = {}) => req<{ items: HomeItem[]; count: number; total_value: number; rooms: Record<string, number>; categories: Record<string, number> }>(`/home/items${qs(p)}`),
   item: (id: string) => req<HomeItem>(`/home/items/${id}`),
   createItem: (body: ItemIn) => req<HomeItem>("/home/items", { method: "POST", body: j(body) }),
   updateItem: (id: string, body: ItemIn) => req<HomeItem>(`/home/items/${id}`, { method: "PUT", body: j(body) }),

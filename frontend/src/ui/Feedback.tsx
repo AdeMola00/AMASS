@@ -303,7 +303,7 @@ export function StatTile({
           {typeof value === "number" ? value.toLocaleString() : value}
         </AppText>
       )}
-      <AppText variant="caption" tone="tertiary" numberOfLines={1}>
+      <AppText variant="caption" tone="tertiary" numberOfLines={2}>
         {label}
       </AppText>
     </>

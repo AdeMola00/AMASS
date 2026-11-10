@@ -178,6 +178,8 @@ TransactionKind = Literal[
     "purchase",           # bought a bundle
     "spend_unlock",       # spent to unlock a property
     "spend_feature",      # spent on a premium feature (FIX profile boost, etc.)
+    "spend_insurance",    # AMASS Home Protect premium / add-on
+    "insurance_payout",   # Home Protect claim settled into the wallet
     "subscription_grant", # monthly grant from subscription
     "earn_reward",        # earned via task/referral/job completion
     "bonus",              # bundle bonus / promotion

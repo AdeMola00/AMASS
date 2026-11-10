@@ -1375,3 +1375,72 @@ agent_communication:
       quiet_listing_sweep → MARKET_QUIET_LISTING notification (deep link /marketplace/my-listings?promote={id}); pytest
       tests/test_iter104_quiet_nudge.py 5/5. Frontend nudge row on the card (Promote it → PromoteSheet; × snoozes 7 days, persisted) and
       ?promote deep link verified via screenshots on demo ("Oak bookshelf (demo)" aged to 4 days, 0 views).
+
+  - agent: "main"
+    message: |
+      Iteration 105 (to run, BOTH) — AMASS MY HOME Phase 1 (visual Home Centre + AI inventory) and Phase 2 (AMASS HOME PROTECT
+      insurance, MASS-paid, admin rate cards + claims). Login demo@amass.africa / amass2026 (this user is_admin → sees the admin
+      shield button on /home/protect). Phase 1 verified by main via screenshots: My Home tab (home-hub-screen: hero home-profile-hero,
+      banner home-protect-banner, next-up, photo tiles tile-items/records/repairs/spending/bills/services, FAB home-fab → AddSheet
+      incl. "Scan with AI"), /home/items/scan (scan-pick-photo → attach-library file chooser → AI identify → confirm form → scan-receipt-add
+      → AI receipt → scan-save → item detail; backend POST /api/home/ai/identify + /receipt accept {path} or {data_url}),
+      /home/spending, /home/profile?id=, /home/items (Under warranty / Warranty · Nd left pills). Phase 2 backend
+      (home_protect.py, prefix /api/home/protect): GET catalog, GET status?home_id, POST quote {home_id, plan_key, include_building,
+      item_ids} or add-on {home_id, policy_id, item_ids} (409 already_covered for a 2nd policy on a live home), POST quotes/{id}/pay
+      (debits MASS kind spend_insurance, receipt kind home_protect, HOME_PROTECT_POLICY notification, idempotent), GET policies,
+      GET policies/{id}, POST claims (validates incident date within term, item on policy, photo ownership), POST claims/{id}/reply,
+      admin: GET admin/summary|rate-cards|policies|claims?status=open|closed|all, POST/PUT admin/rate-cards, POST
+      admin/rate-cards/{id}/activate, POST admin/claims/{id}/decide {status under_review|more_info|approved(payout_ngn)|paid|rejected}
+      → paid credits MASS (kind insurance_payout). Items list/detail + /home/overview now carry real protection; spending has an
+      insurance bucket. Frontend: /home/protect (protect-screen; no live cover → protect-get-quote + protect-plan-{basic|standard|premium};
+      live → protect-live-hero, protect-make-claim, protect-view-policy, protect-unprotected/protect-add-{id}, protect-claim-{id}),
+      /home/protect/quote (quote-stepper; quote-building toggle; quote-item-{id} rows; quote-continue → quote-plan-{key} → quote-continue
+      → quote-review, quote-total-mass, quote-pay | quote-topup when short), /home/protect/policy/[id] (policy-hero, policy-claim,
+      policy-add-items, policy-items, policy-claims, policy-call/email), /home/protect/claims/new (claim-scope-*, claim-item-{id},
+      claim-incident-{key}, claim-date, claim-description, claim-amount, claim-add-photo → attach-library, claim-submit),
+      /home/protect/claims/[id] (claim-hero, claim-status, claim-steps, claim-timeline, claim-reply-text/send), admin:
+      /home/protect/admin (admin-summary, admin-tabs Claims/Policies/Rate cards, admin-claims-open/closed, admin-claim-{id},
+      admin-new-card, admin-card-edit-{id}), /home/protect/admin/claim/[id] (admin-action-{status} → admin-decision-sheet with
+      admin-payout / admin-note / admin-decide-confirm), /home/protect/admin/rate-card?id= (rc-* fields, rc-plan-toggle-{key},
+      rc-rate-toggle-{cat}, rc-save). Item detail item-protect → quote with item preselected or the policy. Wallet shows
+      "Home Protect" / "Claim payout" rows. Backend pytest tests/test_iter105_home_protect.py 12/12. Demo currently has ONE live
+      policy on "Lekki flat" (Premium, 2 appliances) → for a fresh quote flow use the second home "Ikeja rental" or create a home.
+      Don't re-test marketplace/ads/intros.
+
+  - agent: "main"
+    message: |
+      Iteration 107 (to run, BOTH, focused on the iter106 fixes — don't re-test marketplace/ads/intros or Phase 1 scan happy path):
+      BACKEND (home_protect.py / home_hub.py): (1) POST /quotes/{id}/pay is atomic (quoted→paying lock + partial unique index
+      hp_policies.quote_id for status=active) — 4 parallel pays → one 200, three 409 payment_in_progress, one debit, one policy
+      (tests/test_iter106_pay_race.py passes). (2) POST /admin/claims/{id}/decide is atomic: find_one_and_update conditioned on
+      status ∉ {rejected, paid}; concurrent "paid" → one 200 + 409s, wallet credited once (tests/test_iter107_home_protect_fixes.py).
+      (3) POST /quote (new policy) on a home with ownership=null → 422 {code:"ownership_required"}; building cover only for
+      ownership owner|family. (4) DELETE /home/homes/{id}: without force → 409 HOME_NOT_EMPTY now includes live_cover:N and the
+      message names the policy; with force → policies on that home set status=cancelled (cancel_reason=home_deleted), open quotes
+      expired, response {ok, policies_cancelled}. (5) Notification bodies + receipt "Cover until" + claim date-range error use
+      "9 Nov 2027" style dates. (6) GET /home/items/{id} now returns home_policy_id (live policy on the item's home, else null).
+      FRONTEND: /home/protect/quote — when the home has no ownership, step 1 shows quote-ownership prompt with chips
+      quote-own-{owner|renting|family|other} (saves via PUT home, then the building toggle / renter note appears); Continue is
+      disabled with label "Choose own or rent first" until chosen. quote-building is now a labelled row (ToggleRow in ProtectBits)
+      — same for rc-active / rc-plan-rec-{key} on the rate-card editor. Item detail item-protect: if the item is uncovered but its
+      home has live cover → routes to /home/protect/quote?home_id&item_id&policy_id (add-on mode, 2-step stepper) and the row
+      reads "Add it to your home's live cover" / "Add". Admin claim decision sheet: payout prefill = min(claimed, insured item
+      value | contents/building limit) − excess (admin-payout-basis explains it). Claim form: "Pick the appliance" error only
+      after tapping Send (claim-submit now always enabled except while uploading; invalid → toast + inline errors). Scan: receipt
+      price overrides the AI "Worth now" unless the user typed a value (toast when they differ >50%); "Not found" keys humanised.
+      Homes screen delete confirm mentions live cover and that it's cancelled with no refund. 360px: protect hero buttons are
+      size md (Policy auto-width), StatTile + SummaryStrip labels wrap to 2 lines.
+      DATA: demo has a third home "Yaba studio" (id 3eabdf0f…, ownership NOT set, 2 insurable items, no cover) for the ownership
+      prompt + new-policy flow. Lekki flat (HP26-575MX8) and Ikeja rental (HP26-NXPGYL) have live cover. Orphan TEST_ policies
+      from iter106 were purged. Login demo@amass.africa / amass2026 (is_admin).
+
+  - agent: "main"
+    message: |
+      Iteration 107 follow-ups applied by main after the testing agent's report (/app/test_reports/iteration_105.json): Edit-home sheet
+      now scrolls (Sheet `scroll` prop, used on /home/homes → home-form-delete reachable at 375×667 and 360×640, verified by
+      screenshot); /home/items summary strip falls back to a 2×2 grid under 400px (labels/amounts whole, verified at 360);
+      force-deleting a home also withdraws open claims on its policies (status rejected, note "Withdrawn — you removed this home
+      and its cover.", removed from admin open queue) — leftover orphan claim CLM-09JYIF closed the same way; test
+      test_pay_once_then_delete_home_cancels_cover accepts late idempotent 200s (same policy id) and now covers claim withdrawal;
+      quote step-1 footer reads "from N MASS/yr" (cheapest plan) until a plan is picked; ToggleRow is tappable across the whole
+      row (testID `{id}-row`); delete-confirm copy reworded. pytest iter105+106+107 → 30 passed.

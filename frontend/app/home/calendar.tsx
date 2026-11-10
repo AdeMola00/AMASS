@@ -48,7 +48,7 @@ export default function CalendarScreen() {
   useEffect(() => homeHubSignal.subscribe(load), [load]);
 
   const today = data?.today ?? dayjs().format("YYYY-MM-DD");
-  const events = data?.events ?? [];
+  const events = useMemo(() => data?.events ?? [], [data?.events]);
   const agenda = useMemo(() => (selected ? events.filter((e) => e.date === selected) : events.filter((e) => e.date >= today)), [events, selected, today]);
   const grouped = useMemo(() => {
     const out: { date: string; items: DueItem[] }[] = [];
@@ -85,8 +85,9 @@ export default function CalendarScreen() {
     }
   };
 
-  const openAdd = (kind: "bill" | "record" | "item" | "repair") => {
+  const openAdd = (kind: "bill" | "record" | "item" | "repair" | "scan") => {
     setAdding(false);
+    if (kind === "scan") return router.push({ pathname: "/home/items/scan", params: { home_id: homeId && homeId !== "all" ? homeId : "" } } as any);
     const path = kind === "bill" ? "bills" : kind === "record" ? "records" : kind === "item" ? "items" : "repairs";
     router.push({ pathname: `/home/${path}/new`, params: { home_id: homeId && homeId !== "all" ? homeId : "" } } as any);
   };

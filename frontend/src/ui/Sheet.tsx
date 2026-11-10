@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +17,7 @@ export function Sheet({
   children,
   title,
   headline,
+  scroll,
   testID,
 }: {
   visible: boolean;
@@ -26,6 +27,8 @@ export function Sheet({
   title?: string;
   /** Expressive lowercase editorial headline (DM Serif) — premium touchpoints only. */
   headline?: string;
+  /** Long forms: let the body scroll inside the sheet's max height instead of clipping. */
+  scroll?: boolean;
   testID?: string;
 }) {
   const { colors, shadows } = useTheme();
@@ -72,7 +75,13 @@ export function Sheet({
               </Pressable>
             </View>
           ) : null}
-          {children}
+          {scroll ? (
+            <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingBottom: 4 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
+              {children}
+            </ScrollView>
+          ) : (
+            children
+          )}
         </Animated.View>
       </View>
     </Modal>

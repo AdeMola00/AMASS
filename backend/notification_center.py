@@ -146,6 +146,10 @@ KIND_CATEGORY: dict[str, str] = {
     "HOME_REPAIR_OVERDUE": "home",
     "HOME_RECORD_EXPIRY": "home",
     "HOME_WARRANTY_EXPIRY": "home",
+    # AMASS Home Protect (insurance)
+    "HOME_PROTECT_POLICY": "home",
+    "HOME_PROTECT_CLAIM": "home",
+    "HOME_PROTECT_EXPIRING": "home",
     # Agency teams
     "AGENCY_CREATED": "admin",
     "AGENCY_INVITE": "services",

@@ -3,7 +3,7 @@
  * filter chips, the list body, and a floating "+" for the section.
  */
 import React, { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -70,14 +70,17 @@ export function ListShell({ meta, subtitle, homes, homeId, onHome, onAdd, childr
 /** Coloured number strip under a list header, e.g. 1 overdue · 2 due soon · ₦84k this month. */
 export function SummaryStrip({ items, testID }: { items: { label: string; value: string | number; color?: string }[]; testID?: string }) {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  // Four tiles don't fit a 360px phone — fall back to a 2×2 grid so labels and amounts stay whole.
+  const twoUp = items.length >= 4 && width < 400;
   return (
-    <View style={styles.strip} testID={testID}>
+    <View style={[styles.strip, twoUp && { flexWrap: "wrap" }]} testID={testID}>
       {items.map((s) => (
-        <View key={s.label} style={[styles.stat, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View key={s.label} style={[styles.stat, twoUp && { flexBasis: "46%", flexGrow: 1 }, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <AppText variant="title" color={s.color ?? colors.text} tabular numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
             {s.value}
           </AppText>
-          <AppText variant="micro" tone="secondary" numberOfLines={1}>
+          <AppText variant="micro" tone="secondary" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {s.label}
           </AppText>
         </View>

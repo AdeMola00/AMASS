@@ -25,6 +25,8 @@ const TX_META: Record<string, TxMeta> = {
   purchase: { icon: "cart", tone: "default", label: "Top-up" },
   spend_unlock: { icon: "lock-open", tone: "brand", label: "Unlock" },
   spend_feature: { icon: "sparkles", tone: "brand", label: "Feature" },
+  spend_insurance: { icon: "shield-checkmark", tone: "brand", label: "Home Protect" },
+  insurance_payout: { icon: "umbrella", tone: "success", label: "Claim payout" },
   subscription_grant: { icon: "star", tone: "premium", label: "Subscription" },
   earn_reward: { icon: "gift", tone: "mass", label: "Reward" },
   bonus: { icon: "sparkles", tone: "mass", label: "Bonus" },

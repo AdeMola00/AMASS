@@ -2101,6 +2101,11 @@ app.include_router(_map_time_router)
 # ─── My Home hub: homes, bills (reminders only), records, items, repairs, calendar, private uploads
 from home_hub import register_home_hub_routes, start_home_hub, seed_home_hub_demo
 app.include_router(register_home_hub_routes(db, get_current_user, require_admin))
+from home_ai import register_home_ai_routes
+app.include_router(register_home_ai_routes(db, get_current_user))
+# ─── AMASS Home Protect: partner rate cards (admin) → quotes → MASS-paid policies → claims
+from home_protect import register_home_protect_routes, ensure_home_protect, run_protect_sweep
+app.include_router(register_home_protect_routes(db, get_current_user, require_admin))
 
 # ─── Agent Platform (Phase 1: onboarding, plans, quotas, founding, admin)
 from agent_platform import (
@@ -2400,6 +2405,17 @@ async def _startup_work():
     await ensure_fixa_indexes(db)
     await ensure_agency_indexes(db)
     await start_home_hub(db)  # indexes + 30-min bill / maintenance / expiry reminder sweep
+    await ensure_home_protect(db)  # indexes + default partner rate card
+
+    async def _protect_loop():
+        while True:
+            await asyncio.sleep(6 * 3600)
+            try:
+                await run_protect_sweep(db)
+            except Exception as _e:
+                logger.warning("home protect sweep failed: %s", _e)
+
+    asyncio.create_task(_protect_loop())
     try:
         _demo_hh = await db.users.find_one({"email": "demo@amass.africa"}, {"_id": 0, "id": 1})
         if _demo_hh:

@@ -35,6 +35,23 @@ MAX_UPLOAD = 12 * 1024 * 1024
 MAX_CHUNK_B64 = 1_100_000  # ~800 KB binary per chunk
 
 HomeKind = Literal["flat", "house", "duplex", "land", "office", "shop", "other"]
+Ownership = Literal["owner", "renting", "family", "other"]
+
+# Appliance / item categories — drive the photo tiles, AI identification and (HOME PROTECT) insurability.
+ITEM_CATEGORIES: list[dict[str, Any]] = [
+    {"key": "tv", "label": "TV & audio", "icon": "tv", "insurable": True},
+    {"key": "fridge", "label": "Fridge & freezer", "icon": "snow", "insurable": True},
+    {"key": "washer", "label": "Washing machine", "icon": "water", "insurable": True},
+    {"key": "ac", "label": "Air conditioner", "icon": "thermometer", "insurable": True},
+    {"key": "generator", "label": "Generator", "icon": "battery-charging", "insurable": True},
+    {"key": "inverter", "label": "Inverter & solar", "icon": "flash", "insurable": True},
+    {"key": "laptop", "label": "Laptop & computer", "icon": "laptop", "insurable": True},
+    {"key": "phone", "label": "Phone & tablet", "icon": "phone-portrait", "insurable": True},
+    {"key": "kitchen", "label": "Kitchen appliance", "icon": "restaurant", "insurable": True},
+    {"key": "furniture", "label": "Furniture", "icon": "bed", "insurable": True},
+    {"key": "other", "label": "Other", "icon": "cube", "insurable": False},
+]
+ITEM_CATEGORY_KEYS = {c["key"] for c in ITEM_CATEGORIES}
 Freq = Literal["once", "daily", "weekly", "monthly", "yearly", "custom"]
 Unit = Literal["days", "weeks", "months"]
 
@@ -183,6 +200,17 @@ class HomeIn(BaseModel):
     kind: HomeKind = "flat"
     color: Optional[str] = None
     is_default: bool = False
+    # ── My Home Profile (all optional) ──
+    photo: Optional[FileRef] = None
+    property_id: Optional[str] = None  # an AMASS listing this home is (address / cover photo come from it)
+    ownership: Optional[Ownership] = None
+    bedrooms: Optional[int] = Field(None, ge=0, le=50)
+    bathrooms: Optional[int] = Field(None, ge=0, le=50)
+    adults: Optional[int] = Field(None, ge=0, le=50)
+    children: Optional[int] = Field(None, ge=0, le=50)
+    pets: Optional[bool] = None
+    moved_in: Optional[str] = None  # YYYY-MM-DD
+    city: Optional[str] = Field(None, max_length=80)
 
 
 class BillIn(BaseModel):
@@ -226,6 +254,8 @@ class ItemIn(BaseModel):
     home_id: str
     name: str = Field(..., min_length=1, max_length=80)
     room: str = "Other"
+    category: str = "other"
+    condition: Optional[Literal["new", "good", "fair", "poor"]] = None
     photo: Optional[FileRef] = None
     brand: Optional[str] = Field(None, max_length=60)
     model: Optional[str] = Field(None, max_length=60)
@@ -339,11 +369,23 @@ def shape_record(r: dict, today: date) -> dict:
     return r
 
 
+PROFILE_FIELDS = ("photo", "address", "ownership", "bedrooms", "bathrooms", "adults", "moved_in")
+
+
+def profile_completeness(home: dict) -> int:
+    """0–100: how much of My Home Profile is filled (drives the 'Complete your home' nudge)."""
+    filled = sum(1 for k in PROFILE_FIELDS if home.get(k) not in (None, "", []))
+    return int(round(100 * filled / len(PROFILE_FIELDS)))
+
+
 def shape_item(i: dict, today: date) -> dict:
     i = clean(dict(i)) or {}
     w = parse_day(i.get("warranty_until"))
     i["warranty_status"] = "none" if not w else ("expired" if w < today else ("expiring" if (w - today).days <= 30 else "active"))
     i["warranty_days"] = (w - today).days if w else None
+    i.setdefault("category", "other")
+    # HOME PROTECT fills this in once a policy covers the item; until then every item is simply "not protected".
+    i.setdefault("protection", {"status": "none"})
     return i
 
 
@@ -547,6 +589,8 @@ def register_home_hub_routes(db: AsyncIOMotorDatabase, get_current_user, require
             "bill_categories": BILL_CATEGORIES,
             "record_folders": RECORD_FOLDERS,
             "rooms": ROOMS,
+            "item_categories": ITEM_CATEGORIES,
+            "ownership": ["owner", "renting", "family", "other"],
             "repair_trades": REPAIR_TRADES,
             "home_colors": HOME_COLORS,
             "home_kinds": ["flat", "house", "duplex", "land", "office", "shop", "other"],
@@ -559,6 +603,22 @@ def register_home_hub_routes(db: AsyncIOMotorDatabase, get_current_user, require
     @router.get("/homes")
     async def list_homes(user: dict = Depends(get_current_user)):
         return {"items": await _ensure_default_home(user)}
+
+    def _profile_fields(body: HomeIn, photo: Optional[dict]) -> dict:
+        """My Home Profile fields shared by create + update (None clears nothing on create, is stored as null)."""
+        moved = parse_day(body.moved_in)
+        return {
+            "photo": photo,
+            "property_id": (body.property_id or "").strip() or None,
+            "ownership": body.ownership,
+            "bedrooms": body.bedrooms,
+            "bathrooms": body.bathrooms,
+            "adults": body.adults,
+            "children": body.children,
+            "pets": body.pets,
+            "moved_in": moved.isoformat() if moved else None,
+            "city": (body.city or "").strip() or None,
+        }
 
     @router.post("/homes", status_code=201)
     async def create_home(body: HomeIn, user: dict = Depends(get_current_user)):
@@ -576,6 +636,7 @@ def register_home_hub_routes(db: AsyncIOMotorDatabase, get_current_user, require
             "color": body.color if body.color in HOME_COLORS else HOME_COLORS[count % len(HOME_COLORS)],
             "is_default": body.is_default or count == 0,
             "created_at": iso(now_utc()),
+            **_profile_fields(body, await _check_file(user, body.photo)),
         }
         if doc["is_default"]:
             await db.hh_homes.update_many({"user_id": _uid(user)}, {"$set": {"is_default": False}})
@@ -584,8 +645,11 @@ def register_home_hub_routes(db: AsyncIOMotorDatabase, get_current_user, require
 
     @router.put("/homes/{home_id}")
     async def update_home(home_id: str, body: HomeIn, user: dict = Depends(get_current_user)):
-        await _home_or_404(user, home_id)
-        upd = {"name": body.name.strip(), "address": (body.address or "").strip() or None, "kind": body.kind}
+        existing = await _home_or_404(user, home_id)
+        photo = await _check_file(user, body.photo)
+        upd = {"name": body.name.strip(), "address": (body.address or "").strip() or None, "kind": body.kind, **_profile_fields(body, photo if photo is not None else existing.get("photo"))}
+        if body.photo is None and "photo" in body.model_fields_set:
+            upd["photo"] = None  # explicit removal
         if body.color in HOME_COLORS:
             upd["color"] = body.color
         if body.is_default:
@@ -596,19 +660,28 @@ def register_home_hub_routes(db: AsyncIOMotorDatabase, get_current_user, require
 
     @router.delete("/homes/{home_id}")
     async def delete_home(home_id: str, force: bool = False, user: dict = Depends(get_current_user)):
+        from home_protect import cancel_home_cover, home_live_policies
+
         h = await _home_or_404(user, home_id)
         q = {"user_id": _uid(user), "home_id": home_id}
         content = sum([await c.count_documents(q) for c in (db.hh_bills, db.hh_records, db.hh_items, db.hh_repairs)])
-        if content and not force:
-            raise HTTPException(409, {"code": "HOME_NOT_EMPTY", "count": content, "message": f"This home still has {content} saved things. Delete them too?"})
+        live = await home_live_policies(db, _uid(user), home_id, today_local())
+        if (content or live) and not force:
+            parts = []
+            if content:
+                parts.append(f"{content} saved thing{'s' if content != 1 else ''}")
+            if live:
+                parts.append(f"live Home Protect cover ({', '.join(p.get('policy_no') or '' for p in live)})")
+            raise HTTPException(409, {"code": "HOME_NOT_EMPTY", "count": content, "live_cover": len(live), "message": f"This home still has {' and '.join(parts)}. Delete them too?"})
         for c in (db.hh_bills, db.hh_records, db.hh_items, db.hh_repairs, db.hh_payments, db.hh_repair_logs):
             await c.delete_many(q)
+        cancelled = await cancel_home_cover(db, _uid(user), home_id, "home_deleted")
         await db.hh_homes.delete_one({"id": home_id})
         if h.get("is_default"):
             nxt = await db.hh_homes.find_one({"user_id": _uid(user)}, {"_id": 0, "id": 1}, sort=[("created_at", 1)])
             if nxt:
                 await db.hh_homes.update_one({"id": nxt["id"]}, {"$set": {"is_default": True}})
-        return {"ok": True}
+        return {"ok": True, "policies_cancelled": cancelled}
 
     # ── Overview / badge / calendar ──
     async def _next_due(user: dict, home_id: Optional[str], today: date, limit: int = 3) -> list[dict]:
@@ -694,16 +767,116 @@ def register_home_hub_routes(db: AsyncIOMotorDatabase, get_current_user, require
             due_soon += s == "due_soon"
             by_type["repairs"]["overdue"] += s == "overdue"
             by_type["repairs"]["due_soon"] += s == "due_soon"
+        items_rows = await db.hh_items.find(q, {"_id": 0, "value": 1, "price": 1, "warranty_until": 1, "photo": 1, "category": 1}).sort("created_at", -1).to_list(1000)
+        items_value = sum(float(r.get("value") or r.get("price") or 0) for r in items_rows)
+        warranty_expiring = sum(1 for r in items_rows if (w := parse_day(r.get("warranty_until"))) and 0 <= (w - today).days <= 30)
+        home_doc = next((h for h in homes if h["id"] == selected), None)
+        from home_protect import home_protection
+
         return {
             "today": today.isoformat(),
             "homes": homes,
             "home_id": selected,
-            "home": next((h for h in homes if h["id"] == selected), None),
+            "home": home_doc,
+            "profile_completeness": profile_completeness(home_doc) if home_doc else 0,
             "next_due": await _next_due(user, selected, today),
             "counts": counts,
             "attention": {"overdue": overdue, "due_soon": due_soon, **by_type},
             "month": await _month_totals(user, selected, today),
+            "items_value": items_value,
+            "warranty_expiring": warranty_expiring,
+            "item_photos": [r["photo"] for r in items_rows if r.get("photo")][:4],
+            "spend_month": await _spend_month(user, selected, today),
+            "protection": await home_protection(db, _uid(user), selected, today),
         }
+
+    async def _spend_month(user: dict, home_id: Optional[str], today: date) -> dict:
+        """What the household actually spent this month: bill payments + completed repairs + items bought."""
+        first = today.replace(day=1).isoformat()
+        last = today.replace(day=calendar.monthrange(today.year, today.month)[1]).isoformat()
+        q = _scope(user, home_id)
+        bills = 0.0
+        async for p in db.hh_payments.find({**q, "paid_at": {"$gte": first, "$lte": last + "T23:59:59"}}, {"_id": 0, "amount": 1}):
+            bills += float(p.get("amount") or 0)
+        repairs = 0.0
+        async for lg in db.hh_repair_logs.find({**q, "date": {"$gte": first, "$lte": last}}, {"_id": 0, "cost": 1}):
+            repairs += float(lg.get("cost") or 0)
+        purchases = 0.0
+        async for it in db.hh_items.find({**q, "purchased_at": {"$gte": first, "$lte": last}}, {"_id": 0, "price": 1}):
+            purchases += float(it.get("price") or 0)
+        return {"bills": bills, "repairs": repairs, "purchases": purchases, "total": bills + repairs + purchases}
+
+    @router.get("/spending")
+    async def spending(home_id: Optional[str] = None, year: Optional[int] = None, user: dict = Depends(get_current_user)):
+        """My Home Spending — monthly totals for a year, split by bills (by category), repairs, purchases and insurance."""
+        today = today_local()
+        y = year or today.year
+        homes = await _ensure_default_home(user)
+        ids = {h["id"] for h in homes}
+        if home_id and home_id != "all" and home_id not in ids:
+            home_id = None
+        selected = home_id or next((h["id"] for h in homes if h.get("is_default")), homes[0]["id"])
+        q = _scope(user, selected)
+        months = [{"month": f"{y}-{m:02d}", "bills": 0.0, "repairs": 0.0, "purchases": 0.0, "insurance": 0.0, "total": 0.0} for m in range(1, 13)]
+        by_category: dict[str, float] = {}
+        recent: list[dict] = []
+
+        def bucket(day: str) -> Optional[dict]:
+            if not day or not day.startswith(str(y)):
+                return None
+            try:
+                return months[int(day[5:7]) - 1]
+            except (ValueError, IndexError):
+                return None
+
+        bill_cat = {b["id"]: (b.get("category") or "other") for b in await db.hh_bills.find(q, {"_id": 0, "id": 1, "category": 1}).to_list(2000)}
+        async for p in db.hh_payments.find({**q, "paid_at": {"$gte": f"{y}-01-01", "$lte": f"{y}-12-31T23:59:59"}}, {"_id": 0}).sort("paid_at", -1):
+            amt = float(p.get("amount") or 0)
+            cat = bill_cat.get(p.get("bill_id"), "other")
+            if (b := bucket(p.get("paid_at") or "")) is not None:
+                key = "insurance" if cat == "insurance" else "bills"
+                b[key] += amt
+                b["total"] += amt
+            by_category[cat] = by_category.get(cat, 0.0) + amt
+            if len(recent) < 30:
+                recent.append({"type": "bill", "title": p.get("bill_name") or "Bill", "amount": amt, "date": (p.get("paid_at") or "")[:10], "category": cat, "path": f"/home/bills/{p.get('bill_id')}"})
+        async for lg in db.hh_repair_logs.find({**q, "date": {"$gte": f"{y}-01-01", "$lte": f"{y}-12-31"}}, {"_id": 0}).sort("date", -1):
+            amt = float(lg.get("cost") or 0)
+            if (b := bucket(lg.get("date") or "")) is not None:
+                b["repairs"] += amt
+                b["total"] += amt
+            by_category["repairs"] = by_category.get("repairs", 0.0) + amt
+            if amt and len(recent) < 60:
+                recent.append({"type": "repair", "title": lg.get("repair_title") or "Repair", "amount": amt, "date": lg.get("date"), "category": "repairs", "path": f"/home/repairs/{lg.get('repair_id')}"})
+        async for it in db.hh_items.find({**q, "purchased_at": {"$gte": f"{y}-01-01", "$lte": f"{y}-12-31"}}, {"_id": 0}).sort("purchased_at", -1):
+            amt = float(it.get("price") or 0)
+            if (b := bucket(it.get("purchased_at") or "")) is not None:
+                b["purchases"] += amt
+                b["total"] += amt
+            by_category["purchases"] = by_category.get("purchases", 0.0) + amt
+            if amt and len(recent) < 90:
+                recent.append({"type": "item", "title": it.get("name") or "Purchase", "amount": amt, "date": it.get("purchased_at"), "category": "purchases", "path": f"/home/items/{it.get('id')}"})
+        recent.sort(key=lambda r: r.get("date") or "", reverse=True)
+        from home_protect import insurance_spend
+
+        for row in await insurance_spend(db, _uid(user), selected, y):
+            if (b := bucket(row["date"])) is not None:
+                b["insurance"] += row["amount"]
+                b["total"] += row["amount"]
+            by_category["insurance"] = by_category.get("insurance", 0.0) + row["amount"]
+            recent.append(row)
+        recent.sort(key=lambda r: r.get("date") or "", reverse=True)
+        totals = {k: sum(m[k] for m in months) for k in ("bills", "repairs", "purchases", "insurance", "total")}
+        return {"year": y, "home_id": selected, "months": months, "totals": totals, "by_category": by_category, "recent": recent[:40], "years": await _spend_years(q, y)}
+
+    async def _spend_years(q: dict, current: int) -> list[int]:
+        years = {current}
+        first_pay = await db.hh_payments.find_one(q, {"_id": 0, "paid_at": 1}, sort=[("paid_at", 1)])
+        first_item = await db.hh_items.find_one({**q, "purchased_at": {"$ne": None}}, {"_id": 0, "purchased_at": 1}, sort=[("purchased_at", 1)])
+        for d in ((first_pay or {}).get("paid_at"), (first_item or {}).get("purchased_at")):
+            if d and len(d) >= 4 and d[:4].isdigit():
+                years.update(range(int(d[:4]), current + 1))
+        return sorted(years, reverse=True)[:6]
 
     @router.get("/badge")
     async def badge(user: dict = Depends(get_current_user)):
@@ -1058,20 +1231,34 @@ def register_home_hub_routes(db: AsyncIOMotorDatabase, get_current_user, require
 
     # ── Items ──
     @router.get("/items")
-    async def list_items(home_id: Optional[str] = None, room: Optional[str] = None, q: Optional[str] = None, user: dict = Depends(get_current_user)):
+    async def list_items(home_id: Optional[str] = None, room: Optional[str] = None, category: Optional[str] = None, q: Optional[str] = None, user: dict = Depends(get_current_user)):
         today = today_local()
         query = _scope(user, home_id)
         if room:
             query["room"] = room
+        if category:
+            query["category"] = category
         rows = await db.hh_items.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
         if q:
             needle = q.strip().lower()
             rows = [r for r in rows if needle in (r.get("name") or "").lower() or needle in (r.get("brand") or "").lower()]
         total_value = sum(float(r.get("value") or r.get("price") or 0) for r in rows)
         rooms: dict[str, int] = {}
+        categories: dict[str, int] = {}
         for r in rows:
             rooms[r.get("room") or "Other"] = rooms.get(r.get("room") or "Other", 0) + 1
-        return {"items": [shape_item(r, today) for r in rows], "count": len(rows), "total_value": total_value, "rooms": rooms}
+            c = r.get("category") or "other"
+            categories[c] = categories.get(c, 0) + 1
+        from home_protect import protection_map
+
+        pmap = await protection_map(db, _uid(user), today)
+        shaped = []
+        for r in rows:
+            s = shape_item(r, today)
+            if r["id"] in pmap:
+                s["protection"] = pmap[r["id"]]
+            shaped.append(s)
+        return {"items": shaped, "count": len(rows), "total_value": total_value, "rooms": rooms, "categories": categories, "protected": sum(1 for s in shaped if s["protection"]["status"] in ("active", "expiring"))}
 
     def _item_doc(user: dict, body: ItemIn, photo: Optional[dict], existing: Optional[dict] = None) -> dict:
         w = parse_day(body.warranty_until)
@@ -1082,6 +1269,8 @@ def register_home_hub_routes(db: AsyncIOMotorDatabase, get_current_user, require
             "home_id": body.home_id,
             "name": body.name.strip(),
             "room": body.room if body.room in ROOMS else (body.room.strip()[:40] or "Other"),
+            "category": body.category if body.category in ITEM_CATEGORY_KEYS else "other",
+            "condition": body.condition,
             "photo": photo if photo is not None else (existing or {}).get("photo"),
             "brand": (body.brand or "").strip() or None,
             "model": (body.model or "").strip() or None,
@@ -1113,6 +1302,11 @@ def register_home_hub_routes(db: AsyncIOMotorDatabase, get_current_user, require
             raise HTTPException(404, "Item not found")
         today = today_local()
         out = shape_item(it, today)
+        from home_protect import home_protection, protection_map
+
+        out["protection"] = (await protection_map(db, _uid(user), today)).get(item_id, out["protection"])
+        hp = await home_protection(db, _uid(user), it.get("home_id"), today)
+        out["home_policy_id"] = hp.get("policy_id") if hp.get("status") in ("active", "expiring") else None
         out["records"] = [shape_record(r, today) for r in await db.hh_records.find({"item_id": item_id, "user_id": _uid(user)}, {"_id": 0}).sort("created_at", -1).to_list(100)]
         out["repairs"] = [shape_repair(r, today) for r in await db.hh_repairs.find({"item_id": item_id, "user_id": _uid(user), "archived": {"$ne": True}}, {"_id": 0}).to_list(100)]
         return out
@@ -1379,9 +1573,9 @@ async def seed_home_hub_demo(db: AsyncIOMotorDatabase, user: dict) -> None:
     await db.hh_payments.insert_one({"id": str(uuid.uuid4()), "user_id": user["id"], "home_id": home_id, "bill_id": bills[2]["id"], "bill_name": "Estate dues", "amount": 45000, "paid_at": (today - timedelta(days=18)).isoformat() + "T10:00:00+00:00", "period_due": (today - timedelta(days=18)).isoformat(), "note": "Transfer to estate account", "record_id": None, "created_at": iso(now_utc())})
 
     items = [
-        {"name": "Samsung 55\" TV", "room": "Living room", "brand": "Samsung", "price": 620000, "value": 450000, "purchased_at": add_months(today, -8).isoformat(), "warranty_until": add_months(today, 4).isoformat()},
-        {"name": "LG Inverter AC (1.5HP)", "room": "Bedroom", "brand": "LG", "price": 480000, "value": 400000, "purchased_at": add_months(today, -14).isoformat(), "warranty_until": (today + timedelta(days=20)).isoformat()},
-        {"name": "Hisense fridge", "room": "Kitchen", "brand": "Hisense", "price": 350000, "value": 300000, "purchased_at": add_months(today, -20).isoformat(), "warranty_until": None},
+        {"name": "Samsung 55\" TV", "room": "Living room", "category": "tv", "brand": "Samsung", "price": 620000, "value": 450000, "purchased_at": add_months(today, -8).isoformat(), "warranty_until": add_months(today, 4).isoformat()},
+        {"name": "LG Inverter AC (1.5HP)", "room": "Bedroom", "category": "ac", "brand": "LG", "price": 480000, "value": 400000, "purchased_at": add_months(today, -14).isoformat(), "warranty_until": (today + timedelta(days=20)).isoformat()},
+        {"name": "Hisense fridge", "room": "Kitchen", "category": "fridge", "brand": "Hisense", "price": 350000, "value": 300000, "purchased_at": add_months(today, -20).isoformat(), "warranty_until": None},
     ]
     await db.hh_items.insert_many([{"id": str(uuid.uuid4()), "user_id": user["id"], "home_id": home_id, "photo": None, "model": None, "serial": None, "store": None, "warranty_reminders": DEFAULT_WARRANTY_REMINDERS, "notes": None, "created_at": iso(now_utc()), "updated_at": iso(now_utc()), **i} for i in items])
 

@@ -194,8 +194,8 @@ export function StatusPill({ status, daysUntil, label, size = "sm", testID }: { 
 /** Warranty pill wording: active → "Under warranty", expiring → "Warranty ends in Nd", expired → "Warranty ended". `short` fits card corners. */
 export function warrantyPill(status: "none" | "expired" | "expiring" | "active", days?: number | null, short = false): { status: DueStatus; label: string } {
   if (status === "expired") return { status: "overdue", label: short ? "Warranty ended" : days != null && days < 0 ? `Warranty ended ${-days}d ago` : "Warranty ended" };
-  if (status === "expiring") return { status: "due_soon", label: days === 0 ? (short ? "Ends today" : "Warranty ends today") : days != null ? (short ? `Ends in ${days}d` : `Warranty ends in ${days}d`) : "Warranty ending" };
-  return { status: "paid", label: short ? "Covered" : days != null ? `Under warranty · ${days}d left` : "Under warranty" };
+  if (status === "expiring") return { status: "due_soon", label: days === 0 ? "Warranty ends today" : days != null ? (short ? `Warranty · ${days}d left` : `Warranty ends in ${days}d`) : "Warranty ending" };
+  return { status: "paid", label: short ? "Under warranty" : days != null ? `Under warranty · ${days}d left` : "Under warranty" };
 }
 
 /** Document expiry pill wording: valid → "Valid · Nd left", expiring → "Expires in Nd", expired → "Expired". */
@@ -301,11 +301,26 @@ export function BigOption({ icon, label, caption, color, onPress, testID }: { ic
 }
 
 /* ─── Add sheet ─────────────────────────────────────────────────────────── */
-export function AddSheet({ visible, onClose, onPick }: { visible: boolean; onClose: () => void; onPick: (kind: "bill" | "record" | "item" | "repair") => void }) {
+export function AddSheet({ visible, onClose, onPick }: { visible: boolean; onClose: () => void; onPick: (kind: "bill" | "record" | "item" | "repair" | "scan") => void }) {
   const s = useSections();
+  const { colors } = useTheme();
   return (
     <Sheet visible={visible} onClose={onClose} title="Add to My Home" testID="home-add-sheet">
-      <View style={styles.optGrid}>
+      <PressableScale onPress={() => onPick("scan")} scaleTo={0.97} accessibilityRole="button" accessibilityLabel="Scan an appliance with AI. Take a photo and we fill in the details" testID="home-add-scan" style={[styles.scanRow, { backgroundColor: colors.text }]}>
+        <View style={[styles.bigOptIcon, { backgroundColor: colors.brand, width: 48, height: 48, borderRadius: 24 }]}>
+          <Ionicons name="scan" size={24} color="#FFFFFF" />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <AppText variant="title" color={colors.bg} style={{ fontSize: 17 }}>
+            Scan with AI
+          </AppText>
+          <AppText variant="caption" color={colors.bg} style={{ opacity: 0.75 }} numberOfLines={2}>
+            Photograph an appliance or a receipt — AI fills in the name, brand, price and date for you to confirm.
+          </AppText>
+        </View>
+        <Ionicons name="sparkles" size={20} color={colors.mass} />
+      </PressableScale>
+      <View style={[styles.optGrid, { marginTop: 12 }]}>
         <BigOption icon={s.bills.icon} label="Bill" caption="Rent, light, water…" color={s.bills.color} onPress={() => onPick("bill")} testID="home-add-bill" />
         <BigOption icon={s.records.icon} label="Record" caption="Receipt or document" color={s.records.color} onPress={() => onPick("record")} testID="home-add-record" />
         <BigOption icon={s.items.icon} label="Item" caption="TV, fridge, AC…" color={s.items.color} onPress={() => onPick("item")} testID="home-add-item" />
@@ -397,6 +412,7 @@ const styles = StyleSheet.create({
   dueIcon: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
   quick: { minWidth: 56, height: 52, paddingHorizontal: 10, borderRadius: radii.md, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 1 },
   optGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  scanRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radii.lg },
   bigOpt: { width: "47.5%", minHeight: 132, borderRadius: radii.lg, padding: 14, alignItems: "center", justifyContent: "center", gap: 8 },
   bigOptIcon: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
   homeRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, minHeight: 60, borderRadius: radii.lg },

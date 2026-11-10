@@ -12,6 +12,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Button, Card, EmptyState, ListRow, RowGroup, Screen, ScreenHeader, Section, SkeletonRows, useToast } from "@/src/ui";
 import { Fact, FileThumb, ROOM_ICON, StatusPill, fmtDate, naira, useSections, warrantyPill } from "@/src/components/home/HomeBits";
+import { ITEM_CATEGORIES, categoryLabel } from "@/src/components/home/homeArt";
 
 export default function ItemDetail() {
   const router = useRouter();
@@ -122,6 +123,8 @@ export default function ItemDetail() {
         </View>
 
         <Card elevation="xs" style={{ gap: 2 }}>
+          <Fact icon="grid-outline" label="Category" value={categoryLabel(item.category)} testID="item-category" />
+          <Fact icon="sparkles-outline" label="Condition" value={item.condition ? item.condition.charAt(0).toUpperCase() + item.condition.slice(1) : null} />
           <Fact icon="pricetag-outline" label="Paid" value={item.price ? naira(item.price) : null} />
           <Fact icon="calendar-outline" label="Bought" value={item.purchased_at ? fmtDate(item.purchased_at, true) : null} />
           <Fact icon="storefront-outline" label="From" value={item.store} />
@@ -129,6 +132,27 @@ export default function ItemDetail() {
           <Fact icon="barcode-outline" label="Serial" value={item.serial} />
           <Fact icon="chatbox-ellipses-outline" label="Notes" value={item.notes} />
         </Card>
+
+        {/* HOME PROTECT status for this item */}
+        {(() => {
+          const live = item.protection?.status === "active" || item.protection?.status === "expiring";
+          const insurable = ITEM_CATEGORIES.find((c) => c.key === item.category)?.insurable;
+          const go = () => (live && item.protection.policy_id ? router.push(`/home/protect/policy/${item.protection.policy_id}` as any) : router.push({ pathname: "/home/protect/quote", params: item.home_policy_id ? { home_id: item.home_id, item_id: item.id, policy_id: item.home_policy_id } : { home_id: item.home_id, item_id: item.id } } as any));
+          return (
+            <Pressable onPress={go} accessibilityRole="button" accessibilityLabel={live ? "Protected by AMASS Home Protect. View cover" : "Not protected. Protect this item"} style={[styles.protect, { backgroundColor: live ? colors.successSoft : colors.surfaceAlt }]} testID="item-protect">
+              <Ionicons name={live ? "shield-checkmark" : "shield-outline"} size={22} color={live ? colors.success : colors.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyMedium">{live ? (item.protection.status === "expiring" ? "Protected · cover ending soon" : "Protected") : item.protection?.status === "expired" ? "Cover ended" : "Not protected yet"}</AppText>
+                <AppText variant="caption" tone="secondary">
+                  {live ? `AMASS Home Protect · ${item.protection.policy_no ?? ""} · until ${item.protection.expires_at ? fmtDate(item.protection.expires_at, true) : "—"}` : insurable ? (item.home_policy_id ? "Add it to your home's live cover" : "Cover this appliance with AMASS Home Protect") : "This type of item isn't insurable yet"}
+                </AppText>
+              </View>
+              <AppText variant="caption" color={colors.brand}>
+                {live ? "View" : item.protection?.status === "expired" ? "Renew" : item.home_policy_id ? "Add" : "Protect"}
+              </AppText>
+            </Pressable>
+          );
+        })()}
 
         <View style={{ flexDirection: "row", gap: 10 }}>
           <Button label="Warranty doc" variant="secondary" iconLeft="shield-checkmark-outline" onPress={() => router.push({ pathname: "/home/records/new", params: { home_id: item.home_id, item_id: item.id, folder: "warranties", title: `${item.name} warranty` } } as any)} style={{ flex: 1 }} testID="item-add-warranty-doc" />
@@ -166,6 +190,7 @@ export default function ItemDetail() {
 
 const styles = StyleSheet.create({
   photo: { borderRadius: radii.xl, overflow: "hidden" },
+  protect: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: radii.lg },
   noPhoto: { height: 200, alignItems: "center", justifyContent: "center", gap: 8 },
   stat: { flex: 1, padding: 14, borderRadius: radii.lg, gap: 6, minHeight: 84 },
   recCard: { padding: 8, borderRadius: radii.lg, gap: 6 },

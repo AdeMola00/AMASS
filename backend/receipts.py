@@ -31,7 +31,7 @@ from pymongo.errors import DuplicateKeyError
 
 logger = logging.getLogger("amass.receipts")
 
-ReceiptKind = Literal["topup", "property_access"]
+ReceiptKind = Literal["topup", "property_access", "home_protect"]
 
 
 def _now() -> datetime:
@@ -125,11 +125,12 @@ def receipt_html(doc: dict) -> str:
     created = doc.get("created_at")
     when = created.strftime("%d %b %Y, %H:%M UTC") if isinstance(created, datetime) else str(created or "")
     unlock = doc.get("kind") == "property_access"
+    protect = doc.get("kind") == "home_protect"
     currency = str(doc.get("currency", "MASS"))
     rows: list[tuple[str, str]] = [
         ("Receipt no.", str(doc.get("receipt_no", ""))),
         ("Date", when),
-        ("Type", "Property access" if unlock else "Wallet top-up"),
+        ("Type", "Property access" if unlock else "AMASS Home Protect" if protect else "Wallet top-up"),
         ("Reference", str(doc.get("reference", ""))),
         ("Description", str(doc.get("description", ""))),
         *[(str(i.get("label", "")), str(i.get("value", ""))) for i in doc.get("items", [])],
@@ -141,7 +142,7 @@ def receipt_html(doc: dict) -> str:
         rows.append(("Balance after", f"{int(doc['balance_after']):,} {currency}"))
     first = (doc.get("user_name") or "there").split(" ")[0]
     return render_email(
-        title="Your home is unlocked" if unlock else "Payment received",
+        title="Your home is unlocked" if unlock else "Your home is protected" if protect else "Payment received",
         kicker="Receipt",
         hero="lagoon",
         greeting=f"Hi {first},",

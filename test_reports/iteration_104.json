@@ -1,0 +1,56 @@
+{
+  "summary": "Tested AMASS MY HOME and HOME PROTECT, backend and frontend (390x844 plus a layout pass at 360x640). Backend: the existing test_iter105 suite passes 12/12. The new edge-case suite (test_iter106_home_protect_edges.py) passes 13/13: status without home_id, foreign item_ids ignored, renting home gets building=false/0, sequential double pay is idempotent, claim dated before cover starts returns 422, non-admin gets 403, items/overview/spending/notifications integration, and AI identify/receipt return the documented shape. CRITICAL: the concurrent pay race test FAILED. 4 parallel POSTs to /quotes/{id}/pay debited 4x and created 4 policies. Frontend: every requested flow works end to end with no runtime console errors and no nested <button> warnings. Flows covered: dashboard tiles and banner, AI scan with receipt read and save, items list, add-on quote and pay, new policy on Ikeja, claim with photo and reply, the full admin claim lifecycle with the MASS payout credited (+2000), rate card edit and save, new rate card validation, notifications, wallet, calendar and bills. Found 1 critical backend race, 2 backend logic bugs, several UX/design issues and some truncation at 360px. No deprecated Expo packages detected.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/home/protect/quotes/{id}/pay", "issue": "Not race-safe. The status=='paid' check is followed by the debit with no atomic claim on the quote. 4 concurrent requests on one quote returned 200 x4, debited 240 MASS instead of 60, and created 4 separate policies. A double tap or network retry on 'Pay' will double charge. Fix: atomically flip the quote with find_one_and_update({id, status:'quoted'} -> {status:'paying'}) before debiting, and return the existing policy or 409 to the losers. Alternatively add a unique index on hp_policies.quote_id. Reference: /app/backend/home_protect.py:478-526", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/home/protect/admin/claims/{id}/decide (status=paid)", "issue": "Same check-then-act pattern (read status, then WalletService.credit). Two concurrent 'paid' decisions can credit the payout twice. Use an atomic update conditioned on status != 'paid' before crediting. Found in code review; not exercised by a test. Reference: home_protect.py:758-786", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "DELETE /api/home/homes/{id}?force=true", "issue": "Deleting a home leaves its live hp_policies active (orphaned). They stay in /protect/status (no home filter), admin 'Live policies' and spending. Either block deletion when there is live cover or cancel/flag the policies. Reproduced with a TEST_ home; QA cancelled those test policies manually."},
+      {"endpoint": "POST /api/home/protect/quote", "issue": "A home with ownership=null is treated as owner, so building cover is included. 'Ikeja rental' has ownership null and was charged ₦15,000 for building cover. Consider asking for ownership first, or defaulting to excluded."},
+      {"endpoint": "admin decide approved", "issue": "The payout is prefilled from the customer's estimated loss (₦200,000) and the plan excess (₦5,000) is never deducted. The claim screen says 'insurer deducts it from any payout'. There is no cap at the item value or contents limit."},
+      {"endpoint": "notifications HOME_PROTECT_POLICY", "issue": "Body text uses raw ISO dates ('runs until 2027-11-09', add-on 'until 2027-11-09'). Other copy uses '9 Nov 2027'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Toggle (src/ui/Navigation.tsx:106-142)", "issue": "Toggle renders only the switch. The `label` prop is only used as accessibilityLabel, so 'Cover the building (fire, flood, storm…)' on the quote screen and 'Live — quote customers from this card' on the rate card editor show as unlabeled switches. Users can't tell what they toggle.", "testID": "quote-building, rc-active", "priority": "MEDIUM"},
+      {"component": "Scan with AI: Worth now", "issue": "The AI replacement estimate (₦2,350,000) stays as 'Worth now' after the receipt fills Paid = ₦250,000. The item is saved as worth ₦2.35m (9x the price paid) and is then insured and priced on that value (₦47,000 add-on premium). The receipt price should override, or the user should be prompted when the two differ widely.", "testID": "scan-value", "priority": "MEDIUM"},
+      {"component": "Scan receipt status", "issue": "The 'Not found' line shows raw backend keys ('payment_method, receipt_number').", "testID": "scan-receipt-status", "priority": "LOW"},
+      {"component": "Claim new", "issue": "'Pick the appliance' error shows in red before the user has interacted with the form.", "testID": "claim-new-screen", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Item detail Protect on a home with live cover", "issue": "For an unprotected item on Lekki (live Premium), item-protect routes to /home/protect/quote?home_id&item_id in new-policy mode with a 3-step stepper. The user picks a plan, taps 'See my quote', gets 409 already_covered and is bounced to /home/protect. Confusing dead end. When overview/status has a live policy, route to the add-on quote (policy_id=…), as protect-add-{id} already does. Reference: app/home/items/[id].tsx:140", "affected_testIDs": ["item-protect", "quote-continue"]}
+    ],
+    "design_issues": [
+      {"screen": "/home/protect at 360x640", "issues": ["Primary action buttons are truncated: 'Make a cl…' and 'Poli…' (protect-make-claim / protect-view-policy). Stack them or shorten the labels."]},
+      {"screen": "/home/protect/admin at 360x640", "issues": ["Summary tile labels are truncated: 'Live polici…', 'Open clai…', 'MASS pre…'."]},
+      {"screen": "/home/items at 390", "issues": ["items-summary strip labels are truncated: 'total val…', 'protect…', 'warrant…'."]},
+      {"screen": "/home at 360x640", "issues": ["home-fab overlaps the 'See all' link in the Next up card."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter106_home_protect_edges.py", "/app/backend/tests/test_iter106_pay_race.py", "/app/backend/tests/test_iter105_home_protect.py", "/app/test_reports/pytest/iter106.xml"],
+  "action_items": [
+    "CRITICAL: make quotes/{id}/pay atomic (conditional find_one_and_update on status 'quoted' before debit, and/or a unique index on hp_policies.quote_id). Re-run tests/test_iter106_pay_race.py.",
+    "Make admin decide 'paid' atomic so the payout can't be credited twice.",
+    "Item detail item-protect: if the home has a live policy, go to the add-on quote (policy_id) instead of new-policy mode.",
+    "Toggle component: render the visible label text (or wrap callers in a labeled row).",
+    "Scan: let the receipt price override the AI 'Worth now', or warn when they differ widely.",
+    "DELETE home with force: handle live Home Protect policies (block or cancel).",
+    "Fix 360px truncation on the protect hero buttons, admin summary tiles and items-summary labels.",
+    "Optional: deduct the excess in the payout prefill; format dates in notification bodies; treat ownership=null as unknown for building cover."
+  ],
+  "critical_code_review_comments": [
+    "home_protect.py is 797 lines and home_hub.py is 1578 lines (both over the 700-line guideline). Consider splitting the routes, pricing and shared helpers.",
+    "pay_quote and admin_decide use read-then-write wallet mutations without atomic guards.",
+    "claim-timeline testID requested in the review is not present. ClaimTimeline in ProtectBits has no testID."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter106_home_protect_edges.py", "/app/backend/tests/test_iter106_pay_race.py"],
+  "success_rate": {"backend": "96% (25/26: 12 existing + 13 edge cases pass; concurrent pay race fails)", "frontend": "~90% (all flows functional; 1 UX dead-end and design/truncation issues)"},
+  "seed_data_creation": "Created during the requested flows (left in place): item 'Side-by-side refrigerator' b72c566d on Lekki flat, added to policy HP26-575MX8 (470 MASS); new Basic policy HP26-NXPGYL on Ikeja rental (210 MASS); claim CLM-XSV3QK (5231bf2d) on the Hisense fridge, taken through to paid (+2000 MASS); rate card standard excess changed 8000→8500→8000 (restored). Created and cleaned up: 2 TEST_ homes (deleted), 5 TEST_ policies from those homes (set status=cancelled, since QA may not delete policies), and a 300 MASS refund ('TEST_ refund … iter106') to undo the test debits. One TEST_ user test_hp_*@example.com was registered for the 403 check.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Server clock is 2026-11-10. Demo wallet is ~21,044 MASS. Lekki live policy is cbd5a338 (HP26-575MX8, 3 appliances). Ikeja live policy is 510480b9. Run pytest with `-n 0` when a test needs to print. Playwright force-clicks on below-the-fold tiles can land on the tab bar; scroll into view and click without force.",
+  "rca_of_issue": "Double debit: pay_quote reads the quote, checks status=='paid', then debits and inserts the policy, and only marks the quote paid at the end (line 526). Concurrent requests all pass the check before any of them writes. Reproduce: tests/test_iter106_pay_race.py. Mitigation: claim the quote atomically first and roll back on debit failure."
+}
