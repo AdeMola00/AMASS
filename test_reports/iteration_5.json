@@ -1,0 +1,21 @@
+{
+  "summary": "Iteration 5 — email alerts, QR tiles, Ecosystem strip. Backend: 18/18 pytest pass (added hero.subheading 'insure' check, sections.ecosystem=true check, newsletter idempotency, lead POST timing). Backend logs confirm every POST /api/leads triggers 'Lead alert email sent to hello@amass.africa (id=...)' with 202 Accepted from integrations.emergentagent.com; POST /api/leads latency ~160–350ms (not blocked by email). Frontend: all 17 requested data-testids render and are visible on desktop 1366px (hero/mobile-app/final QR + badges + icons, ecosystem section + 3 cards + hub). Ecosystem heading = 'One platform. Every player. One backend.'. No horizontal overflow at desktop or mobile (375px). QR tiles correctly hidden on mobile (hero-qr/mobile-qr/final-qr all is_visible=False). Hero Play Store badge opens Join Waiting List dialog and submission shows success state.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ADMIN_API_KEY is injected via platform env (not persisted in /app/backend/.env); test harness now falls back to os.environ. Document this so future testers aren't tripped up.",
+    "Lead-alert email send is awaited inside the POST /api/leads request path (adds ~150–300ms). Consider fire-and-forget via BackgroundTasks so slow upstream (Emergent email proxy) never degrades user-facing response time.",
+    "No rate-limiting on POST /api/leads — spam vector will directly spam hello@amass.africa. Add basic throttling/captcha before go-live.",
+    "PostHog warning in console: 'Events are being dropped because the user agent looks like a bot' — harmless in tests but confirms analytics is live; make sure consent/GDPR copy exists in production."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (all requested flows)"},
+  "test_credentials": "ADMIN_API_KEY read from process env (platform secret). Not in /app/backend/.env file.",
+  "seed_data_creation": "A handful of TEST_ leads (fixa_provider, become_agent, contact) + newsletter signups created via pytest run — each triggered one real email to hello@amass.africa. Consider cleaning up via admin API if the inbox gets noisy.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "ADMIN_API_KEY lives only in the process environment (not .env); read it via os.environ.get('ADMIN_API_KEY'). Every POST /api/leads sends a real email to hello@amass.africa via the Emergent email proxy — keep lead tests to a minimum. QR tiles use `hidden md:flex` so they are DOM-present but is_visible()==False on <768px. Ecosystem section testids: ecosystem-section, ecosystem-card-{app|agent|admin}, ecosystem-hub. SearchBar is removed (do not look for search-*). FinalCTA ghost download-btn is removed.",
+  "rca of the issue": "N/A — no issues found."
+}

@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
+import asyncio
 import re
 import ipaddress
 import httpx
@@ -322,7 +323,8 @@ async def create_lead(payload: LeadCreate):
     logger.info("New lead captured: %s (%s)", lead.email, lead.form_type)
     if ALERT_EMAIL and EMAIL_KEY:
         label = FORM_LABELS.get(lead.form_type, lead.form_type.replace("_", " ").title())
-        await send_email(to=ALERT_EMAIL, subject=f"New AMASS lead: {label}", html=lead_alert_html(lead))
+        # fire-and-forget: a slow email proxy must never delay the user-facing response
+        asyncio.create_task(send_email(to=ALERT_EMAIL, subject=f"New AMASS lead: {label}", html=lead_alert_html(lead)))
     return lead
 
 

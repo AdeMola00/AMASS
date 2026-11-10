@@ -14,11 +14,13 @@ if not BASE_URL:
             BASE_URL = line.split('=', 1)[1].strip()
 BASE_URL = BASE_URL.rstrip('/')
 
-# Read ADMIN_API_KEY from backend .env
-ADMIN_API_KEY = None
-for line in Path('/app/backend/.env').read_text().splitlines():
-    if line.startswith('ADMIN_API_KEY='):
-        ADMIN_API_KEY = line.split('=', 1)[1].strip()
+# Read ADMIN_API_KEY: prefer process env (platform secret), fallback to .env
+ADMIN_API_KEY = os.environ.get('ADMIN_API_KEY')
+if not ADMIN_API_KEY:
+    for line in Path('/app/backend/.env').read_text().splitlines():
+        if line.startswith('ADMIN_API_KEY='):
+            ADMIN_API_KEY = line.split('=', 1)[1].strip().strip('"')
+            break
 
 API = f"{BASE_URL}/api"
 HDR = {"X-API-Key": ADMIN_API_KEY}
@@ -33,6 +35,33 @@ def test_public_content_no_key():
     for k in ["hero", "trust", "stats", "africanCities", "testimonials", "faqs", "sections"]:
         assert k in d, f"missing {k}"
     assert d["hero"]["line1"] == "Discover Africa's"
+    # iteration 5: hero.subheading mentions "insure"; ecosystem section flag present & true
+    assert "insure" in d["hero"].get("subheading", "").lower(), d["hero"].get("subheading")
+    assert d["sections"].get("ecosystem") is True
+
+
+def test_newsletter_idempotent():
+    email = f"nlidem_{uuid.uuid4().hex[:8]}@example.com"
+    r1 = requests.post(f"{API}/newsletter", json={"email": email}, timeout=15)
+    assert r1.status_code == 201
+    r2 = requests.post(f"{API}/newsletter", json={"email": email}, timeout=15)
+    # Idempotent: either 200 or 201 but must not error, and should be at most 1 row
+    assert r2.status_code in (200, 201)
+    r3 = requests.get(f"{API}/admin/newsletter", headers=HDR, timeout=15)
+    assert sum(1 for l in r3.json() if l["email"] == email) == 1
+
+
+def test_lead_post_response_time_reasonable():
+    """Ensure email send does not block lead POST excessively."""
+    import time
+    t0 = time.time()
+    r = requests.post(f"{API}/leads", json={
+        "form_type": "contact", "name": "TEST_Timing",
+        "email": f"tm_{uuid.uuid4().hex[:8]}@example.com", "message": "timing"
+    }, timeout=20)
+    elapsed = time.time() - t0
+    assert r.status_code == 201
+    assert elapsed < 8.0, f"POST /api/leads took {elapsed:.2f}s"
 
 
 # ---------- Admin auth ----------
