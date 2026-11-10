@@ -5,7 +5,7 @@
  *  • Offers in: buyers' offers on my items → accept / counter / decline → chat.
  *  • Offers out: offers I've sent → counter answers, withdraw, open chat.
  */
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, RefreshControl } from "react-native";
 import { Image } from "expo-image";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -19,6 +19,7 @@ import { useTheme } from "@/src/theme";
 import { radii, space } from "@/src/theme/tokens";
 import { AppText, Badge, Button, Card, EmptyState, IconButton, Input, Screen, ScreenHeader, SegmentedControl, Sheet, SkeletonRows, StatTile, useToast, type BadgeTone } from "@/src/ui";
 import { PromoteSheet } from "@/src/components/marketplace/PromoteSheet";
+import { storage } from "@/src/utils/storage";
 
 type Tab = "listings" | "received" | "sent";
 
@@ -48,6 +49,10 @@ function timeAgo(iso?: string) {
 }
 
 const isLiveAd = (a: any) => a?.status === "active" || a?.status === "paused";
+/** A live listing nobody has opened for this many days gets a gentle "Promote it" nudge. */
+const QUIET_AFTER_DAYS = 3;
+const NUDGE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+const NUDGE_DISMISS_KEY = "amass_quiet_nudge_dismissed";
 
 function pctOff(amount: number, asking?: number | null) {
   if (!asking || asking <= 0) return null;
@@ -61,7 +66,7 @@ export default function MyListingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const toast = useToast();
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; promote?: string }>();
   const [tab, setTab] = useState<Tab>(params.tab === "received" || params.tab === "sent" ? params.tab : "listings");
 
   const [items, setItems] = useState<MarketplaceItem[]>([]);
@@ -75,6 +80,9 @@ export default function MyListingsScreen() {
   const [promote, setPromote] = useState<MarketplaceItem | null>(null);
   /** marketplace_item_id → most recent ad campaign (live ones show "Promoted" and block a second campaign; any shows its results). */
   const [adsByItem, setAdsByItem] = useState<Record<string, any>>({});
+  /** Quiet-listing nudges the seller swiped away (item id → when); hidden for a week. */
+  const [nudgeDismissed, setNudgeDismissed] = useState<Record<string, number>>({});
+  const promoteParamHandled = useRef(false);
   const [edit, setEdit] = useState<MarketplaceItem | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<MarketplaceItem | null>(null);
   const [counter, setCounter] = useState<MarketOffer | null>(null);
@@ -105,7 +113,30 @@ export default function MyListingsScreen() {
 
   useEffect(() => {
     load();
+    storage.getItem<Record<string, number>>(NUDGE_DISMISS_KEY, {}).then((v) => setNudgeDismissed(v ?? {}));
   }, [load]);
+
+  // Deep link from the "has gone quiet" notification: open the Promote sheet for that listing once it's loaded.
+  useEffect(() => {
+    if (promoteParamHandled.current || !params.promote || loading) return;
+    const target = items.find((i) => i.id === params.promote && (i.status ?? "active") === "active");
+    promoteParamHandled.current = true;
+    if (!target) return;
+    if (isLiveAd(adsByItem[target.id])) router.push(`/ads/${adsByItem[target.id].id}` as any);
+    else setPromote(target);
+  }, [params.promote, loading, items, adsByItem, router]);
+
+  const dismissNudge = (item: MarketplaceItem) => {
+    const next = { ...nudgeDismissed, [item.id]: Date.now() };
+    setNudgeDismissed(next);
+    storage.setItem(NUDGE_DISMISS_KEY, next).catch(() => {});
+  };
+  const showNudge = (item: MarketplaceItem) => {
+    if ((item.status ?? "active") !== "active" || isLiveAd(adsByItem[item.id])) return false;
+    if ((item.quiet_days ?? 0) < QUIET_AFTER_DAYS) return false;
+    const at = nudgeDismissed[item.id];
+    return !at || Date.now() - at > NUDGE_SNOOZE_MS;
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -234,7 +265,7 @@ export default function MyListingsScreen() {
             {items.length === 0 ? (
               <EmptyState icon="storefront-outline" title="Nothing listed yet" body="Declutter your home — snap a photo, set a price and buyers nearby will find it." actionLabel="Sell an item" onAction={() => router.push("/marketplace/sell" as any)} testID="my-listings-empty" />
             ) : (
-              items.map((it) => <ListingRow key={it.id} item={it} ad={adsByItem[it.id]} onPress={() => router.push(`/marketplace/${it.id}` as any)} onManage={() => setManage(it)} onOpenAd={() => router.push(`/ads/${adsByItem[it.id].id}` as any)} />)
+              items.map((it) => <ListingRow key={it.id} item={it} ad={adsByItem[it.id]} nudge={showNudge(it)} onPress={() => router.push(`/marketplace/${it.id}` as any)} onManage={() => setManage(it)} onOpenAd={() => router.push(`/ads/${adsByItem[it.id].id}` as any)} onPromote={() => setPromote(it)} onDismissNudge={() => dismissNudge(it)} />)
             )}
           </>
         ) : tab === "received" ? (
@@ -336,7 +367,7 @@ export default function MyListingsScreen() {
   );
 }
 
-function ListingRow({ item, ad, onPress, onManage, onOpenAd }: { item: MarketplaceItem; ad?: any; onPress: () => void; onManage: () => void; onOpenAd: () => void }) {
+function ListingRow({ item, ad, nudge, onPress, onManage, onOpenAd, onPromote, onDismissNudge }: { item: MarketplaceItem; ad?: any; nudge: boolean; onPress: () => void; onManage: () => void; onOpenAd: () => void; onPromote: () => void; onDismissNudge: () => void }) {
   const { colors } = useTheme();
   const status = item.status ?? "active";
   const meta = STATUS_META[status] ?? STATUS_META.active;
@@ -393,6 +424,20 @@ function ListingRow({ item, ad, onPress, onManage, onOpenAd }: { item: Marketpla
           </AppText>
           <Ionicons name="chevron-forward" size={13} color={colors.massText} />
         </Pressable>
+      ) : null}
+      {nudge ? (
+        <View style={[styles.nudgeRow, { backgroundColor: colors.surfaceAlt }]} testID={`quiet-nudge-${item.id}`}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="moon-outline" size={14} color={colors.textSecondary} />
+            <AppText variant="caption" tone="secondary" style={{ flex: 1 }} numberOfLines={2}>
+              Quiet for {item.quiet_days} days — nobody has opened it yet. A small promotion reaches more buyers.
+            </AppText>
+            <IconButton icon="close" size={32} label="Dismiss for a week" onPress={onDismissNudge} testID={`quiet-nudge-dismiss-${item.id}`} />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+            <Button label="Promote it" size="sm" variant="premium" iconLeft="megaphone" onPress={onPromote} testID={`quiet-nudge-promote-${item.id}`} />
+          </View>
+        </View>
       ) : null}
     </Card>
   );
@@ -621,6 +666,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: "row", gap: space[3] },
   thumbWrap: { width: 72, height: 72, borderRadius: radii.md, overflow: "hidden" },
   promoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, paddingHorizontal: 10, height: 30, borderRadius: radii.pill },
+  nudgeRow: { gap: 6, marginTop: 10, paddingLeft: 10, paddingRight: 8, paddingTop: 6, paddingBottom: 8, borderRadius: radii.lg },
   thumbWrapSm: { width: 48, height: 48, borderRadius: radii.sm, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   thumb: { width: "100%", height: "100%" },
   soldTag: { position: "absolute", left: 0, right: 0, bottom: 0, alignItems: "center", paddingVertical: 2 },

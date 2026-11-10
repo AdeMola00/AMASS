@@ -27,7 +27,7 @@ Public feeds only show `active`; detail pages still open `sold` (shown as Sold);
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -208,6 +208,95 @@ async def resolve_report(db, report_id: str, admin_user: dict, action: str, note
                   "resolved_by": admin_user["id"], "resolved_at": now, "updated_at": now}},
     )
     return {"ok": True, "action": action}
+
+
+# ─── Quiet listings → gentle "Promote it" nudge ─────────────────────────────
+QUIET_AFTER_DAYS = 3
+QUIET_NUDGE_COOLDOWN_DAYS = 14  # a listing is nudged at most once a fortnight
+
+
+def _parse_dt(v) -> Optional[datetime]:
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    if isinstance(v, str):
+        try:
+            return datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+async def last_viewed_map(db, item_ids: list[str]) -> dict[str, datetime]:
+    """item_id → most recent buyer view (from marketplace_views, written by POST /marketplace/items/{id}/view)."""
+    if not item_ids:
+        return {}
+    pipeline = [
+        {"$match": {"item_id": {"$in": item_ids}}},
+        {"$group": {"_id": "$item_id", "last": {"$max": "$last_viewed_at"}}},
+    ]
+    out: dict[str, datetime] = {}
+    async for r in db.marketplace_views.aggregate(pipeline):
+        dt = _parse_dt(r.get("last"))
+        if dt:
+            out[r["_id"]] = dt
+    return out
+
+
+def quiet_days_for(item: dict, last_viewed: Optional[datetime], now: datetime) -> int:
+    """Whole days since a buyer last opened the listing (or since it was posted if nobody has)."""
+    since = last_viewed or _parse_dt(item.get("posted_at")) or now
+    return max(0, int((now - since).total_seconds() // 86400))
+
+
+async def quiet_listing_sweep(db) -> int:
+    """Hourly: nudge sellers whose live listing has had no buyer views for QUIET_AFTER_DAYS.
+
+    Skips listings that are already promoted (active/paused campaign) and listings nudged within the cooldown.
+    Returns the number of nudges sent.
+    """
+    from notification_center import emit
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=QUIET_AFTER_DAYS)
+    cooldown = now - timedelta(days=QUIET_NUDGE_COOLDOWN_DAYS)
+    candidates = await db.marketplace.find(
+        {
+            "status": {"$in": ["active", None]},  # live listings only (sold / paused / removed never nudge)
+            "posted_at": {"$lte": cutoff.isoformat()},
+            "$or": [{"quiet_nudged_at": {"$exists": False}}, {"quiet_nudged_at": {"$lte": cooldown.isoformat()}}],
+        },
+        {"_id": 0, "id": 1, "seller_id": 1, "name": 1, "posted_at": 1, "image": 1},
+    ).to_list(500)
+    if not candidates:
+        return 0
+    ids = [c["id"] for c in candidates]
+    last_views = await last_viewed_map(db, ids)
+    promoted = {
+        a["marketplace_item_id"]
+        async for a in db.advertisements.find({"marketplace_item_id": {"$in": ids}, "status": {"$in": ["active", "paused"]}}, {"_id": 0, "marketplace_item_id": 1})
+    }
+    sent = 0
+    for c in candidates:
+        if c["id"] in promoted:
+            continue
+        days = quiet_days_for(c, last_views.get(c["id"]), now)
+        if days < QUIET_AFTER_DAYS:
+            continue
+        doc = await emit(
+            db,
+            c["seller_id"],
+            "MARKET_QUIET_LISTING",
+            f"“{c['name']}” has gone quiet",
+            f"No buyer has opened it in {days} days. A small promotion puts it in front of more people nearby.",
+            {"item_id": c["id"], "quiet_days": days, "image": c.get("image")},
+            dedupe_key=f"quiet:{c['id']}:{now.strftime('%Y%m%d')}",
+            action_url=f"/marketplace/my-listings?promote={c['id']}",
+        )
+        await db.marketplace.update_one({"id": c["id"]}, {"$set": {"quiet_nudged_at": now.isoformat()}})
+        if doc:
+            sent += 1
+    return sent
+
 
 
 def register_marketplace_v2_routes(db, get_current_user, require_admin):
@@ -487,15 +576,21 @@ def register_marketplace_v2_routes(db, get_current_user, require_admin):
         ).sort("posted_at", -1).to_list(200)
         if not docs:
             return docs
+        ids = [d["id"] for d in docs]
         # Open offer counts per listing so the seller can see what needs attention.
         pipeline = [
-            {"$match": {"item_id": {"$in": [d["id"] for d in docs]}, "status": {"$in": ["sent", "countered"]}}},
+            {"$match": {"item_id": {"$in": ids}, "status": {"$in": ["sent", "countered"]}}},
             {"$group": {"_id": "$item_id", "n": {"$sum": 1}}},
         ]
         counts = {r["_id"]: r["n"] async for r in db.marketplace_offers.aggregate(pipeline)}
+        last_views = await last_viewed_map(db, ids)
+        now = datetime.now(timezone.utc)
         for d in docs:
             d.setdefault("status", "active")
             d["open_offers"] = counts.get(d["id"], 0)
+            lv = last_views.get(d["id"])
+            d["last_viewed_at"] = lv.isoformat() if lv else None
+            d["quiet_days"] = quiet_days_for(d, lv, now) if d["status"] == "active" else None
         return docs
 
     # ─── Edit / pause / sell / delete (owner only) ─────────────

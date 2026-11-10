@@ -79,6 +79,7 @@ KIND_CATEGORY: dict[str, str] = {
     "BRAND_OFFER": "brand_offers",
     "MARKET_AD": "marketplace",
     "MARKET_OFFER": "marketplace",
+    "MARKET_QUIET_LISTING": "marketplace",  # seller nudge: no buyer views for 3 days → "Promote it"
     "MARKET_MODERATION": "admin",
     "PASSPORT_EXPIRY": "passport",
     "RECEIPT": "receipts",

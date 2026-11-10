@@ -48,6 +48,7 @@ const KIND_ICON: Record<string, { icon: IconName; tone?: Tone }> = {
   BRAND_OFFER: { icon: "pricetag" },
   MARKET_AD: { icon: "storefront" },
   MARKET_OFFER: { icon: "pricetag" },
+  MARKET_QUIET_LISTING: { icon: "megaphone", tone: "mass" },
   MARKET_MODERATION: { icon: "flag", tone: "warning" },
   PASSPORT_EXPIRY: { icon: "time", tone: "warning" },
   UNLOCK_RECEIPT: { icon: "receipt" },

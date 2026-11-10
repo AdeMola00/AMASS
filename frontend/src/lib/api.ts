@@ -470,6 +470,9 @@ export type MarketplaceItem = {
   status?: ListingStatus;
   /** Only on /marketplace/my-listings — offers awaiting the seller. */
   open_offers?: number;
+  /** Seller-only (my-listings): most recent buyer view, and whole days since it (or since posting). null unless the listing is active. */
+  last_viewed_at?: string | null;
+  quiet_days?: number | null;
   sold_at?: string;
 };
 

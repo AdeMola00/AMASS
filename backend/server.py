@@ -32,7 +32,7 @@ from tokens import register_token_routes, compute_token_cost, has_unlocked, is_f
 from earn_and_tools import register_earn_routes, register_agent_tool_routes
 from promotions import register_promotion_routes, find_promoted_first, annotate_promotion
 from ads import register_ads_routes
-from marketplace_v2 import register_marketplace_v2_routes
+from marketplace_v2 import register_marketplace_v2_routes, quiet_listing_sweep
 
 # ─── Config ───────────────────────────────────────────────
 MONGO_URL = os.environ["MONGO_URL"]
@@ -2461,6 +2461,20 @@ async def _startup_work():
                     logger.warning("event reminder sweep failed: %s", _e)
 
         asyncio.create_task(_reminder_loop())
+
+        async def _quiet_listing_loop():
+            # Gentle "Promote it" nudge for Declutter listings with no buyer views for 3 days (hourly, once per fortnight per listing)
+            while True:
+                await asyncio.sleep(3600)
+                try:
+                    n = await quiet_listing_sweep(db)
+                    if n:
+                        logger.info("quiet listing nudges sent: %s", n)
+                except Exception as _e:
+                    logger.warning("quiet listing sweep failed: %s", _e)
+
+        asyncio.create_task(_quiet_listing_loop())
+        await db.marketplace_views.create_index([("item_id", 1), ("user_id", 1)], unique=True)
         await db.users.create_index("referral_code", sparse=True)
         await db.favorites.create_index([("user_id", 1), ("property_id", 1)], unique=True)
         await db.favorites.create_index("property_id")

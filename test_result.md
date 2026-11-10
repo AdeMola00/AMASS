@@ -1368,3 +1368,10 @@ agent_communication:
       duplicate → counted:false), unique-viewer listing views on POST /marketplace/items/{id}/view, plural copy aligned, ad detail copy plain-English,
       pointer caption shortened ("Opens the AMASS Agent app"), .env comment removed, demo sofa photo fixed, 354 TEST campaigns purged from demo.
       pytest (ads_phase_cde + iter102 + iter103) 44 passed.
+
+  - agent: "main"
+    message: |
+      Iteration 104 (self-tested): quiet-listing promo nudge. Backend quiet_days/last_viewed_at on /marketplace/my-listings + hourly
+      quiet_listing_sweep → MARKET_QUIET_LISTING notification (deep link /marketplace/my-listings?promote={id}); pytest
+      tests/test_iter104_quiet_nudge.py 5/5. Frontend nudge row on the card (Promote it → PromoteSheet; × snoozes 7 days, persisted) and
+      ?promote deep link verified via screenshots on demo ("Oak bookshelf (demo)" aged to 4 days, 0 views).
