@@ -16,7 +16,10 @@ const en = {
   email: "Email",
   password: "Password",
   sign_in: "Sign in",
-  login_help: "Use the same email and password as the AMASS app",
+  or: "or",
+  google_sign_in: "Continue with Google",
+  google_failed: "Google sign-in did not work. Please try again.",
+  login_help: "Use the same email and password as the AMASS app, or your Google account",
   login_error: "Wrong email or password",
   show: "Show",
   hide_pw: "Hide",
@@ -230,6 +233,9 @@ export type TKey = keyof typeof en;
 type Dict = Partial<Record<TKey, string>>;
 
 const pcm: Dict = {
+  or: "or",
+  google_sign_in: "Enter with Google",
+  google_failed: "Google sign-in no work. Abeg try again.",
   edit_listing: "Change price and pictures",
   share_whatsapp: "Share for WhatsApp",
   this_week: "This week",
@@ -385,6 +391,8 @@ const pcm: Dict = {
 };
 
 const yo: Dict = {
+  or: "tàbí",
+  google_sign_in: "Wọlé pẹ̀lú Google",
   edit_listing: "Yí owó àti àwòrán padà",
   share_whatsapp: "Pín sí WhatsApp",
   this_week: "Ọ̀sẹ̀ yìí",
@@ -532,6 +540,8 @@ const yo: Dict = {
 };
 
 const ha: Dict = {
+  or: "ko",
+  google_sign_in: "Shiga da Google",
   edit_listing: "Canza farashi da hotuna",
   share_whatsapp: "Raba a WhatsApp",
   this_week: "Wannan mako",
@@ -679,6 +689,8 @@ const ha: Dict = {
 };
 
 const ig: Dict = {
+  or: "ma ọ bụ",
+  google_sign_in: "Banye site na Google",
   edit_listing: "Gbanwee ọnụahịa na foto",
   share_whatsapp: "Kesaa na WhatsApp",
   this_week: "Izu a",

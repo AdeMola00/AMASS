@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 4: tested Google login and the login regressions only, at a 390x844 viewport. Backend: 10/10 pytest pass. POST /api/auth/google-session returns 401 with a 'Google sign-in expired' detail for an invalid id. It returns 422 for a missing, short (<8), too long (>512) or null session_id, and 405 for GET. Agent login with /partner/me works. A brand account gets 401 on /auth/login and 200 on /brand/auth/login (the fallback path), and a wrong password returns 401. Frontend: the login screen shows the 'or' divider and the 'Continue with Google' button (login-google-button, 358x64) under Sign in. Tapping it on web goes to auth.emergentagent.com/?redirect=https%3A%2F%2F<origin>%2F, then demobackend oauth, then accounts.google.com. Real Google sign-in was not completed (not possible with automation). Opening /#session_id=fakeinvalid123 and /?session_id=fakeinvalid456 sends one google-session POST each (401). session_id is removed from the URL, the app lands on /login, and there is no crash or page error. Regression: a wrong password shows 'Wrong email or password' and empty fields show 'Please fill this in'. Agent adaeze and brand.demo both sign in to Home, stay signed in after a reload, and sign out returns to /login, which persists across a reload. The Google button text is translated in all 5 languages. No deprecated Expo packages were detected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "login", "issues": ["On web, if the Google session exchange fails (expired or used session_id), the user is silently returned to the login screen with no message. A short 'Google sign-in failed, please try again' in login-error would help (src/auth.tsx:128-130 swallows the error)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_google_login.py", "/app/test_reports/pytest/pytest_iter4.xml"],
+  "action_items": [
+    "Optional (low): show a visible error on the login screen when a web Google redirect returns an invalid or expired session_id. Today the catch in AuthProvider init cleans the URL silently."
+  ],
+  "critical_code_review_comments": [
+    "google_auth.py auto-links Google to an existing password account by email. This is acceptable because the Google email is verified by Emergent, but note that any Google user whose email matches a seeded agent gets that agent's account.",
+    "New Google users are created with is_agent=False and no partner roles, so they will land on the buyer or welcome screen. This is expected but could not be verified end to end without a real Google login.",
+    "The native flow dedupes session ids with a ref Set, so the Linking listener and openAuthSessionAsync cannot exchange the same id twice. Looks correct."
+  ],
+  "updated_files": ["/app/backend/tests/test_partner_google_login.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The real Google OAuth completion cannot be automated. Only the redirect chain and invalid session_id handling were verified. The frontend env key is EXPO_PUBLIC_BACKEND_URL. Tabs have no testIDs, so navigate to /me directly to reach me-signout-button."
+}

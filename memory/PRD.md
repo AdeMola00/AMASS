@@ -30,6 +30,9 @@ Study the existing AMASS app (https://github.com/AdeMola00/AMASS) — design, fe
 - Weekly summary: GET /api/partner/summary; dark "This week" card on Home (agent/seller/FIXA) with Listen
 - Voice notes NOT built: workspace install guard blocks adding expo-audio while expo-speech is installed; needs user decision (switch voice guidance to AI voice via OpenAI TTS, which unblocks expo-audio)
 
+## Iteration 4 (Jun 2026)
+- Google login: "Continue with Google" on login screen (Emergent-managed), backend /api/auth/google-session (existing AMASS bridge) returns the same JWT; links to existing accounts by email; failed return shows a message. Tested iteration_4 (real Google sign-in needs a manual check).
+
 ## Backlog
 - P1: Voice notes in chat; customer-side FIXA rating prompt from partner app; brand order handoffs view
 - P1: Edit listing price/photos after publishing

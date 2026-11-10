@@ -1,8 +1,8 @@
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -16,13 +16,34 @@ export default function Login() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t, lang, setLang } = useSettings();
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle, googleFailed, status } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [gBusy, setGBusy] = useState(false);
   const [err, setErr] = useState("");
+
+  // Gate: once signed in (password, Google, or a deep link), leave the login screen.
+  useEffect(() => {
+    if (status === "in") router.replace("/");
+  }, [status, router]);
+  useEffect(() => {
+    if (googleFailed) setErr(t("google_failed"));
+  }, [googleFailed, t]);
+
+  const google = async () => {
+    setErr("");
+    setGBusy(true);
+    try {
+      await signInWithGoogle();
+    } catch (e: any) {
+      setErr(e?.message || t("something_wrong"));
+    } finally {
+      setGBusy(false);
+    }
+  };
 
   const submit = async () => {
     if (!email.trim() || !pw) return setErr(t("fill_needed"));
@@ -103,6 +124,28 @@ export default function Login() {
         ) : null}
 
         <BigButton label={t("sign_in")} icon="log-in" onPress={submit} loading={busy} testID="login-submit-button" />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+          <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.muted }}>{t("or")}</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+        </View>
+        <Pressable
+          testID="login-google-button"
+          accessibilityRole="button"
+          accessibilityLabel={t("google_sign_in")}
+          disabled={gBusy}
+          onPress={google}
+          style={({ pressed }) => [styles.google, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderStrong, opacity: gBusy ? 0.6 : pressed ? 0.85 : 1 }]}
+        >
+          {gBusy ? (
+            <ActivityIndicator color={colors.onSurface} />
+          ) : (
+            <>
+              <Ionicons name="logo-google" size={26} color="#DB4437" />
+              <Text style={{ fontFamily: fonts.bold, fontSize: 18, color: colors.onSurface }}>{t("google_sign_in")}</Text>
+            </>
+          )}
+        </Pressable>
         <Text style={{ fontFamily: fonts.medium, fontSize: 15, color: colors.muted, textAlign: "center", lineHeight: 21 }}>{t("login_help")}</Text>
       </KeyboardAwareScrollView>
     </View>
@@ -122,4 +165,5 @@ const styles = StyleSheet.create({
   input: { minHeight: 64, borderRadius: radius.md, borderWidth: 1.5, paddingHorizontal: space.lg, fontFamily: fonts.medium, fontSize: 19 },
   eye: { position: "absolute", right: 8, top: 8, bottom: 8, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: space.sm },
   err: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg, borderRadius: radius.md },
+  google: { minHeight: 64, borderRadius: radius.md, borderWidth: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.md },
 });
