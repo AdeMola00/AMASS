@@ -40,6 +40,12 @@ Study the existing AMASS app (https://github.com/AdeMola00/AMASS) — design, fe
 - Market item WhatsApp share: item cards + item detail; /api/partner/share/item/{id}; public page /api/partner/go/item/{id} with store links and seller WhatsApp fallback.
 - Known: notes recorded on web are webm (may not play on iPhone); no native-accent voices for Yoruba/Hausa/Igbo (OpenAI voices are English-trained).
 
+## Iteration 7 (Jun 2026)
+- Verified face badge: /api/partner/avatar runs an AI photo check (OpenAI gpt-5.4 vision, Emergent key) for one clear real face → users.face_verified, seller_face_verified, agent_face_verified, FIXA badge "Verified face"; checker errors keep previous state (503), 10 tries/hour. Me tab badge + hint.
+- Share stats: /api/partner/share-stats (property smart_link_clicks + item share_clicks, bots excluded); shown on home/item cards and detail screens.
+- Native voices: Spitch TTS (yo=sade, ha=amina, ig=ngozi) used when SPITCH_API_KEY is set; otherwise OpenAI fallback. Key requested from user.
+- Known: the badge shows a face is present, not that it matches the account holder.
+
 ## Backlog
 - P1: Voice notes in chat; customer-side FIXA rating prompt from partner app; brand order handoffs view
 - P1: Edit listing price/photos after publishing

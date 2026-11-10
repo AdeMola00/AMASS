@@ -189,6 +189,7 @@ export function Tile({ label, icon, count, tone = "neutral", onPress, testID, wi
 // ─── Status pill: colour + icon so it reads without words ───────────────────
 const STATUS_STYLE: Record<string, { tone: Tone; icon: IconName }> = {
   available: { tone: "success", icon: "checkmark-circle" },
+  premium: { tone: "gold", icon: "star" },
   active: { tone: "success", icon: "checkmark-circle" },
   in_stock: { tone: "success", icon: "checkmark-circle" },
   confirmed: { tone: "success", icon: "thumbs-up" },
@@ -304,6 +305,18 @@ export function Avatar({ name, uri, size = 56 }: { name?: string; uri?: string |
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.brandSecondary, alignItems: "center", justifyContent: "center" }}>
       <Text style={{ fontFamily: fonts.bold, fontSize: size * 0.36, color: colors.brandPrimary }}>{initials}</Text>
+    </View>
+  );
+}
+
+// ─── Verified face badge (green shield) ───
+export function FaceBadge({ testID = "face-badge" }: { testID?: string }) {
+  const { colors } = useTheme();
+  const { t } = useSettings();
+  return (
+    <View testID={testID} style={[s.pill, { backgroundColor: colors.successSoft }]}>
+      <Ionicons name="shield-checkmark" size={18} color={colors.success} />
+      <Text style={[s.pillTxt, { color: colors.success }]}>{t("verified_face")}</Text>
     </View>
   );
 }

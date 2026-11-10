@@ -28,7 +28,10 @@ export function AgentWork({ tab }: { tab?: string }) {
     if (tab === "visits" || tab === "homes") setSeg(tab);
   }, [tab]);
 
-  const homes = useLoad(() => api<{ listings: any[] }>("/agent/manager"));
+  const homes = useLoad(async () => {
+    const [m, st] = await Promise.all([api<{ listings: any[] }>("/agent/manager"), api<{ properties: Record<string, number> }>("/partner/share-stats").catch(() => ({ properties: {} as Record<string, number> }))]);
+    return { listings: m.listings.map((l) => ({ ...l, link_opens: st.properties[l.id] ?? 0 })) };
+  });
   const visits = useLoad(() => api<{ upcoming: any[]; past: any[]; pending_for_me: number }>("/viewings/mine?role=agent"));
   const [propose, setPropose] = useState<any>(null);
   const [day, setDay] = useState(1);
@@ -105,6 +108,7 @@ export function AgentWork({ tab }: { tab?: string }) {
                     <Stat icon="eye" n={x.views_total} />
                     <Stat icon="people" n={x.leads?.total} hot={!!x.leads?.total_30d} />
                     <Stat icon="heart" n={x.saves} />
+                    <Stat icon="link" n={x.link_opens} hot={!!x.link_opens} testID={`listing-link-opens-${x.id}`} />
                     <View style={{ flex: 1 }} />
                     <Pressable
                       testID={`listing-card-share-${x.id}`}
@@ -187,10 +191,10 @@ export function AgentWork({ tab }: { tab?: string }) {
   );
 }
 
-function Stat({ icon, n, hot }: { icon: any; n?: number; hot?: boolean }) {
+function Stat({ icon, n, hot, testID }: { icon: any; n?: number; hot?: boolean; testID?: string }) {
   const { colors } = useTheme();
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+    <View testID={testID} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
       <Ionicons name={icon} size={22} color={hot ? colors.brandPrimary : colors.muted} />
       <Text style={{ fontFamily: fonts.heavy, fontSize: 17, color: hot ? colors.brandPrimary : colors.onSurface }}>{n ?? 0}</Text>
     </View>

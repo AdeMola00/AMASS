@@ -10,7 +10,7 @@ import { fonts, radius, space, useTheme } from "@/src/theme";
 import { BigButton, Sheet, useToast } from "@/src/ui";
 
 // Photos are picked as base64 and sent as a data URL (no multipart), then stored in AMASS object storage.
-export function PhotoAdder({ photos, onChange, uploadPath, max = 8, testID = "photo-adder" }: { photos: string[]; onChange: (p: string[]) => void; uploadPath: string; max?: number; testID?: string }) {
+export function PhotoAdder({ photos, onChange, uploadPath, max = 8, testID = "photo-adder" }: { photos: string[]; onChange: (p: string[]) => void | Promise<void>; uploadPath: string; max?: number; testID?: string }) {
   const { colors } = useTheme();
   const { t } = useSettings();
   const toast = useToast();
@@ -26,7 +26,7 @@ export function PhotoAdder({ photos, onChange, uploadPath, max = 8, testID = "ph
         const r = await api<{ url: string }>(uploadPath, { body: { data_url: `data:${a.mimeType || "image/jpeg"};base64,${a.base64}` } });
         urls.push(absUrl(r.url) as string);
       }
-      onChange([...photos, ...urls]);
+      await onChange([...photos, ...urls]);
     } catch (e: any) {
       toast.show(e?.message || t("something_wrong"), "error");
     } finally {

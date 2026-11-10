@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 7 tested the Verified face badge, share-stats and native-voice TTS fallback at a 390x844 viewport. Backend: 9/9 pytest passed (test_partner_iter7_face_sharestats_tts.py). A real Unsplash portrait JPEG went through upload, then avatar, and returned face_verified=true. /partner/me showed face_verified=true, fixa.demo's FIXA item got 'Verified face' added to fixa_badges and seller_face_verified=true, and adaeze's properties got agent_face_verified=true. A sofa photo returned false and removed the badge. The AI check took about 1-2s. Share-stats: two browser-UA opens on /api/go/{pid} and /api/partner/go/item/{iid} each added 2. WhatsApp/2.23 opens added nothing on either route. total equals the sum, FIXA services are left out, and the endpoint returns 401 without a token. TTS yo/ha/ig returned 200 with audio/mpeg (over 1KB) through the OpenAI fallback, with no 500 and no spitch log lines because the key is not set. Frontend: Me shows me-face-hint while unverified. Uploading the face photo through the gallery showed the toast 'Photo saved. You now have the Verified face badge!' and the green me-face-badge, and the badge was still there after a reload. The sofa photo showed the 'could not see one clear face' toast and the hint came back. Work>Homes cards show the link icon with count 2 (listing-link-opens-{id}). The listing detail third tile reads '2 Link opens'. The seller item card shows 'Opened 6 times' only when the count is above 0 (1 of 2 cards). Item detail shows 'Link opens: 6'. All demo data I changed was restored: fixa.demo avatar and badges, adaeze properties, click counters and the social_link_clicks rows I created. New issues are listed below; the biggest is the raw i18n key 'status_premium' on premium listings.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/partner/avatar (_check_face)", "issue": "Any exception (LLM timeout, network, image fetch) returns False. A short outage therefore REMOVES a badge the partner already earned and shows 'could not see one clear face'. The check should tell 'not a face' apart from 'check failed' (keep the old state or return face_verified:null and ask to retry)."},
+      {"endpoint": "POST /api/partner/avatar", "issue": "No rate limit. Every call costs one gpt-5.4 vision call, and repeated calls can run up LLM cost. The URL guard only checks the /api/public-files/ prefix, so any public photo works, including another user's listing photo of a person. The badge shows that a face is present, not whose face it is."},
+      {"endpoint": "GET /api/partner/go/item/{id}, /api/go/{id}", "issue": "Opens are not de-duplicated. Refreshes, or the seller opening their own link, raise the count. Acceptable for an MVP."},
+      {"endpoint": "seed data", "issue": "Seeded agent avatars that are real faces (e.g. adaeze's Unsplash portrait) were never face-checked, so no demo partner has the badge until they upload again. There is no backfill."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "StatusPill (src/ui.tsx:224) + i18n", "issue": "Key 'status_premium' is missing from i18n.ts, so the raw text 'status_premium' shows on Work>Homes cards and on the listing detail (listing-status). adaeze has 4 premium listings.", "testID": "listing-status", "priority": "MEDIUM"},
+      {"component": "listing/[id].tsx:83", "issue": "'Show again' (listing-status-available) appears for premium listings because status != 'available'. Tapping it would probably turn a premium listing into a plain available one. Needs a business-logic check.", "testID": "listing-status-available", "priority": "MEDIUM"},
+      {"component": "i18n opened_times", "issue": "'Opened {n} times' has no plural form, so a count of 1 reads 'Opened 1 times'.", "testID": "item-link-opens-{id}", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Me > photo sheet", "issues": ["PhotoAdder.upload calls onChange without awaiting it, so the spinner stops when the upload finishes and NOT when the AI face check finishes. During the check (1-2s here, up to about 20s when slow) the sheet stays open with Camera/Gallery enabled, with no progress shown and a double submit possible.", "The result toast first appears under the dimmed backdrop of the closing sheet, and the old avatar stays visible for a moment before the new one loads."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_partner_iter7_face_sharestats_tts.py", "/app/test_reports/pytest/pytest_iter7.xml"],
+  "action_items": [
+    "Add status_premium (and any other property statuses) to every language in i18n.ts. Hide or relabel 'Show again' for premium listings.",
+    "In _check_face, return a three-state result (True/False/error). On error, keep the existing face_verified and badge and show a 'could not check, try again' toast.",
+    "Rate-limit POST /api/partner/avatar per user (e.g. 5 per hour) to cap vision LLM cost.",
+    "Me photo sheet: show a 'Checking your photo…' spinner and disable the buttons until /partner/avatar returns (await onChange in PhotoAdder or keep a local busy state).",
+    "Plural form for opened_times when n == 1.",
+    "Optional: backfill a face check for seeded demo avatars, or document that the badge needs a new upload."
+  ],
+  "critical_code_review_comments": [
+    "partner_app.py:398 swallows every exception as 'no face', which hides outages and removes earned badges.",
+    "The face check fetches the image back over the public URL (an extra round trip through ingress). The uploaded bytes could be checked directly instead.",
+    "The Spitch call matches the docs (POST /v1/speech with text, language, voice, format=mp3, raw audio bytes back; voices sade/amina/ngozi are valid) and has a separate cache key. Not tested live because SPITCH_API_KEY is not set."
+  ],
+  "updated_files": ["/app/backend/tests/test_partner_iter7_face_sharestats_tts.py"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% of requested flows; 3 new UI bugs found outside the requested scope"},
+  "seed_data_creation": "None. Uploaded test images are orphaned public files under fixa.demo and adaeze. fixa.demo avatar/face/badges, adaeze avatar and properties, and the property/item click counters were restored, and the 2 social_link_clicks rows I created were deleted by id. adaeze now has face_verified=false explicitly (the field was missing before). A leftover 'TEST_ Ui Buyer offers' offer from an earlier iteration is still on the seller fridge item.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Test images: /tmp/face.jpg (Unsplash photo-1507003211169) and /tmp/sofa.jpg (photo-1555041469); download them again if missing. The me-photo sheet animates in: wait about 1.5s, then click me-photo-gallery with page.mouse.click at its bounding box inside expect_file_chooser (a normal click fails with 'outside of viewport'). Test ids used: property 731b54c4-40ab-437b-8fbc-60a228f251da (adaeze), item 12ab0d67-e0f7-4d46-b001-dc8ce4fed5c9 (seller, share_clicks=4). Snapshot/restore helper: /tmp/snap_fixa.py.",
+  "rca_of_issue": "status_premium: StatusPill renders t(`status_${status}`), and i18n.ts has status_available, status_coming_soon and status_sold but no status_premium. The spinner gap: photos.tsx:29 calls onChange(...) without await, and setBusy(false) runs in finally straight after the upload."
+}

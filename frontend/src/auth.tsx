@@ -9,7 +9,7 @@ import { storage } from "@/src/utils/storage";
 export type Role = "agent" | "seller" | "fixa" | "brand";
 
 export type PartnerMe = {
-  user: { id: string; full_name: string; email: string; phone?: string; avatar_url?: string };
+  user: { id: string; full_name: string; email: string; phone?: string; avatar_url?: string; face_verified?: boolean };
   roles: Role[];
   fixa: { status: string; item_id: string; name: string } | null;
   counts: Record<string, number>;

@@ -21,8 +21,8 @@ export default function ListingDetail() {
   const router = useRouter();
   const toast = useToast();
   const d = useLoad(async () => {
-    const [m, leads] = await Promise.all([api<{ listings: any[] }>("/agent/manager"), api<{ leads: any[] }>(`/agent/listings/${id}/leads`)]);
-    return { p: m.listings.find((x) => x.id === id), leads: leads.leads };
+    const [m, leads, st] = await Promise.all([api<{ listings: any[] }>("/agent/manager"), api<{ leads: any[] }>(`/agent/listings/${id}/leads`), api<{ properties: Record<string, number> }>("/partner/share-stats").catch(() => ({ properties: {} as Record<string, number> }))]);
+    return { p: m.listings.find((x) => x.id === id), leads: leads.leads, opens: st.properties[id] ?? 0 };
   }, [id]);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -68,8 +68,9 @@ export default function ListingDetail() {
             {[
               { icon: "eye", n: p.views_total, label: t("views") },
               { icon: "people", n: p.leads?.total, label: t("people_interested") },
+              { icon: "logo-whatsapp", n: d.data?.opens, label: t("link_opens") },
             ].map((x) => (
-              <Card key={x.icon} style={{ flex: 1, alignItems: "center" }}>
+              <Card key={x.icon} testID={`listing-stat-${x.icon}`} style={{ flex: 1, alignItems: "center", paddingHorizontal: space.sm }}>
                 <Ionicons name={x.icon as any} size={30} color={colors.brandPrimary} />
                 <Text style={{ fontFamily: fonts.display, fontSize: 32, color: colors.onSurface }}>{x.n ?? 0}</Text>
                 <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: colors.muted, textAlign: "center" }}>{x.label}</Text>
@@ -79,7 +80,7 @@ export default function ListingDetail() {
           <View style={{ gap: space.sm }}>
             <BigButton label={t("share_whatsapp")} icon="logo-whatsapp" tone="success" onPress={share} loading={busy === "share"} testID="listing-share-whatsapp" />
             <BigButton label={t("edit_listing")} icon="create" tone="gold" onPress={() => router.push(`/listing/edit/${id}`)} testID="listing-edit-button" />
-            {p.status !== "available" ? <BigButton label={t("show_again")} icon="eye" tone="success" onPress={() => setStatus("available")} loading={busy === "available"} testID="listing-status-available" /> : null}
+            {p.status === "sold" || p.status === "withdrawn" ? <BigButton label={t("show_again")} icon="eye" tone="success" onPress={() => setStatus("available")} loading={busy === "available"} testID="listing-status-available" /> : null}
             {p.status !== "sold" ? <BigButton label={t("mark_sold")} icon="pricetag" tone="dark" onPress={() => setStatus("sold")} loading={busy === "sold"} testID="listing-status-sold" /> : null}
             {p.status !== "withdrawn" ? <BigButton label={t("hide")} icon="eye-off" tone="neutral" outline onPress={() => setStatus("withdrawn")} loading={busy === "withdrawn"} testID="listing-status-hide" /> : null}
           </View>

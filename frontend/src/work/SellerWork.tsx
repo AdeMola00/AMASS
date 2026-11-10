@@ -92,7 +92,10 @@ export function SellerWork({ tab }: { tab?: string }) {
   useEffect(() => {
     if (tab === "offers" || tab === "items") setSeg(tab);
   }, [tab]);
-  const items = useLoad(async () => (await api<any[]>("/marketplace/my-listings")).filter((x) => x.category !== "services"));
+  const items = useLoad(async () => {
+    const [rows, st] = await Promise.all([api<any[]>("/marketplace/my-listings"), api<{ items: Record<string, number> }>("/partner/share-stats").catch(() => ({ items: {} as Record<string, number> }))]);
+    return rows.filter((x) => x.category !== "services").map((x) => ({ ...x, link_opens: st.items[x.id] ?? 0 }));
+  });
   const offers = useLoad(async () => {
     const rank = (o: any) => (o.status === "sent" ? 0 : o.status === "countered" ? 1 : 2);
     return [...(await api<any[]>("/marketplace/offers/received"))].sort((a, b) => rank(a) - rank(b));
@@ -135,6 +138,12 @@ export function SellerWork({ tab }: { tab?: string }) {
                       <StatusPill status={x.status || "active"} />
                       {x.open_offers ? <StatusPill status="sent" /> : null}
                     </View>
+                    {x.link_opens ? (
+                      <View testID={`item-link-opens-${x.id}`} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="link" size={18} color={colors.success} />
+                        <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: colors.success }}>{x.link_opens === 1 ? t("opened_once") : t("opened_times", { n: x.link_opens })}</Text>
+                      </View>
+                    ) : null}
                   </View>
                   {(x.status || "active") === "active" ? (
                     <Pressable

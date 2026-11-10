@@ -110,7 +110,7 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
         counts["unread_messages"] = sum([await _unread_count_for(db, cid, uid) for cid in conv_ids])
         counts["unread_alerts"] = await db.notifications.count_documents({"user_id": uid, "read": False})
         return {
-            "user": {"id": uid, "full_name": user.get("full_name"), "email": user.get("email"), "phone": user.get("phone"), "avatar_url": user.get("avatar_url"), "is_agent": bool(user.get("is_agent")), "identity_verified": bool(user.get("identity_verified"))},
+            "user": {"id": uid, "full_name": user.get("full_name"), "email": user.get("email"), "phone": user.get("phone"), "avatar_url": user.get("avatar_url"), "is_agent": bool(user.get("is_agent")), "identity_verified": bool(user.get("identity_verified")), "face_verified": bool(user.get("face_verified"))},
             "roles": roles,
             "fixa": {"status": (fixa or {}).get("fixa_status") or ("verified" if fixa else None), "item_id": (fixa or {}).get("id"), "name": (fixa or {}).get("seller_name")} if fixa else None,
             "counts": counts,
@@ -248,6 +248,7 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
 
     # --- Natural AI voice (OpenAI TTS via Emergent key), cached per phrase ---
     TTS_MODEL, TTS_VOICE, TTS_SPEED = "tts-1-hd", "coral", 0.9
+    SPITCH_VOICES = {"yo": "sade", "ha": "amina", "ig": "ngozi"}  # native Nigerian voices
 
     async def _public_put(raw: bytes, content_type: str, ext: str, owner: str) -> str:
         from object_storage import APP_NAME, put_object
@@ -292,9 +293,29 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
         if not text:
             raise HTTPException(400, "Nothing to read")
         key = hashlib.sha256(f"{text}|{TTS_VOICE}|{TTS_SPEED}|{TTS_MODEL}|mp3".encode()).hexdigest()
+        spitch_key = os.environ.get("SPITCH_API_KEY", "").strip()
+        native = body.lang in SPITCH_VOICES and bool(spitch_key)
+        if native:
+            key = hashlib.sha256(f"{text}|spitch|{body.lang}|{SPITCH_VOICES[body.lang]}|mp3".encode()).hexdigest()
         hit = await db.partner_tts_cache.find_one({"key": key}, {"_id": 0, "url": 1})
         if hit:
-            return {"url": hit["url"], "cached": True}
+            return {"url": hit["url"], "cached": True, "native": native}
+        if native:
+            import httpx
+
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0)) as client:
+                    up = await client.post("https://api.spitch.app/v1/speech", headers={"Authorization": f"Bearer {spitch_key}", "Content-Type": "application/json"}, json={"text": text, "language": body.lang, "voice": SPITCH_VOICES[body.lang], "format": "mp3"})
+                if up.status_code == 200 and up.content:
+                    url = await _public_put(up.content, "audio/mpeg", "mp3", "tts")
+                    await db.partner_tts_cache.update_one({"key": key}, {"$set": {"key": key, "url": url, "lang": body.lang, "provider": "spitch", "created_at": _now()}}, upsert=True)
+                    return {"url": url, "cached": False, "native": True}
+                logger.warning("spitch tts failed: HTTP %s", up.status_code)
+            except httpx.HTTPError as e:
+                logger.warning("spitch tts error: %s", type(e).__name__)
+            # fall back to the OpenAI voice below (different cache key)
+            key = hashlib.sha256(f"{text}|{TTS_VOICE}|{TTS_SPEED}|{TTS_MODEL}|mp3".encode()).hexdigest()
+            native = False
         from emergentintegrations.llm.openai import OpenAITextToSpeech
 
         engine = OpenAITextToSpeech(api_key=os.environ["EMERGENT_LLM_KEY"])
@@ -334,16 +355,68 @@ def register_partner_routes(db, get_current_user) -> APIRouter:
         return {"url": url, "duration_ms": body.duration_ms, "mime": mime}
 
     # --- Profile photo (shown to customers in AMASS, incl. market & FIXA cards) ---
+    _avatar_hits: dict = {}
+
     @router.post("/avatar")
     async def set_avatar(body: AvatarIn, user: dict = Depends(get_current_user)):
         from public_url import public_api_base
 
+        hk = f"{user['id']}:{int(_now().timestamp() // 3600)}"
+        _avatar_hits[hk] = _avatar_hits.get(hk, 0) + 1
+        if len(_avatar_hits) > 5000:
+            _avatar_hits.clear()
+        if _avatar_hits[hk] > 10:  # each try runs an AI photo check
+            raise HTTPException(429, "Too many photo changes. Try again later.")
         if not body.url.startswith(f"{public_api_base()}/api/public-files/"):
             raise HTTPException(400, "Upload the photo first")
-        await db.users.update_one({"id": user["id"]}, {"$set": {"avatar_url": body.url}})
-        await db.marketplace.update_many({"seller_id": user["id"]}, {"$set": {"seller_avatar": body.url}})
-        await db.properties.update_many({"agent_id": user["id"]}, {"$set": {"agent_avatar": body.url}})
-        return {"ok": True, "avatar_url": body.url}
+        face = await _check_face(body.url)
+        uid = user["id"]
+        if face is None:  # checker unavailable: keep the old photo + badge, ask to retry
+            raise HTTPException(503, "Could not check the photo right now. Please try again.")
+        await db.users.update_one({"id": uid}, {"$set": {"avatar_url": body.url, "face_verified": face, "face_checked_at": _now()}})
+        await db.marketplace.update_many({"seller_id": uid}, {"$set": {"seller_avatar": body.url, "seller_face_verified": face}})
+        await db.properties.update_many({"agent_id": uid}, {"$set": {"agent_avatar": body.url, "agent_face_verified": face}})
+        # FIXA cards in AMASS already render fixa_badges
+        if face:
+            await db.marketplace.update_many({"seller_id": uid, "category": "services"}, {"$addToSet": {"fixa_badges": "Verified face"}})
+        else:
+            await db.marketplace.update_many({"seller_id": uid, "category": "services"}, {"$pull": {"fixa_badges": "Verified face"}})
+        return {"ok": True, "avatar_url": body.url, "face_verified": face}
+
+    async def _check_face(url: str) -> bool | None:
+        """One clear, real human face (not a logo, cartoon, group or photo-of-a-screen)."""
+        import base64
+        import os
+
+        import httpx
+        from emergentintegrations.llm.chat import ImageContent, LlmChat, StreamDone, TextDelta, UserMessage
+
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await client.get(url)
+            if r.status_code != 200:
+                return None
+            chat = LlmChat(api_key=os.environ["EMERGENT_LLM_KEY"], session_id=f"face-{uuid.uuid4().hex}", system_message="You verify marketplace profile photos. Reply with exactly YES or NO.").with_model("openai", "gpt-5.4")
+            msg = UserMessage(text="Does this photo clearly show exactly one real human face (a real person, not a cartoon, logo, object, group, or a photo of a screen), with the face visible enough for a customer to recognise them? Answer YES or NO.", file_contents=[ImageContent(image_base64=base64.b64encode(r.content).decode())])
+            out = ""
+            async for ev in chat.stream_message(msg):
+                if isinstance(ev, TextDelta):
+                    out += ev.content
+                elif isinstance(ev, StreamDone):
+                    break
+            out = out.strip().upper()
+            return True if out.startswith("YES") else False if out.startswith("NO") else None
+        except Exception as e:  # noqa: BLE001 — unknown, not "no face"
+            logger.warning("face check failed: %s", type(e).__name__)
+            return None
+
+    # --- How many people opened each shared link ---
+    @router.get("/share-stats")
+    async def share_stats(user: dict = Depends(get_current_user)):
+        uid = user["id"]
+        props = {p["id"]: int(p.get("smart_link_clicks") or 0) async for p in db.properties.find({"agent_id": uid}, {"_id": 0, "id": 1, "smart_link_clicks": 1})}
+        items = {i["id"]: int(i.get("share_clicks") or 0) async for i in db.marketplace.find({"seller_id": uid, "category": {"$ne": "services"}}, {"_id": 0, "id": 1, "share_clicks": 1})}
+        return {"properties": props, "items": items, "total": sum(props.values()) + sum(items.values())}
 
     # --- Market item sharing (WhatsApp) ---
     @router.get("/share/item/{item_id}")

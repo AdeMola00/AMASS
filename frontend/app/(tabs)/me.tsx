@@ -11,7 +11,7 @@ import { usesNativeTabs } from "@/src/navigation";
 import { PhotoAdder } from "@/src/photos";
 import { useSettings } from "@/src/settings";
 import { fonts, radius, space, useTheme } from "@/src/theme";
-import { Avatar, BigButton, Card, ScreenHeader, Sheet, tap, useToast } from "@/src/ui";
+import { Avatar, BigButton, Card, FaceBadge, ScreenHeader, Sheet, tap, useToast } from "@/src/ui";
 
 import { ROLE_META } from "@/src/roles";
 
@@ -50,8 +50,15 @@ export default function Me() {
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={{ fontFamily: fonts.display, fontSize: 24, color: colors.onSurface }}>{name}</Text>
             <Text style={{ fontFamily: fonts.medium, fontSize: 15, color: colors.muted }}>{email}</Text>
+            {kind === "user" && me?.user?.face_verified ? <FaceBadge testID="me-face-badge" /> : null}
           </View>
         </Card>
+        {kind === "user" && !me?.user?.face_verified ? (
+          <View testID="me-face-hint" style={{ flexDirection: "row", gap: space.sm, padding: space.md, borderRadius: radius.md, backgroundColor: colors.brandTertiary }}>
+            <Ionicons name="shield-outline" size={24} color={colors.onBrandTertiary} />
+            <Text style={{ flex: 1, fontFamily: fonts.bold, fontSize: 15, color: colors.onBrandTertiary }}>{t("face_hint")}</Text>
+          </View>
+        ) : null}
         {kind === "user" ? (
           <BigButton label={me?.user?.avatar_url ? t("change_photo") : t("add_photo")} icon="camera" tone="dark" compact onPress={() => setPhotoOpen(true)} testID="me-change-photo-button" />
         ) : null}
@@ -65,10 +72,10 @@ export default function Me() {
             onChange={async (urls) => {
               if (!urls[0]) return;
               try {
-                await api("/partner/avatar", { body: { url: urls[0] } });
+                const r = await api<{ face_verified: boolean }>("/partner/avatar", { body: { url: urls[0] } });
                 await refresh();
                 setPhotoOpen(false);
-                toast.show(t("saved"));
+                toast.show(r.face_verified ? t("face_ok") : t("face_no"), r.face_verified ? "success" : "error");
               } catch (e: any) {
                 toast.show(e?.message || t("something_wrong"), "error");
               }

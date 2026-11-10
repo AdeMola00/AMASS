@@ -21,8 +21,8 @@ export default function ItemDetail() {
   const { refresh } = useAuth();
   const toast = useToast();
   const d = useLoad(async () => {
-    const [items, offers] = await Promise.all([api<any[]>("/marketplace/my-listings"), api<any[]>("/marketplace/offers/received")]);
-    return { it: items.find((x) => x.id === id), offers: offers.filter((o) => o.item_id === id) };
+    const [items, offers, st] = await Promise.all([api<any[]>("/marketplace/my-listings"), api<any[]>("/marketplace/offers/received"), api<{ items: Record<string, number> }>("/partner/share-stats").catch(() => ({ items: {} as Record<string, number> }))]);
+    return { it: items.find((x) => x.id === id), offers: offers.filter((o) => o.item_id === id), opens: st.items[id] ?? 0 };
   }, [id]);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -52,6 +52,9 @@ export default function ItemDetail() {
           <Image source={{ uri: it.image }} style={{ width: "100%", height: 240, borderRadius: radius.lg, backgroundColor: colors.surfaceTertiary }} contentFit="cover" />
           <StatusPill status={it.status || "active"} testID="item-status" />
           <Text style={{ fontFamily: fonts.bold, fontSize: 22, color: colors.onSurface }}>{it.name}</Text>
+          <Text testID="item-link-opens" style={{ fontFamily: fonts.bold, fontSize: 16, color: d.data?.opens ? colors.success : colors.muted }}>
+            {t("link_opens")}: {d.data?.opens ?? 0}
+          </Text>
           <View style={{ gap: space.sm }}>
             {it.status === "active" ? <BigButton label={t("share_whatsapp")} icon="logo-whatsapp" tone="success" onPress={() => shareItemOnWhatsApp(it.id).catch((e) => toast.show(e?.message || t("something_wrong"), "error"))} testID="item-share-whatsapp" /> : null}
             {it.status !== "active" ? <BigButton label={t("show_again")} icon="eye" tone="success" onPress={() => setStatus("active")} loading={busy === "active"} testID="item-status-active" /> : null}

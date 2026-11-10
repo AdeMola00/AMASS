@@ -29,6 +29,13 @@ const en = {
   add_photo: "Add your photo",
   change_photo: "Change your photo",
   photo_trust: "Customers trust a real face. Use a clear photo of you.",
+  verified_face: "Verified face",
+  face_hint: "Use a clear photo of your own face to get the Verified face badge.",
+  face_ok: "Photo saved. You now have the Verified face badge!",
+  face_no: "Photo saved, but we could not see one clear face. Try a brighter photo of just you.",
+  link_opens: "Link opens",
+  opened_times: "Opened {n} times",
+  opened_once: "Opened 1 time",
   login_help: "Use the same email and password as the AMASS app, or your Google account",
   login_error: "Wrong email or password",
   show: "Show",
@@ -69,6 +76,7 @@ const en = {
   status_coming_soon: "Being checked",
   status_sold: "Sold",
   status_withdrawn: "Hidden",
+  status_premium: "Premium",
   status_requested: "Waiting for you",
   status_rescheduled: "New time sent",
   status_pending: "New",
@@ -243,6 +251,9 @@ export type TKey = keyof typeof en;
 type Dict = Partial<Record<TKey, string>>;
 
 const pcm: Dict = {
+  verified_face: "Face don verify",
+  face_ok: "Picture don save. You don get Verified face badge!",
+  opened_times: "People open am {n} times",
   record_voice: "Voice message",
   mic_why: "AMASS need your mic so you fit send voice message.",
   voice_too_short: "E too short. Press mic, talk, then press send.",
@@ -407,6 +418,8 @@ const pcm: Dict = {
 };
 
 const yo: Dict = {
+  verified_face: "Ojú tí a fọwọ́sí",
+  opened_times: "Wọ́n ṣí i nígbà {n}",
   record_voice: "Ìfiránṣẹ́ ohùn",
   add_photo: "Fi àwòrán rẹ kún un",
   change_photo: "Yí àwòrán rẹ padà",
@@ -559,6 +572,8 @@ const yo: Dict = {
 };
 
 const ha: Dict = {
+  verified_face: "Fuska tabbatacce",
+  opened_times: "An buɗe sau {n}",
   record_voice: "Saƙon murya",
   add_photo: "Ƙara hotonka",
   change_photo: "Canza hotonka",
@@ -711,6 +726,8 @@ const ha: Dict = {
 };
 
 const ig: Dict = {
+  verified_face: "Ihu enyochara",
+  opened_times: "Emeghere ya ugboro {n}",
   record_voice: "Ozi olu",
   add_photo: "Tinye foto gị",
   change_photo: "Gbanwee foto gị",
