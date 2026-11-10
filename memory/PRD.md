@@ -53,3 +53,9 @@ final CTA, footer w/ newsletter, lead-capture forms, dark mode.
 - Hero: section/content now min-h-[100svh] with pt-36 so taller navbar + badges never clip the H1; legend moved top-28 -> top-36; tightened bottom padding/margins so badges sit near the fold.
 - Verified: screenshots at 375/768/1366 (no clipping), badge click opens waiting-list dialog, GET /api/content healthy without "search" key.
 - NOTE: a deployment was in progress while these changes were made — they are in PREVIEW only; press Deploy/Redeploy to ship them live.
+
+## Update — AMASS App Icon + Insurance Added (2026-07)
+- New AMASS app icon (user-supplied "AMASS LOGO 6" square asset -> public/amass-app-icon.png, 512px optimized) now sits beside every store-badge group (Hero, MobileApp, FinalCTA) via StoreBadges `withIcon` prop; unique testids per placement (hero-app-icon, mobile-app-icon, final-app-icon).
+- Insurance added to all visible "things on the app" lists: hero subheading ("...finance, insure and explore..."), marquee words ("Insure"), Property Marketplace pillar desc ("plus mortgages and insurance") + items chip ("Insurance").
+- CMS note: hero.subheading updated in server.py DEFAULT_CONTENT, content.js fallback, AND the preview Mongo doc. The LIVE site's own DB still holds the old subheading — update it on live via AMASS ADMIN: PUT /api/admin/content {"hero":{"subheading":"...insure..."}} (seed never re-runs on an existing doc). Marquee/pillars are static code and ship with deploy.
+- Verified: /api/content serves new subheading; screenshots at 1366/375 confirm app icon + badges, Insure in marquee, Insurance chip in pillars. Needs a fresh Deploy to reach the live site.

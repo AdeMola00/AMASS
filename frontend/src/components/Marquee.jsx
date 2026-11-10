@@ -1,6 +1,6 @@
 import React from "react";
 
-const WORDS = ["Discover", "Verify", "Finance", "Buy", "Rent", "Build", "Furnish", "Manage"];
+const WORDS = ["Discover", "Verify", "Finance", "Insure", "Buy", "Rent", "Build", "Furnish", "Manage"];
 
 export default function Marquee() {
   const items = [...WORDS, ...WORDS];

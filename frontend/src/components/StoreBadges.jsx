@@ -26,7 +26,7 @@ function GooglePlayLogo({ className = "" }) {
  * Official-style App Store + Google Play badges.
  * Tapping either badge opens the launch waiting-list form (apps ship soon).
  */
-export function StoreBadges({ size = "md", testids = {}, className = "" }) {
+export function StoreBadges({ size = "md", testids = {}, className = "", withIcon = true }) {
   const { openForm } = useLeadForm();
   const notify = () => openForm("waiting_list");
   const lg = size === "lg";
@@ -39,6 +39,15 @@ export function StoreBadges({ size = "md", testids = {}, className = "" }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-3 sm:gap-4 ${className}`}>
+      {withIcon && (
+        <img
+          src="/amass-app-icon.png"
+          alt="AMASS app"
+          data-testid={testids.icon || "amass-app-icon"}
+          className={`shrink-0 rounded-2xl border border-white/25 shadow-floating ${lg ? "h-16 w-16 sm:h-[4.75rem] sm:w-[4.75rem]" : "h-14 w-14"}`}
+          draggable="false"
+        />
+      )}
       <button
         onClick={notify}
         data-testid={testids.ios || "app-store-btn"}

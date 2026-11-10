@@ -97,7 +97,7 @@ DEFAULT_CONTENT: Dict[str, Any] = {
         "line1": "Discover Africa's",
         "line2": "Properties Like",
         "line3": "Never Before",
-        "subheading": "The AMASS app lets you search, verify, buy, rent, finance and explore properties with intelligent maps, verified listings and AI-powered property intelligence.",
+        "subheading": "The AMASS app lets you search, verify, buy, rent, finance, insure and explore properties with intelligent maps, verified listings and AI-powered property intelligence.",
         "ctaPrimary": "Get Early Access",
         "ctaSecondary": "Become an Agent",
     },

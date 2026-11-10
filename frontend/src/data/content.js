@@ -76,8 +76,8 @@ export const CATEGORIES = [
 export const PILLARS = [
   {
     id: "marketplace", index: "01", title: "Property Marketplace",
-    desc: "Sales, rentals, leases, short-lets and hotels on one intelligent map.",
-    items: ["For Sale (Green)", "For Rent (Red)", "For Lease (Purple)", "Short-lets", "Hotels", "Commercial", "Land"],
+    desc: "Sales, rentals, leases, short-lets and hotels on one intelligent map — plus mortgages and insurance.",
+    items: ["For Sale (Green)", "For Rent (Red)", "For Lease (Purple)", "Short-lets", "Hotels", "Commercial", "Land", "Insurance"],
     icon: "MapPin",
   },
   {
@@ -205,7 +205,7 @@ export const HERO_DEFAULT = {
   line2: "Properties Like",
   line3: "Never Before",
   subheading:
-    "The AMASS app lets you search, verify, buy, rent, finance and explore properties with intelligent maps, verified listings and AI-powered property intelligence.",
+    "The AMASS app lets you search, verify, buy, rent, finance, insure and explore properties with intelligent maps, verified listings and AI-powered property intelligence.",
   ctaPrimary: "Get Early Access",
   ctaSecondary: "Become an Agent",
 };

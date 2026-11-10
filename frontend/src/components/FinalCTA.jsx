@@ -48,7 +48,7 @@ export default function FinalCTA() {
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </button>
               </Magnetic>
-              <StoreBadges size="lg" testids={{ ios: "final-app-store-btn", android: "final-play-store-btn" }} />
+              <StoreBadges size="lg" testids={{ ios: "final-app-store-btn", android: "final-play-store-btn", icon: "final-app-icon" }} />
             </div>
           </Reveal>
         </div>
