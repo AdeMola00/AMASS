@@ -1,4 +1,5 @@
 import React from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useLeadForm } from "@/context/LeadFormProvider";
 
 /** Apple brand mark (official silhouette). */
@@ -72,6 +73,12 @@ export function StoreBadges({ size = "md", testids = {}, className = "", withIco
           <span className={`block font-bold ${title}`}>Google Play</span>
         </span>
       </button>
+      <span className="hidden flex-col items-center gap-1.5 md:flex" data-testid={testids.qr || "store-qr"}>
+        <span className="rounded-2xl border border-white/25 bg-white p-2 shadow-floating">
+          <QRCodeSVG value={typeof window !== "undefined" ? window.location.origin : "https://amass.africa"} size={lg ? 76 : 64} />
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70">Scan to get the app</span>
+      </span>
     </div>
   );
 }

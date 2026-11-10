@@ -214,7 +214,7 @@ export const SECTIONS_DEFAULT = {
   search: true, marquee: true, categories: true, pillars: true,
   showcase: true, stats: true, howItWorks: true, agents: true,
   constructionPros: true, homeMarketplace: true, mobileApp: true,
-  testimonials: true, faq: true, finalCta: true,
+  testimonials: true, faq: true, finalCta: true, ecosystem: true,
 };
 
 export const DEFAULT_CONTENT = {

@@ -58,7 +58,7 @@ export default function MobileApp() {
               <span className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-brand-emerald" /> Secure Messages</span>
             </div>
 
-            <StoreBadges size="lg" className="mt-9" testids={{ ios: "app-store-btn", android: "play-store-btn", icon: "mobile-app-icon" }} />
+            <StoreBadges size="lg" className="mt-9" testids={{ ios: "app-store-btn", android: "play-store-btn", icon: "mobile-app-icon", qr: "mobile-qr" }} />
           </Reveal>
 
           <div className="relative flex items-end justify-center gap-[-2rem]">

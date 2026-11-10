@@ -166,7 +166,7 @@ export default function Hero() {
           data-testid="hero-app-downloads"
         >
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-white/80">Download the app</p>
-          <StoreBadges size="lg" testids={{ ios: "hero-app-store-btn", android: "hero-play-store-btn", icon: "hero-app-icon" }} />
+          <StoreBadges size="lg" testids={{ ios: "hero-app-store-btn", android: "hero-play-store-btn", icon: "hero-app-icon", qr: "hero-qr" }} />
         </motion.div>
       </div>
     </section>

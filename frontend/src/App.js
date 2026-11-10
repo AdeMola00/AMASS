@@ -18,6 +18,7 @@ import Agents from "@/components/Agents";
 import ConstructionPros from "@/components/ConstructionPros";
 import HomeMarketplace from "@/components/HomeMarketplace";
 import MobileApp from "@/components/MobileApp";
+import Ecosystem from "@/components/Ecosystem";
 import Testimonials from "@/components/Testimonials";
 import FAQSection from "@/components/FAQSection";
 import FinalCTA from "@/components/FinalCTA";
@@ -41,6 +42,7 @@ function Landing() {
         {on("constructionPros") && <ConstructionPros />}
         {on("homeMarketplace") && <HomeMarketplace />}
         {on("mobileApp") && <MobileApp />}
+        {on("ecosystem") && <Ecosystem />}
         {on("testimonials") && <Testimonials />}
         {on("faq") && <FAQSection />}
         {on("finalCta") && <FinalCTA />}
